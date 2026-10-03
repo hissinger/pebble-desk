@@ -9,7 +9,8 @@ import android.widget.LinearLayout
  * 스크롤 없이 페이지 단위로 넘기는 목록. 주어진 높이에 들어가는 만큼만 줄을 그리고, 줄 사이에 가는 회색 선을 둔다.
  * 전자잉크라 넘길 때 애니메이션을 쓰지 않는다.
  */
-class PagedRows(context: Context, private val listRowPx: Int) : LinearLayout(context) {
+/** [fixedRows] 가 0보다 크면 높이에 맞추지 않고 늘 그 줄 수(격자면 그 높이 안에 gridRows 줄)를 쓴다. 높이는 WRAP 으로 둔다. */
+class PagedRows(context: Context, private val listRowPx: Int, private val fixedRows: Int = 0) : LinearLayout(context) {
     private var rows: List<() -> View> = emptyList()
     private val dividerPx = context.dp(1)
 
@@ -49,6 +50,7 @@ class PagedRows(context: Context, private val listRowPx: Int) : LinearLayout(con
 
     init {
         orientation = VERTICAL
+        if (fixedRows > 0) fitRows(0)
     }
 
     fun setRows(rows: List<() -> View>) {
@@ -86,7 +88,7 @@ class PagedRows(context: Context, private val listRowPx: Int) : LinearLayout(con
      * (다음 차례로 미루면 빈 목록을 한 번 그린 뒤 다시 그리게 되어 전자잉크가 깜빡인다.) 줄 수가 바뀌었으면 true.
      */
     private fun fitRows(h: Int): Boolean {
-        if (h <= 0) return false
+        if (h <= 0 && fixedRows == 0) return false
         // 머리 뷰를 실제 배치와 같은 조건(정해진 높이·좌우 여백)으로 잰다. 레이아웃 중에 다른 조건으로 재면
         // 그 값이 그대로 남아 선(높이 2dp)이 0 으로 그려진다.
         val headerPx = header.sumOf { v ->
@@ -102,7 +104,7 @@ class PagedRows(context: Context, private val listRowPx: Int) : LinearLayout(con
             v.measure(wSpec, hSpec)
             v.measuredHeight + (m?.topMargin ?: 0) + (m?.bottomMargin ?: 0)
         }
-        val listFit = maxOf(1, (h - headerPx + dividerPx) / (listRowPx + dividerPx))
+        val listFit = if (fixedRows > 0) fixedRows else maxOf(1, (h - headerPx + dividerPx) / (listRowPx + dividerPx))
         val fit: Int
         val rowPx: Int
         if (gridRows > 0) {
@@ -149,7 +151,7 @@ class PagedRows(context: Context, private val listRowPx: Int) : LinearLayout(con
         }
         // 덜 찬 페이지도 같은 높이를 쓴다(아래를 비워 제목·선 위치가 움직이지 않게).
         // 목록은 페이지가 여러 개일 때만, 격자는 늘(목록과 같은 높이를 유지).
-        val missing = if (pageCount > 1 || gridRows > 0) perPage - (to - from) else 0
+        val missing = if (pageCount > 1 || gridRows > 0 || fixedRows > 0) perPage - (to - from) else 0
         val gap = if (gridRows > 0) 0 else dividerPx
         if (missing > 0) addView(View(context), lp(MATCH, missing * (rowHeightPx + gap)))
         onPageChanged?.invoke()

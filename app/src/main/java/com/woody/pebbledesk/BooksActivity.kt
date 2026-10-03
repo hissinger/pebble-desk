@@ -31,7 +31,7 @@ class BooksActivity : EinkActivity() {
             addView(titleCount, lp(WRAP, WRAP).apply { marginStart = dp(14); topMargin = dp(6) })
         })
         root.addView(hline(2))
-        hint = text(getString(R.string.books_order_hint), 15f, color = Ui.GRAY).apply {
+        hint = text(getString(R.string.books_order_hint), 15f, color = Ui.GRAY, lines = 2).apply {
             setPadding(dp(Ui.MARGIN), dp(12), dp(Ui.MARGIN), dp(4))
         }
         root.addView(hint)

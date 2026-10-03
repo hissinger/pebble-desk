@@ -17,7 +17,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // 쓰지 않는 코드·리소스를 빼서 APK 를 줄이고 로딩을 빠르게 한다.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // 개인 기기 사이드로딩용이라 디버그 키로 서명한다.
             signingConfig = signingConfigs.getByName("debug")
         }

@@ -68,22 +68,14 @@ abstract class EinkActivity : Activity() {
         @Suppress("DEPRECATION") overridePendingTransition(0, 0)
     }
 
-    /** 앱 길게 누르기 메뉴(④) / 읽고 있는 앱 길게 누르기 메뉴(⑤). 무엇이 바뀌면 [changed] 를 부른다. */
+    /** 앱 길게 누르기 메뉴(④). 무엇이 바뀌면 [changed] 를 부른다. */
     protected fun showAppMenu(app: AppEntry, changed: () -> Unit) {
-        val count = prefs.openCount(app.key)
-        val isDefault = prefs.readingApp == app.key
-        val sheet = Sheet(this)
-        if (isDefault) {
-            sheet.header(app.label, resources.getQuantityString(R.plurals.main_opened_times, count, count), app)
-                .item(getString(R.string.change_main)) { startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER)) }
-                .item(getString(R.string.clear_main)) { changeMainApp(this, prefs, null); changed() }
-        } else {
-            val fav = app.key in prefs.favorites
-            sheet.header(app.label, resources.getQuantityString(R.plurals.opened_times, count, count), app)
-                .item(getString(R.string.set_main)) { changeMainApp(this, prefs, app.key); changed() }
-                .item(getString(if (fav) R.string.fav_remove else R.string.fav_add)) { prefs.toggleFavorite(app.key); changed() }
-                .item(getString(R.string.hide)) { prefs.hide(app.key); changed() }
-        }
-        sheet.item(getString(R.string.app_info)) { AppStore.openAppInfo(this, app) }.show()
+        // 읽고 있는 앱은 책에 딸린 설정이라 책 메뉴·책 목록에서만 바꾼다.
+        val fav = app.key in prefs.favorites
+        Sheet(this).header(app.label, app = app)
+            .item(getString(if (fav) R.string.fav_remove else R.string.fav_add)) { prefs.toggleFavorite(app.key); changed() }
+            .item(getString(R.string.hide)) { prefs.hide(app.key); changed() }
+            .item(getString(R.string.app_info)) { AppStore.openAppInfo(this, app) }
+            .show()
     }
 }

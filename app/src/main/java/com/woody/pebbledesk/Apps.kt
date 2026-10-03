@@ -9,6 +9,9 @@ import android.graphics.Canvas
 import android.net.Uri
 import android.provider.Settings
 import android.util.LruCache
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 import java.text.Collator
 import java.util.Locale
 
@@ -20,7 +23,7 @@ data class AppEntry(val component: ComponentName, val label: String) {
 
 object AppStore {
     /** 이름 순서: 영문 → 한글 (ICU 기본 순서는 라틴 문자가 한글보다 앞) */
-    val collator: Collator = Collator.getInstance(Locale.ROOT)
+    val collator: Collator by lazy { Collator.getInstance(Locale.ROOT) }
 
     /** 이북 앱(읽고 있는 앱 고르기에서 먼저 보여 줄 앱) */
     private val EBOOK_PACKAGES = setOf(
@@ -31,21 +34,45 @@ object AppStore {
 
     /** 설치된 앱 전체(이 런처 자신 제외)를 이름 순으로 */
     private var cachedApps: List<AppEntry>? = null
-    private var cachedLocale: java.util.Locale? = null
+    private var cachedLocale: Locale? = null
     private var packageSequence = 0
 
     /**
-     * 설치된 앱 전체. 앱 조회와 이름 읽기가 비싸서(20~30ms) 앱이 설치·삭제·업데이트됐거나
-     * 언어가 바뀌었을 때만 다시 읽고, 그 밖에는 지난번 목록을 쓴다.
+     * 설치된 앱 전체. 앱 조회와 이름 읽기가 비싸서(돌아올 때 20~30ms, 런처가 새로 뜰 때 300ms) 앱이
+     * 설치·삭제·업데이트됐거나 언어가 바뀌었을 때만 다시 읽고, 그 밖에는 지난번 목록을 쓴다.
+     * 런처가 새로 떠도 재부팅 전이면 파일에 저장해 둔 목록을 쓴다(앱 변경 순번은 부팅마다 새로 매겨진다).
      */
     fun load(context: Context): List<AppEntry> {
         val pm = context.packageManager
         val locale = context.resources.configuration.locales[0]
+        if (cachedApps == null) readSaved(context, locale)
         val changed = pm.getChangedPackages(packageSequence)
         cachedApps?.let { if (changed == null && locale == cachedLocale) return it }
         changed?.let { packageSequence = it.sequenceNumber }
         cachedLocale = locale
-        return queryApps(context).also { cachedApps = it }
+        return queryApps(context).also { cachedApps = it; save(context, it, locale) }
+    }
+
+    private fun savedFile(context: Context) = File(context.filesDir, "apps.json")
+    private fun bootCount(context: Context) =
+        Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1)
+
+    private fun readSaved(context: Context, locale: Locale) {
+        val json = runCatching { JSONObject(savedFile(context).readText()) }.getOrNull() ?: return
+        if (json.optInt("boot", -2) != bootCount(context) || json.optString("locale") != locale.toLanguageTag()) return
+        val arr = json.getJSONArray("apps")
+        cachedApps = (0 until arr.length()).map { arr.getJSONArray(it) }
+            .map { AppEntry(ComponentName(it.getString(0), it.getString(1)), it.getString(2)) }
+        cachedLocale = locale
+        packageSequence = json.optInt("seq")
+    }
+
+    private fun save(context: Context, apps: List<AppEntry>, locale: Locale) {
+        val arr = JSONArray()
+        apps.forEach { arr.put(JSONArray().put(it.component.packageName).put(it.component.className).put(it.label)) }
+        val json = JSONObject().put("boot", bootCount(context)).put("seq", packageSequence)
+            .put("locale", locale.toLanguageTag()).put("apps", arr)
+        runCatching { savedFile(context).writeText(json.toString()) }
     }
 
     private fun queryApps(context: Context): List<AppEntry> {
@@ -92,8 +119,7 @@ object AppStore {
         return EBOOK_WORDS.any { it in l }
     }
 
-    /** 앱을 열고 연 횟수를 센다. */
-    fun launch(context: Context, app: AppEntry, prefs: HomePrefs) {
+    fun launch(context: Context, app: AppEntry) {
         val intent = Intent(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_LAUNCHER)
             .setComponent(app.component)
@@ -101,7 +127,6 @@ object AppStore {
         try {
             // 전자잉크라 화면 전환 애니메이션을 쓰지 않는다.
             context.startActivity(intent, ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle())
-            prefs.countOpen(app.key)
         } catch (_: Exception) {
             // 지워졌거나 열 수 없는 앱. 다음에 홈으로 돌아올 때 목록에서 빠진다.
         }

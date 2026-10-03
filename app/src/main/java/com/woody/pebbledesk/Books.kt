@@ -140,7 +140,14 @@ object BookShelf {
     fun cover(context: Context, book: ShelfBook, widthPx: Int): Bitmap? {
         val key = "${book.id}@$widthPx@${book.updatedAt}"
         covers.get(key)?.let { return it }
-        val bmp = runCatching { BookSearch.grayCover(coverFile(context, book.id).readBytes(), widthPx) }.getOrNull() ?: return null
+        // 원본(큰 JPEG)을 매번 줄이지 않도록, 화면 폭으로 줄인 흑백 표지를 파일로 둔다. 원본이 바뀌면 다시 만든다.
+        val original = coverFile(context, book.id)
+        val thumb = File(dir(context), "${book.id}_$widthPx.png")
+        val bmp = thumb.takeIf { it.lastModified() >= original.lastModified() }?.let { BitmapFactory.decodeFile(it.path) }
+            ?: runCatching { BookSearch.grayCover(original.readBytes(), widthPx) }.getOrNull()?.also { made ->
+                runCatching { thumb.outputStream().use { made.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+            }
+            ?: return null
         covers.put(key, bmp)
         return bmp
     }
@@ -191,8 +198,11 @@ object BookShelf {
         write(context, list(context).map { if (it.id == id) it.copy(app = app) else it })
 
     fun remove(context: Context, id: String) {
-        write(context, list(context).filter { it.id != id })
-        coverFile(context, id).delete()
+        val rest = list(context).filter { it.id != id }
+        write(context, rest)
+        // 마지막 책을 빼면 그 책에 딸려 있던 읽고 있는 앱도 비운다(책이 없을 때의 큰 앱 자리에 남지 않게).
+        if (rest.isEmpty()) HomePrefs(context).readingApp = null
+        dir(context).listFiles { f -> f.name.startsWith("${id}_") }?.forEach { it.delete() }
     }
 
     private fun write(context: Context, books: List<ShelfBook>) {
@@ -229,12 +239,6 @@ object BookShelf {
             throw IOException("cannot write ${target.name}")
         }
     }
-}
-
-/** 읽고 있는 앱 바꾸기. 책이 있으면 맨 앞 책의 앱을, 없으면 홈의 읽고 있는 앱을 바꾼다. 자주 쓰는 앱과는 상관없다. */
-fun changeMainApp(context: Context, prefs: HomePrefs, key: String?) {
-    BookShelf.list(context).firstOrNull()?.let { BookShelf.setApp(context, it.id, key) }
-    prefs.readingApp = key
 }
 
 /** 특정 책의 앱 바꾸기. 맨 앞 책이면 읽고 있는 앱도 같이 바꾼다. */

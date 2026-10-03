@@ -3,10 +3,9 @@ package com.woody.pebbledesk
 import android.content.Context
 import org.json.JSONArray
 
-/** 런처 설정과 앱 목록 상태(읽고 있는 앱·자주 쓰는 앱·숨긴 앱·연 횟수) */
+/** 런처 설정과 앱 목록 상태(읽고 있는 앱·자주 쓰는 앱·숨긴 앱) */
 class HomePrefs(context: Context) {
     private val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-    private val counts = context.getSharedPreferences("open_counts", Context.MODE_PRIVATE)
 
     /** 읽고 있는 앱(홈에 크게 보이는 앱). 저장 키는 예전 이름(default_app)을 그대로 쓴다. */
     var readingApp: String?
@@ -15,14 +14,14 @@ class HomePrefs(context: Context) {
 
     /**
      * 자주 쓰는 앱(직접 정한 순서). 예전에는 순서 없는 묶음(favorites)으로 저장했으므로,
-     * 아직 목록이 없으면 그 묶음을 많이 연 순으로 늘어놓아 시작한다.
+     * 아직 목록이 없으면 그 묶음을 늘어놓아 시작한다.
      */
     var favoriteList: List<String>
         get() {
             sp.getString("favorite_list", null)?.let { json ->
                 return runCatching { JSONArray(json).let { a -> (0 until a.length()).map { a.getString(it) } } }.getOrDefault(emptyList())
             }
-            return sp.getStringSet("favorites", emptySet())!!.sortedWith(compareByDescending<String> { openCount(it) }.thenBy { it })
+            return sp.getStringSet("favorites", emptySet())!!.sorted()
         }
         set(v) = sp.edit().putString("favorite_list", JSONArray(v.distinct()).toString()).remove("favorites").apply()
 
@@ -66,12 +65,6 @@ class HomePrefs(context: Context) {
     var showIcons: Boolean
         get() = sp.getBoolean("show_icons", true)
         set(v) = sp.edit().putBoolean("show_icons", v).apply()
-
-    fun openCount(key: String) = counts.getInt(key, 0)
-
-    fun countOpen(key: String) = counts.edit().putInt(key, openCount(key) + 1).apply()
-
-    fun resetCounts() = counts.edit().clear().apply()
 
     fun toggleFavorite(key: String) {
         favorites = if (key in favorites) favorites - key else favorites + key

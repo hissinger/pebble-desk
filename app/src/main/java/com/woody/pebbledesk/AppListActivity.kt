@@ -18,7 +18,7 @@ class AppListActivity : EinkActivity() {
     private val picking get() = mode == Mode.PICK_READER
 
     private lateinit var mode: Mode
-    /** PICK_READER 에서 이 책의 앱을 고른다. null 이면 읽고 있는 앱(맨 앞 책 또는 책이 없을 때 홈의 앱). */
+    /** PICK_READER 에서 이 책의 앱을 고른다. null 이면 맨 앞 책. */
     private var bookId: String? = null
     private lateinit var titleCount: TextView
     private lateinit var rows: PagedRows
@@ -63,8 +63,7 @@ class AppListActivity : EinkActivity() {
         root.addView(hline(2))
         if (picking) {
             // 책이 있으면 그 책을 읽는 앱, 없으면 홈에 크게 보일 앱
-            val desc = if (bookId != null || BookShelf.list(this).isNotEmpty()) R.string.pick_reader_desc else R.string.pick_main_desc
-            root.addView(text(getString(desc), 17f, color = Ui.GRAY, lines = 2).apply {
+            root.addView(text(getString(R.string.pick_reader_desc), 17f, color = Ui.GRAY, lines = 2).apply {
                 setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), dp(4))
             })
         }
@@ -125,7 +124,10 @@ class AppListActivity : EinkActivity() {
         val hidden = prefs.hidden
         val favs = prefs.favorites
         // 고르는 중이면 그 책의 앱(아직 없으면 지금 읽고 있는 앱을 먼저 짚어 둔다)
-        val default = bookId?.let { id -> BookShelf.list(this).find { it.id == id }?.app } ?: prefs.readingApp
+        val books = BookShelf.list(this)
+        val default = (bookId?.let { id -> books.find { it.id == id } } ?: books.firstOrNull())?.app
+        // 모든 앱에서 '읽는 중' 표시: 책에 연결된 앱 전부
+        val readingApps = books.mapNotNull { it.app }.toSet()
         val icons = prefs.showIcons
 
         shown = when (mode) {
@@ -151,12 +153,12 @@ class AppListActivity : EinkActivity() {
                 when (mode) {
                     Mode.ALL -> {
                         val mark = when {
-                            app.key == default -> text(getString(R.string.mark_main), 17f)
+                            app.key in readingApps -> text(getString(R.string.mark_main), 17f)
                             app.key in favs -> text("★", 18f)
                             else -> null
                         }
                         appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = icons, right = mark).apply {
-                            setOnClickListener { AppStore.launch(this@AppListActivity, app, prefs) }
+                            setOnClickListener { AppStore.launch(this@AppListActivity, app) }
                             setOnLongClickListener { showAppMenu(app) { refresh() }; true }
                         }
                     }
@@ -168,9 +170,8 @@ class AppListActivity : EinkActivity() {
                         appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, if (current) Ui.heavy else Ui.regular,
                             showIcon = icons, right = if (current) text("✓", 24f, Ui.bold) else null).apply {
                             setOnClickListener {
-                                val id = bookId
+                                val id = bookId ?: BookShelf.list(this@AppListActivity).firstOrNull()?.id
                                 if (id != null) changeBookApp(this@AppListActivity, prefs, id, app.key)
-                                else changeMainApp(this@AppListActivity, prefs, app.key)
                                 finish()
                             }
                         }

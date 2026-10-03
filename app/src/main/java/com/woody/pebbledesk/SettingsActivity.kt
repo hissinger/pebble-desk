@@ -54,7 +54,7 @@ class SettingsActivity : EinkActivity() {
                 prefs.favGrid = it == 1; render()
             }
         }
-        toggle(getString(R.string.app_icons), prefs.showIcons) { prefs.showIcons = it }
+        toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint)) { prefs.showIcons = it }
         val clocks = listOf(getString(R.string.clock24), getString(R.string.clock12))
         row(getString(R.string.clock), clocks[if (prefs.clock24h) 0 else 1], next = true) {
             choose(getString(R.string.clock), clocks, if (prefs.clock24h) 0 else 1) {
@@ -75,11 +75,6 @@ class SettingsActivity : EinkActivity() {
         section(getString(R.string.section_apps))
         row(getString(R.string.hidden_apps), prefs.hidden.size.toString(), next = true) {
             startActivity(AppListActivity.intent(this, AppListActivity.Mode.HIDDEN))
-        }
-        row(getString(R.string.reset_counts), null) {
-            Sheet(this).header(getString(R.string.reset_counts), getString(R.string.reset_counts_desc))
-                .item(getString(R.string.reset), bold = true) { prefs.resetCounts() }
-                .show()
         }
         row(getString(R.string.set_default_home), null, next = true) { openHomeSettings() }
         row(getString(R.string.device_settings), null, next = true, last = true) {

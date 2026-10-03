@@ -8,17 +8,12 @@
     <string name="all_apps_link">모든 앱  ›</string>
     <string name="settings">설정</string>
     <string name="favorites_empty">모든 앱에서 앱을 길게 눌러 자주 쓰는 앱에 넣으세요</string>
-    <string name="tap_to_read">눌러서 읽기</string>
-    <string name="change_main">읽고 있는 앱 바꾸기</string>
-    <string name="clear_main">읽고 있는 앱 해제</string>
-    <string name="set_main">읽고 있는 앱으로 설정</string>
     <string name="fav_remove">자주 쓰는 앱에서 빼기</string>
     <string name="fav_add">자주 쓰는 앱에 넣기</string>
     <string name="hide">숨기기</string>
     <string name="app_info">앱 정보</string>
     <string name="close">닫기</string>
     <string name="hidden_apps">숨긴 앱</string>
-    <string name="pick_main_desc">홈에 크게 보일 앱을 고르세요. 독서 앱부터 보여 줍니다.</string>
     <string name="hidden_empty">숨긴 앱이 없습니다</string>
     <string name="hidden_empty_desc">모든 앱에서 앱을 길게 눌러 숨길 수 있습니다.\n숨긴 앱은 홈과 모든 앱에 나오지 않습니다.</string>
     <string name="hidden_count_link">숨긴 앱 %1$d  ›</string>
@@ -33,14 +28,11 @@
     <string name="clock24">24시간</string>
     <string name="clock12">12시간</string>
     <string name="section_apps">앱 관리</string>
-    <string name="reset_counts">연 횟수 초기화</string>
-    <string name="reset_counts_desc">모든 앱의 연 횟수를 0으로 되돌립니다</string>
-    <string name="reset">초기화</string>
     <string name="set_default_home">기본 홈 앱으로 설정</string>
     <string name="device_settings">기기 설정 열기</string>
     <string name="on">켜짐</string>
     <string name="off">꺼짐</string>
-    <string name="book_search_title">책 찾기</string>
+    <string name="book_search_title">책 추가</string>
     <string name="book_query_hint">책 제목</string>
     <string name="search">검색</string>
     <string name="book_search_idle">제목을 입력하고 검색하세요. 표지를 고르면 읽고 있는 앱을 정합니다.</string>
@@ -53,13 +45,10 @@
     <string name="pick_reader_title">읽고 있는 앱 고르기</string>
     <string name="pick_reader_desc">이 책을 읽고 있는 앱을 고르세요. 홈에서 표지를 누르면 이 앱이 열립니다.</string>
     <string name="pick_reader_link">읽고 있는 앱 고르기  ›</string>
-    <string name="set_book_link">읽는 책 정하기  ›</string>
-    <string name="set_book_hint">책 표지를 찾고 읽고 있는 앱을 고르면 여기에 크게 보입니다</string>
     <string name="change_reader">읽고 있는 앱 바꾸기</string>
     <string name="reading_in">%1$s에서 읽는 중</string>
     <string name="no_network">인터넷에 연결할 수 없습니다. 와이파이를 확인하세요.</string>
     <string name="also_reading">함께 읽는 책</string>
-    <string name="add_book">책 추가</string>
     <string name="remove_book">책 빼기</string>
     <string name="books_more">%1$s 외 %2$d권</string>
     <string name="books_empty">읽고 있는 책이 없습니다</string>
@@ -68,7 +57,7 @@
     <string name="books_count">%1$d / %2$d권</string>
     <string name="remove">빼기</string>
     <string name="books_full">%1$d권까지 넣을 수 있습니다. 읽고 있는 책 목록에서 한 권을 빼 주세요.</string>
-    <string name="books_order_hint">맨 위 책이 홈에 크게 보입니다. ↑ ↓ 로 순서를 바꿉니다.</string>
+    <string name="books_order_hint">맨 위 책이 홈에 크게 보입니다. ↑ ↓ 로 순서를 바꾸고, 줄을 누르면 읽고 있는 앱을 바꿉니다.</string>
     <string name="favorites_none">자주 쓰는 앱이 없습니다</string>
     <string name="add_app_link">앱 추가  ›</string>
     <string name="add_app">앱 추가</string>
@@ -76,10 +65,5 @@
     <string name="fav_view">자주 쓰는 앱 보기</string>
     <string name="fav_view_list">목록</string>
     <string name="fav_view_grid">격자</string>
-    <plurals name="opened_times">
-        <item quantity="other">%1$d번 열었음</item>
-    </plurals>
-    <plurals name="main_opened_times">
-        <item quantity="other">읽고 있는 앱 · %1$d번 열었음</item>
-    </plurals>
+    <string name="app_icons_hint">목록 보기에서</string>
 </resources>

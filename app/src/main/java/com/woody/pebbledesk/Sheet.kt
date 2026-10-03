@@ -2,6 +2,7 @@ package com.woody.pebbledesk
 
 import android.app.Dialog
 import android.content.Context
+import android.graphics.Bitmap
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -14,12 +15,14 @@ class Sheet(private val context: Context) {
     private class Item(val label: String, val bold: Boolean, val action: () -> Unit)
 
     private var app: AppEntry? = null
+    /** 앱 아이콘 대신 보여 줄 그림(책 표지). 세로로 긴 비율로 그린다. */
+    private var image: Bitmap? = null
     private var title: String = ""
     private var subtitle: String? = null
     private val items = mutableListOf<Item>()
 
-    fun header(title: String, subtitle: String? = null, app: AppEntry? = null) = apply {
-        this.title = title; this.subtitle = subtitle; this.app = app
+    fun header(title: String, subtitle: String? = null, app: AppEntry? = null, image: Bitmap? = null) = apply {
+        this.title = title; this.subtitle = subtitle; this.app = app; this.image = image
     }
 
     fun item(label: String, bold: Boolean = false, action: () -> Unit) = apply { items += Item(label, bold, action) }
@@ -34,6 +37,14 @@ class Sheet(private val context: Context) {
         app?.let {
             head.addView(ImageView(c).apply { setImageBitmap(AppIcons.gray(c, it, c.dp(45))) },
                 lp(c.dp(45), c.dp(45)).apply { marginEnd = c.dp(16) })
+        }
+        image?.let {
+            head.addView(ImageView(c).apply {
+                setImageBitmap(it)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setBackgroundColor(Ui.BLACK)
+                setPadding(c.dp(1), c.dp(1), c.dp(1), c.dp(1))
+            }, lp(c.dp(38), c.dp(56)).apply { marginEnd = c.dp(16) })
         }
         val names = c.vbox()
         names.addView(c.text(title, 29f, Ui.heavy))
