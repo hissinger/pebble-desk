@@ -12,6 +12,14 @@ object Crema {
 
     val isCrema: Boolean get() = Build.DEVICE.startsWith("CREMA", ignoreCase = true)
 
+    /** 페블 패널은 1456px 이지만 맨 아래 8px 쯤은 테두리에 가려 보이지 않는다(같은 6인치 패널의 보통 높이는 1448px). */
+    private const val HIDDEN_BOTTOM_PX = 8
+
+    /** 화면 맨 아래에 붙는 [view] 의 아래를 가려지는 줄만큼 비워, 하단 줄이 보이는 영역의 가운데에 오게 한다. */
+    fun reserveHiddenBottom(view: android.view.View) {
+        if (isCrema) view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, view.paddingBottom + HIDDEN_BOTTOM_PX)
+    }
+
     /**
      * 크레마 런처의 `crema Pebble` 글자 로고. 상표 이미지를 이 앱에 넣지 않으려고 기기에 설치된 크레마 런처에서 불러온다.
      * 없으면 null (로고 자리를 비운다).

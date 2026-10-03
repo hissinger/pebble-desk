@@ -26,7 +26,7 @@ object AppStore {
     val collator: Collator by lazy { Collator.getInstance(Locale.ROOT) }
 
     /** 이북 앱(읽고 있는 앱 고르기에서 먼저 보여 줄 앱) */
-    private val EBOOK_PACKAGES = setOf(
+    val EBOOK_PACKAGES = setOf(
         "com.initialcoms.ridi", "kr.co.millie.eink", "kr.co.aladin.ebook", "com.yes24.ebook.einkstore",
         "com.kyobo.ebook.eink", "com.bookers.ebook", "com.yes24.library.eink", "kr.co.kyobobook.KEL",
     )

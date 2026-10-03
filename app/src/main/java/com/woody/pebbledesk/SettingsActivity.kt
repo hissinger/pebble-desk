@@ -55,6 +55,29 @@ class SettingsActivity : EinkActivity() {
             }
         }
         toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint)) { prefs.showIcons = it }
+        // 켜 두었는데 권한이 없으면 값 자리에 '권한 허용'을 두고, 누르면 시스템 화면으로 보낸다.
+        val access = ReadingLog.hasAccess(this)
+        val needAccess = prefs.readingTime && !access
+        row(
+            getString(R.string.reading_time),
+            getString(if (needAccess) R.string.allow_access else if (prefs.readingTime) R.string.on else R.string.off),
+            on = prefs.readingTime, next = needAccess, hint = getString(R.string.reading_time_hint),
+        ) {
+            when {
+                needAccess -> ReadingLog.openAccessSettings(this)
+                prefs.readingTime -> { prefs.readingTime = false; render() }
+                else -> { prefs.readingTime = true; if (!access) ReadingLog.openAccessSettings(this) else render() }
+            }
+        }
+        if (prefs.readingTime) {
+            val goals = listOf(0, 15, 20, 30, 45, 60)
+            val goalText = { m: Int -> if (m == 0) getString(R.string.none) else getString(R.string.dur_m, m) }
+            row(getString(R.string.daily_goal), goalText(prefs.readingGoalMin), next = true) {
+                choose(getString(R.string.daily_goal), goals.map(goalText), goals.indexOf(prefs.readingGoalMin).coerceAtLeast(0)) {
+                    prefs.readingGoalMin = goals[it]; render()
+                }
+            }
+        }
         val clocks = listOf(getString(R.string.clock24), getString(R.string.clock12))
         row(getString(R.string.clock), clocks[if (prefs.clock24h) 0 else 1], next = true) {
             choose(getString(R.string.clock), clocks, if (prefs.clock24h) 0 else 1) {

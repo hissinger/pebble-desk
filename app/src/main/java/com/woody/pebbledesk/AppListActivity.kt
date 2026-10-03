@@ -102,7 +102,7 @@ class AppListActivity : EinkActivity() {
             setOnClickListener { rows.next() }
         }
         footer.addView(pageText, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.END))
-        root.addView(footer, lp(MATCH, dp(72)))
+        root.addView(footer, lp(MATCH, dp(Ui.FOOTER_DP)))
 
         when (mode) {
             Mode.ALL -> {

@@ -26,6 +26,9 @@ object Ui {
     /** 좌우 여백 */
     const val MARGIN = 40
 
+    /** 화면 맨 아래 줄(모든 앱 · 설정 · 페이지 점 등) 높이. 누르는 자리라 48dp 아래로 줄이지 않는다. */
+    const val FOOTER_DP = 56
+
     /** 목록 한 줄 규격(홈·모든 앱·고르기·숨긴 앱 공통): 줄 높이 dp, 아이콘 dp, 글자 sp */
     const val ROW_DP = 62
     const val ROW_ICON_DP = 27
@@ -94,11 +97,11 @@ fun Context.orderArrow(symbol: String, enabled: Boolean, onClick: () -> Unit): T
         if (enabled) setOnClickListener { onClick() }
     }
 
-/** 책 표지: 가운데를 채워 자르고 1dp 검은 테두리 */
+/** 책 표지: 가운데를 채워 자르고 1dp 회색 테두리(흰 표지 윗변이 구분선처럼 보이지 않게) */
 fun Context.coverImage(bitmap: Bitmap?): ImageView = ImageView(this).apply {
     bitmap?.let { setImageBitmap(it) }
     scaleType = ImageView.ScaleType.CENTER_CROP
-    setBackgroundColor(Ui.BLACK)
+    setBackgroundColor(Ui.LIGHT_GRAY)
     setPadding(dp(1), dp(1), dp(1), dp(1))
 }
 

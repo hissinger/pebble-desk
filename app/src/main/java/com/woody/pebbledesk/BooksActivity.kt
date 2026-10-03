@@ -58,7 +58,7 @@ class BooksActivity : EinkActivity() {
             setPadding(dp(24), 0, dp(Ui.MARGIN), 0)
         }
         footer.addView(countText, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.END))
-        root.addView(footer, lp(MATCH, dp(72)))
+        root.addView(footer, lp(MATCH, dp(Ui.FOOTER_DP)))
         setContentView(root)
     }
 

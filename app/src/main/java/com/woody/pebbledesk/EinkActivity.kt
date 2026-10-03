@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import android.content.Intent
 import android.os.Bundle
 import android.view.MotionEvent
+import android.view.View
 import java.util.Locale
 import kotlin.math.abs
 
@@ -36,6 +37,11 @@ abstract class EinkActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (prefs.english != createdEnglish) recreate()
+    }
+
+    override fun setContentView(view: View) {
+        Crema.reserveHiddenBottom(view)
+        super.setContentView(view)
     }
 
     /** [toLeft] 가 true 면 왼쪽으로 민 것(다음 페이지). 처리했으면 true. */

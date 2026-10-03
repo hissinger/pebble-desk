@@ -22,6 +22,7 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 
 /** ① 홈: 맨 위 두 줄 · 지금 읽는 책과 읽고 있는 앱 · 자주 쓰는 앱 · 하단 줄 */
@@ -30,17 +31,24 @@ class HomeActivity : EinkActivity() {
     /** 읽고 있는 책 자리. 자주 쓰는 앱 높이가 고정이라 남는 높이를 모두 차지하고, 책이 한 권이면 표지가 그만큼 커진다. */
     private lateinit var hero: FrameLayout
     private var heroHeight = 0
-    private lateinit var favTitle: TextView
+    /** 자주 쓰는 앱 제목 줄: 왼쪽 제목, 오른쪽 끝에 페이지(여러 쪽일 때만) */
+    private lateinit var favHeader: LinearLayout
+    private lateinit var favPage: TextView
     private lateinit var favLine: View
     private lateinit var favRows: PagedRows
-    private lateinit var dots: TextView
+    /** 하단 가운데: 오늘 읽은 시간 · 연속 독서일(켜 두었고 권한이 있을 때만) */
+    private lateinit var readingText: TextView
 
     private var apps: List<AppEntry> = emptyList()
     /** 지난번에 그린 홈의 내용. 같으면 다시 만들지 않는다(빠른 설정을 닫거나 앱에서 돌아올 때 불필요한 전자잉크 갱신을 막는다). */
     private var shownState: List<Any?>? = null
 
     private val statusReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = updateStatus()
+        override fun onReceive(context: Context, intent: Intent) {
+            updateStatus()
+            // 날이 바뀌면 오늘 읽은 시간을 0 부터
+            if (intent.action == Intent.ACTION_DATE_CHANGED) updateReading()
+        }
     }
     private val lightObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) = updateStatus()
@@ -54,6 +62,8 @@ class HomeActivity : EinkActivity() {
         super.onResume()
         hideStatusBar()
         refresh()
+        // 읽은 시간은 다른 앱에서 돌아올 때만 바뀐다(레이아웃 때의 refresh 에서는 다시 세지 않는다).
+        updateReading()
     }
 
     /**
@@ -138,12 +148,19 @@ class HomeActivity : EinkActivity() {
         }
 
         // 자주 쓰는 앱: 책 수와 상관없이 늘 목록 세 줄(격자는 그 높이 안에 두 줄) 높이
-        favTitle = text(getString(R.string.favorites), 19f, Ui.bold).apply {
-            layoutParams = lp(MATCH, WRAP)
-            setPadding(dp(Ui.MARGIN), dp(18), dp(Ui.MARGIN), dp(12))
+        // 페이지 표시는 제목과 같은 글자·여백으로 오른쪽 끝에. 누르면 다음 쪽(마지막 쪽에서는 처음으로).
+        favPage = text("", 13f, Ui.bold, Ui.GRAY).apply {
+            setPadding(dp(24), dp(18), dp(Ui.MARGIN), dp(8))
+            setOnClickListener { favRows.next() }
         }
-        favLine = hline(2)
-        favRows = PagedRows(this, dp(Ui.ROW_DP), fixedRows = FAV_ROWS).apply { header = listOf(favTitle, favLine) }
+        favHeader = hbox().apply {
+            layoutParams = lp(MATCH, WRAP)
+            gravity = Gravity.TOP
+            addView(sectionTitle(getString(R.string.favorites), topDp = 18), lp(0, WRAP, 1f))
+            addView(favPage, lp(WRAP, WRAP))
+        }
+        favLine = hline(1)
+        favRows = PagedRows(this, dp(Ui.ROW_DP), fixedRows = FAV_ROWS).apply { header = listOf(favHeader, favLine) }
         root.addView(favRows, lp(MATCH, WRAP))
 
         root.addView(hline(1, inset = false))
@@ -153,19 +170,23 @@ class HomeActivity : EinkActivity() {
             setPadding(dp(Ui.MARGIN), 0, dp(32), 0)
             setOnClickListener { startActivity(AppListActivity.intent(this@HomeActivity, AppListActivity.Mode.ALL)) }
         }, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.START))
-        dots = text("", 15f).apply { gravity = Gravity.CENTER }
-        footer.addView(dots, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.CENTER))
+        readingText = text("", 15f, color = Ui.GRAY).apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(16), 0, dp(16), 0)
+            setOnClickListener { startActivity(ReadingActivity.intent(this@HomeActivity)) }
+        }
+        footer.addView(readingText, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.CENTER))
         footer.addView(ImageView(this).apply {
             setImageResource(R.drawable.ic_settings)
             contentDescription = getString(R.string.settings)
-            setPadding(dp(24), dp(22), dp(Ui.MARGIN), dp(22))
+            setPadding(dp(24), dp((Ui.FOOTER_DP - 28) / 2), dp(Ui.MARGIN), dp((Ui.FOOTER_DP - 28) / 2))
             setOnClickListener { startActivity(Intent(this@HomeActivity, SettingsActivity::class.java)) }
         }, FrameLayout.LayoutParams(dp(24 + 32 + Ui.MARGIN), MATCH, Gravity.END))
-        root.addView(footer, lp(MATCH, dp(72)))
+        root.addView(footer, lp(MATCH, dp(Ui.FOOTER_DP)))
 
         favRows.onPageChanged = {
             val n = favRows.pageCount
-            dots.text = if (n <= 1) "" else (0 until n).joinToString("  ") { if (it == favRows.page) "●" else "○" }
+            favPage.text = if (n <= 1) "" else "${favRows.page + 1} / $n   ›"
         }
         setContentView(root)
     }
@@ -213,25 +234,44 @@ class HomeActivity : EinkActivity() {
      * 격자에서는 '앱 아이콘' 설정과 상관없이 아이콘을 그린다.
      */
     private fun gridRow(line: List<AppEntry>): View = hbox().apply {
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(Ui.MARGIN - 8), 0, dp(Ui.MARGIN - 8), 0)
+        // 함께 읽는 책 줄과 같은 칸(좌우 여백 + 칸 사이 간격)으로 나누고, 칸마다 아이콘과 이름을 가운데에 맞춘다.
+        gravity = Gravity.TOP
+        setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), 0)
         val icon = (favRows.rowHeightPx - dp(GRID_LABEL_DP)).coerceIn(dp(32), dp(GRID_ICON_MAX_DP))
-        line.forEach { app ->
+        line.forEachIndexed { i, app ->
             addView(vbox().apply {
                 gravity = Gravity.CENTER_HORIZONTAL
                 addView(ImageView(context).apply {
                     setImageBitmap(AppIcons.gray(context, app, icon))
                 }, lp(icon, icon))
-                addView(text(app.label, 15f).apply { gravity = Gravity.CENTER }, lp(MATCH, WRAP).apply { topMargin = dp(6) })
+                addView(text(app.label, 13f, lines = 2).apply { gravity = Gravity.CENTER }, lp(MATCH, WRAP).apply { topMargin = dp(6) })
                 setOnClickListener { AppStore.launch(this@HomeActivity, app) }
                 setOnLongClickListener { showAppMenu(app) { refresh() }; true }
-            }, lp(0, WRAP, 1f))
+            }, lp(0, WRAP, 1f).apply { if (i > 0) marginStart = dp(GAP_DP) })
         }
         // 덜 찬 줄도 칸 폭이 같도록 빈 칸을 채운다.
-        repeat(GRID_COLUMNS - line.size) { addView(View(context), lp(0, 1, 1f)) }
+        repeat(GRID_COLUMNS - line.size) { addView(View(context), lp(0, 1, 1f).apply { marginStart = dp(GAP_DP) }) }
+    }
+
+    /** 구역 제목(함께 읽는 책 · 자주 쓰는 앱): 작은 회색 굵은 글자, 아래에 가는 선 */
+    private fun sectionTitle(title: String, topDp: Int) = text(title, 13f, Ui.bold, Ui.GRAY).apply {
+        layoutParams = lp(MATCH, WRAP)
+        setPadding(dp(Ui.MARGIN), dp(topDp), dp(Ui.MARGIN), dp(8))
     }
 
     private fun findApp(key: String): AppEntry? = apps.find { it.key == key }
+
+    /** 하단 가운데의 `오늘 42분 · 5일째`. 꺼 두었거나 사용 기록 권한이 없으면 비운다. */
+    private fun updateReading() {
+        // 어느 책인지는 알 수 없어 하루 합계만 센다.
+        val summary = if (prefs.readingTime) ReadingLog.summary(this, ReadingLog.readerPackages(this)) else null
+        val line = summary?.let {
+            val today = getString(R.string.reading_today, duration(it.todayMs))
+            // 연속일은 이틀째부터
+            if (it.streak >= 2) today + "  ·  " + getString(R.string.reading_streak, it.streak) else today
+        } ?: ""
+        if (readingText.text.toString() != line) readingText.text = line
+    }
 
     /** 그 책의 앱을 연다. 앱을 아직 안 정했거나 지워졌으면 고르러 간다. */
     private fun openBook(book: ShelfBook) {
@@ -242,37 +282,49 @@ class HomeActivity : EinkActivity() {
 
     /**
      * 읽고 있는 책 자리. 없으면 같은 모양의 스켈레톤, 한 권이면 남는 높이를 채우는 큰 표지,
-     * 여러 권이면 맨 앞 책(136dp) + 아래 '함께 읽는 책' 줄.
+     * 여러 권이면 남는 높이에 맞춘 맨 앞 책 + 아래 '함께 읽는 책' 줄.
      */
     private fun buildHero(books: List<ShelfBook>, reading: AppEntry?) {
         hero.removeAllViews()
         if (heroHeight <= 0) return
         val view: View = when (books.size) {
-            0 -> skeleton(bigCoverWidth())
-            1 -> mainBook(books.first(), reading, bigCoverWidth())
-            else -> vbox().apply {
-                addView(mainBook(books.first(), reading, dp(COVER_SMALLER_DP)))
-                addView(text(getString(R.string.also_reading), 15f, color = Ui.LIGHT_GRAY).apply {
-                    setPadding(dp(Ui.MARGIN), dp(28), dp(Ui.MARGIN), dp(8))
-                })
-                addView(hbox().apply {
-                    gravity = Gravity.TOP
-                    setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
-                    books.drop(1).forEachIndexed { i, book ->
-                        addView(smallBook(book), lp(0, WRAP, 1f).apply { if (i > 0) marginStart = dp(12) })
-                    }
-                    // 두 권·세 권일 때도 표지 폭이 같도록 빈 칸을 채운다.
-                    repeat(BookShelf.MAX - books.size) { addView(View(context), lp(0, 1, 1f).apply { marginStart = dp(12) }) }
-                })
+            0 -> skeleton(coverWidth())
+            1 -> mainBook(books.first(), reading, coverWidth())
+            else -> {
+                val also = vbox().apply {
+                    addView(sectionTitle(getString(R.string.also_reading), topDp = 28))
+                    addView(hline(1))
+                    addView(hbox().apply {
+                        gravity = Gravity.TOP
+                        setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), 0)
+                        books.drop(1).forEachIndexed { i, book ->
+                            addView(smallBook(book), lp(0, WRAP, 1f).apply { if (i > 0) marginStart = dp(GAP_DP) })
+                        }
+                        // 두 권·세 권일 때도 표지 폭이 같도록 빈 칸을 채운다.
+                        repeat(BookShelf.MAX - books.size) { addView(View(context), lp(0, 1, 1f).apply { marginStart = dp(GAP_DP) }) }
+                    })
+                }
+                // 함께 읽는 책 줄 높이를 먼저 재고, 남는 높이를 맨 앞 책 표지에 준다.
+                also.measure(
+                    View.MeasureSpec.makeMeasureSpec(hero.width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                )
+                vbox().apply {
+                    addView(mainBook(books.first(), reading, coverWidth(reserved = also.measuredHeight, min = COVER_SMALLER_DP)))
+                    addView(also)
+                }
             }
         }
         hero.addView(view, FrameLayout.LayoutParams(MATCH, WRAP))
     }
 
-    /** 책이 한 권(또는 없음)일 때 표지 폭: 자리 높이에서 위아래 여백을 뺀 만큼, 단 너무 커지지 않게 */
-    private fun bigCoverWidth(): Int {
-        val coverH = heroHeight - dp(HERO_PAD_TOP_DP) - dp(HERO_PAD_BOTTOM_DP)
-        return (coverH * 2 / 3).coerceIn(dp(COVER_DP), dp(COVER_MAX_DP))
+    /**
+     * 맨 앞 책 표지 폭: 책 자리 높이에서 위아래 여백과 그 아래에 놓일 높이([reserved], 함께 읽는 책 줄)를 뺀 만큼.
+     * 너무 작거나 커지지 않게 [min]dp ~ COVER_MAX_DP.
+     */
+    private fun coverWidth(reserved: Int = 0, min: Int = COVER_DP): Int {
+        val coverH = heroHeight - dp(HERO_PAD_TOP_DP) - dp(HERO_PAD_BOTTOM_DP) - reserved
+        return (coverH * 2 / 3).coerceIn(dp(min), dp(COVER_MAX_DP))
     }
 
     /** 책이 없을 때: 표지 자리에 `+` 상자, 제목·저자·앱 자리에 회색 막대. 누르면 책 추가. */
@@ -289,8 +341,7 @@ class HomeActivity : EinkActivity() {
         }
         info.addView(bar(0.7f, 26), lp(MATCH, WRAP).apply { topMargin = dp(14) })
         info.addView(bar(0.45f, 14), lp(MATCH, WRAP).apply { topMargin = dp(14) })
-        info.addView(View(context), lp(MATCH, 0, 1f))
-        info.addView(bar(0.45f, 22), lp(MATCH, WRAP).apply { bottomMargin = dp(32) })
+        info.addView(bar(0.4f, 18), lp(MATCH, WRAP).apply { topMargin = dp(30) })
         addView(info, lp(0, coverH + dp(2), 1f).apply { marginStart = dp(24) })
         setOnClickListener { startActivity(BookSearchActivity.intent(this@HomeActivity)) }
     }
@@ -331,18 +382,17 @@ class HomeActivity : EinkActivity() {
         val info = vbox()
         info.addView(text(book.title, 34f, Ui.heavy, lines = 2), lp(MATCH, WRAP).apply { topMargin = dp(10) })
         if (book.author.isNotBlank()) {
-            info.addView(text(book.author, 18f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(10) })
+            info.addView(text(book.author, 16f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(10) })
         }
-        info.addView(View(context), lp(MATCH, 0, 1f))
         info.addView(
             if (reading != null) hbox().apply {
                 if (prefs.showIcons) addView(ImageView(context).apply {
-                    setImageBitmap(AppIcons.gray(context, reading, dp(34)))
-                }, lp(dp(34), dp(34)).apply { marginEnd = dp(12) })
-                addView(text("${reading.label}  ›", 28f, Ui.heavy))
-            } else text(getString(R.string.pick_reader_link), 24f, Ui.bold, Ui.LIGHT_GRAY),
-            // 표지 아랫선보다 조금 올려 제목·저자와 한 덩어리로 보이게 한다.
-            lp(WRAP, WRAP).apply { bottomMargin = dp(28) }
+                    setImageBitmap(AppIcons.gray(context, reading, dp(26)))
+                }, lp(dp(26), dp(26)).apply { marginEnd = dp(10) })
+                addView(text("${reading.label}  ›", 20f, Ui.bold))
+            } else text(getString(R.string.pick_reader_link), 20f, Ui.bold, Ui.LIGHT_GRAY),
+            // 제목·저자 바로 아래에 붙여 한 덩어리로 읽히게 한다.
+            lp(WRAP, WRAP).apply { topMargin = dp(26) }
         )
         addView(info, lp(0, coverH + dp(2), 1f).apply { marginStart = dp(24) })
         setOnClickListener { openBook(book) }
@@ -385,7 +435,7 @@ class HomeActivity : EinkActivity() {
     companion object {
         /** 자주 쓰는 앱 고정 줄 수 */
         private const val FAV_ROWS = 3
-        /** 책이 한 권이면 남는 높이에 맞춰 COVER_DP~COVER_MAX_DP, 여러 권이면 COVER_SMALLER_DP */
+        /** 맨 앞 책 표지는 남는 높이에 맞춰 COVER_DP~COVER_MAX_DP(여러 권이면 COVER_SMALLER_DP 부터) */
         private const val COVER_DP = 160
         private const val COVER_MAX_DP = 230
         private const val COVER_SMALLER_DP = 136
@@ -396,6 +446,8 @@ class HomeActivity : EinkActivity() {
 
         /** 자주 쓰는 앱 격자: 4칸 × 2줄(목록과 같은 높이 안에), 아이콘 최대 크기, 아이콘 밖에 필요한 높이(이름·여백) */
         private const val GRID_COLUMNS = 4
+        /** 함께 읽는 책·격자 칸 사이 간격(두 줄의 칸을 맞춘다) */
+        private const val GAP_DP = 12
         private const val GRID_ROWS = 2
         private const val GRID_ICON_MAX_DP = 56
         private const val GRID_LABEL_DP = 46

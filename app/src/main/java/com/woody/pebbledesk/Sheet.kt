@@ -31,6 +31,7 @@ class Sheet(private val context: Context) {
         val dialog = Dialog(context, R.style.Sheet)
         val c = context
         val root = c.vbox()
+        Crema.reserveHiddenBottom(root)
         root.addView(c.hline(2, inset = false))
 
         val head = c.hbox().apply { setPadding(c.dp(Ui.MARGIN), c.dp(22), c.dp(Ui.MARGIN), c.dp(20)) }

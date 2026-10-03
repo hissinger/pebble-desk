@@ -87,7 +87,7 @@ class BookSearchActivity : EinkActivity() {
             setOnClickListener { rows.next() }
         }
         footer.addView(pageText, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.END))
-        root.addView(footer, lp(MATCH, dp(72)))
+        root.addView(footer, lp(MATCH, dp(Ui.FOOTER_DP)))
         rows.onPageChanged = {
             pageText.text = if (rows.pageCount <= 1) "" else "${rows.page + 1} / ${rows.pageCount}   ›"
         }

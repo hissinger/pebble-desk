@@ -60,6 +60,16 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("fav_grid", false)
         set(v) = sp.edit().putBoolean("fav_grid", v).apply()
 
+    /** 하단에 오늘 읽은 시간·연속 독서일(사용 기록 액세스 권한 필요) */
+    var readingTime: Boolean
+        get() = sp.getBoolean("reading_time", false)
+        set(v) = sp.edit().putBoolean("reading_time", v).apply()
+
+    /** 하루 목표(분). 0 이면 목표 없이 읽은 날만 표시 */
+    var readingGoalMin: Int
+        get() = sp.getInt("reading_goal_min", 30)
+        set(v) = sp.edit().putInt("reading_goal_min", v).apply()
+
     var showIcons: Boolean
         get() = sp.getBoolean("show_icons", true)
         set(v) = sp.edit().putBoolean("show_icons", v).apply()
