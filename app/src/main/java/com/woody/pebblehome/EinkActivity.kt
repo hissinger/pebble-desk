@@ -1,9 +1,12 @@
 package com.woody.pebblehome
 
 import android.app.Activity
+import android.content.Context
+import android.content.res.Configuration
 import android.content.Intent
 import android.os.Bundle
 import android.view.MotionEvent
+import java.util.Locale
 import kotlin.math.abs
 
 /**
@@ -14,10 +17,25 @@ abstract class EinkActivity : Activity() {
     protected lateinit var prefs: HomePrefs
     private var downX = 0f
     private var downY = 0f
+    /** 이 화면을 만들 때 쓴 언어. 설정에서 바뀌었으면 돌아올 때 다시 만든다. */
+    private var createdEnglish = false
+
+    /** 설정의 언어(한국어/영어)로 화면 글자와 날짜 형식을 정한다. */
+    override fun attachBaseContext(newBase: Context) {
+        createdEnglish = HomePrefs.isEnglish(newBase)
+        val config = Configuration(newBase.resources.configuration)
+        config.setLocale(if (createdEnglish) Locale.ENGLISH else Locale.KOREAN)
+        super.attachBaseContext(newBase.createConfigurationContext(config))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = HomePrefs(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (prefs.english != createdEnglish) recreate()
     }
 
     /** [toLeft] 가 true 면 왼쪽으로 민 것(다음 페이지). 처리했으면 true. */
@@ -50,22 +68,22 @@ abstract class EinkActivity : Activity() {
         @Suppress("DEPRECATION") overridePendingTransition(0, 0)
     }
 
-    /** 앱 길게 누르기 메뉴(④) / 기본 앱 길게 누르기 메뉴(⑤). 무엇이 바뀌면 [changed] 를 부른다. */
+    /** 앱 길게 누르기 메뉴(④) / 읽고 있는 앱 길게 누르기 메뉴(⑤). 무엇이 바뀌면 [changed] 를 부른다. */
     protected fun showAppMenu(app: AppEntry, changed: () -> Unit) {
         val count = prefs.openCount(app.key)
-        val isDefault = prefs.defaultApp == app.key
+        val isDefault = prefs.readingApp == app.key
         val sheet = Sheet(this)
         if (isDefault) {
-            sheet.header(app.label, "기본 앱 · ${count}번 열었음", app)
-                .item("기본 앱 바꾸기") { startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_DEFAULT)) }
-                .item("기본 앱 해제") { prefs.defaultApp = null; changed() }
+            sheet.header(app.label, resources.getQuantityString(R.plurals.main_opened_times, count, count), app)
+                .item(getString(R.string.change_main)) { startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER)) }
+                .item(getString(R.string.clear_main)) { prefs.changeReadingApp(null); changed() }
         } else {
             val fav = app.key in prefs.favorites
-            sheet.header(app.label, "${count}번 열었음", app)
-                .item("기본 앱으로 설정", bold = true) { prefs.defaultApp = app.key; changed() }
-                .item(if (fav) "자주 쓰는 앱에서 빼기" else "자주 쓰는 앱에 넣기") { prefs.toggleFavorite(app.key); changed() }
-                .item("숨기기") { prefs.hide(app.key); changed() }
+            sheet.header(app.label, resources.getQuantityString(R.plurals.opened_times, count, count), app)
+                .item(getString(R.string.set_main)) { prefs.changeReadingApp(app.key); changed() }
+                .item(getString(if (fav) R.string.fav_remove else R.string.fav_add)) { prefs.toggleFavorite(app.key); changed() }
+                .item(getString(R.string.hide)) { prefs.hide(app.key); changed() }
         }
-        sheet.item("앱 정보") { AppStore.openAppInfo(this, app) }.show()
+        sheet.item(getString(R.string.app_info)) { AppStore.openAppInfo(this, app) }.show()
     }
 }

@@ -81,7 +81,7 @@ class TopBarView(context: Context) : View(context) {
     private val logo: Drawable? = Crema.logo(context)
     private val clockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Ui.regular
-        textSize = context.dpf(42)
+        textSize = context.dpf(37)
         color = Ui.BLACK
         letterSpacing = -0.02f
     }
@@ -108,8 +108,25 @@ class TopBarView(context: Context) : View(context) {
         "light" to context.getDrawable(R.drawable.ic_light)!!,
         "bolt" to context.getDrawable(R.drawable.ic_bolt)!!,
     )
-    private val timeFormat = SimpleDateFormat("HH:mm", Locale.KOREA)
-    private val dateFormat = SimpleDateFormat("M월 d일 EEEE", Locale.KOREA)
+    private val time24 = SimpleDateFormat("HH:mm", Locale.KOREA)
+    private val time12 = SimpleDateFormat("h:mm", Locale.KOREA)
+    private val ampmKo = SimpleDateFormat("a", Locale.KOREA)
+    private val ampmEn = SimpleDateFormat("a", Locale.US)
+    private val dateKo = SimpleDateFormat("M월 d일 EEEE", Locale.KOREA)
+    private val dateEn = SimpleDateFormat("EEE, MMM d", Locale.US)
+    private val timeFormat get() = if (use24Hour) time24 else time12
+    private val dateFormat get() = if (english) dateEn else dateKo
+
+    /** 24시간(18:24) / 12시간. 12시간이면 작은 오전·오후를 한국어는 시각 앞(오후 6:24), 영어는 뒤(6:24 PM)에 붙인다. */
+    var use24Hour = true
+        set(v) {
+            if (v == field) return
+            field = v
+            invalidate()
+        }
+
+    /** 시계·날짜를 영어로. 언어를 바꾸면 화면을 새로 만들므로 만들 때 적용된 언어로 한 번 정한다. */
+    private val english = context.resources.configuration.locales[0].language == Locale.ENGLISH.language
 
     private var status: DeviceStatus? = null
     private var now = Date()
@@ -151,7 +168,20 @@ class TopBarView(context: Context) : View(context) {
         }
 
         val time = timeFormat.format(now)
-        canvas.drawText(time, right - clockPaint.measureText(time), clockBase, clockPaint)
+        val gap = context.dpf(6)
+        if (use24Hour) {
+            canvas.drawText(time, right - clockPaint.measureText(time), clockBase, clockPaint)
+        } else if (english) {
+            val ampm = ampmEn.format(now)
+            val ampmW = statusPaint.measureText(ampm)
+            canvas.drawText(ampm, right - ampmW, clockBase, statusPaint)
+            canvas.drawText(time, right - ampmW - gap - clockPaint.measureText(time), clockBase, clockPaint)
+        } else {
+            val ampm = ampmKo.format(now)
+            val timeLeft = right - clockPaint.measureText(time)
+            canvas.drawText(time, timeLeft, clockBase, clockPaint)
+            canvas.drawText(ampm, timeLeft - gap - statusPaint.measureText(ampm), clockBase, statusPaint)
+        }
 
         // 상태 줄: 오른쪽부터 왼쪽으로 쌓는다.
         val s = status ?: return

@@ -22,7 +22,7 @@ object AppStore {
     /** 이름 순서: 영문 → 한글 (ICU 기본 순서는 라틴 문자가 한글보다 앞) */
     val collator: Collator = Collator.getInstance(Locale.ROOT)
 
-    /** 이북 앱(기본 앱 고르기에서 먼저 보여 줄 앱) */
+    /** 이북 앱(읽고 있는 앱 고르기에서 먼저 보여 줄 앱) */
     private val EBOOK_PACKAGES = setOf(
         "com.initialcoms.ridi", "kr.co.millie.eink", "kr.co.aladin.ebook", "com.yes24.ebook.einkstore",
         "com.kyobo.ebook.eink", "com.bookers.ebook", "com.yes24.library.eink", "kr.co.kyobobook.KEL",
@@ -116,10 +116,11 @@ object AppIcons {
         return gray
     }
 
-    /** 앱이 설치·업데이트·삭제됐을 때만 캐시를 비운다(아이콘이 바뀌었을 수 있으므로). */
-    fun clearIfPackagesChanged(context: Context) {
-        val changed = context.packageManager.getChangedPackages(packageSequence) ?: return
+    /** 앱이 설치·업데이트·삭제됐을 때만 캐시를 비운다(아이콘이 바뀌었을 수 있으므로). 비웠으면 true. */
+    fun clearIfPackagesChanged(context: Context): Boolean {
+        val changed = context.packageManager.getChangedPackages(packageSequence) ?: return false
         packageSequence = changed.sequenceNumber
         cache.evictAll()
+        return true
     }
 }

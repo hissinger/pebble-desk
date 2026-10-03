@@ -1,6 +1,10 @@
 [versions]
 agp = "8.13.2"
 kotlin = "2.2.21"
+jsoup = "1.21.2"
+
+[libraries]
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

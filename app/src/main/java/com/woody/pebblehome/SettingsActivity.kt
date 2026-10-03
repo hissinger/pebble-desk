@@ -4,16 +4,17 @@ import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
+import android.view.View
 import android.widget.LinearLayout
 
-/** ⑧ 설정. 회색 소제목으로 묶고 값은 오른쪽에 쓴다. 켜짐은 굵게, 꺼짐은 회색, `›` 는 다음 화면. */
+/** ⑧ 설정. 회색 소제목으로 묶고 값은 오른쪽에 같은 굵기로 쓴다. 켜짐은 검정, 꺼짐은 진회색, `›` 는 다음 화면. */
 class SettingsActivity : EinkActivity() {
     private lateinit var list: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = vbox()
-        root.addView(titleRow("설정") { finish() })
+        root.addView(titleRow(getString(R.string.settings)) { finish() })
         root.addView(hline(2))
         list = vbox()
         root.addView(list, lp(MATCH, 0, 1f))
@@ -31,40 +32,49 @@ class SettingsActivity : EinkActivity() {
 
     private fun render() {
         list.removeAllViews()
-        val apps = AppStore.loadAndPrune(this, prefs)
-        val defaultLabel = apps.find { it.key == prefs.defaultApp }?.label
+        AppStore.loadAndPrune(this, prefs)
 
-        section("기본 앱")
-        row("기본 앱", defaultLabel ?: "없음", on = defaultLabel != null, next = true) {
-            startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_DEFAULT))
+        // 읽고 있는 앱은 책을 정할 때 함께 고른다(책 없이 바꾸려면 앱을 길게 눌러 '읽고 있는 앱으로 설정').
+        section(getString(R.string.section_home))
+        val bookTitle = NowReadingStore.title(this)
+        row(getString(R.string.now_reading), bookTitle ?: getString(R.string.none), on = bookTitle != null, next = true) {
+            startActivity(BookSearchActivity.intent(this))
         }
-        toggle("켤 때 기본 앱 바로 열기", prefs.openDefaultOnWake) { prefs.openDefaultOnWake = it }
-
-        section("홈 화면")
-        toggle("지금 읽는 책 (Cover Pebble)", prefs.showNowReading) { prefs.showNowReading = it }
-        row("자주 쓰는 앱 정렬", if (prefs.sortByCount) "많이 연 순" else "가나다순", next = true) {
-            choose("자주 쓰는 앱 정렬", listOf("많이 연 순", "가나다순"), if (prefs.sortByCount) 0 else 1) {
+        val sorts = listOf(getString(R.string.sort_count), getString(R.string.sort_name))
+        row(getString(R.string.fav_sort), sorts[if (prefs.sortByCount) 0 else 1], next = true) {
+            choose(getString(R.string.fav_sort), sorts, if (prefs.sortByCount) 0 else 1) {
                 prefs.sortByCount = it == 0; render()
             }
         }
-        toggle("앱 아이콘", prefs.showIcons) { prefs.showIcons = it }
-        row("글자 크기", if (prefs.largeText) "크게" else "보통", next = true) {
-            choose("글자 크기", listOf("보통", "크게"), if (prefs.largeText) 1 else 0) {
-                prefs.largeText = it == 1; render()
+        toggle(getString(R.string.app_icons), prefs.showIcons) { prefs.showIcons = it }
+        val clocks = listOf(getString(R.string.clock24), getString(R.string.clock12))
+        row(getString(R.string.clock), clocks[if (prefs.clock24h) 0 else 1], next = true) {
+            choose(getString(R.string.clock), clocks, if (prefs.clock24h) 0 else 1) {
+                prefs.clock24h = it == 0; render()
+            }
+        }
+        // 언어 이름은 바꾸지 않는다(어느 언어에서도 알아볼 수 있게). 바꾸면 이 화면부터 다시 만든다.
+        val languages = listOf("한국어", "English")
+        row(getString(R.string.language), languages[if (prefs.english) 1 else 0], next = true) {
+            choose(getString(R.string.language), languages, if (prefs.english) 1 else 0) {
+                if ((it == 1) != prefs.english) {
+                    prefs.english = it == 1
+                    recreate()
+                }
             }
         }
 
-        section("앱 관리")
-        row("숨긴 앱", prefs.hidden.size.toString(), next = true) {
+        section(getString(R.string.section_apps))
+        row(getString(R.string.hidden_apps), prefs.hidden.size.toString(), next = true) {
             startActivity(AppListActivity.intent(this, AppListActivity.Mode.HIDDEN))
         }
-        row("연 횟수 초기화", null) {
-            Sheet(this).header("연 횟수 초기화", "모든 앱의 연 횟수를 0으로 되돌립니다")
-                .item("초기화", bold = true) { prefs.resetCounts() }
+        row(getString(R.string.reset_counts), null) {
+            Sheet(this).header(getString(R.string.reset_counts), getString(R.string.reset_counts_desc))
+                .item(getString(R.string.reset), bold = true) { prefs.resetCounts() }
                 .show()
         }
-        row("기본 홈 앱으로 설정", null, next = true) { openHomeSettings() }
-        row("기기 설정 열기", null, next = true, last = true) {
+        row(getString(R.string.set_default_home), null, next = true) { openHomeSettings() }
+        row(getString(R.string.device_settings), null, next = true, last = true) {
             runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
         }
     }
@@ -75,22 +85,26 @@ class SettingsActivity : EinkActivity() {
         })
     }
 
-    private fun row(label: String, value: String?, on: Boolean = true, next: Boolean = false, last: Boolean = false, action: () -> Unit) {
+    /** 설정 한 줄. [hint] 는 이름 뒤에 작은 회색 글자로 붙는 보조 설명. 값은 같은 굵기로, 꺼짐은 진회색. */
+    private fun row(
+        label: String, value: String?, on: Boolean = true, next: Boolean = false, last: Boolean = false,
+        hint: String? = null, action: () -> Unit,
+    ) {
         val row = hbox().apply {
             setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
-            addView(text(label, 22f), lp(0, WRAP, 1f))
+            addView(text(label, 22f))
+            if (hint != null) addView(text(hint, 15f, color = Ui.LIGHT_GRAY), lp(WRAP, WRAP).apply { marginStart = dp(10) })
+            addView(View(context), lp(0, 1, 1f))
             val shown = listOfNotNull(value, if (next) "›" else null).joinToString("  ")
-            if (shown.isNotEmpty()) {
-                addView(text(shown, 20f, if (on && value != null) Ui.bold else Ui.regular, if (on) Ui.BLACK else Ui.LIGHT_GRAY))
-            }
+            if (shown.isNotEmpty()) addView(text(shown, 20f, Ui.medium, if (on) Ui.BLACK else Ui.GRAY))
             setOnClickListener { action() }
         }
-        list.addView(row, lp(MATCH, dp(46)))
+        list.addView(row, lp(MATCH, dp(49)))
         if (!last) list.addView(hline(1, Ui.DIVIDER))
     }
 
-    private fun toggle(label: String, value: Boolean, set: (Boolean) -> Unit) =
-        row(label, if (value) "켜짐" else "꺼짐", on = value) { set(!value); render() }
+    private fun toggle(label: String, value: Boolean, hint: String? = null, set: (Boolean) -> Unit) =
+        row(label, getString(if (value) R.string.on else R.string.off), on = value, hint = hint) { set(!value); render() }
 
     /** 안드로이드 홈 앱 선택 화면. 기기마다 있는 화면이 달라 차례로 시도한다. */
     private fun openHomeSettings() {

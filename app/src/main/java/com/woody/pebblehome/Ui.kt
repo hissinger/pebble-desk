@@ -20,10 +20,15 @@ object Ui {
     const val BLACK = Color.BLACK
     const val GRAY = 0xFF555555.toInt()
     const val LIGHT_GRAY = 0xFF888888.toInt()
-    const val DIVIDER = 0xFFE2E2E2.toInt()
+    const val DIVIDER = 0xFFCCCCCC.toInt()
 
     /** 좌우 여백 */
     const val MARGIN = 40
+
+    /** 목록 한 줄 규격(홈·모든 앱·고르기·숨긴 앱 공통): 줄 높이 dp, 아이콘 dp, 글자 sp */
+    const val ROW_DP = 62
+    const val ROW_ICON_DP = 27
+    const val ROW_SP = 25f
 
     /** 흑백(채도 0)으로 그리는 페인트: 앱 아이콘과 책 표지 */
     fun grayPaint() = Paint(Paint.FILTER_BITMAP_FLAG).apply {
@@ -32,6 +37,7 @@ object Ui {
 
     val heavy: Typeface = Typeface.create(Typeface.DEFAULT, 800, false)
     val bold: Typeface = Typeface.create(Typeface.DEFAULT, 700, false)
+    val medium: Typeface = Typeface.create(Typeface.DEFAULT, 500, false)
     val regular: Typeface = Typeface.create(Typeface.DEFAULT, 400, false)
 }
 

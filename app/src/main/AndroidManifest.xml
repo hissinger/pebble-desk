@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 런처라서 설치된 앱 전체와 크레마 런처(로고), Cover Pebble(지금 읽는 책)을 봐야 한다. -->
+    <!-- 런처라서 설치된 앱 전체와 크레마 런처(로고)를 봐야 한다. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- 지금 읽는 책: YES24 에서 책 표지 검색 -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- 상태 줄: 와이파이·블루투스가 켜져 있는지 -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission
@@ -41,6 +43,13 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".BookSearchActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".SettingsActivity"

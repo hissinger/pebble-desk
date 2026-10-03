@@ -2,12 +2,13 @@ package com.woody.pebblehome
 
 import android.content.Context
 
-/** 런처 설정과 앱 목록 상태(기본 앱·자주 쓰는 앱·숨긴 앱·연 횟수) */
+/** 런처 설정과 앱 목록 상태(읽고 있는 앱·자주 쓰는 앱·숨긴 앱·연 횟수) */
 class HomePrefs(context: Context) {
-    private val sp = context.getSharedPreferences("home", Context.MODE_PRIVATE)
+    private val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
     private val counts = context.getSharedPreferences("open_counts", Context.MODE_PRIVATE)
 
-    var defaultApp: String?
+    /** 읽고 있는 앱(홈에 크게 보이는 앱). 저장 키는 예전 이름(default_app)을 그대로 쓴다. */
+    var readingApp: String?
         get() = sp.getString("default_app", null)
         set(v) = sp.edit().putString("default_app", v).apply()
 
@@ -19,36 +20,42 @@ class HomePrefs(context: Context) {
         get() = sp.getStringSet("hidden", emptySet())!!.toSet()
         set(v) = sp.edit().putStringSet("hidden", v).apply()
 
-    /** 기기를 켜거나 슬립에서 깨면 홈 대신 기본 앱을 연다. */
-    var openDefaultOnWake: Boolean
-        get() = sp.getBoolean("open_default_on_wake", false)
-        set(v) = sp.edit().putBoolean("open_default_on_wake", v).apply()
-
     /** 자주 쓰는 앱 정렬: true 면 많이 연 순, false 면 가나다순 */
     var sortByCount: Boolean
         get() = sp.getBoolean("sort_by_count", true)
         set(v) = sp.edit().putBoolean("sort_by_count", v).apply()
 
+    /** 홈 시계: true 면 24시간(18:24), false 면 12시간(오후 6:24) */
+    var clock24h: Boolean
+        get() = sp.getBoolean("clock_24h", true)
+        set(v) = sp.edit().putBoolean("clock_24h", v).apply()
+
+    /** 앱 전체(시계·날짜 포함)를 영어로. false 면 한국어 */
+    var english: Boolean
+        get() = sp.getBoolean(KEY_ENGLISH, false)
+        set(v) = sp.edit().putBoolean(KEY_ENGLISH, v).apply()
+
     var showIcons: Boolean
         get() = sp.getBoolean("show_icons", true)
         set(v) = sp.edit().putBoolean("show_icons", v).apply()
 
-    var showNowReading: Boolean
-        get() = sp.getBoolean("show_now_reading", true)
-        set(v) = sp.edit().putBoolean("show_now_reading", v).apply()
 
-    var largeText: Boolean
-        get() = sp.getBoolean("large_text", false)
-        set(v) = sp.edit().putBoolean("large_text", v).apply()
-
-    /** 목록 글자 배율 (글자 크기: 보통 / 크게) */
-    val textScale: Float get() = if (largeText) 1.15f else 1f
 
     fun openCount(key: String) = counts.getInt(key, 0)
 
     fun countOpen(key: String) = counts.edit().putInt(key, openCount(key) + 1).apply()
 
     fun resetCounts() = counts.edit().clear().apply()
+
+    /**
+     * 읽고 있는 앱을 [key] 로 바꾼다(null 이면 해제). 이전 앱은 홈에서 사라지지 않도록 자주 쓰는 앱에 넣는다.
+     */
+    fun changeReadingApp(key: String?) {
+        val previous = readingApp
+        if (previous == key) return
+        if (previous != null) favorites = favorites + previous
+        readingApp = key
+    }
 
     fun toggleFavorite(key: String) {
         favorites = if (key in favorites) favorites - key else favorites + key
@@ -57,7 +64,7 @@ class HomePrefs(context: Context) {
     fun hide(key: String) {
         hidden = hidden + key
         favorites = favorites - key
-        if (defaultApp == key) defaultApp = null
+        if (readingApp == key) readingApp = null
     }
 
     fun unhide(key: String) {
@@ -76,8 +83,17 @@ class HomePrefs(context: Context) {
             apps.firstOrNull { it.pkg == pkg }?.let { return it.key }
             return if (isInstalled(pkg)) key else null
         }
-        defaultApp?.let { key -> fix(key).let { if (it != key) defaultApp = it } }
+        readingApp?.let { key -> fix(key).let { if (it != key) readingApp = it } }
         favorites.let { set -> set.mapNotNull(::fix).toSet().let { if (it != set) favorites = it } }
         hidden.let { set -> set.mapNotNull(::fix).toSet().let { if (it != set) hidden = it } }
+    }
+
+    companion object {
+        private const val FILE = "home"
+        private const val KEY_ENGLISH = "english"
+
+        /** 화면을 만들기 전에(attachBaseContext) 언어를 정하려고 쓴다. */
+        fun isEnglish(context: Context) =
+            context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_ENGLISH, false)
     }
 }

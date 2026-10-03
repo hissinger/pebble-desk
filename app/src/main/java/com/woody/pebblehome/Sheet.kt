@@ -30,27 +30,27 @@ class Sheet(private val context: Context) {
         val root = c.vbox()
         root.addView(c.hline(2, inset = false))
 
-        val head = c.hbox().apply { setPadding(c.dp(Ui.MARGIN), c.dp(26), c.dp(Ui.MARGIN), c.dp(20)) }
+        val head = c.hbox().apply { setPadding(c.dp(Ui.MARGIN), c.dp(22), c.dp(Ui.MARGIN), c.dp(20)) }
         app?.let {
             head.addView(ImageView(c).apply { setImageBitmap(AppIcons.gray(c, it, c.dp(45))) },
                 lp(c.dp(45), c.dp(45)).apply { marginEnd = c.dp(16) })
         }
         val names = c.vbox()
-        names.addView(c.text(title, 31f, Ui.heavy))
-        subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = c.dp(6) }) }
+        names.addView(c.text(title, 29f, Ui.heavy))
+        subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
         head.addView(names, lp(0, WRAP, 1f))
         root.addView(head)
 
         items.forEach { item ->
-            root.addView(c.hline(1, 0xFFDDDDDD.toInt()))
+            root.addView(c.hline(1, Ui.DIVIDER))
             root.addView(c.hbox().apply {
                 setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
-                addView(c.text(item.label, 25f, if (item.bold) Ui.bold else Ui.regular), lp(MATCH, WRAP))
+                addView(c.text(item.label, 24f, if (item.bold) Ui.bold else Ui.regular), lp(MATCH, WRAP))
                 setOnClickListener { dialog.dismiss(); item.action() }
-            }, lp(MATCH, c.dp(65)))
+            }, lp(MATCH, c.dp(Ui.ROW_DP)))
         }
-        root.addView(c.hline(1, 0xFFDDDDDD.toInt()))
-        root.addView(c.text("닫기", 21f, Ui.bold).apply {
+        root.addView(c.hline(1, Ui.DIVIDER))
+        root.addView(c.text(c.getString(R.string.close), 21f, Ui.bold).apply {
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
             setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
             setOnClickListener { dialog.dismiss() }

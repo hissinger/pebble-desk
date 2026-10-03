@@ -5,13 +5,16 @@ import android.content.Intent
 import android.graphics.Paint
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 
-/** ③ 모든 앱 / ⑥ 기본 앱 고르기 / ⑦ 숨긴 앱. 모두 제목 + 페이지 목록 + 하단 줄 구조다. */
+/** ③ 모든 앱 / ⑥ 읽고 있는 앱 고르기 / ⑦ 숨긴 앱. 모두 제목 + 페이지 목록 + 하단 줄 구조다. */
 class AppListActivity : EinkActivity() {
-    enum class Mode { ALL, PICK_DEFAULT, HIDDEN }
+    enum class Mode { ALL, PICK_READER, HIDDEN }
+
+    private val picking get() = mode == Mode.PICK_READER
 
     private lateinit var mode: Mode
     private lateinit var titleCount: TextView
@@ -19,7 +22,10 @@ class AppListActivity : EinkActivity() {
     private lateinit var footerLeft: TextView
     private lateinit var pageText: TextView
     private var indexCol: LinearLayout? = null
+    private var emptyView: LinearLayout? = null
     private var shown: List<AppEntry> = emptyList()
+    /** 처음 그릴 때만 지금 읽고 있는 앱이 있는 페이지를 연다. */
+    private var firstRefresh = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,27 +47,38 @@ class AppListActivity : EinkActivity() {
     private fun buildViews() {
         val root = vbox()
         val title = when (mode) {
-            Mode.ALL -> "모든 앱"
-            Mode.PICK_DEFAULT -> "기본 앱 고르기"
-            Mode.HIDDEN -> "숨긴 앱"
+            Mode.ALL -> getString(R.string.all_apps)
+            Mode.PICK_READER -> getString(R.string.pick_reader_title)
+            Mode.HIDDEN -> getString(R.string.hidden_apps)
         }
         root.addView(titleRow(title) { finish() }.apply {
             titleCount = text("", 21f, color = Ui.GRAY)
             addView(titleCount, lp(WRAP, WRAP).apply { marginStart = dp(14); topMargin = dp(6) })
         })
         root.addView(hline(2))
-        if (mode == Mode.PICK_DEFAULT) {
-            root.addView(text("홈 맨 위에 크게 보일 앱을 고르세요", 17f, color = Ui.GRAY).apply {
+        if (picking) {
+            // 책이 있으면 그 책을 읽는 앱, 없으면 홈에 크게 보일 앱
+            val desc = if (NowReadingStore.title(this) != null) R.string.pick_reader_desc else R.string.pick_main_desc
+            root.addView(text(getString(desc), 17f, color = Ui.GRAY, lines = 2).apply {
                 setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), dp(4))
             })
         }
 
-        val body = LinearLayout(this)
-        val rowHeight = when (mode) {
-            Mode.PICK_DEFAULT -> 64
-            else -> 58
+        if (mode == Mode.HIDDEN) {
+            // 숨긴 앱이 없을 때: 이유와 숨기는 방법
+            emptyView = vbox().apply {
+                setPadding(dp(Ui.MARGIN), dp(56), dp(Ui.MARGIN), 0)
+                visibility = View.GONE
+                addView(text(getString(R.string.hidden_empty), 23f, Ui.bold))
+                addView(text(getString(R.string.hidden_empty_desc), 17f,
+                    color = Ui.GRAY, lines = 3).apply { setLineSpacing(dp(4).toFloat(), 1f) },
+                    lp(WRAP, WRAP).apply { topMargin = dp(12) })
+            }
+            root.addView(emptyView)
         }
-        rows = PagedRows(this, dp(rowHeight * prefs.textScale))
+
+        val body = LinearLayout(this)
+        rows = PagedRows(this, dp(Ui.ROW_DP))
         body.addView(rows, lp(0, MATCH, 1f))
         if (mode == Mode.ALL) {
             indexCol = vbox().apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL }
@@ -71,8 +88,7 @@ class AppListActivity : EinkActivity() {
 
         root.addView(hline(1, inset = false))
         val footer = FrameLayout(this)
-        footerLeft = text("", if (mode == Mode.HIDDEN) 17f else 24f, if (mode == Mode.HIDDEN) Ui.regular else Ui.bold,
-            if (mode == Mode.HIDDEN) Ui.GRAY else Ui.BLACK).apply {
+        footerLeft = text("", if (mode == Mode.HIDDEN) 17f else 21f, color = if (mode == Mode.HIDDEN) Ui.GRAY else Ui.BLACK).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(Ui.MARGIN), 0, dp(24), 0)
         }
@@ -89,8 +105,7 @@ class AppListActivity : EinkActivity() {
             Mode.ALL -> {
                 footerLeft.setOnClickListener { startActivity(intent(this, Mode.HIDDEN)) }
             }
-            Mode.HIDDEN -> footerLeft.text = "숨긴 앱은 홈과 모든 앱에 나오지 않습니다."
-            Mode.PICK_DEFAULT -> Unit
+            Mode.HIDDEN, Mode.PICK_READER -> Unit
         }
         rows.onPageChanged = {
             pageText.text = if (rows.pageCount <= 1) "" else "${rows.page + 1} / ${rows.pageCount}   ›"
@@ -104,51 +119,62 @@ class AppListActivity : EinkActivity() {
         val apps = AppStore.loadAndPrune(this, prefs)
         val hidden = prefs.hidden
         val favs = prefs.favorites
-        val default = prefs.defaultApp
+        val default = prefs.readingApp
         val icons = prefs.showIcons
-        val scale = prefs.textScale
 
         shown = when (mode) {
             Mode.ALL -> apps.filter { it.key !in hidden }
             Mode.HIDDEN -> apps.filter { it.key in hidden }
             // 이북 앱을 먼저, 그다음 나머지
-            Mode.PICK_DEFAULT -> apps.filter { it.key !in hidden }.sortedBy { if (AppStore.isEbook(it)) 0 else 1 }
+            Mode.PICK_READER -> apps.filter { it.key !in hidden }.sortedBy { if (AppStore.isEbook(it)) 0 else 1 }
         }
-        titleCount.text = if (mode == Mode.PICK_DEFAULT) "" else shown.size.toString()
-        if (mode == Mode.ALL) footerLeft.text = "숨긴 앱 ${hidden.size}"
+        titleCount.text = if (picking) "" else shown.size.toString()
+        when (mode) {
+            Mode.ALL -> footerLeft.text = getString(R.string.hidden_count_link, hidden.size)
+            // 비어 있으면 안내를 본문에 모으고, 목록이 있으면 하단에 한 줄로
+            Mode.HIDDEN -> {
+                emptyView?.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
+                footerLeft.text = if (shown.isEmpty()) "" else getString(R.string.hidden_note)
+            }
+            Mode.PICK_READER -> Unit
+        }
 
         rows.setRows(shown.map { app ->
             {
                 when (mode) {
                     Mode.ALL -> {
                         val mark = when {
-                            app.key == default -> text("기본", 17f)
+                            app.key == default -> text(getString(R.string.mark_main), 17f)
                             app.key in favs -> text("★", 18f)
                             else -> null
                         }
-                        appRow(app, app.label, 27, 27f * scale, showIcon = icons, right = mark).apply {
+                        appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = icons, right = mark).apply {
                             setOnClickListener { AppStore.launch(this@AppListActivity, app, prefs) }
                             setOnLongClickListener { showAppMenu(app) { refresh() }; true }
                         }
                     }
-                    Mode.PICK_DEFAULT -> {
+                    Mode.PICK_READER -> {
                         val current = app.key == default
-                        appRow(app, app.label, 28, 28f * scale, if (current) Ui.heavy else Ui.regular,
+                        appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, if (current) Ui.heavy else Ui.regular,
                             showIcon = icons, right = if (current) text("✓", 24f, Ui.bold) else null).apply {
-                            setOnClickListener { prefs.defaultApp = app.key; finish() }
+                            setOnClickListener { prefs.changeReadingApp(app.key); finish() }
                         }
                     }
                     Mode.HIDDEN -> {
-                        val show = text("보이기", 20f).apply {
+                        val show = text(getString(R.string.unhide), 20f).apply {
                             paintFlags = paintFlags or Paint.UNDERLINE_TEXT_FLAG
                             setPadding(dp(16), dp(14), 0, dp(14))
                             setOnClickListener { prefs.unhide(app.key); refresh() }
                         }
-                        appRow(app, app.label, 27, 27f * scale, color = Ui.GRAY, showIcon = icons, right = show)
+                        appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, color = Ui.GRAY, showIcon = icons, right = show)
                     }
                 }
             }
         })
+        if (firstRefresh && picking) {
+            shown.indexOfFirst { it.key == default }.takeIf { it >= 0 }?.let { rows.reveal(it) }
+        }
+        firstRefresh = false
     }
 
     /** 오른쪽 색인: 있는 첫 글자만, 지금 페이지의 글자는 진하게. 누르면 그 글자가 있는 페이지로. */
@@ -160,10 +186,10 @@ class AppListActivity : EinkActivity() {
         val letters = initials.distinct()
         val from = rows.page * rows.perPage
         val onPage = initials.subList(from, minOf(initials.size, from + rows.perPage)).toSet()
-        val cell = if (col.height > 0) minOf(dp(42), col.height / letters.size) else dp(42)
+        val cell = if (col.height > 0) minOf(dp(48), col.height / letters.size) else dp(48)
         letters.forEach { letter ->
-            col.addView(text(letter, 18f, if (letter in onPage) Ui.heavy else Ui.regular,
-                if (letter in onPage) Ui.BLACK else 0xFF999999.toInt()).apply {
+            val current = letter in onPage
+            col.addView(text(letter, 18f, if (current) Ui.heavy else Ui.regular, if (current) Ui.BLACK else Ui.LIGHT_GRAY).apply {
                 gravity = Gravity.CENTER
                 setOnClickListener { rows.showPage(rows.pageOf(initials.indexOf(letter))) }
             }, lp(MATCH, cell))
