@@ -36,14 +36,22 @@ class SettingsActivity : EinkActivity() {
 
         // 읽고 있는 앱은 책을 정할 때 함께 고른다(책 없이 바꾸려면 앱을 길게 눌러 '읽고 있는 앱으로 설정').
         section(getString(R.string.section_home))
-        val bookTitle = NowReadingStore.title(this)
-        row(getString(R.string.now_reading), bookTitle ?: getString(R.string.none), on = bookTitle != null, next = true) {
-            startActivity(BookSearchActivity.intent(this))
+        val books = BookShelf.list(this)
+        val booksText = when (books.size) {
+            0 -> getString(R.string.none)
+            1 -> books[0].title
+            else -> getString(R.string.books_more, books[0].title, books.size - 1)
         }
-        val sorts = listOf(getString(R.string.sort_count), getString(R.string.sort_name))
-        row(getString(R.string.fav_sort), sorts[if (prefs.sortByCount) 0 else 1], next = true) {
-            choose(getString(R.string.fav_sort), sorts, if (prefs.sortByCount) 0 else 1) {
-                prefs.sortByCount = it == 0; render()
+        row(getString(R.string.now_reading), booksText, on = books.isNotEmpty(), next = true) {
+            startActivity(BooksActivity.intent(this))
+        }
+        row(getString(R.string.favorites), prefs.favoriteList.size.toString(), next = true) {
+            startActivity(FavoritesActivity.intent(this))
+        }
+        val views = listOf(getString(R.string.fav_view_list), getString(R.string.fav_view_grid))
+        row(getString(R.string.fav_view), views[if (prefs.favGrid) 1 else 0], next = true) {
+            choose(getString(R.string.fav_view), views, if (prefs.favGrid) 1 else 0) {
+                prefs.favGrid = it == 1; render()
             }
         }
         toggle(getString(R.string.app_icons), prefs.showIcons) { prefs.showIcons = it }

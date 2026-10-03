@@ -12,11 +12,14 @@ import android.widget.TextView
 
 /** ③ 모든 앱 / ⑥ 읽고 있는 앱 고르기 / ⑦ 숨긴 앱. 모두 제목 + 페이지 목록 + 하단 줄 구조다. */
 class AppListActivity : EinkActivity() {
-    enum class Mode { ALL, PICK_READER, HIDDEN }
+    /** ADD_FAVORITE 는 자주 쓰는 앱에 넣을 앱 고르기(아직 안 넣은 앱만). */
+    enum class Mode { ALL, PICK_READER, HIDDEN, ADD_FAVORITE }
 
     private val picking get() = mode == Mode.PICK_READER
 
     private lateinit var mode: Mode
+    /** PICK_READER 에서 이 책의 앱을 고른다. null 이면 읽고 있는 앱(맨 앞 책 또는 책이 없을 때 홈의 앱). */
+    private var bookId: String? = null
     private lateinit var titleCount: TextView
     private lateinit var rows: PagedRows
     private lateinit var footerLeft: TextView
@@ -30,6 +33,7 @@ class AppListActivity : EinkActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         mode = Mode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: Mode.ALL.name)
+        bookId = intent.getStringExtra(EXTRA_BOOK)
         buildViews()
     }
 
@@ -50,6 +54,7 @@ class AppListActivity : EinkActivity() {
             Mode.ALL -> getString(R.string.all_apps)
             Mode.PICK_READER -> getString(R.string.pick_reader_title)
             Mode.HIDDEN -> getString(R.string.hidden_apps)
+            Mode.ADD_FAVORITE -> getString(R.string.add_app)
         }
         root.addView(titleRow(title) { finish() }.apply {
             titleCount = text("", 21f, color = Ui.GRAY)
@@ -58,7 +63,7 @@ class AppListActivity : EinkActivity() {
         root.addView(hline(2))
         if (picking) {
             // 책이 있으면 그 책을 읽는 앱, 없으면 홈에 크게 보일 앱
-            val desc = if (NowReadingStore.title(this) != null) R.string.pick_reader_desc else R.string.pick_main_desc
+            val desc = if (bookId != null || BookShelf.list(this).isNotEmpty()) R.string.pick_reader_desc else R.string.pick_main_desc
             root.addView(text(getString(desc), 17f, color = Ui.GRAY, lines = 2).apply {
                 setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), dp(4))
             })
@@ -105,7 +110,7 @@ class AppListActivity : EinkActivity() {
             Mode.ALL -> {
                 footerLeft.setOnClickListener { startActivity(intent(this, Mode.HIDDEN)) }
             }
-            Mode.HIDDEN, Mode.PICK_READER -> Unit
+            Mode.HIDDEN, Mode.PICK_READER, Mode.ADD_FAVORITE -> Unit
         }
         rows.onPageChanged = {
             pageText.text = if (rows.pageCount <= 1) "" else "${rows.page + 1} / ${rows.pageCount}   ›"
@@ -119,13 +124,15 @@ class AppListActivity : EinkActivity() {
         val apps = AppStore.loadAndPrune(this, prefs)
         val hidden = prefs.hidden
         val favs = prefs.favorites
-        val default = prefs.readingApp
+        // 고르는 중이면 그 책의 앱(아직 없으면 지금 읽고 있는 앱을 먼저 짚어 둔다)
+        val default = bookId?.let { id -> BookShelf.list(this).find { it.id == id }?.app } ?: prefs.readingApp
         val icons = prefs.showIcons
 
         shown = when (mode) {
             Mode.ALL -> apps.filter { it.key !in hidden }
             Mode.HIDDEN -> apps.filter { it.key in hidden }
             // 이북 앱을 먼저, 그다음 나머지
+            Mode.ADD_FAVORITE -> apps.filter { it.key !in hidden && it.key !in favs }
             Mode.PICK_READER -> apps.filter { it.key !in hidden }.sortedBy { if (AppStore.isEbook(it)) 0 else 1 }
         }
         titleCount.text = if (picking) "" else shown.size.toString()
@@ -136,7 +143,7 @@ class AppListActivity : EinkActivity() {
                 emptyView?.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
                 footerLeft.text = if (shown.isEmpty()) "" else getString(R.string.hidden_note)
             }
-            Mode.PICK_READER -> Unit
+            Mode.PICK_READER, Mode.ADD_FAVORITE -> Unit
         }
 
         rows.setRows(shown.map { app ->
@@ -153,11 +160,19 @@ class AppListActivity : EinkActivity() {
                             setOnLongClickListener { showAppMenu(app) { refresh() }; true }
                         }
                     }
+                    Mode.ADD_FAVORITE -> appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = icons).apply {
+                        setOnClickListener { prefs.favorites = prefs.favorites + app.key; finish() }
+                    }
                     Mode.PICK_READER -> {
                         val current = app.key == default
                         appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, if (current) Ui.heavy else Ui.regular,
                             showIcon = icons, right = if (current) text("✓", 24f, Ui.bold) else null).apply {
-                            setOnClickListener { prefs.changeReadingApp(app.key); finish() }
+                            setOnClickListener {
+                                val id = bookId
+                                if (id != null) changeBookApp(this@AppListActivity, prefs, id, app.key)
+                                else changeMainApp(this@AppListActivity, prefs, app.key)
+                                finish()
+                            }
                         }
                     }
                     Mode.HIDDEN -> {
@@ -198,8 +213,9 @@ class AppListActivity : EinkActivity() {
 
     companion object {
         private const val EXTRA_MODE = "mode"
+        private const val EXTRA_BOOK = "book"
 
-        fun intent(context: Context, mode: Mode): Intent =
-            Intent(context, AppListActivity::class.java).putExtra(EXTRA_MODE, mode.name)
+        fun intent(context: Context, mode: Mode, bookId: String? = null): Intent =
+            Intent(context, AppListActivity::class.java).putExtra(EXTRA_MODE, mode.name).putExtra(EXTRA_BOOK, bookId)
     }
 }

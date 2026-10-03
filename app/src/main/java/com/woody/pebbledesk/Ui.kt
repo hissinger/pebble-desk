@@ -84,6 +84,15 @@ fun Context.titleRow(title: String, onBack: () -> Unit): LinearLayout = hbox().a
     setOnClickListener { onBack() }
 }
 
+/** 순서 바꾸기 버튼(↑/↓). 끝에 있어 못 옮기면 흐리게 두고 누르지 않게 한다. 누르는 폭은 48dp. */
+fun Context.orderArrow(symbol: String, enabled: Boolean, onClick: () -> Unit): TextView =
+    text(symbol, 24f, Ui.bold, if (enabled) Ui.BLACK else Ui.DIVIDER).apply {
+        gravity = Gravity.CENTER
+        minWidth = dp(48)
+        setPadding(dp(4), dp(10), dp(4), dp(10))
+        if (enabled) setOnClickListener { onClick() }
+    }
+
 fun Context.vbox(): LinearLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
 fun Context.hbox(): LinearLayout = LinearLayout(this).apply {

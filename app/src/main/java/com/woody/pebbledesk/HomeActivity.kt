@@ -180,27 +180,30 @@ class HomeActivity : EinkActivity() {
     private fun refresh() {
         val iconsChanged = AppIcons.clearIfPackagesChanged(this)
         apps = AppStore.loadAndPrune(this, prefs)
-        val hidden = prefs.hidden
-        val default = readingApp()
-        val favKeys = prefs.favorites
-        var favs = apps.filter { it.key in favKeys && it.key !in hidden && it.key != default?.key }
-        if (prefs.sortByCount) favs = favs.sortedByDescending { prefs.openCount(it.key) }
-        val book = NowReadingStore.read(this, dp(COVER_DP))
+        val books = BookShelf.list(this)
+        // 맨 앞 책의 앱이 곧 읽고 있는 앱이다(앱 메뉴에서 '읽고 있는 앱'을 알아보는 데 쓴다).
+        books.firstOrNull()?.app?.let { if (it != prefs.readingApp) prefs.readingApp = it }
+        val reading = (if (books.isEmpty()) prefs.readingApp else books.first().app)?.let(::findApp)
+        // 자주 쓰는 앱은 직접 넣고 뺀 그대로 보인다(위의 책·앱과 상관없다).
+        val favs = favoriteApps(apps, prefs)
         val icons = prefs.showIcons
+        val grid = prefs.favGrid
 
-        val state = listOf(default, favs, book, icons)
+        val state = listOf(books, reading, favs, icons, grid)
         if (!iconsChanged && state == shownState) return
         shownState = state
 
-        buildHero(default, book)
+        buildHero(books, reading)
 
+        favRows.setGrid(if (grid) GRID_ROWS else 0)
         favRows.setRows(
             if (favs.isEmpty()) listOf {
                 text(getString(R.string.favorites_empty), 18f, color = Ui.LIGHT_GRAY, lines = 2).apply {
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
                 }
-            } else favs.map { app ->
+            } else if (grid) favs.chunked(GRID_COLUMNS).map { line -> { gridRow(line) } }
+            else favs.map { app ->
                 {
                     appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = icons).apply {
                         setOnClickListener { AppStore.launch(this@HomeActivity, app, prefs) }
@@ -211,66 +214,135 @@ class HomeActivity : EinkActivity() {
         )
     }
 
-    private fun readingApp(): AppEntry? = prefs.readingApp?.let { key -> apps.find { it.key == key } }
-
-    private fun pickReader() = startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER))
-
-    /** 지금 읽는 책(A안) 또는 읽고 있는 앱 크게 또는 읽는 책 정하기 */
-    private fun buildHero(default: AppEntry?, book: NowReading?) {
-        hero.removeAllViews()
-        centerHero.removeAllViews()
-        val coverW = dp(COVER_DP)
-        val onTap = View.OnClickListener { if (default != null) AppStore.launch(this, default, prefs) else pickReader() }
-
-        if (book == null) {
-            showCenterHero(default, onTap)
-            return
-        }
-        favRows.header = listOf(favTitle, favLine)
-        val view = hbox().apply {
-                gravity = Gravity.TOP
-                setPadding(dp(Ui.MARGIN), dp(26), dp(Ui.MARGIN), 0)
-                val coverH = coverW * book.cover.height / book.cover.width
+    /**
+     * 격자 한 줄: 흑백 아이콘 아래 이름 한 줄. 줄 높이(목록 높이를 두 줄로 나눈 값)에 맞춰 아이콘 크기를 정한다.
+     * 격자에서는 '앱 아이콘' 설정과 상관없이 아이콘을 그린다.
+     */
+    private fun gridRow(line: List<AppEntry>): View = hbox().apply {
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(Ui.MARGIN - 8), 0, dp(Ui.MARGIN - 8), 0)
+        val icon = (favRows.rowHeightPx - dp(GRID_LABEL_DP)).coerceIn(dp(32), dp(GRID_ICON_MAX_DP))
+        line.forEach { app ->
+            addView(vbox().apply {
+                gravity = Gravity.CENTER_HORIZONTAL
                 addView(ImageView(context).apply {
-                    setImageBitmap(book.cover)
-                    scaleType = ImageView.ScaleType.FIT_XY
-                    setBackgroundColor(Ui.BLACK)
-                    setPadding(dp(1), dp(1), dp(1), dp(1))
-                }, lp(coverW + dp(2), coverH + dp(2)))
-                val info = vbox()
-                info.addView(text(book.title, 34f, Ui.heavy, lines = 2), lp(MATCH, WRAP).apply { topMargin = dp(10) })
-                if (book.author.isNotBlank()) {
-                    info.addView(text(book.author, 18f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(10) })
-                }
-                info.addView(View(context), lp(MATCH, 0, 1f))
-                info.addView(
-                    if (default != null) hbox().apply {
-                        if (prefs.showIcons) addView(ImageView(context).apply {
-                            setImageBitmap(AppIcons.gray(context, default, dp(42)))
-                        }, lp(dp(42), dp(42)).apply { marginEnd = dp(14) })
-                        addView(text("${default.label}  ›", 36f, Ui.heavy))
-                    } else text(getString(R.string.pick_reader_link), 24f, Ui.bold, Ui.LIGHT_GRAY),
-                    // 표지 아랫선보다 조금 올려 제목·저자와 한 덩어리로 보이게 한다.
-                    lp(WRAP, WRAP).apply { bottomMargin = dp(28) }
-                )
-                addView(info, lp(0, coverH + dp(2), 1f).apply { marginStart = dp(24) })
+                    setImageBitmap(AppIcons.gray(context, app, icon))
+                }, lp(icon, icon))
+                addView(text(app.label, 15f).apply { gravity = Gravity.CENTER }, lp(MATCH, WRAP).apply { topMargin = dp(6) })
+                setOnClickListener { AppStore.launch(this@HomeActivity, app, prefs) }
+                setOnLongClickListener { showAppMenu(app) { refresh() }; true }
+            }, lp(0, WRAP, 1f))
         }
-        view.setOnClickListener(onTap)
-        view.setOnLongClickListener { showBookMenu(book, default); true }
-        hero.addView(view, FrameLayout.LayoutParams(MATCH, WRAP))
+        // 덜 찬 줄도 칸 폭이 같도록 빈 칸을 채운다.
+        repeat(GRID_COLUMNS - line.size) { addView(View(context), lp(0, 1, 1f)) }
     }
 
-    /** 책을 길게 누르면: 책 바꾸기 / 읽는 앱 바꾸기 / 책 지우기 */
-    private fun showBookMenu(book: NowReading, default: AppEntry?) {
-        Sheet(this).header(book.title, default?.let { getString(R.string.reading_in, it.label) })
-            .item(getString(R.string.change_book)) { startActivity(BookSearchActivity.intent(this)) }
-            .item(getString(R.string.change_reader)) { startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER)) }
-            .item(getString(R.string.clear_book)) { NowReadingStore.clear(this); refresh() }
+    private fun findApp(key: String): AppEntry? = apps.find { it.key == key }
+
+    /** 그 책의 앱을 연다. 앱을 아직 안 정했거나 지워졌으면 고르러 간다. */
+    private fun openBook(book: ShelfBook) {
+        val app = book.app?.let(::findApp)
+        if (app != null) AppStore.launch(this, app, prefs)
+        else startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, book.id))
+    }
+
+    /** 읽고 있는 책(맨 앞 책을 크게, 나머지는 아래 '함께 읽는 책' 줄) 또는 책이 없으면 가운데에 읽고 있는 앱 */
+    private fun buildHero(books: List<ShelfBook>, reading: AppEntry?) {
+        hero.removeAllViews()
+        centerHero.removeAllViews()
+        if (books.isEmpty()) {
+            showCenterHero(reading)
+            return
+        }
+        // 여러 권이면 표지와 여백을 조금 줄여 자주 쓰는 앱이 세 줄 들어가게 한다.
+        val several = books.size > 1
+        favTitle.setPadding(dp(Ui.MARGIN), dp(if (several) 18 else 30), dp(Ui.MARGIN), dp(12))
+        favRows.header = listOf(favTitle, favLine)
+        val main = books.first()
+        val col = vbox()
+        col.addView(mainBook(main, reading, dp(if (several) COVER_SMALLER_DP else COVER_DP)))
+        if (several) {
+            col.addView(text(getString(R.string.also_reading), 15f, color = Ui.LIGHT_GRAY).apply {
+                setPadding(dp(Ui.MARGIN), dp(16), dp(Ui.MARGIN), dp(8))
+            })
+            col.addView(hbox().apply {
+                gravity = Gravity.TOP
+                setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
+                books.drop(1).forEachIndexed { i, book ->
+                    addView(smallBook(book), lp(0, WRAP, 1f).apply { if (i > 0) marginStart = dp(12) })
+                }
+                // 두 권·세 권일 때도 표지 폭이 같도록 빈 칸을 채운다.
+                repeat(BookShelf.MAX - books.size) { addView(View(context), lp(0, 1, 1f).apply { marginStart = dp(12) }) }
+            })
+        }
+        hero.addView(col, FrameLayout.LayoutParams(MATCH, WRAP))
+    }
+
+    /** 맨 앞 책: 왼쪽 표지, 오른쪽 제목·저자와 읽고 있는 앱 */
+    private fun mainBook(book: ShelfBook, reading: AppEntry?, coverW: Int): View = hbox().apply {
+        gravity = Gravity.TOP
+        setPadding(dp(Ui.MARGIN), dp(26), dp(Ui.MARGIN), 0)
+        val coverH = coverW * 3 / 2
+        addView(coverView(book, coverW), lp(coverW + dp(2), coverH + dp(2)))
+        val info = vbox()
+        info.addView(text(book.title, 34f, Ui.heavy, lines = 2), lp(MATCH, WRAP).apply { topMargin = dp(10) })
+        if (book.author.isNotBlank()) {
+            info.addView(text(book.author, 18f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(10) })
+        }
+        info.addView(View(context), lp(MATCH, 0, 1f))
+        info.addView(
+            if (reading != null) hbox().apply {
+                if (prefs.showIcons) addView(ImageView(context).apply {
+                    setImageBitmap(AppIcons.gray(context, reading, dp(42)))
+                }, lp(dp(42), dp(42)).apply { marginEnd = dp(14) })
+                addView(text("${reading.label}  ›", 36f, Ui.heavy))
+            } else text(getString(R.string.pick_reader_link), 24f, Ui.bold, Ui.LIGHT_GRAY),
+            // 표지 아랫선보다 조금 올려 제목·저자와 한 덩어리로 보이게 한다.
+            lp(WRAP, WRAP).apply { bottomMargin = dp(28) }
+        )
+        addView(info, lp(0, coverH + dp(2), 1f).apply { marginStart = dp(24) })
+        setOnClickListener { openBook(book) }
+        setOnLongClickListener { showBookMenu(book); true }
+    }
+
+    /** 함께 읽는 책: 작은 표지 옆에 제목과 그 책의 앱. 누르면 맨 앞으로 올리고 그 앱을 연다. */
+    private fun smallBook(book: ShelfBook): View = hbox().apply {
+        gravity = Gravity.TOP
+        val w = dp(SMALL_COVER_DP)
+        addView(coverView(book, w), lp(w + dp(2), w * 3 / 2 + dp(2)))
+        val info = vbox()
+        info.addView(text(book.title, 16f, Ui.bold, lines = 2))
+        book.app?.let(::findApp)?.let {
+            info.addView(text(it.label, 13f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = dp(4) })
+        }
+        addView(info, lp(0, WRAP, 1f).apply { marginStart = dp(10) })
+        setOnClickListener {
+            BookShelf.moveToFront(this@HomeActivity, book.id)
+            openBook(book)
+        }
+        setOnLongClickListener { showBookMenu(book); true }
+    }
+
+    private fun coverView(book: ShelfBook, widthPx: Int): ImageView = ImageView(this).apply {
+        BookShelf.cover(this@HomeActivity, book, widthPx)?.let { setImageBitmap(it) }
+        scaleType = ImageView.ScaleType.CENTER_CROP
+        setBackgroundColor(Ui.BLACK)
+        setPadding(dp(1), dp(1), dp(1), dp(1))
+    }
+
+    /** 책을 길게 누르면: 읽고 있는 앱 바꾸기 / 책 빼기 / 책 추가 */
+    private fun showBookMenu(book: ShelfBook) {
+        Sheet(this).header(book.title, book.app?.let(::findApp)?.let { getString(R.string.reading_in, it.label) })
+            .item(getString(R.string.change_reader)) {
+                startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, book.id))
+            }
+            .item(getString(R.string.remove_book)) { BookShelf.remove(this, book.id); refresh() }
+            .item(getString(R.string.add_book)) { startActivity(BookSearchActivity.intent(this)) }
             .show()
     }
 
     /** 지금 읽는 책이 없을 때(B안): 읽고 있는 앱의 큰 아이콘과 이름을 상단과 자주 쓰는 앱 사이 가운데에 */
-    private fun showCenterHero(default: AppEntry?, onTap: View.OnClickListener) {
+    private fun showCenterHero(default: AppEntry?) {
         favRows.header = listOf(centerSpacer, favTitle, favLine)
         val block = vbox().apply {
             gravity = Gravity.CENTER_HORIZONTAL
@@ -281,7 +353,7 @@ class HomeActivity : EinkActivity() {
                 }, lp(dp(100), dp(100)).apply { bottomMargin = dp(14) })
                 addView(text(default.label, 40f, Ui.heavy).apply { gravity = Gravity.CENTER }, lp(WRAP, WRAP))
                 addView(text(getString(R.string.tap_to_read), 17f, color = Ui.LIGHT_GRAY), lp(WRAP, WRAP).apply { topMargin = dp(8) })
-                setOnClickListener(onTap)
+                setOnClickListener { AppStore.launch(this@HomeActivity, default, prefs) }
                 setOnLongClickListener { showAppMenu(default) { refresh() }; true }
             } else {
                 addView(text(getString(R.string.set_book_link), 30f, Ui.bold, Ui.LIGHT_GRAY), lp(WRAP, WRAP))
@@ -300,8 +372,17 @@ class HomeActivity : EinkActivity() {
     }
 
     companion object {
-        /** 지금 읽는 책 표지 폭 */
+        /** 맨 앞 책 표지 폭 (함께 읽는 책이 있으면 조금 작게) */
         private const val COVER_DP = 160
+        private const val COVER_SMALLER_DP = 136
+        /** 함께 읽는 책 표지 폭 */
+        private const val SMALL_COVER_DP = 50
+
+        /** 자주 쓰는 앱 격자: 4칸 × 2줄(목록과 같은 높이 안에), 아이콘 최대 크기, 아이콘 밖에 필요한 높이(이름·여백) */
+        private const val GRID_COLUMNS = 4
+        private const val GRID_ROWS = 2
+        private const val GRID_ICON_MAX_DP = 56
+        private const val GRID_LABEL_DP = 46
 
         /** 가운데 자리 최소 높이: 아이콘 100 + 이름 + 안내 + 여백 */
         private const val CENTER_MIN_DP = 220

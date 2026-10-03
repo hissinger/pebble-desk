@@ -76,11 +76,11 @@ abstract class EinkActivity : Activity() {
         if (isDefault) {
             sheet.header(app.label, resources.getQuantityString(R.plurals.main_opened_times, count, count), app)
                 .item(getString(R.string.change_main)) { startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER)) }
-                .item(getString(R.string.clear_main)) { prefs.changeReadingApp(null); changed() }
+                .item(getString(R.string.clear_main)) { changeMainApp(this, prefs, null); changed() }
         } else {
             val fav = app.key in prefs.favorites
             sheet.header(app.label, resources.getQuantityString(R.plurals.opened_times, count, count), app)
-                .item(getString(R.string.set_main)) { prefs.changeReadingApp(app.key); changed() }
+                .item(getString(R.string.set_main)) { changeMainApp(this, prefs, app.key); changed() }
                 .item(getString(if (fav) R.string.fav_remove else R.string.fav_add)) { prefs.toggleFavorite(app.key); changed() }
                 .item(getString(R.string.hide)) { prefs.hide(app.key); changed() }
         }

@@ -7,7 +7,9 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
+import android.util.LruCache
 import org.jsoup.Jsoup
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -100,47 +102,123 @@ object Bg {
     }
 }
 
-/** 지금 읽는 책 */
-data class NowReading(val title: String, val author: String, val updatedAt: Long, val cover: Bitmap)
+/** 읽고 있는 책 한 권: 표지는 앱 전용 저장소의 `books/<id>.jpg`, [app] 은 그 책을 읽는 앱(없으면 null). */
+data class ShelfBook(val id: String, val title: String, val author: String, val app: String?, val updatedAt: Long)
 
-/** 지금 읽는 책을 앱 전용 저장소에 둔다: 원본 표지(cover.jpg)와 제목·저자(info.json). */
-object NowReadingStore {
-    private var cached: NowReading? = null
+/**
+ * 읽고 있는 책 목록(최대 [MAX]권). 맨 앞 책이 홈에 크게 보이고, 그 책의 앱이 '읽고 있는 앱'이다.
+ * 목록은 books/books.json, 표지는 books/<id>.jpg.
+ */
+object BookShelf {
+    const val MAX = 4
+    private val covers = LruCache<String, Bitmap>(8)
 
-    private fun dir(context: Context) = File(context.filesDir, "now_reading").apply { mkdirs() }
-    private fun info(context: Context) = File(dir(context), "info.json")
-    private fun cover(context: Context) = File(dir(context), "cover.jpg")
+    private fun dir(context: Context) = File(context.filesDir, "books").apply { mkdirs() }
+    private fun index(context: Context) = File(dir(context), "books.json")
+    private fun coverFile(context: Context, id: String) = File(dir(context), "$id.jpg")
 
-    /** 없으면 null. 바뀌지 않았으면 표지를 다시 읽지 않는다. */
-    fun read(context: Context, coverWidthPx: Int): NowReading? {
-        val json = info(context).takeIf { it.exists() }?.let { runCatching { JSONObject(it.readText()) }.getOrNull() }
-            ?: return null.also { cached = null }
-        val updatedAt = json.optLong("updated_at")
-        cached?.let { if (it.updatedAt == updatedAt && it.cover.width == coverWidthPx) return it }
-        val bitmap = runCatching { BookSearch.grayCover(cover(context).readBytes(), coverWidthPx) }.getOrNull() ?: return null
-        return NowReading(json.optString("title"), json.optString("author"), updatedAt, bitmap).also { cached = it }
+    /** 이 런처만 쓰는 파일이라 쓸 때 함께 바꾸는 메모리 사본(돌아올 때마다 파일을 읽지 않도록) */
+    @Volatile private var cached: List<ShelfBook>? = null
+
+    fun list(context: Context): List<ShelfBook> {
+        cached?.let { return it }
+        migrateSingleBook(context)
+        return readIndex(context).also { cached = it }
     }
 
-    /** 설정 화면용: 표지는 읽지 않고 제목만. 없으면 null. */
-    fun title(context: Context): String? = info(context).takeIf { it.exists() }
-        ?.let { runCatching { JSONObject(it.readText()).optString("title") }.getOrNull() }
+    private fun readIndex(context: Context): List<ShelfBook> {
+        val f = index(context)
+        if (!f.exists()) return emptyList()
+        val arr = runCatching { JSONArray(f.readText()) }.getOrNull() ?: return emptyList()
+        return (0 until arr.length()).map { arr.getJSONObject(it) }.map {
+            ShelfBook(it.getString("id"), it.optString("title"), it.optString("author"),
+                it.optString("app").ifEmpty { null }, it.optLong("updated_at"))
+        }.filter { coverFile(context, it.id).length() > 0 }
+    }
 
-    /** 이미지가 아니면(오류 페이지 등) 저장하지 않고 IOException. */
+    /** 흑백으로 줄인 표지. 없거나 읽지 못하면 null. */
+    fun cover(context: Context, book: ShelfBook, widthPx: Int): Bitmap? {
+        val key = "${book.id}@$widthPx@${book.updatedAt}"
+        covers.get(key)?.let { return it }
+        val bmp = runCatching { BookSearch.grayCover(coverFile(context, book.id).readBytes(), widthPx) }.getOrNull() ?: return null
+        covers.put(key, bmp)
+        return bmp
+    }
+
+    /** 맨 앞에 넣는다(이미 있으면 앞으로 옮긴다). 새 책인데 [MAX]권이 차 있으면 넣지 않는다([isFull] 로 먼저 확인). 이미지가 아니면 IOException. */
     @Throws(IOException::class)
-    fun save(context: Context, book: BookResult, coverBytes: ByteArray) {
+    fun add(context: Context, book: BookResult, coverBytes: ByteArray, app: String?): ShelfBook {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(coverBytes, 0, coverBytes.size, bounds)
         if (bounds.outWidth <= 0) throw IOException("not an image")
-        writeAtomically(cover(context)) { it.writeBytes(coverBytes) }
-        val json = JSONObject().put("title", book.title).put("author", book.author)
-            .put("updated_at", System.currentTimeMillis())
-        writeAtomically(info(context)) { it.writeText(json.toString()) }
+        writeAtomically(coverFile(context, book.id)) { it.writeBytes(coverBytes) }
+        val old = list(context)
+        val added = ShelfBook(book.id, book.title, book.author, old.find { it.id == book.id }?.app ?: app, System.currentTimeMillis())
+        write(context, (listOf(added) + old.filter { it.id != book.id }).take(MAX))
+        return added
     }
 
-    fun clear(context: Context) {
-        info(context).delete()
-        cover(context).delete()
-        cached = null
+    /** 새 책을 더 넣을 수 없으면 true. 이미 있는 책([id])을 다시 고르는 것은 괜찮다. */
+    fun isFull(context: Context, id: String? = null): Boolean {
+        val books = list(context)
+        return books.size >= MAX && books.none { it.id == id }
+    }
+
+    fun moveToFront(context: Context, id: String) {
+        val books = list(context)
+        val book = books.find { it.id == id } ?: return
+        write(context, listOf(book) + books.filter { it.id != id })
+    }
+
+    /** [id] 책을 [delta] 칸 옮긴다(-1 이면 위로). 맨 위 책이 홈에 크게 보인다. */
+    fun move(context: Context, id: String, delta: Int) {
+        val books = list(context).toMutableList()
+        val from = books.indexOfFirst { it.id == id }
+        val to = from + delta
+        if (from < 0 || to !in books.indices) return
+        books.add(to, books.removeAt(from))
+        write(context, books)
+    }
+
+    /** 책마다 저장한 앱 키를 정리한다(지워진 앱은 null, 실행 화면 이름이 바뀐 앱은 새 키로). */
+    fun pruneApps(context: Context, fix: (String) -> String?) {
+        val books = list(context)
+        val fixed = books.map { b -> b.app?.let { b.copy(app = fix(it)) } ?: b }
+        if (fixed != books) write(context, fixed)
+    }
+
+    fun setApp(context: Context, id: String, app: String?) =
+        write(context, list(context).map { if (it.id == id) it.copy(app = app) else it })
+
+    fun remove(context: Context, id: String) {
+        write(context, list(context).filter { it.id != id })
+        coverFile(context, id).delete()
+    }
+
+    private fun write(context: Context, books: List<ShelfBook>) {
+        val arr = JSONArray()
+        books.forEach {
+            arr.put(JSONObject().put("id", it.id).put("title", it.title).put("author", it.author)
+                .put("app", it.app ?: "").put("updated_at", it.updatedAt))
+        }
+        writeAtomically(index(context)) { it.writeText(arr.toString()) }
+        cached = books.filter { coverFile(context, it.id).length() > 0 }
+    }
+
+    /** 예전(한 권만 저장하던) now_reading/ 을 목록의 첫 책으로 옮긴다. 그때의 읽고 있는 앱을 그 책의 앱으로. */
+    private fun migrateSingleBook(context: Context) {
+        val oldDir = File(context.filesDir, "now_reading")
+        val info = File(oldDir, "info.json")
+        val cover = File(oldDir, "cover.jpg")
+        if (!info.exists() || index(context).exists()) return
+        val json = runCatching { JSONObject(info.readText()) }.getOrNull()
+        if (json != null && cover.length() > 0) {
+            val id = "legacy"
+            cover.copyTo(coverFile(context, id), overwrite = true)
+            val app = HomePrefs(context).readingApp
+            write(context, listOf(ShelfBook(id, json.optString("title"), json.optString("author"), app, json.optLong("updated_at"))))
+        }
+        oldDir.deleteRecursively()
     }
 
     private fun writeAtomically(target: File, write: (File) -> Unit) {
@@ -151,4 +229,18 @@ object NowReadingStore {
             throw IOException("cannot write ${target.name}")
         }
     }
+}
+
+/** 읽고 있는 앱 바꾸기. 책이 있으면 맨 앞 책의 앱을, 없으면 홈의 읽고 있는 앱을 바꾼다. 자주 쓰는 앱과는 상관없다. */
+fun changeMainApp(context: Context, prefs: HomePrefs, key: String?) {
+    BookShelf.list(context).firstOrNull()?.let { BookShelf.setApp(context, it.id, key) }
+    prefs.readingApp = key
+}
+
+/** 특정 책의 앱 바꾸기. 맨 앞 책이면 읽고 있는 앱도 같이 바꾼다. */
+fun changeBookApp(context: Context, prefs: HomePrefs, bookId: String, key: String) {
+    val books = BookShelf.list(context)
+    if (books.none { it.id == bookId }) return
+    BookShelf.setApp(context, bookId, key)
+    if (books.first().id == bookId) prefs.readingApp = key
 }

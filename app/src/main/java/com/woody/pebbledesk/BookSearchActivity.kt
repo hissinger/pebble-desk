@@ -21,7 +21,7 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 /**
- * 지금 읽는 책 정하기: 제목으로 YES24 표지를 찾아 고르면 표지를 저장하고, 이어서 읽고 있는 앱을 고른다.
+ * 읽는 책 추가: 제목으로 YES24 표지를 찾아 고르면 책 목록 맨 앞에 넣고, 이어서 그 책을 읽는 앱을 고른다.
  * 결과는 표지 4열 그리드(한 페이지 두 줄)로 보여 주고 페이지로 넘긴다.
  */
 class BookSearchActivity : EinkActivity() {
@@ -155,16 +155,21 @@ class BookSearchActivity : EinkActivity() {
     /** 표지를 받아 저장한 뒤 읽는 앱을 고르러 간다. */
     private fun pick(book: BookResult) {
         if (busy) return
+        if (BookShelf.isFull(this, book.id)) {
+            status.text = getString(R.string.books_full, BookShelf.MAX)
+            return
+        }
         busy = true
         status.setText(R.string.cover_loading)
         Bg.run({
             val bytes = runCatching { BookSearch.download(book.coverUrl) }.getOrElse { BookSearch.download(book.thumbUrl) }
-            NowReadingStore.save(this, book, bytes)
+            BookShelf.add(this, book, bytes, app = null)
         }) { result ->
             busy = false
             if (isDestroyed) return@run
-            result.onSuccess {
-                startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER))
+            result.onSuccess { added ->
+                // 이미 앱을 정해 둔 책을 다시 고른 것이면 앞으로만 옮기고 끝
+                if (added.app == null) startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, added.id))
                 finish()
             }.onFailure { status.text = errorText(R.string.cover_error, it) }
         }

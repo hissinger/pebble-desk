@@ -60,12 +60,13 @@ data class DeviceStatus(
         }
 
         /** 크레마 상단바와 같은 값(persist.vendor.fullmode_cnt). 일반 앱도 읽을 수 있다. */
+        /** SystemProperties.get 은 숨은 함수라 한 번만 찾아 둔다(배터리 신호마다 불리므로). */
+        private val getProperty by lazy {
+            runCatching { Class.forName("android.os.SystemProperties").getMethod("get", String::class.java, String::class.java) }.getOrNull()
+        }
+
         private fun refreshEvery(): Int {
-            val value = runCatching {
-                Class.forName("android.os.SystemProperties")
-                    .getMethod("get", String::class.java, String::class.java)
-                    .invoke(null, "persist.vendor.fullmode_cnt", "") as String
-            }.getOrDefault("")
+            val value = runCatching { getProperty?.invoke(null, "persist.vendor.fullmode_cnt", "") as? String }.getOrNull().orEmpty()
             return value.trim().toIntOrNull()?.takeIf { it in 1..99 } ?: 0
         }
     }

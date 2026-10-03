@@ -9,9 +9,26 @@ import android.widget.LinearLayout
  * 스크롤 없이 페이지 단위로 넘기는 목록. 주어진 높이에 들어가는 만큼만 줄을 그리고, 줄 사이에 가는 회색 선을 둔다.
  * 전자잉크라 넘길 때 애니메이션을 쓰지 않는다.
  */
-class PagedRows(context: Context, private val rowHeightPx: Int) : LinearLayout(context) {
+class PagedRows(context: Context, private val listRowPx: Int) : LinearLayout(context) {
     private var rows: List<() -> View> = emptyList()
     private val dividerPx = context.dp(1)
+
+    /**
+     * 격자 모드: 목록일 때 들어갈 높이를 그대로 쓰고 그 안을 [gridRows] 줄로 나눈다(줄 사이 선 없음).
+     * 덜 차도 그 높이를 비워 두어 머리(제목·선) 위치가 목록일 때와 같다. 0 이면 목록.
+     */
+    private var gridRows = 0
+
+    /** 지금 한 줄의 높이(격자면 목록 높이를 나눈 값) */
+    var rowHeightPx: Int = listRowPx
+        private set
+
+    fun setGrid(gridRows: Int) {
+        if (gridRows == this.gridRows) return
+        this.gridRows = gridRows
+        perPage = 0
+        if (!fitRows(height)) render()
+    }
 
     var perPage = 0
         private set
@@ -85,9 +102,19 @@ class PagedRows(context: Context, private val rowHeightPx: Int) : LinearLayout(c
             v.measure(wSpec, hSpec)
             v.measuredHeight + (m?.topMargin ?: 0) + (m?.bottomMargin ?: 0)
         }
-        val fit = maxOf(1, (h - headerPx + dividerPx) / (rowHeightPx + dividerPx))
-        if (fit == perPage) return false
+        val listFit = maxOf(1, (h - headerPx + dividerPx) / (listRowPx + dividerPx))
+        val fit: Int
+        val rowPx: Int
+        if (gridRows > 0) {
+            fit = minOf(gridRows, listFit)
+            rowPx = (listFit * (listRowPx + dividerPx) - dividerPx) / fit
+        } else {
+            fit = listFit
+            rowPx = listRowPx
+        }
+        if (fit == perPage && rowPx == rowHeightPx) return false
         perPage = fit
+        rowHeightPx = rowPx
         renderBeforeDraw()
         return true
     }
@@ -117,9 +144,14 @@ class PagedRows(context: Context, private val rowHeightPx: Int) : LinearLayout(c
         val from = page * perPage
         val to = minOf(rows.size, from + perPage)
         for (i in from until to) {
-            if (i > from) addView(context.hline(1, Ui.DIVIDER))
+            if (i > from && gridRows == 0) addView(context.hline(1, Ui.DIVIDER))
             addView(rows[i](), lp(MATCH, rowHeightPx))
         }
+        // 덜 찬 페이지도 같은 높이를 쓴다(아래를 비워 제목·선 위치가 움직이지 않게).
+        // 목록은 페이지가 여러 개일 때만, 격자는 늘(목록과 같은 높이를 유지).
+        val missing = if (pageCount > 1 || gridRows > 0) perPage - (to - from) else 0
+        val gap = if (gridRows > 0) 0 else dividerPx
+        if (missing > 0) addView(View(context), lp(MATCH, missing * (rowHeightPx + gap)))
         onPageChanged?.invoke()
     }
 }

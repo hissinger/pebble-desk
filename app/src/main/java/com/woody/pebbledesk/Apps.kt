@@ -30,7 +30,25 @@ object AppStore {
     private val EBOOK_WORDS = listOf("ebook", "e-book", "eink", "e ink", "도서", "서재", "리디", "book")
 
     /** 설치된 앱 전체(이 런처 자신 제외)를 이름 순으로 */
+    private var cachedApps: List<AppEntry>? = null
+    private var cachedLocale: java.util.Locale? = null
+    private var packageSequence = 0
+
+    /**
+     * 설치된 앱 전체. 앱 조회와 이름 읽기가 비싸서(20~30ms) 앱이 설치·삭제·업데이트됐거나
+     * 언어가 바뀌었을 때만 다시 읽고, 그 밖에는 지난번 목록을 쓴다.
+     */
     fun load(context: Context): List<AppEntry> {
+        val pm = context.packageManager
+        val locale = context.resources.configuration.locales[0]
+        val changed = pm.getChangedPackages(packageSequence)
+        cachedApps?.let { if (changed == null && locale == cachedLocale) return it }
+        changed?.let { packageSequence = it.sequenceNumber }
+        cachedLocale = locale
+        return queryApps(context).also { cachedApps = it }
+    }
+
+    private fun queryApps(context: Context): List<AppEntry> {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         return pm.queryIntentActivities(intent, 0)
@@ -45,13 +63,27 @@ object AppStore {
             .sortedWith { a, b -> collator.compare(a.label, b.label) }
     }
 
-    /** 앱 목록을 읽고, 지워진 앱을 설정에서 정리한다. */
+    /** 앱 목록을 읽고, 지워진 앱을 설정과 읽고 있는 책에서 정리한다. */
     fun loadAndPrune(context: Context, prefs: HomePrefs): List<AppEntry> {
         val apps = load(context)
-        prefs.prune(apps) { pkg ->
-            runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
-        }
+        val fix = keyFixer(apps) { pkg -> runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess }
+        prefs.prune(fix)
+        BookShelf.pruneApps(context, fix)
         return apps
+    }
+
+    /**
+     * 저장해 둔 앱 키를 지금 목록에 맞춘다. 앱을 업데이트하는 동안에는 잠깐 목록에서 빠지므로,
+     * 패키지가 정말 지워졌을 때만 null(빼기), 실행 화면 이름만 바뀌었으면 같은 패키지의 새 화면 키를 돌려준다.
+     */
+    private fun keyFixer(apps: List<AppEntry>, isInstalled: (String) -> Boolean): (String) -> String? {
+        val keys = apps.map { it.key }.toSet()
+        return fix@{ key ->
+            if (key in keys) return@fix key
+            val pkg = key.substringBefore('/')
+            apps.firstOrNull { it.pkg == pkg }?.let { return@fix it.key }
+            if (isInstalled(pkg)) key else null
+        }
     }
 
     fun isEbook(app: AppEntry): Boolean {
@@ -94,6 +126,13 @@ object AppStore {
         if (c.isLetter() && c.code < 128) return c.uppercaseChar().toString()
         return "#"
     }
+}
+
+/** 자주 쓰는 앱을 직접 정한 순서대로(숨긴 앱·지워진 앱 제외). */
+fun favoriteApps(apps: List<AppEntry>, prefs: HomePrefs): List<AppEntry> {
+    val hidden = prefs.hidden
+    val byKey = apps.associateBy { it.key }
+    return prefs.favoriteList.mapNotNull { byKey[it] }.filter { it.key !in hidden }
 }
 
 /** 흑백으로 바꾼 앱 아이콘 캐시 */
