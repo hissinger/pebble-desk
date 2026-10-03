@@ -1,4 +1,4 @@
-package com.woody.pebblehome
+package com.woody.pebbledesk
 
 import android.content.Context
 import android.graphics.Bitmap

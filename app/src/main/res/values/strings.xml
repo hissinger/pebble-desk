@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pebble Home</string>
+    <string name="app_name">Pebble Desk</string>
     <!-- 설정의 언어 항목: 어느 언어에서도 찾을 수 있게 두 언어로 쓴다 -->
     <string name="language" translatable="false">언어 · Language</string>
     <string name="favorites">자주 쓰는 앱</string>

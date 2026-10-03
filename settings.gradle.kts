@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PebbleHome"
+rootProject.name = "PebbleDesk"
 include(":app")

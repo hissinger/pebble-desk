@@ -1,4 +1,4 @@
-package com.woody.pebblehome
+package com.woody.pebbledesk
 
 import android.content.Intent
 import android.os.Bundle
@@ -19,7 +19,7 @@ class SettingsActivity : EinkActivity() {
         list = vbox()
         root.addView(list, lp(MATCH, 0, 1f))
         val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
-        root.addView(text("Pebble Home $version", 15f, color = Ui.LIGHT_GRAY).apply {
+        root.addView(text("Pebble Desk $version", 15f, color = Ui.LIGHT_GRAY).apply {
             gravity = Gravity.CENTER
         }, lp(MATCH, dp(44)))
         setContentView(root)

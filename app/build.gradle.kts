@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.woody.pebblehome"
+    namespace = "com.woody.pebbledesk"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.woody.pebblehome"
+        applicationId = "com.woody.pebbledesk"
         minSdk = 28
         targetSdk = 34
         versionCode = 1
@@ -28,11 +28,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // 빌드 결과 APK 이름에 앱 이름과 버전을 넣는다. 예: PebbleHome-1.0.0-release.apk
+    // 빌드 결과 APK 이름에 앱 이름과 버전을 넣는다. 예: PebbleDesk-1.0.0-release.apk
     applicationVariants.all {
         outputs.all {
             (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
-                "PebbleHome-${versionName}-${buildType.name}.apk"
+                "PebbleDesk-${versionName}-${buildType.name}.apk"
         }
     }
 
