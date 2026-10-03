@@ -131,9 +131,10 @@ class HomeActivity : EinkActivity() {
 
         hero = FrameLayout(this)
         root.addView(hero, lp(MATCH, 0, 1f))
-        // 높이가 정해진 뒤에 그 높이에 맞춰 책 자리를 그린다(화면 회전은 없으므로 보통 한 번).
-        hero.addOnLayoutChangeListener { _, _, t, _, b, _, ot, _, ob ->
-            if (b - t != ob - ot && b - t != heroHeight) hero.post { shownState = null; refresh() }
+        // 높이가 정해지면(보통 처음 한 번) 이번 그리기를 건너뛰고 그 높이에 맞춰 책 자리를 채운 뒤 그린다.
+        // (다음 차례로 미루면 빈 자리를 한 번 그린 뒤 다시 그리게 되어 전자잉크가 깜빡인다.)
+        hero.viewTreeObserver.addOnPreDrawListener {
+            if (hero.height == heroHeight) true else { shownState = null; refresh(); false }
         }
 
         // 자주 쓰는 앱: 책 수와 상관없이 늘 목록 세 줄(격자는 그 높이 안에 두 줄) 높이
@@ -174,8 +175,7 @@ class HomeActivity : EinkActivity() {
         val iconsChanged = AppIcons.clearIfPackagesChanged(this)
         apps = AppStore.loadAndPrune(this, prefs)
         val books = BookShelf.list(this)
-        // 맨 앞 책의 앱이 곧 읽고 있는 앱이다(앱 메뉴에서 '읽고 있는 앱'을 알아보는 데 쓴다).
-        books.firstOrNull()?.app?.let { if (it != prefs.readingApp) prefs.readingApp = it }
+        // 맨 앞 책의 앱이 곧 읽고 있는 앱이다.
         val reading = books.firstOrNull()?.app?.let(::findApp)
         // 자주 쓰는 앱은 직접 넣고 뺀 그대로 보인다(위의 책·앱과 상관없다).
         val favs = favoriteApps(apps, prefs)
@@ -367,12 +367,7 @@ class HomeActivity : EinkActivity() {
         setOnLongClickListener { showBookMenu(book); true }
     }
 
-    private fun coverView(book: ShelfBook, widthPx: Int): ImageView = ImageView(this).apply {
-        BookShelf.cover(this@HomeActivity, book, widthPx)?.let { setImageBitmap(it) }
-        scaleType = ImageView.ScaleType.CENTER_CROP
-        setBackgroundColor(Ui.BLACK)
-        setPadding(dp(1), dp(1), dp(1), dp(1))
-    }
+    private fun coverView(book: ShelfBook, widthPx: Int): ImageView = coverImage(BookShelf.cover(this, book, widthPx))
 
     /** 책을 길게 누르면: 읽고 있는 앱 바꾸기 / 책 빼기. 머리에 작은 표지. */
     private fun showBookMenu(book: ShelfBook) {

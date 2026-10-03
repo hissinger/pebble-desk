@@ -62,7 +62,6 @@ class AppListActivity : EinkActivity() {
         })
         root.addView(hline(2))
         if (picking) {
-            // 책이 있으면 그 책을 읽는 앱, 없으면 홈에 크게 보일 앱
             root.addView(text(getString(R.string.pick_reader_desc), 17f, color = Ui.GRAY, lines = 2).apply {
                 setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), dp(4))
             })
@@ -123,8 +122,8 @@ class AppListActivity : EinkActivity() {
         val apps = AppStore.loadAndPrune(this, prefs)
         val hidden = prefs.hidden
         val favs = prefs.favorites
-        // 고르는 중이면 그 책의 앱(아직 없으면 지금 읽고 있는 앱을 먼저 짚어 둔다)
         val books = BookShelf.list(this)
+        // 고르는 중이면 지금 그 책의 앱에 ✓
         val default = (bookId?.let { id -> books.find { it.id == id } } ?: books.firstOrNull())?.app
         // 모든 앱에서 '읽는 중' 표시: 책에 연결된 앱 전부
         val readingApps = books.mapNotNull { it.app }.toSet()
@@ -153,7 +152,7 @@ class AppListActivity : EinkActivity() {
                 when (mode) {
                     Mode.ALL -> {
                         val mark = when {
-                            app.key in readingApps -> text(getString(R.string.mark_main), 17f)
+                            app.key in readingApps -> text(getString(R.string.mark_reading), 17f)
                             app.key in favs -> text("★", 18f)
                             else -> null
                         }
@@ -171,7 +170,7 @@ class AppListActivity : EinkActivity() {
                             showIcon = icons, right = if (current) text("✓", 24f, Ui.bold) else null).apply {
                             setOnClickListener {
                                 val id = bookId ?: BookShelf.list(this@AppListActivity).firstOrNull()?.id
-                                if (id != null) changeBookApp(this@AppListActivity, prefs, id, app.key)
+                                if (id != null) BookShelf.setApp(this@AppListActivity, id, app.key)
                                 finish()
                             }
                         }

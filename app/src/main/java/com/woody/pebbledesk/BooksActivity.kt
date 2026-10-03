@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 
@@ -88,12 +87,7 @@ class BooksActivity : EinkActivity() {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(Ui.MARGIN), dp(12), dp(Ui.MARGIN), dp(12))
                 val w = dp(COVER_DP)
-                addView(ImageView(context).apply {
-                    BookShelf.cover(context, book, w)?.let { setImageBitmap(it) }
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                    setBackgroundColor(Ui.BLACK)
-                    setPadding(dp(1), dp(1), dp(1), dp(1))
-                }, lp(w + dp(2), w * 3 / 2 + dp(2)))
+                addView(coverImage(BookShelf.cover(context, book, w)), lp(w + dp(2), w * 3 / 2 + dp(2)))
                 addView(vbox().apply {
                     addView(text(book.title, 22f, Ui.bold, lines = 2))
                     addView(text(app?.label ?: getString(R.string.pick_reader_link), 16f,

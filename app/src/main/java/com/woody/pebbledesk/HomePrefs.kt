@@ -3,14 +3,12 @@ package com.woody.pebbledesk
 import android.content.Context
 import org.json.JSONArray
 
-/** 런처 설정과 앱 목록 상태(읽고 있는 앱·자주 쓰는 앱·숨긴 앱) */
+/** 런처 설정과 앱 목록 상태(자주 쓰는 앱·숨긴 앱) */
 class HomePrefs(context: Context) {
     private val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
-    /** 읽고 있는 앱(홈에 크게 보이는 앱). 저장 키는 예전 이름(default_app)을 그대로 쓴다. */
-    var readingApp: String?
-        get() = sp.getString("default_app", null)
-        set(v) = sp.edit().putString("default_app", v).apply()
+    /** 예전(책 한 권만 저장하던) 버전의 읽고 있는 앱. 그 책을 새 목록으로 옮길 때만 읽는다. */
+    val legacyReadingApp: String? get() = sp.getString("default_app", null)
 
     /**
      * 자주 쓰는 앱(직접 정한 순서). 예전에는 순서 없는 묶음(favorites)으로 저장했으므로,
@@ -73,7 +71,6 @@ class HomePrefs(context: Context) {
     fun hide(key: String) {
         hidden = hidden + key
         favorites = favorites - key
-        if (readingApp == key) readingApp = null
     }
 
     fun unhide(key: String) {
@@ -82,7 +79,6 @@ class HomePrefs(context: Context) {
 
     /** 지워졌거나 실행 화면 이름이 바뀐 앱을 정리한다([fix] 는 AppStore.keyFixer). */
     fun prune(fix: (String) -> String?) {
-        readingApp?.let { key -> fix(key).let { if (it != key) readingApp = it } }
         favoriteList.let { list -> list.mapNotNull(fix).distinct().let { if (it != list) favoriteList = it } }
         hidden.let { set -> set.mapNotNull(fix).toSet().let { if (it != set) hidden = it } }
     }

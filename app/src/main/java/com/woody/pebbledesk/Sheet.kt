@@ -39,12 +39,7 @@ class Sheet(private val context: Context) {
                 lp(c.dp(45), c.dp(45)).apply { marginEnd = c.dp(16) })
         }
         image?.let {
-            head.addView(ImageView(c).apply {
-                setImageBitmap(it)
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                setBackgroundColor(Ui.BLACK)
-                setPadding(c.dp(1), c.dp(1), c.dp(1), c.dp(1))
-            }, lp(c.dp(38), c.dp(56)).apply { marginEnd = c.dp(16) })
+            head.addView(c.coverImage(it), lp(c.dp(38), c.dp(56)).apply { marginEnd = c.dp(16) })
         }
         val names = c.vbox()
         names.addView(c.text(title, 29f, Ui.heavy))

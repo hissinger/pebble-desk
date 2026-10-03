@@ -18,7 +18,7 @@
     <string name="hidden_empty_desc">모든 앱에서 앱을 길게 눌러 숨길 수 있습니다.\n숨긴 앱은 홈과 모든 앱에 나오지 않습니다.</string>
     <string name="hidden_count_link">숨긴 앱 %1$d  ›</string>
     <string name="hidden_note">숨긴 앱은 홈과 모든 앱에 나오지 않습니다.</string>
-    <string name="mark_main">읽는 중</string>
+    <string name="mark_reading">읽는 중</string>
     <string name="unhide">보이기</string>
     <string name="section_home">홈 화면</string>
     <string name="none">없음</string>

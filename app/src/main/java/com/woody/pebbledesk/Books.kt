@@ -198,10 +198,8 @@ object BookShelf {
         write(context, list(context).map { if (it.id == id) it.copy(app = app) else it })
 
     fun remove(context: Context, id: String) {
-        val rest = list(context).filter { it.id != id }
-        write(context, rest)
-        // 마지막 책을 빼면 그 책에 딸려 있던 읽고 있는 앱도 비운다(책이 없을 때의 큰 앱 자리에 남지 않게).
-        if (rest.isEmpty()) HomePrefs(context).readingApp = null
+        write(context, list(context).filter { it.id != id })
+        coverFile(context, id).delete()
         dir(context).listFiles { f -> f.name.startsWith("${id}_") }?.forEach { it.delete() }
     }
 
@@ -225,7 +223,7 @@ object BookShelf {
         if (json != null && cover.length() > 0) {
             val id = "legacy"
             cover.copyTo(coverFile(context, id), overwrite = true)
-            val app = HomePrefs(context).readingApp
+            val app = HomePrefs(context).legacyReadingApp
             write(context, listOf(ShelfBook(id, json.optString("title"), json.optString("author"), app, json.optLong("updated_at"))))
         }
         oldDir.deleteRecursively()
@@ -239,12 +237,4 @@ object BookShelf {
             throw IOException("cannot write ${target.name}")
         }
     }
-}
-
-/** 특정 책의 앱 바꾸기. 맨 앞 책이면 읽고 있는 앱도 같이 바꾼다. */
-fun changeBookApp(context: Context, prefs: HomePrefs, bookId: String, key: String) {
-    val books = BookShelf.list(context)
-    if (books.none { it.id == bookId }) return
-    BookShelf.setApp(context, bookId, key)
-    if (books.first().id == bookId) prefs.readingApp = key
 }

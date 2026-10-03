@@ -8,8 +8,8 @@ import android.widget.LinearLayout
 /**
  * 스크롤 없이 페이지 단위로 넘기는 목록. 주어진 높이에 들어가는 만큼만 줄을 그리고, 줄 사이에 가는 회색 선을 둔다.
  * 전자잉크라 넘길 때 애니메이션을 쓰지 않는다.
+ * [fixedRows] 가 0보다 크면 높이에 맞추지 않고 늘 그 줄 수(격자면 그 높이 안에 gridRows 줄)를 쓴다. 높이는 WRAP 으로 둔다.
  */
-/** [fixedRows] 가 0보다 크면 높이에 맞추지 않고 늘 그 줄 수(격자면 그 높이 안에 gridRows 줄)를 쓴다. 높이는 WRAP 으로 둔다. */
 class PagedRows(context: Context, private val listRowPx: Int, private val fixedRows: Int = 0) : LinearLayout(context) {
     private var rows: List<() -> View> = emptyList()
     private val dividerPx = context.dp(1)
@@ -88,23 +88,8 @@ class PagedRows(context: Context, private val listRowPx: Int, private val fixedR
      * (다음 차례로 미루면 빈 목록을 한 번 그린 뒤 다시 그리게 되어 전자잉크가 깜빡인다.) 줄 수가 바뀌었으면 true.
      */
     private fun fitRows(h: Int): Boolean {
-        if (h <= 0 && fixedRows == 0) return false
-        // 머리 뷰를 실제 배치와 같은 조건(정해진 높이·좌우 여백)으로 잰다. 레이아웃 중에 다른 조건으로 재면
-        // 그 값이 그대로 남아 선(높이 2dp)이 0 으로 그려진다.
-        val headerPx = header.sumOf { v ->
-            val m = v.layoutParams as? MarginLayoutParams
-            val lpW = v.layoutParams?.width ?: MATCH
-            val lpH = v.layoutParams?.height ?: WRAP
-            val wSpec = getChildMeasureSpec(
-                MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
-                paddingLeft + paddingRight + (m?.leftMargin ?: 0) + (m?.rightMargin ?: 0), lpW,
-            )
-            val hSpec = if (lpH >= 0) MeasureSpec.makeMeasureSpec(lpH, MeasureSpec.EXACTLY)
-            else MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-            v.measure(wSpec, hSpec)
-            v.measuredHeight + (m?.topMargin ?: 0) + (m?.bottomMargin ?: 0)
-        }
-        val listFit = if (fixedRows > 0) fixedRows else maxOf(1, (h - headerPx + dividerPx) / (listRowPx + dividerPx))
+        if (fixedRows == 0 && h <= 0) return false
+        val listFit = if (fixedRows > 0) fixedRows else maxOf(1, (h - headerHeight() + dividerPx) / (listRowPx + dividerPx))
         val fit: Int
         val rowPx: Int
         if (gridRows > 0) {
@@ -119,6 +104,24 @@ class PagedRows(context: Context, private val listRowPx: Int, private val fixedR
         rowHeightPx = rowPx
         renderBeforeDraw()
         return true
+    }
+
+    /**
+     * 머리 뷰 높이 합. 실제 배치와 같은 조건(정해진 높이·좌우 여백)으로 잰다. 레이아웃 중에 다른 조건으로 재면
+     * 그 값이 그대로 남아 선(높이 2dp)이 0 으로 그려진다.
+     */
+    private fun headerHeight(): Int = header.sumOf { v ->
+        val m = v.layoutParams as? MarginLayoutParams
+        val lpW = v.layoutParams?.width ?: MATCH
+        val lpH = v.layoutParams?.height ?: WRAP
+        val wSpec = getChildMeasureSpec(
+            MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+            paddingLeft + paddingRight + (m?.leftMargin ?: 0) + (m?.rightMargin ?: 0), lpW,
+        )
+        val hSpec = if (lpH >= 0) MeasureSpec.makeMeasureSpec(lpH, MeasureSpec.EXACTLY)
+        else MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        v.measure(wSpec, hSpec)
+        v.measuredHeight + (m?.topMargin ?: 0) + (m?.bottomMargin ?: 0)
     }
 
     private var renderPending = false

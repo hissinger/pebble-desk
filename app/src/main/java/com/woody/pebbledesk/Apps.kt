@@ -57,14 +57,16 @@ object AppStore {
     private fun bootCount(context: Context) =
         Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1)
 
-    private fun readSaved(context: Context, locale: Locale) {
-        val json = runCatching { JSONObject(savedFile(context).readText()) }.getOrNull() ?: return
-        if (json.optInt("boot", -2) != bootCount(context) || json.optString("locale") != locale.toLanguageTag()) return
+    /** 저장해 둔 목록이 이번 부팅·언어의 것이면 쓴다. 없거나 깨졌으면 그냥 새로 읽게 둔다. */
+    private fun readSaved(context: Context, locale: Locale) = runCatching {
+        val json = JSONObject(savedFile(context).readText())
+        if (json.optInt("boot", -2) != bootCount(context) || json.optString("locale") != locale.toLanguageTag()) return@runCatching
         val arr = json.getJSONArray("apps")
-        cachedApps = (0 until arr.length()).map { arr.getJSONArray(it) }
+        val apps = (0 until arr.length()).map { arr.getJSONArray(it) }
             .map { AppEntry(ComponentName(it.getString(0), it.getString(1)), it.getString(2)) }
+        packageSequence = json.getInt("seq")
+        cachedApps = apps
         cachedLocale = locale
-        packageSequence = json.optInt("seq")
     }
 
     private fun save(context: Context, apps: List<AppEntry>, locale: Locale) {

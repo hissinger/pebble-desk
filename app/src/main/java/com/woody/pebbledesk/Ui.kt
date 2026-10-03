@@ -1,6 +1,7 @@
 package com.woody.pebbledesk
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -92,6 +93,14 @@ fun Context.orderArrow(symbol: String, enabled: Boolean, onClick: () -> Unit): T
         setPadding(dp(4), dp(10), dp(4), dp(10))
         if (enabled) setOnClickListener { onClick() }
     }
+
+/** 책 표지: 가운데를 채워 자르고 1dp 검은 테두리 */
+fun Context.coverImage(bitmap: Bitmap?): ImageView = ImageView(this).apply {
+    bitmap?.let { setImageBitmap(it) }
+    scaleType = ImageView.ScaleType.CENTER_CROP
+    setBackgroundColor(Ui.BLACK)
+    setPadding(dp(1), dp(1), dp(1), dp(1))
+}
 
 fun Context.vbox(): LinearLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 

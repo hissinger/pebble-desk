@@ -15,7 +15,7 @@
     <string name="hidden_empty_desc">Long-press an app in All apps to hide it.\nHidden apps don\'t appear on Home or in All apps.</string>
     <string name="hidden_count_link">Hidden %1$d  ›</string>
     <string name="hidden_note">Hidden apps don\'t appear on Home or in All apps.</string>
-    <string name="mark_main">Reading</string>
+    <string name="mark_reading">Reading</string>
     <string name="unhide">Show</string>
     <string name="section_home">Home</string>
     <string name="none">None</string>
