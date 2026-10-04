@@ -61,6 +61,11 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("fav_grid", false)
         set(v) = sp.edit().putBoolean("fav_grid", v).apply()
 
+    /** 교보도서관·밀리의서재에서 편 책을 읽고 있는 책에 자동으로 넣기(접근성 서비스 필요) */
+    var autoBooks: Boolean
+        get() = sp.getBoolean("auto_books", false)
+        set(v) = sp.edit().putBoolean("auto_books", v).apply()
+
     /** 하단에 오늘 읽은 시간·연속 독서일(사용 기록 액세스 권한 필요) */
     var readingTime: Boolean
         get() = sp.getBoolean("reading_time", false)

@@ -2,6 +2,7 @@
 
 크레마 페블(전자잉크 6인치, 1072×1456, 300dpi) 전용 글자 중심 런처. 패키지 `com.woody.pebbledesk`.
 화면 규격·동작의 기준은 **DESIGN.md**다. 코드를 바꾸면 DESIGN.md도 같이 맞춘다.
+이북 앱(교보도서관·밀리의서재 등)에서 알아낼 수 있는 것과 없는 것은 **docs/READER_APPS.md** 에 정리했다.
 
 ## 빌드·설치
 
@@ -23,12 +24,15 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.0.0-release.apk </dev/
 - 기기가 잠깐 offline 이 되면 기다렸다 다시 한다.
 - 글자로 누르기: `uiautomator dump` 후 `text="..."` 의 bounds 가운데를 탭(이중 공백은 하나로 접힌다). 이미지 뷰는 dump 에 안 나온다.
 - **사용자가 기기를 쓰는 중일 수 있다.** 자동 조작은 필요한 만큼만, 와이파이·블루투스 등 기기 설정은 건드리지 않는다. 다른 앱 화면에서 길게 누르기·탭이 엉뚱한 곳(다른 이북 앱, Play 스토어)을 누른 적이 있다.
+- **`am force-stop com.woody.pebbledesk` 를 하지 않는다**: 접근성 서비스(읽는 책 자동 추가)가 시스템 설정에서 꺼진다. 다시 켜는 것은 사용자가 한다(adb 로 켜지 않는다). 덮어 설치는 괜찮다.
 - 캡처: `adb exec-out screencap -p > x.png`. 시안·비교 이미지는 `design-review/`(git 제외)에 둔다.
 
 ## 기기 특성(크레마 페블)
 
 - 1dp = 1.875px. 패널 맨 아래 약 8px 는 테두리에 가려 보이지 않는다 → `Crema.reserveHiddenBottom()` 으로 모든 화면·아래 메뉴의 아래를 비운다.
 - 연한 회색을 실제보다 어둡게 그린다(#e6 → 약 #c1). 아주 연한 회색은 디자인 값보다 밝게 잡는다(링 바탕 #f2).
+  - 원인은 크레마 **화면 대비**(`Settings.System hq_contrast`, 기본 56): 앱 화면 전체를 밝기^(1/s) 로 어둡게 그리고(s = 1 − 대비×90/8000 = 0.37, SystemUI `EinkSettingsProvider`) ImageView 그림만 같은 만큼 다시 밝힌다(bleach).
+  - 그래서 직접 그리는 표지는 `Crema.undoContrast` 로 미리 밝힌다(`Crema.contrastTone`). 검색 결과처럼 ImageView 에 넣는 그림은 밝히지 않는다(두 번 밝아짐).
 - 홈은 안드로이드 상단바를 숨기고 자체 상단(로고·시계·상태 줄)을 그린다. 상태 줄을 누르면 크레마 빠른 설정(`com.epd.drop_down` 브로드캐스트).
 - 크레마가 고친 안드로이드는 앱이 바뀔 때마다 모든 `ImageView` 와 배경 있는 뷰 묶음에 명암(bleach) 필터를 다시 걸고 다시 그린다. 그래서 그림은 `PictureView`(직접 그림)로 그리고, 홈의 흰 바탕은 창 배경 대신 직접 칠한다.
 - 화면 갱신(깜빡임)의 실제 횟수는 커널 로그 `ebc-dev: frame start` 로 센다. 그리기 횟수와 다르다(갱신 중 들어온 그리기는 합쳐진다).
@@ -42,6 +46,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.0.0-release.apk </dev/
 | HomeActivity | 홈: 상단 · 책 자리(스켈레톤/한 권/여러 권) · 자주 쓰는 앱(고정 3줄) · 하단 줄(모든 앱 · 오늘 읽은 시간 · 설정) |
 | ReadingActivity | ⑫ 독서 기록: 연속일·오늘 링, 4주 링 달력(뷰 하나로 그림), 합계, 이번 주 앱별 |
 | Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간 계산, `reading.json` 저장, 연속일 |
+| ReaderWatch | `ReaderWatchService`(접근성): 교보도서관·밀리·알라딘·북커스 서재에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기. 앱별 화면 요소 이름은 `SPECS` |
 | Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 4권, YES24 표지 검색), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
 | AppListActivity / FavoritesActivity / SettingsActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 |

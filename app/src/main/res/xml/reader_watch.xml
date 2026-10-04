@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 읽는 책 자동 추가: 교보도서관·밀리의서재·알라딘·북커스 화면만 받는다(다른 앱은 시스템이 보내지 않음). -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:packageNames="kr.co.kyobobook.KEL,kr.co.millie.eink,kr.co.aladin.ebook,com.bookers.ebook"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagIncludeNotImportantViews"
+    android:canRetrieveWindowContent="true"
+    android:canTakeScreenshot="true"
+    android:notificationTimeout="300"
+    android:description="@string/reader_watch_desc" />

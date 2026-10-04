@@ -3,8 +3,11 @@ package com.woody.pebbledesk
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.os.Build
+import android.provider.Settings
+import kotlin.math.pow
 
 /** 크레마 기기에서만 쓰는 기능 */
 object Crema {
@@ -30,6 +33,35 @@ object Crema {
         val id = res.getIdentifier("ic_icon_crema", "drawable", LAUNCHER_PKG)
         if (id == 0) null else res.getDrawable(id, null)
     }.getOrNull()
+
+    /**
+     * 크레마 '화면 대비'의 감마 s. 크레마는 글자를 진하게 하려고 앱 화면 전체를 밝기^(1/s) 로 어둡게 그리고
+     * ImageView 그림만 같은 만큼 다시 밝힌다(SystemUI `EinkSettingsProvider`: s = 1 − 대비 × 90 / 8000, 대비 56 → 0.37).
+     * 대비를 끄면(0) 또는 크레마가 아니면 1.
+     */
+    fun contrastTone(context: Context): Float {
+        if (!isCrema) return 1f
+        val contrast = runCatching { Settings.System.getInt(context.contentResolver, "hq_contrast", 0) }.getOrDefault(0)
+        return (1f - contrast * 90f / 8000f).coerceIn(0.1f, 1f)
+    }
+
+    /**
+     * 직접 그리는 그림(PictureView, 크레마가 밝혀 주지 않음)을 미리 밝기^s 로 밝혀, 화면 대비로 어두워진 뒤
+     * 원래 밝기로 보이게 한다. 흑백 그림([bmp] 의 파랑 값을 밝기로 본다)을 그 자리에서 바꾼다.
+     */
+    fun undoContrast(bmp: Bitmap, tone: Float) {
+        if (tone >= 1f) return
+        val lut = IntArray(256) { (255 * (it / 255f).pow(tone) + 0.5f).toInt() }
+        val w = bmp.width
+        val h = bmp.height
+        val px = IntArray(w * h)
+        bmp.getPixels(px, 0, w, 0, 0, w, h)
+        for (i in px.indices) {
+            val l = lut[px[i] and 0xFF]
+            px[i] = (px[i] and 0xFF000000.toInt()) or (l shl 16) or (l shl 8) or l
+        }
+        bmp.setPixels(px, 0, w, 0, 0, w, h)
+    }
 
     /** 크레마 상단바를 눌렀을 때와 같은 빠른 설정 창(와이파이·BT·조명·음량)을 연다. */
     fun openQuickSettings(context: Context) {

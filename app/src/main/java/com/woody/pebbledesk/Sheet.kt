@@ -43,7 +43,7 @@ class Sheet(private val context: Context) {
         }
         val names = c.vbox()
         names.addView(c.text(title, 29f, Ui.heavy))
-        subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
+        subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = 6), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
         head.addView(names, lp(0, WRAP, 1f))
         root.addView(head)
 

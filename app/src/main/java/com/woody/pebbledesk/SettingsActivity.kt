@@ -12,16 +12,18 @@ import java.time.format.TextStyle
 /** ⑧ 설정. 회색 소제목으로 묶고 값은 오른쪽에 같은 굵기로 쓴다. 켜짐은 검정, 꺼짐은 진회색, `›` 는 다음 화면. */
 class SettingsActivity : EinkActivity() {
     private lateinit var list: LinearLayout
+    /** 독서 화면으로 열렸는가(설정 > 독서) */
+    private val readingPage by lazy { intent.getBooleanExtra(EXTRA_READING, false) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = vbox()
-        root.addView(titleRow(getString(R.string.settings)) { finish() })
+        root.addView(titleRow(getString(if (readingPage) R.string.reading_settings else R.string.settings)) { finish() })
         root.addView(hline(2))
         list = vbox()
         root.addView(list, lp(MATCH, 0, 1f))
         val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
-        root.addView(text("Pebble Desk $version", 15f, color = Ui.LIGHT_GRAY).apply {
+        if (!readingPage) root.addView(text("Pebble Desk $version", 15f, color = Ui.LIGHT_GRAY).apply {
             gravity = Gravity.CENTER
         }, lp(MATCH, dp(44)))
         setContentView(root)
@@ -29,7 +31,7 @@ class SettingsActivity : EinkActivity() {
 
     override fun onResume() {
         super.onResume()
-        render()
+        if (readingPage) renderReading() else render()
     }
 
     private fun render() {
@@ -57,35 +59,14 @@ class SettingsActivity : EinkActivity() {
             }
         }
         toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint)) { prefs.showIcons = it }
-        // 켜 두었는데 권한이 없으면 값 자리에 '권한 허용'을 두고, 누르면 시스템 화면으로 보낸다.
-        val access = ReadingLog.hasAccess(this)
-        val needAccess = prefs.readingTime && !access
-        row(
-            getString(R.string.reading_time),
-            getString(if (needAccess) R.string.allow_access else if (prefs.readingTime) R.string.on else R.string.off),
-            on = prefs.readingTime, next = needAccess, hint = getString(R.string.reading_time_hint),
-        ) {
-            when {
-                needAccess -> ReadingLog.openAccessSettings(this)
-                prefs.readingTime -> { prefs.readingTime = false; render() }
-                else -> { prefs.readingTime = true; if (!access) ReadingLog.openAccessSettings(this) else render() }
-            }
-        }
-        if (prefs.readingTime) {
-            val goals = listOf(0, 15, 20, 30, 45, 60)
-            val goalText = { m: Int -> if (m == 0) getString(R.string.none) else getString(R.string.dur_m, m) }
-            row(getString(R.string.daily_goal), goalText(prefs.readingGoalMin), next = true) {
-                choose(getString(R.string.daily_goal), goals.map(goalText), goals.indexOf(prefs.readingGoalMin).coerceAtLeast(0)) {
-                    prefs.readingGoalMin = goals[it]; render()
-                }
-            }
-            // 독서 기록 달력과 '이번 주'의 시작 요일
-            val days = listOf(DayOfWeek.MONDAY, DayOfWeek.SUNDAY)
-            val dayNames = days.map { it.getDisplayName(TextStyle.FULL, resources.configuration.locales[0]) }
-            val first = days.indexOf(prefs.firstDayOfWeek)
-            row(getString(R.string.week_starts), dayNames[first], next = true) {
-                choose(getString(R.string.week_starts), dayNames, first) { prefs.firstDayOfWeek = days[it]; render() }
-            }
+        // 독서(읽는 책 자동 추가·오늘 읽은 시간·하루 목표·한 주 시작)는 줄이 많아 따로 한 화면에 둔다.
+        val reading = listOfNotNull(
+            getString(R.string.auto_books_short).takeIf { prefs.autoBooks },
+            getString(R.string.reading_time).takeIf { prefs.readingTime },
+        )
+        row(getString(R.string.reading_settings), reading.joinToString(" · ").ifEmpty { getString(R.string.off) },
+            on = reading.isNotEmpty(), next = true) {
+            startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_READING, true))
         }
         val clocks = listOf(getString(R.string.clock24), getString(R.string.clock12))
         row(getString(R.string.clock), clocks[if (prefs.clock24h) 0 else 1], next = true) {
@@ -112,6 +93,64 @@ class SettingsActivity : EinkActivity() {
         row(getString(R.string.device_settings), null, next = true, last = true) {
             runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
         }
+    }
+
+
+    /** 독서 화면: 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */
+    private fun renderReading() {
+        list.removeAllViews()
+        // 읽는 책 자동 추가: 켜려면 안드로이드 접근성에서 이 앱을 켜야 한다(앱이 대신 켤 수 없다).
+        val watching = ReaderWatchService.isEnabled(this)
+        val needWatch = prefs.autoBooks && !watching
+        row(
+            getString(R.string.auto_books),
+            getString(if (needWatch) R.string.allow_access else if (prefs.autoBooks) R.string.on else R.string.off),
+            on = prefs.autoBooks, next = needWatch, hint = getString(R.string.auto_books_hint),
+        ) {
+            when {
+                needWatch -> openAccessibility()
+                prefs.autoBooks -> { prefs.autoBooks = false; renderReading() }
+                watching -> { prefs.autoBooks = true; renderReading() }
+                else -> Sheet(this).header(getString(R.string.auto_books), getString(R.string.auto_books_desc))
+                    .item(getString(R.string.open_accessibility), bold = true) { prefs.autoBooks = true; openAccessibility() }
+                    .show()
+            }
+        }
+        // 켜 두었는데 권한이 없으면 값 자리에 '권한 허용'을 두고, 누르면 시스템 화면으로 보낸다.
+        val access = ReadingLog.hasAccess(this)
+        val needAccess = prefs.readingTime && !access
+        row(
+            getString(R.string.reading_time),
+            getString(if (needAccess) R.string.allow_access else if (prefs.readingTime) R.string.on else R.string.off),
+            on = prefs.readingTime, next = needAccess, hint = getString(R.string.reading_time_hint),
+        ) {
+            when {
+                needAccess -> ReadingLog.openAccessSettings(this)
+                prefs.readingTime -> { prefs.readingTime = false; renderReading() }
+                else -> { prefs.readingTime = true; if (!access) ReadingLog.openAccessSettings(this) else renderReading() }
+            }
+        }
+        if (prefs.readingTime) {
+            val goals = listOf(0, 15, 20, 30, 45, 60)
+            val goalText = { m: Int -> if (m == 0) getString(R.string.none) else getString(R.string.dur_m, m) }
+            row(getString(R.string.daily_goal), goalText(prefs.readingGoalMin), next = true) {
+                choose(getString(R.string.daily_goal), goals.map(goalText), goals.indexOf(prefs.readingGoalMin).coerceAtLeast(0)) {
+                    prefs.readingGoalMin = goals[it]; renderReading()
+                }
+            }
+            // 독서 기록 달력과 '이번 주'의 시작 요일
+            val days = listOf(DayOfWeek.MONDAY, DayOfWeek.SUNDAY)
+            val dayNames = days.map { it.getDisplayName(TextStyle.FULL, resources.configuration.locales[0]) }
+            val first = days.indexOf(prefs.firstDayOfWeek)
+            row(getString(R.string.week_starts), dayNames[first], next = true) {
+                choose(getString(R.string.week_starts), dayNames, first) { prefs.firstDayOfWeek = days[it]; renderReading() }
+            }
+        }
+        row(getString(R.string.reading_stats), null, next = true, last = true) { startActivity(ReadingActivity.intent(this)) }
+    }
+
+    private fun openAccessibility() {
+        runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
     }
 
     private fun section(title: String) {
@@ -151,5 +190,9 @@ class SettingsActivity : EinkActivity() {
         for (intent in candidates) {
             if (runCatching { startActivity(intent) }.isSuccess) return
         }
+    }
+
+    companion object {
+        private const val EXTRA_READING = "reading"
     }
 }

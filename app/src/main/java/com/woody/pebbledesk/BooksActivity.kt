@@ -77,7 +77,9 @@ class BooksActivity : EinkActivity() {
         addLink.isEnabled = !full
         addLink.setTextColor(if (full) Ui.LIGHT_GRAY else Ui.BLACK)
         empty.visibility = if (books.isEmpty()) View.VISIBLE else View.GONE
-        hint.visibility = if (books.size > 1) View.VISIBLE else View.GONE
+        // 자동 추가를 켰으면 그 규칙을, 아니면 순서 바꾸기를 안내한다.
+        hint.setText(if (prefs.autoBooks) R.string.books_auto_hint else R.string.books_order_hint)
+        hint.visibility = if (books.size > 1 || prefs.autoBooks) View.VISIBLE else View.GONE
 
         list.removeAllViews()
         books.forEachIndexed { i, book ->
@@ -90,8 +92,9 @@ class BooksActivity : EinkActivity() {
                 addView(coverImage(BookShelf.cover(context, book, w)), lp(w + dp(2), w * 3 / 2 + dp(2)))
                 addView(vbox().apply {
                     addView(text(book.title, 22f, Ui.bold, lines = 2))
-                    addView(text(app?.label ?: getString(R.string.pick_reader_link), 16f,
-                        color = if (app != null) Ui.GRAY else Ui.LIGHT_GRAY), lp(WRAP, WRAP).apply { topMargin = dp(6) })
+                    val appText = app?.label ?: getString(R.string.pick_reader_link)
+                    val line = (listOf(appText) + bookStatus(book)).joinToString("  ·  ")
+                    addView(text(line, 16f, color = if (app != null) Ui.GRAY else Ui.LIGHT_GRAY), lp(WRAP, WRAP).apply { topMargin = dp(6) })
                 }, lp(0, WRAP, 1f).apply { marginStart = dp(16) })
                 addView(orderArrow("↑", i > 0) { BookShelf.move(this@BooksActivity, book.id, -1); render() })
                 addView(orderArrow("↓", i < books.size - 1) { BookShelf.move(this@BooksActivity, book.id, 1); render() })
@@ -103,6 +106,8 @@ class BooksActivity : EinkActivity() {
                 setOnClickListener {
                     startActivity(AppListActivity.intent(this@BooksActivity, AppListActivity.Mode.PICK_READER, book.id))
                 }
+                // 길게 누르면 표지를 인터넷(YES24)에서 다시 찾아 바꾼다(자동으로 넣은 책도).
+                setOnLongClickListener { startActivity(BookSearchActivity.intent(this@BooksActivity, replace = book)); true }
             })
         }
     }

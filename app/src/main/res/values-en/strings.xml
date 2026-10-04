@@ -54,7 +54,7 @@
     <string name="books_count">%1$d / %2$d</string>
     <string name="remove">Remove</string>
     <string name="books_full">You can keep up to %1$d books. Remove one from your reading list first.</string>
-    <string name="books_order_hint">The top book shows large on Home. Use ↑ ↓ to reorder; tap a row to change its app.</string>
+    <string name="books_order_hint">The top book shows large on Home. Use ↑ ↓ to reorder; tap a row to change its app, long-press to change its cover.</string>
     <string name="favorites_none">No favorites yet</string>
     <string name="add_app_link">Add app  ›</string>
     <string name="add_app">Add app</string>
@@ -89,4 +89,17 @@
     <string name="month_fmt">MMM</string>
     <string name="date_short_fmt">MMM d</string>
     <string name="week_starts">Week starts on</string>
+    <string name="reading_settings">Reading</string>
+    <string name="auto_books">Auto-add books</string>
+    <string name="auto_books_short">Auto-add</string>
+    <string name="auto_books_hint">Kyobo Library · Millie · Aladin · Bookers</string>
+    <string name="auto_books_desc">When you open a book on the Kyobo Library, Millie, Aladin or Bookers shelf, it goes to the top of your reading list. Only book titles, authors, progress, due dates and covers on the shelf and search screens are read; other apps are never seen. Turn on Pebble Desk in Accessibility.</string>
+    <string name="open_accessibility">Open Accessibility</string>
+    <string name="progress_pct">%1$d%% read</string>
+    <string name="due_days">Due in %1$d days</string>
+    <string name="due_today">Due today</string>
+    <string name="due_over">Overdue</string>
+    <string name="find_cover">Find cover again</string>
+    <string name="books_auto_hint">Books you open in Kyobo Library, Millie, Aladin or Bookers are added to the top automatically; past 4 books, the one opened longest ago drops off. Long-press to change a cover.</string>
+    <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the Kyobo Library, Millie, Aladin and Bookers shelf and search screens to fill your reading list. Other apps are not seen, and nothing leaves the device.</string>
 </resources>

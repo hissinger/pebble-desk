@@ -34,6 +34,8 @@ class BookSearchActivity : EinkActivity() {
     /** 늦게 끝난 옛 검색이 새 결과를 덮지 않도록 검색마다 번호를 붙인다. */
     private var searchId = 0
     private var busy = false
+    /** 표지 다시 찾기: 이 책의 표지·제목만 바꾼다(자리·앱·진행률은 그대로). */
+    private val replaceId by lazy { intent.getStringExtra(EXTRA_REPLACE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,7 +44,7 @@ class BookSearchActivity : EinkActivity() {
         coverH = cellW * 3 / 2
 
         val root = vbox()
-        root.addView(titleRow(getString(R.string.book_search_title)) { finish() })
+        root.addView(titleRow(getString(if (replaceId != null) R.string.find_cover else R.string.book_search_title)) { finish() })
         root.addView(hline(2))
 
         // 제목 입력 줄: 박스 없이 아래 굵은 선만
@@ -93,8 +95,15 @@ class BookSearchActivity : EinkActivity() {
         }
         setContentView(root)
 
-        input.requestFocus()
-        input.post { getSystemService(InputMethodManager::class.java).showSoftInput(input, 0) }
+        val preset = intent.getStringExtra(EXTRA_QUERY)
+        if (preset != null) {
+            // 표지 다시 찾기: 제목으로 바로 찾는다.
+            input.setText(preset)
+            search()
+        } else {
+            input.requestFocus()
+            input.post { getSystemService(InputMethodManager::class.java).showSoftInput(input, 0) }
+        }
     }
 
     override fun onSwipe(toLeft: Boolean): Boolean {
@@ -155,6 +164,7 @@ class BookSearchActivity : EinkActivity() {
     /** 표지를 받아 저장한 뒤 읽는 앱을 고르러 간다. */
     private fun pick(book: BookResult) {
         if (busy) return
+        replaceId?.let { old -> replaceCover(old, book); return }
         if (BookShelf.isFull(this, book.id)) {
             status.text = getString(R.string.books_full, BookShelf.MAX)
             return
@@ -175,6 +185,19 @@ class BookSearchActivity : EinkActivity() {
         }
     }
 
+    private fun replaceCover(oldId: String, book: BookResult) {
+        busy = true
+        status.setText(R.string.cover_loading)
+        Bg.run({
+            val bytes = runCatching { BookSearch.download(book.coverUrl) }.getOrElse { BookSearch.download(book.thumbUrl) }
+            BookShelf.replace(this, oldId, book, bytes)
+        }) { result ->
+            busy = false
+            if (isDestroyed) return@run
+            result.onSuccess { finish() }.onFailure { status.text = errorText(R.string.cover_error, it) }
+        }
+    }
+
     /** 연결 문제면 와이파이를 확인하라고, 그 밖에는 [res] 에 오류 내용을 넣어 보여 준다. */
     private fun errorText(res: Int, e: Throwable): String = when (e) {
         is UnknownHostException, is ConnectException, is SocketTimeoutException -> getString(R.string.no_network)
@@ -189,6 +212,12 @@ class BookSearchActivity : EinkActivity() {
             override fun sizeOf(key: String, value: Bitmap) = value.byteCount
         }
 
-        fun intent(context: Context) = Intent(context, BookSearchActivity::class.java)
+        private const val EXTRA_REPLACE = "replace"
+        private const val EXTRA_QUERY = "query"
+
+        /** 책 추가. [replace] 를 주면 그 책의 표지 다시 찾기(제목으로 바로 검색). */
+        fun intent(context: Context, replace: ShelfBook? = null) = Intent(context, BookSearchActivity::class.java).apply {
+            replace?.let { putExtra(EXTRA_REPLACE, it.id); putExtra(EXTRA_QUERY, listOf(it.title, it.author).filter(String::isNotBlank).joinToString(" ")) }
+        }
     }
 }

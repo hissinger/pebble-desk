@@ -154,7 +154,7 @@ class PictureView(context: Context, private val crop: Boolean = false) : View(co
 fun Context.picture(bitmap: Bitmap?): PictureView = PictureView(this).apply { this.bitmap = bitmap }
 
 /** 책 표지: 가운데를 채워 자르고 1dp 회색 테두리(흰 표지 윗변이 구분선처럼 보이지 않게) */
-fun Context.coverImage(bitmap: Bitmap?): PictureView = PictureView(this, crop = true).apply {
+fun Context.coverImage(bitmap: Bitmap): PictureView = PictureView(this, crop = true).apply {
     this.bitmap = bitmap
     setBackgroundColor(Ui.LIGHT_GRAY)
     setPadding(dp(1), dp(1), dp(1), dp(1))

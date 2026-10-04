@@ -391,6 +391,10 @@ class HomeActivity : EinkActivity() {
         if (book.author.isNotBlank()) {
             info.addView(text(book.author, 16f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(10) })
         }
+        // 이북 앱 서재에서 읽어 온 진행률·반납일(읽는 책 자동 추가를 켰을 때), 한 줄씩
+        bookStatus(book).forEachIndexed { i, s ->
+            info.addView(text(s, 15f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(if (i == 0) 6 else 2) })
+        }
         info.addView(
             if (reading != null) hbox().apply {
                 if (prefs.showIcons) addView(picture(AppIcons.gray(context, reading, dp(26))), lp(dp(26), dp(26)).apply { marginEnd = dp(10) })
@@ -414,6 +418,7 @@ class HomeActivity : EinkActivity() {
         book.app?.let(::findApp)?.let {
             info.addView(text(it.label, 13f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = dp(4) })
         }
+        bookStatus(book).forEach { info.addView(text(it, 12f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = dp(2) }) }
         addView(info, lp(0, WRAP, 1f).apply { marginStart = dp(10) })
         setOnClickListener {
             BookShelf.moveToFront(this@HomeActivity, book.id)
@@ -433,6 +438,7 @@ class HomeActivity : EinkActivity() {
             .item(getString(R.string.change_reader)) {
                 startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, book.id))
             }
+            .item(getString(R.string.find_cover)) { startActivity(BookSearchActivity.intent(this, replace = book)) }
             .item(getString(R.string.remove_book)) { BookShelf.remove(this, book.id); refresh() }
             .show()
     }
