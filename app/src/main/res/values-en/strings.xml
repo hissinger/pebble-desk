@@ -88,4 +88,5 @@
     <string name="dur_hm">%1$dh %2$dm</string>
     <string name="month_fmt">MMM</string>
     <string name="date_short_fmt">MMM d</string>
+    <string name="week_starts">Week starts on</string>
 </resources>

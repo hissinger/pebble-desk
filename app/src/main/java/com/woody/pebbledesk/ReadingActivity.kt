@@ -83,10 +83,13 @@ class ReadingActivity : EinkActivity() {
         }, lp(dp(86), dp(86)))
     }
 
-    /** 최근 4주(월~일) 링 달력. 날짜는 링 위에 작게, 오늘은 검은 동그라미 안에. 기록 전([since] 전)·앞날은 흐린 빈 링. */
+    /** 이번 주의 첫날(설정의 한 주 시작 요일). 달력·이번 주 합계·이번 주 앱별이 모두 따른다. */
+    private fun startOfWeek(today: LocalDate): LocalDate = today.with(TemporalAdjusters.previousOrSame(prefs.firstDayOfWeek))
+
+    /** 최근 4주 링 달력. 날짜는 링 위에 작게, 오늘은 검은 동그라미 안에. 기록 전([since] 전)·앞날은 흐린 빈 링. */
     private fun calendar(today: LocalDate, since: LocalDate, goalMs: Long, progress: (LocalDate) -> Float) = vbox().apply {
         val locale = resources.configuration.locales[0]
-        val start = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(WEEKS - 1L)
+        val start = startOfWeek(today).minusWeeks(WEEKS - 1L)
         val end = start.plusDays(WEEKS * 7L - 1)
         val dateFmt = DateTimeFormatter.ofPattern(getString(R.string.date_short_fmt), locale)
         addView(hbox().apply {
@@ -105,7 +108,7 @@ class ReadingActivity : EinkActivity() {
     private fun totals(days: ReadingDays, today: LocalDate, since: LocalDate, goalMs: Long) = hbox().apply {
         setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), dp(10))
         val locale = resources.configuration.locales[0]
-        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val weekStart = startOfWeek(today)
         fun sum(from: LocalDate) = days.filterKeys { it in from..today }.keys.sumOf { days.total(it) }
         // 이번 달 중 기록이 있는 날만 센다.
         val monthDays = (1..today.dayOfMonth).map { today.withDayOfMonth(it) }.filter { it >= since }
@@ -127,7 +130,7 @@ class ReadingActivity : EinkActivity() {
     private fun byApp(days: ReadingDays, today: LocalDate) = vbox().apply {
         setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), 0)
         addView(text(getString(R.string.apps_this_week), 13f, Ui.bold, Ui.GRAY))
-        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val weekStart = startOfWeek(today)
         val perApp = mutableMapOf<String, Long>()
         days.filterKeys { it in weekStart..today }.values.forEach { apps -> apps.forEach { (pkg, ms) -> perApp[pkg] = (perApp[pkg] ?: 0) + ms } }
         val top = perApp.filterValues { it >= 60_000 }.entries.sortedByDescending { it.value }.take(3)
@@ -204,7 +207,8 @@ private class RingCalendar(
     private val weeks: Int,
     private val progress: (LocalDate) -> Float,
 ) : View(context) {
-    private val weekdays = (1..7).map { DayOfWeek.of(it).getDisplayName(TextStyle.NARROW, context.resources.configuration.locales[0]) }
+    /** [start] 의 요일부터 일주일 */
+    private val weekdays = (0L..6L).map { start.dayOfWeek.plus(it).getDisplayName(TextStyle.NARROW, context.resources.configuration.locales[0]) }
     private val margin = context.dpf(Ui.MARGIN)
     private val weekdayTop = context.dpf(8)
     private val weekdayH = context.dpf(22)

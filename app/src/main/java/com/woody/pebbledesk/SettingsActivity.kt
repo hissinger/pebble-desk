@@ -6,6 +6,8 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
+import java.time.DayOfWeek
+import java.time.format.TextStyle
 
 /** ⑧ 설정. 회색 소제목으로 묶고 값은 오른쪽에 같은 굵기로 쓴다. 켜짐은 검정, 꺼짐은 진회색, `›` 는 다음 화면. */
 class SettingsActivity : EinkActivity() {
@@ -77,6 +79,13 @@ class SettingsActivity : EinkActivity() {
                     prefs.readingGoalMin = goals[it]; render()
                 }
             }
+            // 독서 기록 달력과 '이번 주'의 시작 요일
+            val days = listOf(DayOfWeek.MONDAY, DayOfWeek.SUNDAY)
+            val dayNames = days.map { it.getDisplayName(TextStyle.FULL, resources.configuration.locales[0]) }
+            val first = days.indexOf(prefs.firstDayOfWeek)
+            row(getString(R.string.week_starts), dayNames[first], next = true) {
+                choose(getString(R.string.week_starts), dayNames, first) { prefs.firstDayOfWeek = days[it]; render() }
+            }
         }
         val clocks = listOf(getString(R.string.clock24), getString(R.string.clock12))
         row(getString(R.string.clock), clocks[if (prefs.clock24h) 0 else 1], next = true) {
@@ -125,7 +134,7 @@ class SettingsActivity : EinkActivity() {
             if (shown.isNotEmpty()) addView(text(shown, 20f, Ui.medium, if (on) Ui.BLACK else Ui.GRAY))
             setOnClickListener { action() }
         }
-        list.addView(row, lp(MATCH, dp(49)))
+        list.addView(row, lp(MATCH, dp(45)))
         if (!last) list.addView(hline(1, Ui.DIVIDER))
     }
 

@@ -2,6 +2,7 @@ package com.woody.pebbledesk
 
 import android.content.Context
 import org.json.JSONArray
+import java.time.DayOfWeek
 
 /** 런처 설정과 앱 목록 상태(자주 쓰는 앱·숨긴 앱) */
 class HomePrefs(context: Context) {
@@ -69,6 +70,11 @@ class HomePrefs(context: Context) {
     var readingGoalMin: Int
         get() = sp.getInt("reading_goal_min", 30)
         set(v) = sp.edit().putInt("reading_goal_min", v).apply()
+
+    /** 독서 기록 달력·이번 주의 시작 요일: 월요일(기본) 또는 일요일 */
+    var firstDayOfWeek: DayOfWeek
+        get() = if (sp.getBoolean("week_starts_sunday", false)) DayOfWeek.SUNDAY else DayOfWeek.MONDAY
+        set(v) = sp.edit().putBoolean("week_starts_sunday", v == DayOfWeek.SUNDAY).apply()
 
     var showIcons: Boolean
         get() = sp.getBoolean("show_icons", true)
