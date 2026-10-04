@@ -12,18 +12,23 @@ import java.time.format.TextStyle
 /** ⑧ 설정. 회색 소제목으로 묶고 값은 오른쪽에 같은 굵기로 쓴다. 켜짐은 검정, 꺼짐은 진회색, `›` 는 다음 화면. */
 class SettingsActivity : EinkActivity() {
     private lateinit var list: LinearLayout
-    /** 독서 화면으로 열렸는가(설정 > 독서) */
-    private val readingPage by lazy { intent.getBooleanExtra(EXTRA_READING, false) }
+    /** 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]) */
+    private val page by lazy { intent.getStringExtra(EXTRA_PAGE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = vbox()
-        root.addView(titleRow(getString(if (readingPage) R.string.reading_settings else R.string.settings)) { finish() })
+        val title = when (page) {
+            PAGE_GUIDE -> R.string.auto_books_guide
+            PAGE_READING -> R.string.reading_settings
+            else -> R.string.settings
+        }
+        root.addView(titleRow(getString(title)) { finish() })
         root.addView(hline(2))
         list = vbox()
         root.addView(list, lp(MATCH, 0, 1f))
         val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
-        if (!readingPage) root.addView(text("Pebble Desk $version", 15f, color = Ui.LIGHT_GRAY).apply {
+        if (page == null) root.addView(text("Pebble Desk $version", 15f, color = Ui.LIGHT_GRAY).apply {
             gravity = Gravity.CENTER
         }, lp(MATCH, dp(44)))
         setContentView(root)
@@ -31,7 +36,11 @@ class SettingsActivity : EinkActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (readingPage) renderReading() else render()
+        when (page) {
+            PAGE_GUIDE -> renderGuide()
+            PAGE_READING -> renderReading()
+            else -> render()
+        }
     }
 
     private fun render() {
@@ -66,7 +75,7 @@ class SettingsActivity : EinkActivity() {
         )
         row(getString(R.string.reading_settings), reading.joinToString(" · ").ifEmpty { getString(R.string.off) },
             on = reading.isNotEmpty(), next = true) {
-            startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_READING, true))
+            startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, PAGE_READING))
         }
         val clocks = listOf(getString(R.string.clock24), getString(R.string.clock12))
         row(getString(R.string.clock), clocks[if (prefs.clock24h) 0 else 1], next = true) {
@@ -116,6 +125,10 @@ class SettingsActivity : EinkActivity() {
                     .show()
             }
         }
+        // 무엇을 어떻게 읽는지(서재 화면에 보이는 것만, 앱마다 되는 화면) 안내
+        row(getString(R.string.auto_books_guide), null, next = true) {
+            startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, PAGE_GUIDE))
+        }
         // 켜 두었는데 권한이 없으면 값 자리에 '권한 허용'을 두고, 누르면 시스템 화면으로 보낸다.
         val access = ReadingLog.hasAccess(this)
         val needAccess = prefs.readingTime && !access
@@ -147,6 +160,30 @@ class SettingsActivity : EinkActivity() {
             }
         }
         row(getString(R.string.reading_stats), null, next = true, last = true) { startActivity(ReadingActivity.intent(this)) }
+    }
+
+    /** 자동 추가 안내: 공통 안내 한 단락, 앱마다 이름과 한 줄 설명, 표지·제목 안내 */
+    private fun renderGuide() {
+        list.removeAllViews()
+        fun para(res: Int, size: Float, color: Int, top: Int) = list.addView(text(getString(res), size, color = color, lines = 6).apply {
+            setLineSpacing(0f, 1.2f)
+            setPadding(dp(Ui.MARGIN), dp(top), dp(Ui.MARGIN), dp(top))
+        })
+        para(R.string.guide_intro, 18f, Ui.BLACK, 18)
+        for ((name, desc) in listOf(
+            R.string.guide_kel to R.string.guide_kel_desc,
+            R.string.guide_millie to R.string.guide_millie_desc,
+            R.string.guide_aladin to R.string.guide_aladin_desc,
+            R.string.guide_bookers to R.string.guide_bookers_desc,
+        )) {
+            list.addView(hline(1, Ui.DIVIDER))
+            list.addView(text(getString(name), 21f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), 0) })
+            list.addView(text(getString(desc), 17f, color = Ui.GRAY, lines = 3).apply {
+                setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(14))
+            })
+        }
+        list.addView(hline(1, Ui.DIVIDER))
+        para(R.string.guide_cover_note, 17f, Ui.GRAY, 18)
     }
 
     private fun openAccessibility() {
@@ -193,6 +230,8 @@ class SettingsActivity : EinkActivity() {
     }
 
     companion object {
-        private const val EXTRA_READING = "reading"
+        private const val EXTRA_PAGE = "page"
+        private const val PAGE_READING = "reading"
+        private const val PAGE_GUIDE = "guide"
     }
 }

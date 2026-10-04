@@ -100,6 +100,19 @@
     <string name="due_today">Due today</string>
     <string name="due_over">Overdue</string>
     <string name="find_cover">Find cover again</string>
+    <string name="auto_books_guide">How auto-add works</string>
+    <string name="guide_intro">Only what the e-book app shows on its shelf screen is read. Anything the shelf does not show is not updated, and progress changes when you return to the shelf after reading.</string>
+    <string name="guide_kel">Kyobo Library</string>
+    <string name="guide_kel_desc">Keep the shelf in list view. Cover view has no titles, so books are not added from it.</string>
+    <string name="guide_millie">Millie</string>
+    <string name="guide_millie_desc">Downloads · All books · Shelves, and Read now in search. Progress is also read while reading.</string>
+    <string name="guide_aladin">Aladin</string>
+    <string name="guide_aladin_desc">Added when you return to the shelf after reading. The shelf shows no progress.</string>
+    <string name="guide_bookers">Bookers</string>
+    <string name="guide_bookers_desc">Books opened from My library.</string>
+    <string name="guide_cover_note">Covers are cut from the shelf screen. If a title is cut off or wrong, long-press the book on the home screen to edit it.</string>
+    <string name="edit_title">Edit title</string>
+    <string name="save">Save</string>
     <string name="books_auto_hint">Books you open in Kyobo Library, Millie, Aladin or Bookers are added to the top automatically; past 4 books, the one opened longest ago drops off. Long-press to change a cover.</string>
     <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the Kyobo Library, Millie, Aladin and Bookers shelf and search screens to fill your reading list. Other apps are not seen, and nothing leaves the device.</string>
 </resources>

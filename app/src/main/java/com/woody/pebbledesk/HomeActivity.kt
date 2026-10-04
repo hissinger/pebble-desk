@@ -438,6 +438,9 @@ class HomeActivity : EinkActivity() {
             .item(getString(R.string.change_reader)) {
                 startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, book.id))
             }
+            .item(getString(R.string.edit_title)) {
+                Sheet(this).header(getString(R.string.edit_title)).input(book.title) { BookShelf.setTitle(this, book.id, it); refresh() }.show()
+            }
             .item(getString(R.string.find_cover)) { startActivity(BookSearchActivity.intent(this, replace = book)) }
             .item(getString(R.string.remove_book)) { BookShelf.remove(this, book.id); refresh() }
             .show()

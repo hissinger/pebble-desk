@@ -185,7 +185,7 @@ class ReaderWatchService : AccessibilityService() {
     private fun fromClickText(spec: ReaderSpec, list: List<CharSequence>): Seen? {
         val items = list.map { it.toString().trim() }.filter { it.isNotEmpty() }
         val progress = items.firstNotNullOfOrNull { percent(it).takeIf { p -> p >= 0 } } ?: return null
-        val title = items.firstOrNull()?.takeIf { percent(it) < 0 } ?: return null
+        val title = items.firstOrNull()?.takeIf { percent(it) < 0 && !STATUS_ONLY.matches(it) } ?: return null
         val due = if (spec.due != null) items.firstOrNull { "반납" in it || "만료" in it }?.let(::dueDate) ?: -1 else -1
         val author = if (spec.author != null) items.getOrNull(1)?.takeIf { "%" !in it && "반납" !in it }.orEmpty() else ""
         return Seen(title, author, progress, due, null, Rect())
@@ -202,7 +202,7 @@ class ReaderWatchService : AccessibilityService() {
             BookShelf.updateStatus(this, it.id, seen.progress, seen.due)
         } ?: run {
             val app = AppStore.load(this).firstOrNull { it.pkg == spec.pkg }?.key
-            BookShelf.addOpened(this, "auto-${normTitle(seen.title)}", seen.title, seen.author, app, seen.progress, seen.due)
+            BookShelf.addOpened(this, autoBookId(seen.title), seen.title, seen.author, app, seen.progress, seen.due)
         }
         opened[spec.pkg] = book.title
         // 검색 화면에서 `바로 읽기`를 누를 때 잘라 둔 표지
@@ -458,6 +458,9 @@ class ReaderWatchService : AccessibilityService() {
         private const val FRAME_PX = 2
         /** 여백으로 보는 밝기 */
         private const val WHITE = 230
+
+        /** 제목이 아니라 상태 글자(`4일`, `반납 4일 남음`, `D-3`, `만료`) — 교보도서관 표지 보기 칸은 제목 없이 이것만 있다 */
+        private val STATUS_ONLY = Regex("""^(반납\s*)?(\d+\s*일(\s*남음)?|D-?\d+|만료|오늘 반납)$""")
 
         private fun percent(text: CharSequence): Int =
             Regex("""(\d{1,3})\s*%""").find(text)?.groupValues?.get(1)?.toInt()?.coerceIn(0, 100) ?: -1

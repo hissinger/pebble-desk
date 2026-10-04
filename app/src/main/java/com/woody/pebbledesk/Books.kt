@@ -135,6 +135,9 @@ fun Context.bookStatus(book: ShelfBook, today: LocalDate = LocalDate.now()): Lis
 fun normTitle(title: String): String =
     title.substringBefore(':').filter { it.isLetterOrDigit() }.lowercase()
 
+/** 이북 앱에서 편 책을 자동으로 넣을 때의 id(앱이 보여 준 제목으로 만든다) */
+fun autoBookId(title: String) = "auto-${normTitle(title)}"
+
 /** 같은 책으로 볼 만한가: 정리한 제목이 같거나, 한쪽이 다른 쪽의 앞부분(두 글자 이상) */
 fun sameTitle(a: String, b: String): Boolean {
     val x = normTitle(a)
@@ -262,8 +265,14 @@ object BookShelf {
         write(context, books.map { if (it.id == id) it.copy(updatedAt = now) else it })
     }
 
-    /** 제목이 같은 책(부제·공백 무시) */
-    fun findByTitle(context: Context, title: String): ShelfBook? = list(context).firstOrNull { sameTitle(it.title, title) }
+    /**
+     * 제목이 같은 책(부제·공백 무시). 사용자가 제목을 고친 자동 추가 책은 앱이 보여 준 제목으로 만든 id 로도 찾는다
+     * (그러지 않으면 다음에 펼 때 새 책으로 들어가며 고친 제목이 되돌아간다).
+     */
+    fun findByTitle(context: Context, title: String): ShelfBook? {
+        val books = list(context)
+        return books.firstOrNull { sameTitle(it.title, title) } ?: books.firstOrNull { it.id == autoBookId(title) }
+    }
 
     @Throws(IOException::class)
     private fun saveCover(context: Context, id: String, bytes: ByteArray) {
@@ -305,6 +314,12 @@ object BookShelf {
         val books = list(context)
         val fixed = books.map { b -> b.app?.let { b.copy(app = fix(it)) } ?: b }
         if (fixed != books) write(context, fixed)
+    }
+
+    /** 제목을 바꾼다(제목이 잘렸거나 없는 책). 빈 표지가 새 제목으로 다시 그려지도록 updatedAt 도 새로. */
+    @Synchronized fun setTitle(context: Context, id: String, title: String) {
+        val now = System.currentTimeMillis()
+        write(context, list(context).map { if (it.id == id) it.copy(title = title, updatedAt = now) else it })
     }
 
     @Synchronized fun setApp(context: Context, id: String, app: String?) =
