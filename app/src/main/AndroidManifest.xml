@@ -26,6 +26,7 @@
         <activity
             android:name=".HomeActivity"
             android:clearTaskOnLaunch="true"
+            android:directBootAware="true"
             android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleTask"

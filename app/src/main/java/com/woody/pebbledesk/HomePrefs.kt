@@ -5,7 +5,7 @@ import org.json.JSONArray
 
 /** 런처 설정과 앱 목록 상태(자주 쓰는 앱·숨긴 앱) */
 class HomePrefs(context: Context) {
-    private val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    private val sp = Storage.of(context).getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
     /** 예전(책 한 권만 저장하던) 버전의 읽고 있는 앱. 그 책을 새 목록으로 옮길 때만 읽는다. */
     val legacyReadingApp: String? get() = sp.getString("default_app", null)
@@ -94,11 +94,11 @@ class HomePrefs(context: Context) {
     }
 
     companion object {
-        private const val FILE = "home"
+        const val FILE = "home"
         private const val KEY_ENGLISH = "english"
 
         /** 화면을 만들기 전에(attachBaseContext) 언어를 정하려고 쓴다. */
         fun isEnglish(context: Context) =
-            context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_ENGLISH, false)
+            Storage.of(context).getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_ENGLISH, false)
     }
 }

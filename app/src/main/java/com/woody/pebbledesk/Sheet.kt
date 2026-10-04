@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.view.Gravity
 import android.view.ViewGroup
-import android.widget.ImageView
 
 /**
  * 아래에서 올라오는 메뉴. 위쪽 굵은 선, 머리(아이콘·이름·설명), 항목들, 맨 아래 오른쪽 `닫기`.
@@ -36,7 +35,7 @@ class Sheet(private val context: Context) {
 
         val head = c.hbox().apply { setPadding(c.dp(Ui.MARGIN), c.dp(22), c.dp(Ui.MARGIN), c.dp(20)) }
         app?.let {
-            head.addView(ImageView(c).apply { setImageBitmap(AppIcons.gray(c, it, c.dp(45))) },
+            head.addView(c.picture(AppIcons.gray(c, it, c.dp(45))),
                 lp(c.dp(45), c.dp(45)).apply { marginEnd = c.dp(16) })
         }
         image?.let {

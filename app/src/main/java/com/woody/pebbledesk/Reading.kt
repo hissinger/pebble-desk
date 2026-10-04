@@ -85,7 +85,8 @@ object ReadingLog {
      * 끝난 날은 한 번만 계산해 저장하고, 오늘은 부를 때마다 다시 센다.
      */
     fun days(context: Context, packages: Set<String>): ReadingDays? {
-        if (!hasAccess(context)) return null
+        // 잠금 해제 전에는 사용 기록이 비어 보인다. 그대로 세면 어제를 0분으로 확정해 버리므로 기다린다.
+        if (!Storage.isUnlocked(context) || !hasAccess(context)) return null
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now(zone)
         val saved = load(context)
@@ -183,7 +184,7 @@ object ReadingLog {
 
     private class Saved(val through: LocalDate?, val since: LocalDate?, val days: ReadingDays)
 
-    private fun file(context: Context) = File(context.filesDir, "reading.json")
+    private fun file(context: Context) = File(Storage.of(context).filesDir, "reading.json")
 
     /** `{"through": "2026-10-03", "since": "2026-09-27", "days": {"2026-10-03": {"kr.co.millie.eink": 1234}}}` */
     /** 이 런처만 쓰는 파일이라 쓸 때 함께 바꾸는 메모리 사본 */

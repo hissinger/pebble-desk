@@ -113,7 +113,7 @@ object BookShelf {
     const val MAX = 4
     private val covers = LruCache<String, Bitmap>(8)
 
-    private fun dir(context: Context) = File(context.filesDir, "books").apply { mkdirs() }
+    private fun dir(context: Context) = File(Storage.of(context).filesDir, "books").apply { mkdirs() }
     private fun index(context: Context) = File(dir(context), "books.json")
     private fun coverFile(context: Context, id: String) = File(dir(context), "$id.jpg")
 

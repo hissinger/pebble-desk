@@ -12,7 +12,8 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.0.0-release.apk </dev/
 ```
 
 - 릴리스는 R8 축소(약 377KB)이고 디버그 키로 서명한다. 덮어 설치하면 앱 데이터가 남는다.
-- 릴리스는 `run-as` 가 안 된다. 앱 데이터(설정 `shared_prefs/home.xml`, `files/books/`, `files/reading.json`)를 직접 고쳐야 하면 같은 키로 서명된 디버그 빌드를 잠깐 깔아 `run-as` 로 넣고 다시 릴리스를 깐다.
+- 앱 데이터는 **기기 보호 저장소**(`/data/user_de/0/com.woody.pebbledesk/`: `shared_prefs/home.xml`, `files/books/`, `files/apps.json`, `files/reading.json`)에 있다(`Storage`). 홈이 잠금 해제 전에도 뜨게(directBootAware) 하려고 옮겼다.
+- 릴리스는 `run-as` 가 안 된다. 앱 데이터를 직접 고쳐야 하면 같은 키로 서명된 디버그 빌드를 잠깐 깔아 `run-as` 로 넣고 다시 릴리스를 깐다.
 - 성능은 꼭 **릴리스 빌드**로 잰다(디버그는 몇 배 느리다).
 
 ## 기기 작업 요령
@@ -29,6 +30,9 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.0.0-release.apk </dev/
 - 1dp = 1.875px. 패널 맨 아래 약 8px 는 테두리에 가려 보이지 않는다 → `Crema.reserveHiddenBottom()` 으로 모든 화면·아래 메뉴의 아래를 비운다.
 - 연한 회색을 실제보다 어둡게 그린다(#e6 → 약 #c1). 아주 연한 회색은 디자인 값보다 밝게 잡는다(링 바탕 #f2).
 - 홈은 안드로이드 상단바를 숨기고 자체 상단(로고·시계·상태 줄)을 그린다. 상태 줄을 누르면 크레마 빠른 설정(`com.epd.drop_down` 브로드캐스트).
+- 크레마가 고친 안드로이드는 앱이 바뀔 때마다 모든 `ImageView` 와 배경 있는 뷰 묶음에 명암(bleach) 필터를 다시 걸고 다시 그린다. 그래서 그림은 `PictureView`(직접 그림)로 그리고, 홈의 흰 바탕은 창 배경 대신 직접 칠한다.
+- 화면 갱신(깜빡임)의 실제 횟수는 커널 로그 `ebc-dev: frame start` 로 센다. 그리기 횟수와 다르다(갱신 중 들어온 그리기는 합쳐진다).
+- 부팅: 홈이 directBootAware 라 시스템 임시 홈(FallbackHome) 없이 부팅 화면 직후 바로 뜬다. 잠금 해제 전에는 앱 목록·아이콘을 `MATCH_DIRECT_BOOT_AWARE|UNAWARE` 로 찾고, 지워진 앱 정리와 읽은 시간 계산은 잠금이 풀린 뒤에 한다. SD 카드가 꽂혀 있으면 부팅 몇 초 뒤 시스템 알림 때문에 한 번 더 깜빡인다(시스템 동작).
 - 잔상 제거 횟수는 `persist.vendor.fullmode_cnt`(리플렉션 SystemProperties). 로고는 크레마 런처(`com.wetao.cremalauncher`)의 리소스를 불러온다(상표 이미지를 앱에 넣지 않음).
 
 ## 코드 구조 (`app/src/main/java/com/woody/pebbledesk/`)
@@ -42,7 +46,8 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.0.0-release.apk </dev/
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
 | AppListActivity / FavoritesActivity / SettingsActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 |
 | PagedRows | 스크롤 없는 페이지 목록(목록·격자, fixedRows) |
-| EinkActivity / Sheet / Ui / TopBarView / Crema / HomePrefs | 공통 화면·아래 메뉴·규격·상단·기기 기능·설정 저장 |
+| EinkActivity / Sheet / Ui / TopBarView / Crema / HomePrefs | 공통 화면·아래 메뉴·규격(`PictureView` 포함)·상단·기기 기능·설정 저장 |
+| Storage | 기기 보호 저장소와 예전 저장소에서 옮기기 |
 
 ## 지금까지 정한 것(요지, 자세한 건 DESIGN.md)
 

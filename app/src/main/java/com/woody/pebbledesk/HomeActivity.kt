@@ -9,6 +9,7 @@ import android.database.ContentObserver
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.os.Bundle
@@ -21,7 +22,6 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 
@@ -46,8 +46,8 @@ class HomeActivity : EinkActivity() {
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             updateStatus()
-            // 날이 바뀌면 오늘 읽은 시간을 0 부터
-            if (intent.action == Intent.ACTION_DATE_CHANGED) updateReading()
+            // 날이 바뀌면 오늘 읽은 시간을 0 부터. 부팅 직후 잠금이 풀리면 그때부터 읽은 시간을 셀 수 있다.
+            if (intent.action == Intent.ACTION_DATE_CHANGED || intent.action == Intent.ACTION_USER_UNLOCKED) updateReading()
         }
     }
     private val lightObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
@@ -78,6 +78,7 @@ class HomeActivity : EinkActivity() {
             addAction(Intent.ACTION_TIME_CHANGED)
             addAction(Intent.ACTION_TIMEZONE_CHANGED)
             addAction(Intent.ACTION_DATE_CHANGED)
+            addAction(Intent.ACTION_USER_UNLOCKED)
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_BATTERY_CHANGED)
             addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
@@ -135,7 +136,14 @@ class HomeActivity : EinkActivity() {
     }
 
     private fun buildViews() {
-        val root = vbox()
+        // 흰 바탕은 배경(background)으로 두지 않고 직접 칠한다. 크레마는 앱이 바뀔 때마다 배경이 있는 뷰 묶음(창의 맨 바깥 포함)에
+        // 명암 필터를 다시 걸고 다시 그려, 홈으로 돌아올 때 전자잉크가 한 번 더 깜빡인다. 창 배경도 그래서 비운다.
+        val root = object : LinearLayout(this) {
+            override fun dispatchDraw(canvas: Canvas) {
+                canvas.drawColor(Color.WHITE)
+                super.dispatchDraw(canvas)
+            }
+        }.apply { orientation = LinearLayout.VERTICAL }
         topBar = TopBarView(this).apply { setOnClickListener { Crema.openQuickSettings(this@HomeActivity) } }
         root.addView(topBar, lp(MATCH, WRAP))
 
@@ -176,8 +184,8 @@ class HomeActivity : EinkActivity() {
             setOnClickListener { startActivity(ReadingActivity.intent(this@HomeActivity)) }
         }
         footer.addView(readingText, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.CENTER))
-        footer.addView(ImageView(this).apply {
-            setImageResource(R.drawable.ic_settings)
+        footer.addView(PictureView(this).apply {
+            drawable = getDrawable(R.drawable.ic_settings)
             contentDescription = getString(R.string.settings)
             setPadding(dp(24), dp((Ui.FOOTER_DP - 28) / 2), dp(Ui.MARGIN), dp((Ui.FOOTER_DP - 28) / 2))
             setOnClickListener { startActivity(Intent(this@HomeActivity, SettingsActivity::class.java)) }
@@ -189,6 +197,7 @@ class HomeActivity : EinkActivity() {
             favPage.text = if (n <= 1) "" else "${favRows.page + 1} / $n   ›"
         }
         setContentView(root)
+        window.setBackgroundDrawable(null)
     }
 
     /** 앱 목록과 설정을 다시 읽어 그린다. 홈으로 돌아올 때마다 부른다. */
@@ -241,9 +250,7 @@ class HomeActivity : EinkActivity() {
         line.forEachIndexed { i, app ->
             addView(vbox().apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                addView(ImageView(context).apply {
-                    setImageBitmap(AppIcons.gray(context, app, icon))
-                }, lp(icon, icon))
+                addView(picture(AppIcons.gray(context, app, icon)), lp(icon, icon))
                 addView(text(app.label, 13f, lines = 2).apply { gravity = Gravity.CENTER }, lp(MATCH, WRAP).apply { topMargin = dp(6) })
                 setOnClickListener { AppStore.launch(this@HomeActivity, app) }
                 setOnLongClickListener { showAppMenu(app) { refresh() }; true }
@@ -386,9 +393,7 @@ class HomeActivity : EinkActivity() {
         }
         info.addView(
             if (reading != null) hbox().apply {
-                if (prefs.showIcons) addView(ImageView(context).apply {
-                    setImageBitmap(AppIcons.gray(context, reading, dp(26)))
-                }, lp(dp(26), dp(26)).apply { marginEnd = dp(10) })
+                if (prefs.showIcons) addView(picture(AppIcons.gray(context, reading, dp(26))), lp(dp(26), dp(26)).apply { marginEnd = dp(10) })
                 addView(text("${reading.label}  ›", 20f, Ui.bold))
             } else text(getString(R.string.pick_reader_link), 20f, Ui.bold, Ui.LIGHT_GRAY),
             // 제목·저자 바로 아래에 붙여 한 덩어리로 읽히게 한다.
@@ -417,7 +422,7 @@ class HomeActivity : EinkActivity() {
         setOnLongClickListener { showBookMenu(book); true }
     }
 
-    private fun coverView(book: ShelfBook, widthPx: Int): ImageView = coverImage(BookShelf.cover(this, book, widthPx))
+    private fun coverView(book: ShelfBook, widthPx: Int): View = coverImage(BookShelf.cover(this, book, widthPx))
 
     /** 책을 길게 누르면: 읽고 있는 앱 바꾸기 / 책 빼기. 머리에 작은 표지. */
     private fun showBookMenu(book: ShelfBook) {

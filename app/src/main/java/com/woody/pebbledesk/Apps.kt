@@ -4,6 +4,7 @@ import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
@@ -20,6 +21,9 @@ data class AppEntry(val component: ComponentName, val label: String) {
     val key: String get() = component.flattenToShortString()
     val pkg: String get() = component.packageName
 }
+
+/** 잠금 해제 전(부팅 직후)에도 모든 앱을 찾는다. 기본값은 잠금 전에 뜰 수 있는 앱만 돌려준다. */
+private const val MATCH_ALL_BOOT_STATES = PackageManager.MATCH_DIRECT_BOOT_AWARE or PackageManager.MATCH_DIRECT_BOOT_UNAWARE
 
 object AppStore {
     /** 이름 순서: 영문 → 한글 (ICU 기본 순서는 라틴 문자가 한글보다 앞) */
@@ -53,7 +57,7 @@ object AppStore {
         return queryApps(context).also { cachedApps = it; save(context, it, locale) }
     }
 
-    private fun savedFile(context: Context) = File(context.filesDir, "apps.json")
+    private fun savedFile(context: Context) = File(Storage.of(context).filesDir, "apps.json")
     private fun bootCount(context: Context) =
         Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1)
 
@@ -80,7 +84,7 @@ object AppStore {
     private fun queryApps(context: Context): List<AppEntry> {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        return pm.queryIntentActivities(intent, 0)
+        return pm.queryIntentActivities(intent, MATCH_ALL_BOOT_STATES)
             .filter { it.activityInfo.packageName != context.packageName }
             .map {
                 AppEntry(
@@ -95,6 +99,8 @@ object AppStore {
     /** 앱 목록을 읽고, 지워진 앱을 설정과 읽고 있는 책에서 정리한다. */
     fun loadAndPrune(context: Context, prefs: HomePrefs): List<AppEntry> {
         val apps = load(context)
+        // 잠금 해제 전에는 앱 정보가 덜 보일 수 있어, 지워진 앱 정리는 잠금이 풀린 뒤에만 한다.
+        if (!Storage.isUnlocked(context)) return apps
         val fix = keyFixer(apps) { pkg -> runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess }
         prefs.prune(fix)
         BookShelf.pruneApps(context, fix)
@@ -171,14 +177,18 @@ object AppIcons {
     fun gray(context: Context, app: AppEntry, px: Int): Bitmap {
         val key = "${app.key}@$px"
         cache.get(key)?.let { return it }
-        val drawable = runCatching { context.packageManager.getActivityIcon(app.component) }
-            .getOrElse { context.packageManager.defaultActivityIcon }
+        val pm = context.packageManager
+        // 못 찾으면 기본 아이콘을 쓰되 기억하지 않는다(다음에 다시 찾는다).
+        val found = runCatching {
+            pm.getActivityInfo(app.component, MATCH_ALL_BOOT_STATES).loadIcon(pm)
+        }.getOrNull()
+        val drawable = found ?: pm.defaultActivityIcon
         val color = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         Canvas(color).let { drawable.setBounds(0, 0, px, px); drawable.draw(it) }
         val gray = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         Canvas(gray).drawBitmap(color, 0f, 0f, grayPaint)
         color.recycle()
-        cache.put(key, gray)
+        if (found != null) cache.put(key, gray)
         return gray
     }
 
