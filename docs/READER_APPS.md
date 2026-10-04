@@ -126,7 +126,16 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 
 - `정렬` 메뉴의 보기방식: 목록 보기(기본) / 표지 보기. 둘 다 `MainActivity`, 칸 요소 이름은 같다(`ivThumbnail`, `tvRemainDate`, `tvReadPercentageTxt`).
 - **표지 보기 칸에는 제목(`tvTitle`)·저자가 없다.** 반납은 `4일` 처럼 짧게, 표지 그림에 설명 글(contentDescription)도 없다. 칸을 누르면 `[4일, 47%]` 클릭이 온다.
-- → 표지 보기에서는 어떤 책인지 알 수 없다. (표지 그림 특징값으로 목록의 책과 맞춰 보는 것은 해 봤고 되지만, 추측이라 넣지 않기로 했다.)
+- → 표지 보기 서재에서는 어떤 책인지 알 수 없다. (표지 그림 특징값으로 목록의 책과 맞춰 보는 것은 해 봤고 되지만, 추측이라 넣지 않기로 했다.) 대신 읽는 화면의 메뉴 제목으로 안다(아래 교보eBook).
+
+### 교보 읽는 화면 (교보도서관·교보eBook 공통, 2026-10-05)
+
+- 본문은 웹 화면(`WebView`)이고, 위아래 막대는 이름 있는 일반 요소다. 웹 화면 안을 훑지 않고 이름으로만 찾을 수 있다.
+- 늘 보이는 것: `bookIndicator` = `2% (4/226p)`(처음엔 `- % ( - /0p)`), `bookMarkDefault`.
+- 가운데를 눌러 메뉴를 띄우면: `viewer_top_booktitle` = 책 제목(`어린 왕자(한글판 영문판)`), `viewer_bottom_pagecount` = `2% (4/226p)`, 목차·메모·설정 단추들.
+- 창 바뀜 알림의 글자는 앱 이름(`교보eBook EInk`)뿐, 웹 화면 자체에도 제목이 없다. → 제목은 메뉴를 띄웠을 때만 알 수 있다.
+- 교보eBook 서재 정렬 기본값은 `최근활동순`(필터). `내 책장` 탭은 사용자가 만든 책장 목록, 책장 안은 같은 격자·목록.
+- 화면 이름: 교보eBook `com.kyobo.ebook.common.b2c.viewer.{epub.ViewerEpubMainActivity, pdf.ViewerPdfMainActivity, comic.ViewerComicMainActivity}`, 교보도서관 `com.kyobo.ebook.kel.viewer.{epub.B2BViewerEpubMainActivity, pdf.B2BViewerPdfMainActivity}`.
 
 ### 밀리 탭별 (2026-10-05)
 
@@ -141,7 +150,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 |---|---|---|---|---|
 | 알라딘 | `kr.co.aladin.ebook.MainActivity` | 제목 `txt_title`, 표지 `img_cover`, 아래 '최근 읽은 책' `reading_book_tv_book_title`. 진행률·저자 없음 | 대개 안 옴(표지 그림이 눌린 것으로 한 번 옴) | **지원**: 읽는 화면에서 돌아오면 '최근 읽은 책' 이 방금 편 책 |
 | 북커스 `com.bookers.ebook` | `ui.purchase.PurchaseActivity`(내서재) | 제목 `tv_title`, 표지 `iv_cover`, 진행률 `tv_percent`, 대여 기한 `tv_end_date`(`만료` 등) | 옴(글자에 제목) | **지원** |
-| 교보eBook | `common.b2c.ui.mainV3.activity.MainV3Activity` | 화면 요소 이름이 없다(Compose). 격자 보기는 제목도 없고, 목록 보기에서만 제목·저자 글자 | 안 옴 | 미지원(어떤 책을 폈는지 알 수 없음) |
+| 교보eBook | `common.b2c.ui.mainV3.activity.MainV3Activity` | 화면 요소 이름이 없다(Compose). 격자 보기는 제목도 없고, 목록 보기에서만 제목·저자 글자 | 안 옴 | **지원**: 서재는 안 읽고, 읽는 화면 메뉴의 제목·진행률로 안다 |
 | 리디 | `main.activity.MainActivity` | 탭·메뉴만 보이고 책 칸은 접근성에 안 나온다 | 안 옴 | 미지원 |
 | YES24 서점 | — | 연결이 없으면 알림만 띄우고 닫힌다 | — | 확인 못 함 |
 | YES24 도서관 | `shelf.LibShelfActivity` | 읽고 있는 책이 없어 칸을 못 봄 | — | 확인 못 함 |

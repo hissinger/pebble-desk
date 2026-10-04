@@ -17,9 +17,9 @@ import java.time.LocalDate
 import kotlin.math.abs
 
 /**
- * 읽고 있는 책 자동 추가(접근성 서비스). 교보도서관·밀리의서재·알라딘·북커스의 **서재 화면**에 보이는 제목·저자·진행률·반납일과
+ * 읽고 있는 책 자동 추가(접근성 서비스). 교보도서관·교보eBook·밀리의서재·알라딘·북커스의 **서재 화면**에 보이는 제목·저자·진행률·반납일과
  * 사용자가 누른 책 칸만 읽는다. 다른 앱은 시스템이 아예 보내지 않고(`res/xml/reader_watch.xml` 의 packageNames),
- * 교보도서관 뷰어는 본문 글자가 들어 있어 읽지 않는다. 읽은 내용은 책 목록에만 적고 밖으로 보내지 않는다.
+ * 읽는 화면은 본문(웹 화면)을 훑지 않고 진행률 줄·메뉴 제목만 이름으로 읽는다. 읽은 내용은 책 목록에만 적고 밖으로 보내지 않는다.
  */
 class ReaderWatchService : AccessibilityService() {
     /** 앱마다 지금 앞에 있는 화면(액티비티 이름) */
@@ -34,11 +34,13 @@ class ReaderWatchService : AccessibilityService() {
     /** 서재에서 읽는 화면으로 갔다 온 앱(서재의 '최근 읽은 책' 줄로 어떤 책인지 안다) */
     private val readSince = mutableSetOf<String>()
     private var lastShot = 0L
-    private var lastViewerRead = 0L
     private val handler = Handler(Looper.getMainLooper())
     /** 화면이 멈추면 다시 읽을 서재 */
     private var settleSpec: ReaderSpec? = null
     private val settleLater = Runnable { settleSpec?.let(::settleShelf) }
+    /** 읽는 화면이 잠잠해지면(쪽 넘김·메뉴 열기 뒤) 읽을 앱 */
+    private var viewerSpec: ReaderSpec? = null
+    private val viewerLater = Runnable { viewerSpec?.let(::readViewer) }
 
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
@@ -66,12 +68,12 @@ class ReaderWatchService : AccessibilityService() {
         }
     }
 
-    /** 서재 화면이면 멈춘 뒤에 보이는 책들을 읽고([settleShelf]), 밀리 뷰어면 편 책의 진행률을 적는다. 그 밖의 화면은 읽지 않는다. */
+    /** 서재 화면이면 멈춘 뒤에 보이는 책들을 읽고([settleShelf]), 읽는 화면이면 잠잠해진 뒤 진행률·제목을 읽는다([readViewer]). 그 밖의 화면은 읽지 않는다. */
     private fun readScreen(spec: ReaderSpec, force: Boolean) {
-        val now = System.currentTimeMillis()
         when (screen[spec.pkg]) {
             in spec.shelves -> {
                 // 검색 화면의 책 상세는 `바로 읽기`를 누르자마자 사라지므로 멈추기를 기다리지 않고 1초마다 기억해 둔다.
+                val now = System.currentTimeMillis()
                 if (spec.readNow.isNotEmpty() && (force || now - lastWebRead >= THROTTLE_MS)) {
                     lastWebRead = now
                     root(spec)?.let { root ->
@@ -81,15 +83,33 @@ class ReaderWatchService : AccessibilityService() {
                 scheduleSettle(spec)
             }
             in spec.viewers -> {
-                val id = spec.viewerProgress ?: return
-                if (!force && now - lastViewerRead < THROTTLE_MS) return
-                lastViewerRead = now
-                val book = opened[spec.pkg]?.let { BookShelf.findByTitle(this, it) } ?: return
-                val root = root(spec) ?: return
-                val progress = root.byId(spec, id).firstOrNull()?.text?.let(::percent) ?: return
-                BookShelf.updateStatus(this, book.id, progress, -1)
+                viewerSpec = spec
+                handler.removeCallbacks(viewerLater)
+                handler.postDelayed(viewerLater, VIEWER_SETTLE_MS)
             }
         }
+    }
+
+    /**
+     * 읽는 화면: 본문(웹 화면)은 훑지 않고 이름으로 찾은 요소만 읽는다. 진행률 줄([ReaderSpec.viewerProgress])은 늘 있고,
+     * 제목([ReaderSpec.viewerTitle], 교보 읽는 화면)은 가운데를 눌러 메뉴를 띄웠을 때만 보인다. 제목이 보이면 그 책을
+     * 편 것으로 보고(서재 칸에 제목이 없는 교보도서관 표지 보기·교보eBook), 진행률을 그 책에 적는다.
+     */
+    private fun readViewer(spec: ReaderSpec) {
+        viewerSpec = null
+        if (screen[spec.pkg] !in spec.viewers) return
+        val root = root(spec) ?: return
+        val progress = spec.viewerProgress?.let { id -> root.byId(spec, id).firstOrNull()?.text?.let(::percent) } ?: -1
+        spec.viewerTitle?.let { id -> root.byId(spec, id).firstOrNull()?.text?.toString()?.trim() }?.takeIf { it.isNotEmpty() }?.let { title ->
+            val current = opened[spec.pkg]?.let { BookShelf.findByTitle(this, it) }
+            if (current == null || BookShelf.findByTitle(this, title)?.id != current.id) {
+                bookOpened(spec, Seen(title, "", progress, -1, null, Rect()))
+                return
+            }
+        }
+        if (progress < 0) return
+        val book = opened[spec.pkg]?.let { BookShelf.findByTitle(this, it) } ?: return
+        BookShelf.updateStatus(this, book.id, progress, -1)
     }
 
     /**
@@ -298,6 +318,7 @@ class ReaderWatchService : AccessibilityService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(settleLater)
+        handler.removeCallbacks(viewerLater)
         super.onDestroy()
     }
 
@@ -335,6 +356,8 @@ class ReaderWatchService : AccessibilityService() {
         val progress: String?,
         val due: String?,
         val viewerProgress: String?,
+        /** 읽는 화면 메뉴의 책 제목(메뉴를 띄웠을 때만 보인다) */
+        val viewerTitle: String? = null,
         /** 서재 화면의 '최근 읽은 책' 제목(책 칸을 눌러도 알림이 오지 않는 앱) */
         val recent: String? = null,
         /** 검색(웹 화면) 책 상세의 읽기 단추 글자 */
@@ -343,6 +366,8 @@ class ReaderWatchService : AccessibilityService() {
 
     companion object {
         private const val THROTTLE_MS = 1000L
+        /** 읽는 화면이 이만큼 잠잠하면 진행률·제목을 읽는다 */
+        private const val VIEWER_SETTLE_MS = 700L
         private const val SHOT_INTERVAL_MS = 1100L
         /** 서재 화면이 이만큼 그대로여야 표지를 찍는다 */
         private const val SETTLE_MS = 1500L
@@ -359,10 +384,27 @@ class ReaderWatchService : AccessibilityService() {
             ReaderSpec(
                 pkg = "kr.co.kyobobook.KEL", classPrefix = "com.kyobo",
                 shelves = setOf("com.kyobo.ebook.kel.ui.main.MainActivity"),
-                // 교보도서관 뷰어는 본문이 보이므로 읽지 않는다(진행률은 서재로 돌아올 때 얻는다).
-                viewers = emptySet(),
+                // 읽는 화면은 본문이 웹 화면이라 훑지 않고, 아래 진행률 줄과 메뉴의 제목만 이름으로 읽는다.
+                viewers = setOf(
+                    "com.kyobo.ebook.kel.viewer.epub.B2BViewerEpubMainActivity",
+                    "com.kyobo.ebook.kel.viewer.pdf.B2BViewerPdfMainActivity",
+                ),
                 title = "tvTitle", thumb = "ivThumbnail", author = "tvAuthor", progress = "tvReadPercentageTxt", due = "tvRemainDate",
-                viewerProgress = null,
+                viewerProgress = "bookIndicator", viewerTitle = "viewer_top_booktitle",
+            ),
+            // 교보eBook: 서재(Compose)에는 요소 이름이 없고 격자 보기에는 제목도 없어 서재는 읽지 않는다.
+            // 교보도서관과 같은 읽는 화면이라 진행률 줄과 메뉴의 제목으로 안다(서재·내 책장 어디서 열어도).
+            ReaderSpec(
+                pkg = "com.kyobo.ebook.eink", classPrefix = "com.kyobo",
+                shelves = emptySet(),
+                viewers = setOf(
+                    "com.kyobo.ebook.common.b2c.viewer.epub.ViewerEpubMainActivity",
+                    "com.kyobo.ebook.common.b2c.viewer.pdf.ViewerPdfMainActivity",
+                    "com.kyobo.ebook.common.b2c.viewer.comic.ViewerComicMainActivity",
+                ),
+                // 서재(shelves)를 읽지 않으므로 칸 요소 이름(title·thumb)은 쓰이지 않는다.
+                title = "", thumb = "", author = null, progress = null, due = null,
+                viewerProgress = "bookIndicator", viewerTitle = "viewer_top_booktitle",
             ),
             ReaderSpec(
                 pkg = "kr.co.millie.eink", classPrefix = "kr.co.millie",

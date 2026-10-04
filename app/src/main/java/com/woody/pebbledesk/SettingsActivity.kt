@@ -172,6 +172,7 @@ class SettingsActivity : EinkActivity() {
         para(R.string.guide_intro, 18f, Ui.BLACK, 18)
         for ((name, desc) in listOf(
             R.string.guide_kel to R.string.guide_kel_desc,
+            R.string.guide_kyobo to R.string.guide_kyobo_desc,
             R.string.guide_millie to R.string.guide_millie_desc,
             R.string.guide_aladin to R.string.guide_aladin_desc,
             R.string.guide_bookers to R.string.guide_bookers_desc,
