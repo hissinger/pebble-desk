@@ -244,14 +244,16 @@ object BookShelf {
         if (oldId != book.id) dropFiles(context, oldId)
     }
 
-    /** 이북 앱 서재에서 본 진행률·반납일을 적는다(순서는 그대로). 바뀐 게 없으면 쓰지 않는다. */
-    @Synchronized fun updateStatus(context: Context, id: String, progress: Int, due: Long) {
+    /** 이북 앱 서재에서 본 진행률·반납일(저자는 비어 있을 때만)을 적는다(순서는 그대로). 바뀐 게 없으면 쓰지 않는다. */
+    @Synchronized fun updateStatus(context: Context, id: String, progress: Int, due: Long, author: String = "") {
         val books = list(context)
         val book = books.find { it.id == id } ?: return
         val p = if (progress >= 0) progress else book.progress
         val d = if (due >= 0) due else book.due
-        if (p == book.progress && d == book.due) return
-        write(context, books.map { if (it.id == id) it.copy(progress = p, due = d) else it })
+        // 저자는 비어 있을 때만 채운다(읽는 화면 메뉴의 제목으로 먼저 들어온 책).
+        val a = book.author.ifBlank { author }
+        if (p == book.progress && d == book.due && a == book.author) return
+        write(context, books.map { if (it.id == id) it.copy(progress = p, due = d, author = a) else it })
     }
 
     fun hasCover(context: Context, id: String) = coverFile(context, id).length() > 0

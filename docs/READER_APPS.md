@@ -62,7 +62,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **알라딘**
   - `aladinreader://?view=viewer&itemid=<알라딘 eBook ItemId>&isShortcut=true` 로 특정 책을 연다(없으면 내려받은 뒤 연다). 마지막과 같은 주소는 무시하므로 `&ts=…` 같은 값을 붙인다. 그 밖에 `view=purchase`(구매 목록), `setting` 등.
   - 읽는 화면 `cpviewer.ViewerActivity`, `epubreader.readonbook.bookrender.ReadONBookRenderActivity`.
-  - 표지를 `/sdcard/sleep/.bookcover/bookcover.png` 에 쓰고 `com.keph.crema.shine.book_cover_added` 를 방송하는 코드(`CremaUtil`)가 있다. 페블에는 그 폴더가 없다(다른 크레마 기종용으로 보임).
+  - 표지를 `/sdcard/sleep/.bookcover/bookcover.png` 에 쓰고 `com.keph.crema.shine.book_cover_added` 를 방송하는 코드(`CremaUtil`)가 있다. 페블에는 그 폴더가 없다(다른 크레마 기종용으로 보임). 폴더를 만들어 두고 책을 열어 봐도 쓰지 않았다(2026-10-05).
   - 소리로 읽기(TTS) 음성 데이터, 책장 목록 `files/bookshelf.json`(런처 접근 불가).
 - **리디**
   - `SplashActivity` 에 `book_id`(리디 책 번호, `ridibooks.com/books/<번호>`) 를 주면 그 책을 연다. `ridi://Library` 는 서재.
@@ -148,7 +148,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 
 | 앱 | 서재 화면 | 읽을 수 있는 것 | 책 칸 누름 알림 | 결과 |
 |---|---|---|---|---|
-| 알라딘 | `kr.co.aladin.ebook.MainActivity` | 제목 `txt_title`, 표지 `img_cover`, 아래 '최근 읽은 책' `reading_book_tv_book_title`. 진행률·저자 없음 | 대개 안 옴(표지 그림이 눌린 것으로 한 번 옴) | **지원**: 읽는 화면에서 돌아오면 '최근 읽은 책' 이 방금 편 책 |
+| 알라딘 | `kr.co.aladin.ebook.MainActivity` | 격자 보기: 제목 `txt_title`, 표지 `img_cover`. 목록 보기: 제목 `text_title`, 저자 `text_author`(`한강 지음`), 진행률 `txt_read_percent`, 대여 `text_rent_date`. 아래 '최근 읽은 책' `reading_book_tv_book_title` | 격자 보기는 안 옴, 목록 보기는 옴(`[제목, 저자, 45%]`) | **지원**. 읽는 화면(`ReadONBookRenderActivity`, 본문 웹 화면) 메뉴의 `viewer_header_title` 로도 안다. 아래 쪽 표시 `bookrender_txt_page_onepage`(`6 / 368　 저자소개`, 처음엔 높이 0 이라 늦게 그려진다)로 진행률. 메뉴에도 `viewermenu_text_pageinfo`(`6 / 368`) |
 | 북커스 `com.bookers.ebook` | `ui.purchase.PurchaseActivity`(내서재) | 제목 `tv_title`, 표지 `iv_cover`, 진행률 `tv_percent`, 대여 기한 `tv_end_date`(`만료` 등) | 옴(글자에 제목) | **지원** |
 | 교보eBook | `common.b2c.ui.mainV3.activity.MainV3Activity` | 화면 요소 이름이 없다(Compose). 격자 보기는 제목도 없고, 목록 보기에서만 제목·저자 글자 | 안 옴 | **지원**: 서재는 안 읽고, 읽는 화면 메뉴의 제목·진행률로 안다 |
 | 리디 | `main.activity.MainActivity` | 탭·메뉴만 보이고 책 칸은 접근성에 안 나온다 | 안 옴 | 미지원 |

@@ -112,7 +112,7 @@
     <string name="guide_millie">밀리의서재</string>
     <string name="guide_millie_desc">다운로드·전체도서·책장, 검색의 바로 읽기. 읽는 중 진행률도 적습니다.</string>
     <string name="guide_aladin">알라딘</string>
-    <string name="guide_aladin_desc">읽고 서재로 돌아오면 넣습니다. 서재에 진행률이 없습니다.</string>
+    <string name="guide_aladin_desc">목록 보기 서재에서 펴면 들어옵니다. 격자 보기는 읽다가 메뉴를 띄우면.\n표지는 서재 화면에서 가져와, 서재를 거치지 않으면 빈 표지일 수 있습니다.</string>
     <string name="guide_bookers">북커스</string>
     <string name="guide_bookers_desc">내서재에서 편 책.</string>
     <string name="guide_cover_note">표지는 서재 화면의 표지를 잘라 옵니다. 제목이 잘리거나 다르면 홈에서 책을 길게 눌러 고치세요.</string>

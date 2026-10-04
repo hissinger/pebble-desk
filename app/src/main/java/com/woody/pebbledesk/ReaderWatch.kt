@@ -29,8 +29,16 @@ class ReaderWatchService : AccessibilityService() {
     /** 검색(웹 화면)에서 보고 있는 책 상세. 여기서 읽는 화면으로 넘어가면 이 책을 편 것으로 본다(`바로 읽기` 클릭에는 글자가 없다). */
     private val webBook = mutableMapOf<String, Seen>()
     private var lastWebRead = 0L
-    /** 아직 목록에 없는 책의 잘라 둔 표지(검색 화면에서 `바로 읽기`를 누를 때 찍음). 그 책이 들어오면 붙인다. */
-    private var pendingCover: Pair<String, ByteArray>? = null
+    /**
+     * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 알라딘 서재가 잠깐 보일 때
+     * 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
+     */
+    private val pendingCovers = object : LinkedHashMap<String, ByteArray>() {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?) = size > PENDING_MAX
+    }
+    private var lastEagerRead = 0L
+    /** 이번 서재 방문에서 책(정리한 제목)마다 바로 자르기를 해 본 횟수. 그 앱 화면이 새로 열릴 때마다 비운다. */
+    private val eagerTries = mutableMapOf<String, Int>()
     /** 서재에서 읽는 화면으로 갔다 온 앱(서재의 '최근 읽은 책' 줄로 어떤 책인지 안다) */
     private val readSince = mutableSetOf<String>()
     private var lastShot = 0L
@@ -40,6 +48,8 @@ class ReaderWatchService : AccessibilityService() {
     private val settleLater = Runnable { settleSpec?.let(::settleShelf) }
     /** 읽는 화면이 잠잠해지면(쪽 넘김·메뉴 열기 뒤) 읽을 앱 */
     private var viewerSpec: ReaderSpec? = null
+    /** 진행률을 아직 못 읽어 다시 읽어 볼 횟수(메뉴의 쪽 정보는 조금 늦게 채워지고, 채워질 때 알림이 없다) */
+    private var viewerRetries = 0
     private val viewerLater = Runnable { viewerSpec?.let(::readViewer) }
 
 
@@ -52,6 +62,8 @@ class ReaderWatchService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 // 대화상자 같은 것은 빼고 그 앱의 화면만 기억한다.
                 e.className?.toString()?.takeIf { it.startsWith(spec.classPrefix) }?.let {
+                    // 화면이 새로 열릴 때마다(홈에서 돌아온 서재 포함) 바로 자르기 횟수를 다시 센다.
+                    eagerTries.clear()
                     screen[spec.pkg] = it
                     if (ReadingLog.isReaderScreen(it)) {
                         if (spec.recent != null) readSince += spec.pkg
@@ -80,10 +92,28 @@ class ReaderWatchService : AccessibilityService() {
                         readWebBook(spec, root)?.let { webBook[spec.pkg] = it } ?: webBook.remove(spec.pkg)
                     }
                 }
+                // 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘)은 멈추기를 기다리지 않고 표지가 보이는 대로 잘라 둔다.
+                if (spec.eagerCovers && (force || now - lastEagerRead >= THROTTLE_MS)) {
+                    lastEagerRead = now
+                    root(spec)?.let { root ->
+                        captureCovers(spec, readShelf(spec, root).mapNotNull { s ->
+                            val thumb = s.thumb?.takeIf(::usableThumb) ?: return@mapNotNull null
+                            val book = BookShelf.findByTitle(this, s.title)
+                            val need = if (book == null) pendingFor(s.title) == null else !BookShelf.hasCover(this, book.id)
+                            // 찍어도 버려지는 칸(한 가지 색 표지 등)을 계속 찍지 않도록 서재를 볼 때마다 책마다 몇 번만.
+                            val key = normTitle(s.title)
+                            val tries = eagerTries.getOrDefault(key, 0)
+                            if (!need || tries >= EAGER_TRIES) return@mapNotNull null
+                            eagerTries[key] = tries + 1
+                            s.title to thumb
+                        }, retry = false)
+                    }
+                }
                 scheduleSettle(spec)
             }
             in spec.viewers -> {
                 viewerSpec = spec
+                viewerRetries = VIEWER_RETRIES
                 handler.removeCallbacks(viewerLater)
                 handler.postDelayed(viewerLater, VIEWER_SETTLE_MS)
             }
@@ -98,9 +128,15 @@ class ReaderWatchService : AccessibilityService() {
     private fun readViewer(spec: ReaderSpec) {
         viewerSpec = null
         if (screen[spec.pkg] !in spec.viewers) return
-        val root = root(spec) ?: return
-        val progress = spec.viewerProgress?.let { id -> root.byId(spec, id).firstOrNull()?.text?.let(::percent) } ?: -1
-        spec.viewerTitle?.let { id -> root.byId(spec, id).firstOrNull()?.text?.toString()?.trim() }?.takeIf { it.isNotEmpty() }?.let { title ->
+        // 메뉴·알림 창이 위에 떠 있어도 그 아래 읽는 화면의 진행률 줄을 읽도록 그 앱의 창을 모두 본다.
+        val roots = appRoots(spec).ifEmpty { return }
+        fun texts(id: String) = roots.flatMap { it.byId(spec, id) }.mapNotNull { it.text?.toString()?.trim() }.filter { it.isNotEmpty() }
+        val progress = spec.viewerProgress.firstNotNullOfOrNull { id -> texts(id).map(::viewerPercent).firstOrNull { it >= 0 } } ?: -1
+        if (progress < 0 && spec.viewerProgress.isNotEmpty() && viewerRetries-- > 0) {
+            viewerSpec = spec
+            handler.postDelayed(viewerLater, VIEWER_RETRY_MS)
+        }
+        spec.viewerTitle?.let { id -> texts(id).firstOrNull() }?.let { title ->
             val current = opened[spec.pkg]?.let { BookShelf.findByTitle(this, it) }
             if (current == null || BookShelf.findByTitle(this, title)?.id != current.id) {
                 bookOpened(spec, Seen(title, "", progress, -1, null, Rect()))
@@ -141,7 +177,7 @@ class ReaderWatchService : AccessibilityService() {
         val rowLeft = texts.filter { abs(it.second.top - button.top) < ALIGN_PX }.minOf { it.second.left }
         val above = texts.filter { abs(it.second.left - rowLeft) < ALIGN_PX && it.second.bottom <= button.top }.sortedBy { it.second.top }
         val (title, titleAt) = above.firstOrNull() ?: return null
-        val author = above.getOrNull(1)?.first?.substringBefore(" 지음")?.trim().orEmpty()
+        val author = authorName(above.getOrNull(1)?.first.orEmpty())
         val cover = images.firstOrNull { it.right <= rowLeft && it.top <= titleAt.bottom && it.bottom >= button.top }
         return Seen(title, author, -1, -1, cover, Rect())
     }
@@ -159,9 +195,15 @@ class ReaderWatchService : AccessibilityService() {
         if (web.thumb != null && (book == null || !BookShelf.hasCover(this, book.id))) captureCovers(spec, listOf(web.title to web.thumb))
     }
 
+    /** 잘라 둔 표지 가운데 [title] 의 것(부제·공백 무시)의 열쇠 */
+    private fun pendingFor(title: String): String? {
+        val n = normTitle(title)
+        return pendingCovers.keys.firstOrNull { sameTitle(it, n) }
+    }
+
     /** 서재에 보이는 책 칸들 */
     private fun readShelf(spec: ReaderSpec, root: AccessibilityNodeInfo): List<Seen> =
-        root.byId(spec, spec.title).mapNotNull { title -> cellOf(spec, title)?.let { readCell(spec, it) } }
+        spec.titles.flatMap { root.byId(spec, it) }.mapNotNull { title -> cellOf(spec, title)?.let { readCell(spec, it) } }
 
     /**
      * [node] 가 들어 있는 책 칸: 위로 올라가며 제목이 하나뿐인 가장 큰 묶음(그 위는 여러 권을 담은 목록).
@@ -172,7 +214,7 @@ class ReaderWatchService : AccessibilityService() {
         var n: AccessibilityNodeInfo? = node
         for (i in 0 until CELL_UP) {
             val c = n ?: break
-            val titles = c.count(spec, spec.title)
+            val titles = spec.titles.sumOf { c.count(spec, it) }
             if (titles > 1) break
             if (titles == 1) cell = c
             n = c.parent
@@ -193,9 +235,9 @@ class ReaderWatchService : AccessibilityService() {
         }
         walk(cell, 0)
         fun text(id: String?) = id?.let { texts[it] }.orEmpty()
-        val title = text(spec.title).ifEmpty { return null }
+        val title = spec.titles.map(::text).firstOrNull { it.isNotEmpty() } ?: return null
         val bounds = Rect().also { cell.getBoundsInScreen(it) }
-        return Seen(title, text(spec.author), percent(text(spec.progress)), dueDate(text(spec.due)), thumb, bounds)
+        return Seen(title, authorName(text(spec.author)), percent(text(spec.progress)), dueDate(text(spec.due)), thumb, bounds)
     }
 
     /**
@@ -207,7 +249,7 @@ class ReaderWatchService : AccessibilityService() {
         val progress = items.firstNotNullOfOrNull { percent(it).takeIf { p -> p >= 0 } } ?: return null
         val title = items.firstOrNull()?.takeIf { percent(it) < 0 && !STATUS_ONLY.matches(it) } ?: return null
         val due = if (spec.due != null) items.firstOrNull { "반납" in it || "만료" in it }?.let(::dueDate) ?: -1 else -1
-        val author = if (spec.author != null) items.getOrNull(1)?.takeIf { "%" !in it && "반납" !in it }.orEmpty() else ""
+        val author = if (spec.author != null) authorName(items.getOrNull(1)?.takeIf { "%" !in it && "반납" !in it }.orEmpty()) else ""
         return Seen(title, author, progress, due, null, Rect())
     }
 
@@ -219,15 +261,15 @@ class ReaderWatchService : AccessibilityService() {
         webBook.remove(spec.pkg)
         val book = BookShelf.findByTitle(this, seen.title)?.also {
             BookShelf.moveToFront(this, it.id)
-            BookShelf.updateStatus(this, it.id, seen.progress, seen.due)
+            BookShelf.updateStatus(this, it.id, seen.progress, seen.due, seen.author)
         } ?: run {
             val app = AppStore.load(this).firstOrNull { it.pkg == spec.pkg }?.key
             BookShelf.addOpened(this, autoBookId(seen.title), seen.title, seen.author, app, seen.progress, seen.due)
         }
         opened[spec.pkg] = book.title
-        // 검색 화면에서 `바로 읽기`를 누를 때 잘라 둔 표지
-        pendingCover?.takeIf { sameTitle(it.first, book.title) }?.let { (_, bytes) ->
-            pendingCover = null
+        // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 알라딘 서재)
+        pendingFor(book.title)?.let { key ->
+            val bytes = pendingCovers.remove(key) ?: return@let
             if (!BookShelf.hasCover(this, book.id)) runCatching { BookShelf.setCover(this, book.id, bytes) }
         }
         // 그 밖의 표지는 지금(누른 칸이 반전돼 있거나 화면이 넘어가는 중) 찍지 않고, 서재로 돌아와 화면이 멈췄을 때 잘라 온다.
@@ -265,7 +307,7 @@ class ReaderWatchService : AccessibilityService() {
         }
         for (s in seen) {
             val book = BookShelf.findByTitle(this, s.title) ?: continue
-            BookShelf.updateStatus(this, book.id, s.progress, s.due)
+            BookShelf.updateStatus(this, book.id, s.progress, s.due, s.author)
             if (s.thumb != null && !BookShelf.hasCover(this, book.id)) targets += s.title to s.thumb
         }
         captureCovers(spec, targets)
@@ -273,13 +315,13 @@ class ReaderWatchService : AccessibilityService() {
 
     /**
      * 화면을 한 번 찍어 책(제목)마다 표지 칸([Rect], 화면 좌표)을 잘라 표지로 저장한다. 아직 목록에 없는 책이면
-     * [pendingCover] 로 두었다가 그 책이 들어올 때 붙인다. 안드로이드 11 부터 되고,
+     * [pendingCovers] 에 두었다가 그 책이 들어올 때 붙인다. 안드로이드 11 부터 되고,
      * 1초에 한 번만 찍을 수 있으므로 너무 이르면 조금 뒤에 다시 한다. 한 가지 색뿐인 칸(그림을 불러오기 전)은 버린다.
      */
-    private fun captureCovers(spec: ReaderSpec, targets: List<Pair<String, Rect>>) {
+    private fun captureCovers(spec: ReaderSpec, targets: List<Pair<String, Rect>>, retry: Boolean = true) {
         if (targets.isEmpty() || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         val now = System.currentTimeMillis()
-        if (now - lastShot < SHOT_INTERVAL_MS) { scheduleSettle(spec); return }
+        if (now - lastShot < SHOT_INTERVAL_MS) { if (retry) scheduleSettle(spec); return }
         lastShot = now
         val context = applicationContext
         takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor, object : TakeScreenshotCallback {
@@ -292,7 +334,7 @@ class ReaderWatchService : AccessibilityService() {
                     try {
                         targets.mapNotNull { (title, rect) ->
                             val r = Rect(rect).apply { intersect(0, 0, shot.width, shot.height) }
-                            if (r.width() < MIN_THUMB_PX || r.height() < MIN_THUMB_PX) return@mapNotNull null
+                            if (!usableThumb(r)) return@mapNotNull null
                             val crop = trimEdges(Bitmap.createBitmap(shot, r.left, r.top, r.width(), r.height()))
                             if (isFlat(crop)) return@mapNotNull null
                             title to ByteArrayOutputStream().also { crop.compress(Bitmap.CompressFormat.JPEG, 92, it) }.toByteArray()
@@ -303,7 +345,7 @@ class ReaderWatchService : AccessibilityService() {
                 }) { result ->
                     for ((title, bytes) in result.getOrNull().orEmpty()) {
                         val book = BookShelf.findByTitle(context, title)
-                        if (book == null) { pendingCover = title to bytes; continue }
+                        if (book == null) { pendingCovers[normTitle(title)] = bytes; continue }
                         // 한 권이 실패해도(저장 공간 등) 나머지는 넣는다. 못 넣은 책은 다음에 서재를 볼 때 다시 한다.
                         if (!BookShelf.hasCover(context, book.id)) runCatching { BookShelf.setCover(context, book.id, bytes) }
                     }
@@ -321,6 +363,15 @@ class ReaderWatchService : AccessibilityService() {
         handler.removeCallbacks(viewerLater)
         super.onDestroy()
     }
+
+    /** 자를 만한 표지 칸: 너무 작지 않고(가려졌거나 화면 밖), 세로로 긴 표지 모양(화면 위·아래에 걸쳐 일부만 보이면 아님) */
+    private fun usableThumb(r: Rect) =
+        r.width() >= MIN_THUMB_PX && r.height() >= MIN_THUMB_PX && r.height() >= r.width() * MIN_COVER_RATIO
+
+    /** 화면에 떠 있는 그 앱의 창들(읽는 화면 + 위에 뜬 메뉴·알림). 창 목록을 못 얻으면 맨 앞 창만. */
+    private fun appRoots(spec: ReaderSpec): List<AccessibilityNodeInfo> =
+        runCatching { windows.mapNotNull { it.root }.filter { it.packageName == spec.pkg } }.getOrDefault(emptyList())
+            .ifEmpty { listOfNotNull(root(spec)) }
 
     /** 지금 앞에 있는 그 앱의 화면(다른 앱·시스템 창이면 null) */
     private fun root(spec: ReaderSpec): AccessibilityNodeInfo? = rootInActiveWindow?.takeIf { it.packageName == spec.pkg }
@@ -349,25 +400,32 @@ class ReaderWatchService : AccessibilityService() {
         /** 책 칸이 보이는 화면들(서재·탭·책장 안) */
         val shelves: Set<String>,
         val viewers: Set<String>,
-        val title: String,
+        /** 서재 칸의 제목(보기 방식마다 이름이 다르면 여럿) */
+        val titles: List<String>,
         /** 서재 칸의 표지 그림 */
         val thumb: String,
         val author: String?,
         val progress: String?,
         val due: String?,
-        val viewerProgress: String?,
+        /** 읽는 화면의 진행률 줄(앞에서부터 먼저 찾은 것) */
+        val viewerProgress: List<String>,
         /** 읽는 화면 메뉴의 책 제목(메뉴를 띄웠을 때만 보인다) */
         val viewerTitle: String? = null,
         /** 서재 화면의 '최근 읽은 책' 제목(책 칸을 눌러도 알림이 오지 않는 앱) */
         val recent: String? = null,
         /** 검색(웹 화면) 책 상세의 읽기 단추 글자 */
         val readNow: Set<String> = emptySet(),
+        /** 서재를 잠깐만 보고 책으로 넘어가는 앱: 멈추기를 기다리지 않고 표지를 잘라 둔다 */
+        val eagerCovers: Boolean = false,
     )
 
     companion object {
         private const val THROTTLE_MS = 1000L
         /** 읽는 화면이 이만큼 잠잠하면 진행률·제목을 읽는다 */
         private const val VIEWER_SETTLE_MS = 700L
+        /** 진행률이 비어 있으면 이 간격으로 이만큼 더 읽어 본다 */
+        private const val VIEWER_RETRY_MS = 1000L
+        private const val VIEWER_RETRIES = 3
         private const val SHOT_INTERVAL_MS = 1100L
         /** 서재 화면이 이만큼 그대로여야 표지를 찍는다 */
         private const val SETTLE_MS = 1500L
@@ -379,6 +437,12 @@ class ReaderWatchService : AccessibilityService() {
         private const val ALIGN_PX = 8
         /** 이보다 작게 보이는 표지 칸은 자르지 않는다(가려졌거나 화면 밖) */
         private const val MIN_THUMB_PX = 40
+        /** 표지 칸의 세로 ÷ 가로가 이보다 작으면 일부만 보이는 칸으로 본다(표지는 1.4~1.5) */
+        private const val MIN_COVER_RATIO = 1.1f
+        /** 바로 자르기를 서재 방문마다 책 한 권에 해 보는 최대 횟수 */
+        private const val EAGER_TRIES = 3
+        /** 목록에 없는 책의 표지를 잘라 둘 최대 권수 */
+        private const val PENDING_MAX = 6
 
         private val SPECS = listOf(
             ReaderSpec(
@@ -389,8 +453,8 @@ class ReaderWatchService : AccessibilityService() {
                     "com.kyobo.ebook.kel.viewer.epub.B2BViewerEpubMainActivity",
                     "com.kyobo.ebook.kel.viewer.pdf.B2BViewerPdfMainActivity",
                 ),
-                title = "tvTitle", thumb = "ivThumbnail", author = "tvAuthor", progress = "tvReadPercentageTxt", due = "tvRemainDate",
-                viewerProgress = "bookIndicator", viewerTitle = "viewer_top_booktitle",
+                titles = listOf("tvTitle"), thumb = "ivThumbnail", author = "tvAuthor", progress = "tvReadPercentageTxt", due = "tvRemainDate",
+                viewerProgress = listOf("bookIndicator"), viewerTitle = "viewer_top_booktitle",
             ),
             // 교보eBook: 서재(Compose)에는 요소 이름이 없고 격자 보기에는 제목도 없어 서재는 읽지 않는다.
             // 교보도서관과 같은 읽는 화면이라 진행률 줄과 메뉴의 제목으로 안다(서재·내 책장 어디서 열어도).
@@ -402,9 +466,9 @@ class ReaderWatchService : AccessibilityService() {
                     "com.kyobo.ebook.common.b2c.viewer.pdf.ViewerPdfMainActivity",
                     "com.kyobo.ebook.common.b2c.viewer.comic.ViewerComicMainActivity",
                 ),
-                // 서재(shelves)를 읽지 않으므로 칸 요소 이름(title·thumb)은 쓰이지 않는다.
-                title = "", thumb = "", author = null, progress = null, due = null,
-                viewerProgress = "bookIndicator", viewerTitle = "viewer_top_booktitle",
+                // 서재(shelves)를 읽지 않으므로 칸 요소 이름(titles·thumb)은 쓰이지 않는다.
+                titles = emptyList(), thumb = "", author = null, progress = null, due = null,
+                viewerProgress = listOf("bookIndicator"), viewerTitle = "viewer_top_booktitle",
             ),
             ReaderSpec(
                 pkg = "kr.co.millie.eink", classPrefix = "kr.co.millie",
@@ -415,25 +479,29 @@ class ReaderWatchService : AccessibilityService() {
                     "kr.co.millie.eink.pdf.PDFViewActivity",
                     "kr.co.millie.eink.epub.StoryViewActivity",
                 ),
-                title = "tv_book_title", thumb = "iv_thumbnail", author = null, progress = "bookshelf_cell_reading", due = null,
-                viewerProgress = "tv_viewer_add_on_right",
+                titles = listOf("tv_book_title"), thumb = "iv_thumbnail", author = null, progress = "bookshelf_cell_reading", due = null,
+                viewerProgress = listOf("tv_viewer_add_on_right"),
                 readNow = setOf("바로 읽기", "이어 읽기"),
             ),
-            // 알라딘: 서재 칸에 제목·표지만 있다(진행률 없음). 책 칸을 눌러도 알림이 없어 서재 아래 '최근 읽은 책'으로 안다.
+            // 알라딘: 격자 보기 칸에는 제목·표지만 있고 눌러도 알림이 없다(서재 아래 '최근 읽은 책'으로 안다).
+            // 목록 보기 칸에는 제목·저자·진행률·대여 기한이 있고 누르면 알림이 온다. 읽는 화면은 메뉴의 제목으로 안다.
             ReaderSpec(
                 pkg = "kr.co.aladin.ebook", classPrefix = "kr.co.aladin",
                 shelves = setOf("kr.co.aladin.ebook.MainActivity"),
-                viewers = emptySet(),
-                title = "txt_title", thumb = "img_cover", author = null, progress = null, due = null,
-                viewerProgress = null, recent = "reading_book_tv_book_title",
+                viewers = setOf("kr.co.aladin.epubreader.readonbook.bookrender.ReadONBookRenderActivity"),
+                titles = listOf("txt_title", "text_title"), thumb = "img_cover", author = "text_author", progress = "txt_read_percent",
+                // 읽는 화면 아래 쪽 표시(`6 / 368　 저자소개`, 쪽·장 이름)로 진행률을 셈한다.
+                due = "text_rent_date", viewerProgress = listOf("bookrender_txt_page_onepage", "viewermenu_text_pageinfo"),
+                viewerTitle = "viewer_header_title",
+                recent = "reading_book_tv_book_title", eagerCovers = true,
             ),
             // 북커스: 내서재 칸에 제목·표지·진행률·대여 만료.
             ReaderSpec(
                 pkg = "com.bookers.ebook", classPrefix = "com.bookers",
                 shelves = setOf("com.bookers.ebook.ui.purchase.PurchaseActivity"),
                 viewers = emptySet(),
-                title = "tv_title", thumb = "iv_cover", author = null, progress = "tv_percent", due = "tv_end_date",
-                viewerProgress = null,
+                titles = listOf("tv_title"), thumb = "iv_cover", author = null, progress = "tv_percent", due = "tv_end_date",
+                viewerProgress = emptyList(),
             ),
         ).associateBy { it.pkg }
 
@@ -504,8 +572,19 @@ class ReaderWatchService : AccessibilityService() {
         /** 제목이 아니라 상태 글자(`4일`, `반납 4일 남음`, `D-3`, `만료`) — 교보도서관 표지 보기 칸은 제목 없이 이것만 있다 */
         private val STATUS_ONLY = Regex("""^(반납\s*)?(\d+\s*일(\s*남음)?|D-?\d+|만료|오늘 반납)$""")
 
+        /** `한강 지음`, `한스 로슬링 지음 / 이창신 옮김` → 지은이만 */
+        private fun authorName(text: String) = text.substringBefore(" 지음").trim()
+
         private fun percent(text: CharSequence): Int =
             Regex("""(\d{1,3})\s*%""").find(text)?.groupValues?.get(1)?.toInt()?.coerceIn(0, 100) ?: -1
+
+        /** 읽는 화면의 진행률: `2% (4/226p)` 처럼 % 가 있으면 그것, 없으면 쪽 `6 / 368` 로 계산(알라딘). 모르면 -1 */
+        private fun viewerPercent(text: CharSequence): Int {
+            percent(text).takeIf { it >= 0 }?.let { return it }
+            val m = Regex("""(\d+)\s*/\s*(\d+)""").find(text) ?: return -1
+            val (page, total) = m.destructured
+            return if (total.toInt() > 0) (page.toLong() * 100 / total.toLong()).toInt().coerceIn(0, 100) else -1
+        }
 
         /** `2026.10.20` → 그날, `반납 4일 남음` → 오늘 + 4일, `오늘 반납` → 오늘, `만료` → 어제(지남). 모르면 -1 */
         private fun dueDate(text: String): Long {

@@ -109,7 +109,7 @@
     <string name="guide_millie">Millie</string>
     <string name="guide_millie_desc">Downloads · All books · Shelves, and Read now in search. Progress is also read while reading.</string>
     <string name="guide_aladin">Aladin</string>
-    <string name="guide_aladin_desc">Added when you return to the shelf after reading. The shelf shows no progress.</string>
+    <string name="guide_aladin_desc">Books opened from the shelf in list view are added. In grid view, open the menu while reading.\nCovers come from the shelf screen, so without passing the shelf the cover may be blank.</string>
     <string name="guide_bookers">Bookers</string>
     <string name="guide_bookers_desc">Books opened from My library.</string>
     <string name="guide_cover_note">Covers are cut from the shelf screen. If a title is cut off or wrong, long-press the book on the home screen to edit it.</string>

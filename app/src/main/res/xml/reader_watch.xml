@@ -4,7 +4,7 @@
     android:packageNames="kr.co.kyobobook.KEL,com.kyobo.ebook.eink,kr.co.millie.eink,kr.co.aladin.ebook,com.bookers.ebook"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagReportViewIds|flagIncludeNotImportantViews"
+    android:accessibilityFlags="flagReportViewIds|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
     android:canTakeScreenshot="true"
     android:notificationTimeout="300"
