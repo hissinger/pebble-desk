@@ -7,8 +7,8 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
+import android.text.Html
 import android.util.LruCache
-import org.jsoup.Jsoup
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -35,38 +35,56 @@ object BookSearch {
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
     private val EXCLUDED_TYPES = setOf("[중고도서]", "[Blu-ray]", "[DVD]", "[음반]", "[LP]", "[GIFT]")
     private val GOODS_ID = Regex("""/goods/(\d+)""")
+    // 검색 결과 한 권(`<div class="itemUnit">`)에서 읽는 것. HTML 라이브러리(jsoup)는 앱 크기의 절반이라 쓰지 않는다.
+    private val TYPE = Regex("""<span class="gd_res">(.*?)</span>""", RegexOption.DOT_MATCHES_ALL)
+    private val NAME = Regex("""(<a\b[^>]*\bclass="gd_name"[^>]*>)(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
+    private val HREF = Regex("""href="([^"]*)"""")
+    private val AUTHORS = Regex("""<span[^>]*\binfo_auth\b[^>]*>(.*?)</span>""", RegexOption.DOT_MATCHES_ALL)
+    private val LINK = Regex("""<a\b[^>]*>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
 
     /** 네트워크를 쓰므로 백그라운드에서 부른다. */
     @Throws(IOException::class)
     fun search(query: String): List<BookResult> {
         val url = "https://www.yes24.com/Product/Search?domain=ALL&query=" + URLEncoder.encode(query, "UTF-8")
-        val doc = Jsoup.connect(url).userAgent(USER_AGENT).timeout(15_000).get()
-        if (!doc.location().contains("/Search", ignoreCase = true)) throw IOException("redirected")
-        return doc.select("div.itemUnit").mapNotNull { item ->
-            val type = item.selectFirst("span.gd_res")?.text()?.trim()
+        val html = String(get(url, readTimeout = 15_000) { conn ->
+            // 검색 페이지가 아닌 곳(메인)으로 넘겨졌으면 결과가 아니다.
+            if (!conn.url.toString().contains("/Search", ignoreCase = true)) throw IOException("redirected")
+        }, Charsets.UTF_8)
+        return html.split("class=\"itemUnit\"").drop(1).mapNotNull { item ->
+            val type = TYPE.find(item)?.groupValues?.get(1)?.let(::plain)
             if (type != null && type in EXCLUDED_TYPES) return@mapNotNull null
-            val name = item.selectFirst("a.gd_name") ?: return@mapNotNull null
-            val id = GOODS_ID.find(name.attr("href"))?.groupValues?.get(1) ?: return@mapNotNull null
+            val name = NAME.find(item) ?: return@mapNotNull null
+            val href = HREF.find(name.groupValues[1])?.groupValues?.get(1) ?: return@mapNotNull null
+            val id = GOODS_ID.find(href)?.groupValues?.get(1) ?: return@mapNotNull null
+            val authors = AUTHORS.find(item)?.groupValues?.get(1).orEmpty()
             BookResult(
                 id = id,
-                title = name.text().trim(),
-                author = item.select("span.info_auth a").joinToString(", ") { it.text().trim() },
+                title = plain(name.groupValues[2]),
+                author = LINK.findAll(authors).joinToString(", ") { plain(it.groupValues[1]) },
                 thumbUrl = "https://image.yes24.com/goods/$id/L",
                 coverUrl = "https://image.yes24.com/goods/$id/XL",
             )
         }.distinctBy { it.id }
     }
 
+    /** HTML 조각의 글자만(태그를 빼고 `&#39;` 같은 것을 풀어서) */
+    private fun plain(html: String) = Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY).toString().trim()
+
     /** 네트워크를 쓰므로 백그라운드에서 부른다. */
     @Throws(IOException::class)
-    fun download(url: String): ByteArray {
+    fun download(url: String): ByteArray = get(url, readTimeout = 20_000, referer = "https://www.yes24.com/")
+
+    /** [url] 을 받아 온다(200 이 아니거나 [verify] 가 던지면 IOException). */
+    @Throws(IOException::class)
+    private fun get(url: String, readTimeout: Int, referer: String? = null, verify: (HttpURLConnection) -> Unit = {}): ByteArray {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 15_000
-        conn.readTimeout = 20_000
+        conn.readTimeout = readTimeout
         conn.setRequestProperty("User-Agent", USER_AGENT)
-        conn.setRequestProperty("Referer", "https://www.yes24.com/")
+        referer?.let { conn.setRequestProperty("Referer", it) }
         try {
             if (conn.responseCode != HttpURLConnection.HTTP_OK) throw IOException("HTTP ${conn.responseCode}")
+            verify(conn)
             return conn.inputStream.use { it.readBytes() }
         } finally {
             conn.disconnect()

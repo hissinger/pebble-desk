@@ -12,7 +12,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 adb install -r app/build/outputs/apk/release/PebbleDesk-1.0.0-release.apk </dev/null
 ```
 
-- 릴리스는 R8 축소(약 377KB)이고 디버그 키로 서명한다. 덮어 설치하면 앱 데이터가 남는다.
+- 릴리스는 R8 축소(약 235KB, HTML 라이브러리 없이 YES24 검색 결과를 직접 읽는다)이고 디버그 키로 서명한다. 덮어 설치하면 앱 데이터가 남는다.
 - 앱 데이터는 **기기 보호 저장소**(`/data/user_de/0/com.woody.pebbledesk/`: `shared_prefs/home.xml`, `files/books/`, `files/apps.json`, `files/reading.json`)에 있다(`Storage`). 홈이 잠금 해제 전에도 뜨게(directBootAware) 하려고 옮겼다.
 - 릴리스는 `run-as` 가 안 된다. 앱 데이터를 직접 고쳐야 하면 같은 키로 서명된 디버그 빌드를 잠깐 깔아 `run-as` 로 넣고 다시 릴리스를 깐다.
 - 성능은 꼭 **릴리스 빌드**로 잰다(디버그는 몇 배 느리다).

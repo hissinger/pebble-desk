@@ -39,6 +39,11 @@ android {
         }
     }
 
+    // 쓰지 않는 Kotlin 메타 정보(리플렉션용)는 APK 에 넣지 않는다.
+    packaging {
+        resources.excludes += setOf("kotlin/**", "kotlin-tooling-metadata.json")
+    }
+
     lint {
         disable += "QueryAllPackagesPermission"
     }
@@ -50,6 +55,3 @@ kotlin {
     }
 }
 
-dependencies {
-    implementation(libs.jsoup)
-}

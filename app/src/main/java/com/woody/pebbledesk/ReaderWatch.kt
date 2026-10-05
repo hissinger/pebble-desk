@@ -287,7 +287,8 @@ class ReaderWatchService : AccessibilityService() {
         val marker = spec.unnamedShelf ?: return emptyList()
         var shelf = false
         val found = mutableMapOf<String, Seen>()
-        fun walk(n: AccessibilityNodeInfo, depth: Int) {
+        /** [over]: 위 단계들에서 나중에 그려지는(drawingOrder 가 큰) 형제들의 자리. 그중 하나가 칸을 다 덮으면 위에 뜬 화면에 가려진 칸이다. */
+        fun walk(n: AccessibilityNodeInfo, depth: Int, over: List<Rect>) {
             // 같은 화면이 품은 홈·검색 탭의 웹 화면은 훑지 않는다.
             if (n.isWebView()) return
             // React Native 의 요소 이름은 `패키지:id/` 없이 그대로라 이름으로 찾기가 안 되어 훑으면서 본다.
@@ -295,12 +296,19 @@ class ReaderWatchService : AccessibilityService() {
             val desc = n.contentDescription?.toString()
             if (!desc.isNullOrEmpty()) unnamedCell(n, desc)?.let { s ->
                 val old = found[s.title]
-                if (!covered(n) && (old?.thumb == null || s.thumb!!.width() > old.thumb.width())) found[s.title] = s
+                if ((old?.thumb == null || s.thumb!!.width() > old.thumb.width()) && over.none { it.contains(s.cell) }) found[s.title] = s
                 return
             }
-            if (depth < DEEP_WALK_DEPTH) for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1) }
+            if (depth >= DEEP_WALK_DEPTH) return
+            val kids = (0 until n.childCount).mapNotNull { n.getChild(it) }
+            val order = kids.map { it.drawingOrder }
+            val rects = kids.map { k -> Rect().also { k.getBoundsInScreen(it) } }
+            kids.forEachIndexed { i, k ->
+                val above = kids.indices.filter { j -> order[j] > order[i] && !rects[j].isEmpty }.map { rects[it] }
+                walk(k, depth + 1, if (above.isEmpty()) over else over + above)
+            }
         }
-        walk(root, 0)
+        walk(root, 0, emptyList())
         return if (shelf) found.values.toList() else emptyList()
     }
 
@@ -328,22 +336,6 @@ class ReaderWatchService : AccessibilityService() {
     }
 
     private fun AccessibilityNodeInfo.isWebView() = className?.endsWith("WebView") == true
-
-    /** [node] 를 덮는 화면이 있는가: 위로 올라가며 나중에 그려지는(drawingOrder 가 큰) 형제가 [node] 를 다 덮으면 가려졌다. */
-    private fun covered(node: AccessibilityNodeInfo): Boolean {
-        val at = Rect().also { node.getBoundsInScreen(it) }
-        var n = node
-        for (i in 0 until DEEP_WALK_DEPTH) {
-            val parent = n.parent ?: return false
-            for (j in 0 until parent.childCount) {
-                val sib = parent.getChild(j) ?: continue
-                if (sib == n || sib.drawingOrder <= n.drawingOrder) continue
-                if (Rect().also { sib.getBoundsInScreen(it) }.contains(at)) return true
-            }
-            n = parent
-        }
-        return false
-    }
 
     /**
      * 누른 순간 화면이 이미 읽는 화면으로 넘어가 칸을 못 읽었을 때(북커스·YES24 도서관): 누른 글자 가운데 하나가 방금 본 서재 칸의
