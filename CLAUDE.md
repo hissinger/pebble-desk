@@ -46,7 +46,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.0.0-release.apk </dev/
 | HomeActivity | 홈: 상단 · 책 자리(스켈레톤/한 권/여러 권) · 자주 쓰는 앱(고정 3줄) · 하단 줄(모든 앱 · 오늘 읽은 시간 · 설정) |
 | ReadingActivity | ⑫ 독서 기록: 연속일·오늘 링, 4주 링 달력(뷰 하나로 그림), 합계, 이번 주 앱별 |
 | Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간 계산, `reading.json` 저장, 연속일 |
-| ReaderWatch | `ReaderWatchService`(접근성): 교보도서관·교보eBook·밀리·알라딘·북커스·리디·YES24 전자도서관 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기. 앱별 화면 요소 이름은 `SPECS` |
+| ReaderWatch | `ReaderWatchService`(접근성): 교보도서관·교보eBook·밀리·알라딘·북커스·리디·YES24(전자도서관·my YES) 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기. 앱별 화면 요소 이름은 `SPECS` |
 | Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 4권, YES24 표지 검색), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
 | AppListActivity / FavoritesActivity / SettingsActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 |

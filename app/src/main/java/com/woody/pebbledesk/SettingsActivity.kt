@@ -165,28 +165,40 @@ class SettingsActivity : EinkActivity() {
     /** 자동 추가 안내: 공통 안내 한 단락, 앱마다 이름과 한 줄 설명, 표지·제목 안내 */
     private fun renderGuide() {
         list.removeAllViews()
-        fun para(res: Int, size: Float, color: Int, top: Int) = list.addView(text(getString(res), size, color = color, lines = 6).apply {
+        fun para(res: Int, top: Int, bottom: Int) = list.addView(text(getString(res), 17f, color = Ui.BLACK, lines = 6).apply {
             setLineSpacing(0f, 1.2f)
-            setPadding(dp(Ui.MARGIN), dp(top), dp(Ui.MARGIN), dp(top))
+            setPadding(dp(Ui.MARGIN), dp(top), dp(Ui.MARGIN), dp(bottom))
         })
-        para(R.string.guide_intro, 18f, Ui.BLACK, 12)
-        for ((name, desc) in listOf(
+        // 앱마다 공통인 것(읽는 방식, 진행률, 표지·제목)을 먼저
+        para(R.string.guide_intro, 12, 4)
+        para(R.string.guide_progress_note, 4, 4)
+        para(R.string.guide_cover_note, 4, 12)
+        // 지원하는 앱 이름을 한 단락으로, 그 아래 안 되는 게 있는 앱만 설명
+        val apps = listOf(
             R.string.guide_kel to R.string.guide_kel_desc,
             R.string.guide_kyobo to R.string.guide_kyobo_desc,
-            R.string.guide_millie to R.string.guide_millie_desc,
+            R.string.guide_millie to null,
             R.string.guide_aladin to R.string.guide_aladin_desc,
-            R.string.guide_bookers to R.string.guide_bookers_desc,
+            R.string.guide_bookers to null,
             R.string.guide_ridi to R.string.guide_ridi_desc,
-            R.string.guide_yes24lib to R.string.guide_yes24lib_desc,
-        )) {
+            R.string.guide_yes24lib to null,
+            R.string.guide_myyes to R.string.guide_myyes_desc,
+        )
+        section(getString(R.string.guide_apps))
+        list.addView(text(apps.joinToString("  ·  ") { getString(it.first) }, 18f, Ui.bold, lines = 3).apply {
+            setLineSpacing(0f, 1.2f)
+            setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(10))
+        })
+        section(getString(R.string.guide_limits))
+        for ((name, desc) in apps) {
+            if (desc == null) continue
             list.addView(hline(1, Ui.DIVIDER))
-            list.addView(text(getString(name), 21f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(6), dp(Ui.MARGIN), 0) })
+            list.addView(text(getString(name), 19f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), 0) })
             list.addView(text(getString(desc), 17f, color = Ui.GRAY, lines = 3).apply {
-                setPadding(dp(Ui.MARGIN), dp(2), dp(Ui.MARGIN), dp(6))
+                setPadding(dp(Ui.MARGIN), dp(2), dp(Ui.MARGIN), dp(8))
             })
         }
         list.addView(hline(1, Ui.DIVIDER))
-        para(R.string.guide_cover_note, 17f, Ui.GRAY, 8)
     }
 
     private fun openAccessibility() {
