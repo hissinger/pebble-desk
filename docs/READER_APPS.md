@@ -13,7 +13,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 알라딘 `kr.co.aladin.ebook` | O | O (알라딘 상품번호) | O | O | `Android/data` |
 | 리디 `com.initialcoms.ridi` | O | O (리디 책 번호) | O `ridi://Library` | O | 앱 전용 저장소 |
 | 교보eBook `com.kyobo.ebook.eink` | O | 기기 안 번호라 사실상 X | O `kyoboebookeink://mylibrary` | O | `Android/data` |
-| YES24 `com.yes24.ebook.einkstore` | O | X (스토어 상세만) | O | X | `Android/data` |
+| YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
 - 사용 기록에는 **앱·화면 이름과 시각만** 남는다. 어떤 책인지는 알 수 없다.
 - 받은 책 파일은 안드로이드 11 이후 다른 앱이 `Android/data` 를 열 수 없고, 내용도 DRM 으로 암호화돼 있다(알라딘 책 폴더에 `encryption.xml`·`rights.xml`).
@@ -152,8 +152,8 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 북커스 `com.bookers.ebook` | `ui.purchase.PurchaseActivity`(내서재) | 제목 `tv_title`, 표지 `iv_cover`, 진행률 `tv_percent`, 대여 기한 `tv_end_date`(`14일 남음`, 다운로드 탭). 리스트 보기에 저자 `tv_author`·출판 `tv_publisher` | 옴(글자에 제목) | **지원**. 읽는 화면 `ui.viewer.epub.EpubActivity`(본문 웹 화면)는 메뉴에 제목 `tv_title`·쪽 `tv_current_page`/`tv_total_page`(1/368 을 서재는 1% 로 보여 올림). 뷰어 설정의 하단 정보를 켜면 아래 줄 `ll_page_area`(이름 없는 글자 세 조각 `8`,` / `,`371`, 메뉴가 뜨면 빈다). 읽는 화면은 화면 캡처가 막혀 있다. 홈 탭은 오프라인이라 못 봄 |
 | 교보eBook | `common.b2c.ui.mainV3.activity.MainV3Activity` | 화면 요소 이름이 없다(Compose). 격자 보기는 제목도 없고, 목록 보기에서만 제목·저자 글자 | 안 옴 | **지원**: 서재는 안 읽고, 읽는 화면 메뉴의 제목·진행률로 안다 |
 | 리디 (26.8.1) | `main.activity.MainActivity`(React Native) | 칸 글자(제목, `소장`)·설명(`제목, 제목, 소장`, 목록 보기는 `제목, 26.7MB, 소장, 48%`)·표지 그림(`ImageView`, 격자 327px·목록 86px 폭)은 보이지만 요소 이름이 없다(있는 것도 `libraryGnbMenus` 처럼 `패키지:id/` 없이). 칸을 누르면 작품 화면(같은 책 묶음)을 거쳐 연다. 작품 화면이 떠 있어도 아래 서재 화면이 트리에 남아 있고 둘 다 '보임'이라, 나중에 그려지는 형제(drawingOrder)로 가린다. 홈·검색 탭으로 가면 서재는 트리에서 빠진다 | 안 옴 | **지원**: 서재에서는 표지만 잘라 두고, 읽는 화면 `reader.epub.EPubReaderActivity` 메뉴의 제목 `title`·쪽 `reader_toolbar_page_text`(`14 / 626`). 뷰어 설정 '하단 좌/우 정보 표시'(챕터 제목·페이지 번호·독서 진행률·시계)를 켜면 `reader_left_info`·`reader_right_info`(`15 / 640`, `2%`, 처음엔 `독서 진행률 계산 중입니다...`, 전체 쪽은 계산이 끝날 때까지 바뀐다) |
-| YES24 서점 | — | 연결이 없으면 알림만 띄우고 닫힌다 | — | 확인 못 함 |
-| YES24 도서관 | `shelf.LibShelfActivity` | 읽고 있는 책이 없어 칸을 못 봄 | — | 확인 못 함 |
+| my YES(YES24 서점) 1.5.99 | `com.keph.crema.lunar.ui.MainActivity` | USB 디버깅이 켜져 있으면 "보안정책에 따라 USB 개발자모드 진입 시에는 어플리케이션 사용이 중지됩니다." 알림을 띄우고 닫힌다(코드에 `adb_enabled`) | — | 확인 중: 디버깅을 끈 채 화면 구조를 기기 안에 기록(`ScreenRecorder`) |
+| YES24 전자도서관 1.0.27 | `com.yes24.library.shelf.LibShelfActivity`(내 서재) | 격자·목록 보기 같은 이름: 제목 `tv_title`, 표지 `iv_cover`, 저자 `tv_author`(`<정지원,염선형 저>`, 목록은 `/ 미래의창` 이 붙음), 도서관 `tv_lib_name`, 반납 `tv_d_day`(`D-15`), 목록 보기에 `tv_end_date`(`(2026.10.20 까지)`), 진행 막대 `pb_read_percent`(글자 없음, 읽는 화면이 8% 인데 0 이라 안 씀). 개발자 모드에서도 쓸 수 있다 | 옴(`[고양시도서관센터, 제목, <저자>]`, 누른 요소는 없음) | **지원**. 읽는 화면 `com.yes24.ebook.fourth.ui.viewer.epub.EpubActivity`(본문 웹 화면, 화면 캡처 막힘): 아래 `tv_percent`(`8%`), 뷰어 설정의 하단 정보를 켜면 그 대신 아래 줄에 제목(이름 없음)·`ll_page_area`(`14`,`/`,`283`)·`tv_toc_title`(장 제목). 메뉴에 `tv_title`. 도서관 화면 책 상세(`lib.detail.LibDetailActivity`)의 `도서 읽기`로도 연다 |
 
 - 알라딘 `txt_title` 은 `분야`·`필터` 단추에도 쓰인다 → 표지 그림이 들어 있는 묶음만 책 칸으로 본다.
 - 이벤트로 받은 요소(누른 요소)는 부모로 올라갈 수 없다 → 누른 곳의 가운데가 들어 있는 칸을 서재 화면에서 찾는다.

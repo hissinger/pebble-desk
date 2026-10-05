@@ -17,15 +17,22 @@ import java.time.LocalDate
 import kotlin.math.abs
 
 /**
- * 읽고 있는 책 자동 추가(접근성 서비스). 교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디의 **서재 화면**에 보이는 제목·저자·진행률·반납일과
+ * 읽고 있는 책 자동 추가(접근성 서비스). 교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24 도서관의 **서재 화면**에 보이는 제목·저자·진행률·반납일과
  * 사용자가 누른 책 칸만 읽는다. 다른 앱은 시스템이 아예 보내지 않고(`res/xml/reader_watch.xml` 의 packageNames),
  * 읽는 화면은 본문(웹 화면)을 훑지 않고 진행률 줄·메뉴 제목만 이름으로 읽는다. 읽은 내용은 책 목록에만 적고 밖으로 보내지 않는다.
  */
 class ReaderWatchService : AccessibilityService() {
     /** 앱마다 지금 앞에 있는 화면(액티비티 이름) */
     private val screen = mutableMapOf<String, String>()
-    /** 앱마다 마지막으로 편 책의 제목(밀리 뷰어의 진행률을 붙일 곳). 표지 다시 찾기로 id 가 바뀌어도 찾도록 제목으로 둔다. */
-    private val opened = mutableMapOf<String, String>()
+    /**
+     * 앱마다 마지막으로 편 책의 제목(읽는 화면의 진행률을 붙일 곳). 표지 다시 찾기로 id 가 바뀌어도 찾도록 제목으로 둔다.
+     * 서비스가 다시 시작돼도(앱 업데이트·재부팅) 읽는 화면으로 바로 돌아간 책의 진행률을 적도록 저장해 둔다.
+     */
+    private val openedPrefs by lazy { Storage.of(this).getSharedPreferences("reader_watch", MODE_PRIVATE) }
+    private fun opened(pkg: String) = openedPrefs.getString("opened_$pkg", null)
+    private fun setOpened(pkg: String, title: String) {
+        if (opened(pkg) != title) openedPrefs.edit().putString("opened_$pkg", title).apply()
+    }
     /** 검색(웹 화면)에서 보고 있는 책 상세. 여기서 읽는 화면으로 넘어가면 이 책을 편 것으로 본다(`바로 읽기` 클릭에는 글자가 없다). */
     private val webBook = mutableMapOf<String, Seen>()
     private var lastWebRead = 0L
@@ -56,6 +63,7 @@ class ReaderWatchService : AccessibilityService() {
 
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
+        if (e.packageName in ScreenRecorder.PACKAGES) return ScreenRecorder.record(this, e) // (임시) YES24 화면 구조 기록
         val spec = SPECS[e.packageName?.toString()] ?: return
         if (!HomePrefs(this).autoBooks) return
         // 서재는 화면이 바뀌는 동안(칸을 다시 채우는 중, 표지를 불러오는 중, 누른 칸이 반전된 순간) 읽지 않고 멈출 때까지 미룬다.
@@ -143,14 +151,14 @@ class ReaderWatchService : AccessibilityService() {
         }
         // 제목은 하나만 보일 때만 믿는다(같은 이름이 여럿이면 목차 같은 목록이다. 북커스는 흔한 이름 `tv_title`).
         spec.viewerTitle?.let { id -> texts(id).distinct().singleOrNull() }?.let { title ->
-            val current = opened[spec.pkg]?.let { BookShelf.findByTitle(this, it) }
+            val current = opened(spec.pkg)?.let { BookShelf.findByTitle(this, it) }
             if (current == null || BookShelf.findByTitle(this, title)?.id != current.id) {
                 bookOpened(spec, Seen(title, "", progress, -1, null, Rect()))
                 return
             }
         }
         if (progress < 0) return
-        val book = opened[spec.pkg]?.let { BookShelf.findByTitle(this, it) } ?: return
+        val book = opened(spec.pkg)?.let { BookShelf.findByTitle(this, it) } ?: return
         BookShelf.updateStatus(this, book.id, progress, -1)
     }
 
@@ -290,13 +298,13 @@ class ReaderWatchService : AccessibilityService() {
     }
 
     /**
-     * 누른 순간 화면이 이미 읽는 화면으로 넘어가 칸을 못 읽었을 때(북커스): 누른 글자의 첫 줄이 방금 본 서재 칸의 제목과
-     * 똑같으면 그 칸. 탭·단추 글자는 책 제목과 같을 일이 없어 책으로 들어가지 않는다.
+     * 누른 순간 화면이 이미 읽는 화면으로 넘어가 칸을 못 읽었을 때(북커스·YES24 도서관): 누른 글자 가운데 하나가 방금 본 서재 칸의
+     * 제목과 똑같으면 그 칸(YES24 도서관은 도서관 이름이 제목보다 앞에 온다). 탭·단추 글자는 책 제목과 같을 일이 없어 책으로 들어가지 않는다.
      * 진행률·반납일은 그 뒤 읽는 화면에서 바뀌었을 수 있어 쓰지 않는다.
      */
     private fun shelfCellByText(spec: ReaderSpec, list: List<CharSequence>): Seen? {
-        val first = list.firstOrNull()?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val s = lastShelf[spec.pkg]?.firstOrNull { it.title == first } ?: return null
+        val texts = list.map { it.toString().trim() }.filter { it.isNotEmpty() }.toSet()
+        val s = lastShelf[spec.pkg]?.firstOrNull { it.title in texts } ?: return null
         return Seen(s.title, s.author, -1, -1, s.thumb, s.cell)
     }
 
@@ -361,7 +369,7 @@ class ReaderWatchService : AccessibilityService() {
             val app = AppStore.load(this).firstOrNull { it.pkg == spec.pkg }?.key
             BookShelf.addOpened(this, autoBookId(seen.title), seen.title, seen.author, app, seen.progress, seen.due)
         }
-        opened[spec.pkg] = book.title
+        setOpened(spec.pkg, book.title)
         // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 알라딘 서재)
         pendingFor(book.title)?.let { key ->
             val bytes = pendingCovers.remove(key) ?: return@let
@@ -639,6 +647,16 @@ class ReaderWatchService : AccessibilityService() {
                 viewerProgress = listOf("reader_right_info", "reader_left_info", "reader_toolbar_page_text"), viewerTitle = "title",
                 unnamedShelf = "libraryGnbMenus", eagerCovers = true,
             ),
+            // YES24 도서관: 내 서재 칸(격자·목록 보기 같은 이름)에 제목·표지·저자(`<지은이 저>`)·반납(`D-15`). 진행 막대(`pb_read_percent`)는
+            // 읽는 화면과 맞지 않아(읽는 화면 8% 인데 0) 쓰지 않는다. 읽는 화면(본문 웹 화면, 북커스와 같은 뷰어)은 아래에 진행률(`tv_percent`),
+            // 뷰어 설정에서 하단 정보를 켜면 그 자리에 쪽(`ll_page_area`, `14` `/` `283` 세 조각)이 보인다. 메뉴에 제목(`tv_title`).
+            ReaderSpec(
+                pkg = "com.yes24.library.eink", classPrefix = "com.yes24",
+                shelves = setOf("com.yes24.library.shelf.LibShelfActivity"),
+                viewers = setOf("com.yes24.ebook.fourth.ui.viewer.epub.EpubActivity"),
+                titles = listOf("tv_title"), thumb = "iv_cover", author = "tv_author", progress = null, due = "tv_d_day",
+                viewerProgress = listOf("tv_percent", "ll_page_area"), viewerTitle = "tv_title", pagesRoundUp = true, eagerCovers = true,
+            ),
         ).associateBy { it.pkg }
 
         /** 거의 한 가지 색뿐인 그림(아직 그려지지 않은 표지 칸)인가. 16×16 점의 밝기 차로 본다. */
@@ -708,8 +726,14 @@ class ReaderWatchService : AccessibilityService() {
         /** 제목이 아니라 상태 글자(`4일`, `반납 4일 남음`, `D-3`, `만료`) — 교보도서관 표지 보기 칸은 제목 없이 이것만 있다 */
         private val STATUS_ONLY = Regex("""^(반납\s*)?(\d+\s*일(\s*남음)?|D-?\d+|만료|오늘 반납)$""")
 
-        /** `한강 지음`, `한스 로슬링 지음 / 이창신 옮김` → 지은이만 */
-        private fun authorName(text: String) = text.substringBefore(" 지음").trim()
+        /** `한강 지음`, `한스 로슬링 지음 / 이창신 옮김`, `<정지원,염선형 저>/ 미래의창` → 지은이만 */
+        private fun authorName(text: String): String {
+            val t = text.trim().removePrefix("<").substringBefore(">")
+            return (AUTHOR_ROLE.find(t)?.let { t.substring(0, it.range.first) } ?: t).trim()
+        }
+
+        /** 지은이 뒤의 `지음`·`저`(뒤에 옮긴이·출판사가 이어질 수 있다) */
+        private val AUTHOR_ROLE = Regex("""\s+(지음|저)(?=\s*($|/|,))""")
 
         private fun percent(text: CharSequence): Int =
             Regex("""(\d{1,3})\s*%""").find(text)?.groupValues?.get(1)?.toInt()?.coerceIn(0, 100) ?: -1
@@ -729,7 +753,7 @@ class ReaderWatchService : AccessibilityService() {
             return pct.toInt().coerceIn(0, 100)
         }
 
-        /** `2026.10.20` → 그날, `반납 4일 남음` → 오늘 + 4일, `오늘 반납` → 오늘, `만료` → 어제(지남). 모르면 -1 */
+        /** `2026.10.20` → 그날, `반납 4일 남음`·`D-4` → 오늘 + 4일, `오늘 반납` → 오늘, `만료` → 어제(지남). 모르면 -1 */
         private fun dueDate(text: String): Long {
             if (text.isEmpty()) return -1
             Regex("""(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})""").find(text)?.let { m ->
@@ -737,6 +761,8 @@ class ReaderWatchService : AccessibilityService() {
                 runCatching { return LocalDate.of(y.toInt(), mo.toInt(), d.toInt()).toEpochDay() }
             }
             val today = LocalDate.now().toEpochDay()
+            Regex("""D-\s*(\d+)""", RegexOption.IGNORE_CASE).find(text)?.let { return today + it.groupValues[1].toLong() }
+            if (text.equals("D-Day", ignoreCase = true)) return today
             Regex("""(\d+)\s*일""").find(text)?.let { return today + it.groupValues[1].toLong() }
             if ("만료" in text) return today - 1
             if ("오늘" in text) return today

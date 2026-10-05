@@ -169,7 +169,7 @@ class SettingsActivity : EinkActivity() {
             setLineSpacing(0f, 1.2f)
             setPadding(dp(Ui.MARGIN), dp(top), dp(Ui.MARGIN), dp(top))
         })
-        para(R.string.guide_intro, 18f, Ui.BLACK, 18)
+        para(R.string.guide_intro, 18f, Ui.BLACK, 12)
         for ((name, desc) in listOf(
             R.string.guide_kel to R.string.guide_kel_desc,
             R.string.guide_kyobo to R.string.guide_kyobo_desc,
@@ -177,15 +177,16 @@ class SettingsActivity : EinkActivity() {
             R.string.guide_aladin to R.string.guide_aladin_desc,
             R.string.guide_bookers to R.string.guide_bookers_desc,
             R.string.guide_ridi to R.string.guide_ridi_desc,
+            R.string.guide_yes24lib to R.string.guide_yes24lib_desc,
         )) {
             list.addView(hline(1, Ui.DIVIDER))
-            list.addView(text(getString(name), 21f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), 0) })
+            list.addView(text(getString(name), 21f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(6), dp(Ui.MARGIN), 0) })
             list.addView(text(getString(desc), 17f, color = Ui.GRAY, lines = 3).apply {
-                setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(10))
+                setPadding(dp(Ui.MARGIN), dp(2), dp(Ui.MARGIN), dp(6))
             })
         }
         list.addView(hline(1, Ui.DIVIDER))
-        para(R.string.guide_cover_note, 17f, Ui.GRAY, 12)
+        para(R.string.guide_cover_note, 17f, Ui.GRAY, 8)
     }
 
     private fun openAccessibility() {
