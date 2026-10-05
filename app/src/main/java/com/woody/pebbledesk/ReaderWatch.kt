@@ -300,12 +300,13 @@ class ReaderWatchService : AccessibilityService() {
     /**
      * 누른 순간 화면이 이미 읽는 화면으로 넘어가 칸을 못 읽었을 때(북커스·YES24 도서관): 누른 글자 가운데 하나가 방금 본 서재 칸의
      * 제목과 똑같으면 그 칸(YES24 도서관은 도서관 이름이 제목보다 앞에 온다). 탭·단추 글자는 책 제목과 같을 일이 없어 책으로 들어가지 않는다.
-     * 진행률·반납일은 그 뒤 읽는 화면에서 바뀌었을 수 있어 쓰지 않는다.
+     * 진행률은 그 뒤 읽는 화면에서 바뀌었을 수 있어 목록에 이미 있는 책에는 쓰지 않는다(반납일은 읽는 동안 바뀌지 않는다).
      */
     private fun shelfCellByText(spec: ReaderSpec, list: List<CharSequence>): Seen? {
         val texts = list.map { it.toString().trim() }.filter { it.isNotEmpty() }.toSet()
         val s = lastShelf[spec.pkg]?.firstOrNull { it.title in texts } ?: return null
-        return Seen(s.title, s.author, -1, -1, s.thumb, s.cell)
+        val progress = if (BookShelf.findByTitle(this, s.title) == null) s.progress else -1
+        return Seen(s.title, s.author, progress, s.due, s.thumb, s.cell)
     }
 
     /**
