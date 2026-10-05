@@ -149,7 +149,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 앱 | 서재 화면 | 읽을 수 있는 것 | 책 칸 누름 알림 | 결과 |
 |---|---|---|---|---|
 | 알라딘 | `kr.co.aladin.ebook.MainActivity` | 격자 보기: 제목 `txt_title`, 표지 `img_cover`. 목록 보기: 제목 `text_title`, 저자 `text_author`(`한강 지음`), 진행률 `txt_read_percent`, 대여 `text_rent_date`. 아래 '최근 읽은 책' `reading_book_tv_book_title` | 격자 보기는 안 옴, 목록 보기는 옴(`[제목, 저자, 45%]`) | **지원**. 읽는 화면(`ReadONBookRenderActivity`, 본문 웹 화면) 메뉴의 `viewer_header_title` 로도 안다. 아래 쪽 표시 `bookrender_txt_page_onepage`(`6 / 368　 저자소개`, 처음엔 높이 0 이라 늦게 그려진다)로 진행률. 메뉴에도 `viewermenu_text_pageinfo`(`6 / 368`) |
-| 북커스 `com.bookers.ebook` | `ui.purchase.PurchaseActivity`(내서재) | 제목 `tv_title`, 표지 `iv_cover`, 진행률 `tv_percent`, 대여 기한 `tv_end_date`(`만료` 등) | 옴(글자에 제목) | **지원** |
+| 북커스 `com.bookers.ebook` | `ui.purchase.PurchaseActivity`(내서재) | 제목 `tv_title`, 표지 `iv_cover`, 진행률 `tv_percent`, 대여 기한 `tv_end_date`(`14일 남음`, 다운로드 탭). 리스트 보기에 저자 `tv_author`·출판 `tv_publisher` | 옴(글자에 제목) | **지원**. 읽는 화면 `ui.viewer.epub.EpubActivity`(본문 웹 화면)는 메뉴에 제목 `tv_title`·쪽 `tv_current_page`/`tv_total_page`(1/368 을 서재는 1% 로 보여 올림). 뷰어 설정의 하단 정보를 켜면 아래 줄 `ll_page_area`(이름 없는 글자 세 조각 `8`,` / `,`371`, 메뉴가 뜨면 빈다). 읽는 화면은 화면 캡처가 막혀 있다. 홈 탭은 오프라인이라 못 봄 |
 | 교보eBook | `common.b2c.ui.mainV3.activity.MainV3Activity` | 화면 요소 이름이 없다(Compose). 격자 보기는 제목도 없고, 목록 보기에서만 제목·저자 글자 | 안 옴 | **지원**: 서재는 안 읽고, 읽는 화면 메뉴의 제목·진행률로 안다 |
 | 리디 | `main.activity.MainActivity` | 탭·메뉴만 보이고 책 칸은 접근성에 안 나온다 | 안 옴 | 미지원 |
 | YES24 서점 | — | 연결이 없으면 알림만 띄우고 닫힌다 | — | 확인 못 함 |
