@@ -92,8 +92,8 @@
     <string name="reading_settings">Reading</string>
     <string name="auto_books">Auto-add books</string>
     <string name="auto_books_short">Auto-add</string>
-    <string name="auto_books_hint">Kyobo · Millie · Aladin · Bookers</string>
-    <string name="auto_books_desc">When you open a book in Kyobo Library, Kyobo eBook, Millie, Aladin or Bookers, it goes to the top of your reading list. Only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, are read; book text and other apps are never seen. Turn on Pebble Desk in Accessibility.</string>
+    <string name="auto_books_hint">Kyobo · Millie · Aladin · Bookers · Ridi</string>
+    <string name="auto_books_desc">When you open a book in Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers or Ridi, it goes to the top of your reading list. Only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, are read; book text and other apps are never seen. Turn on Pebble Desk in Accessibility.</string>
     <string name="open_accessibility">Open Accessibility</string>
     <string name="progress_pct">%1$d%% read</string>
     <string name="due_days">Due in %1$d days</string>
@@ -112,9 +112,11 @@
     <string name="guide_aladin_desc">Books opened from the shelf in list view are added. In grid view, open the menu while reading.\nCovers come from the shelf screen, so without passing the shelf the cover may be blank.</string>
     <string name="guide_bookers">Bookers</string>
     <string name="guide_bookers_desc">Books opened from My library are added (Downloads tab: progress, rental due).\nFor progress while reading, turn on the bottom info in viewer settings or open the menu.</string>
+    <string name="guide_ridi">Ridi</string>
+    <string name="guide_ridi_desc">Open the menu while reading to add the book. Covers come from the My library screen.\nFor progress while reading, turn on the bottom left/right info in viewer settings.</string>
     <string name="guide_cover_note">Covers are cut from the shelf screen. If a title is cut off or wrong, long-press the book on the home screen to edit it.</string>
     <string name="edit_title">Edit title</string>
     <string name="save">Save</string>
-    <string name="books_auto_hint">Books you open in Kyobo Library, Kyobo eBook, Millie, Aladin or Bookers are added to the top automatically; past 4 books, the one opened longest ago drops off. Long-press to change a cover.</string>
-    <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, of Kyobo Library, Kyobo eBook, Millie, Aladin and Bookers to fill your reading list. Book text and other apps are not seen, and nothing leaves the device.</string>
+    <string name="books_auto_hint">Books you open in Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers or Ridi are added to the top automatically; past 4 books, the one opened longest ago drops off. Long-press to change a cover.</string>
+    <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, of Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers and Ridi to fill your reading list. Book text and other apps are not seen, and nothing leaves the device.</string>
 </resources>

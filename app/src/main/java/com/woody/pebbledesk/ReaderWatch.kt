@@ -17,7 +17,7 @@ import java.time.LocalDate
 import kotlin.math.abs
 
 /**
- * 읽고 있는 책 자동 추가(접근성 서비스). 교보도서관·교보eBook·밀리의서재·알라딘·북커스의 **서재 화면**에 보이는 제목·저자·진행률·반납일과
+ * 읽고 있는 책 자동 추가(접근성 서비스). 교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디의 **서재 화면**에 보이는 제목·저자·진행률·반납일과
  * 사용자가 누른 책 칸만 읽는다. 다른 앱은 시스템이 아예 보내지 않고(`res/xml/reader_watch.xml` 의 packageNames),
  * 읽는 화면은 본문(웹 화면)을 훑지 않고 진행률 줄·메뉴 제목만 이름으로 읽는다. 읽은 내용은 책 목록에만 적고 밖으로 보내지 않는다.
  */
@@ -94,7 +94,7 @@ class ReaderWatchService : AccessibilityService() {
                         readWebBook(spec, root)?.let { webBook[spec.pkg] = it } ?: webBook.remove(spec.pkg)
                     }
                 }
-                // 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스)은 멈추기를 기다리지 않고 표지가 보이는 대로 잘라 둔다.
+                // 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스·리디)은 멈추기를 기다리지 않고 표지가 보이는 대로 잘라 둔다.
                 if (spec.eagerCovers && (force || now - lastEagerRead >= THROTTLE_MS)) {
                     lastEagerRead = now
                     root(spec)?.let { root ->
@@ -102,12 +102,7 @@ class ReaderWatchService : AccessibilityService() {
                             val thumb = s.thumb?.takeIf(::usableThumb) ?: return@mapNotNull null
                             val book = BookShelf.findByTitle(this, s.title)
                             val need = if (book == null) pendingFor(s.title) == null else !BookShelf.hasCover(this, book.id)
-                            // 찍어도 버려지는 칸(한 가지 색 표지 등)을 계속 찍지 않도록 서재를 볼 때마다 책마다 몇 번만.
-                            val key = normTitle(s.title)
-                            val tries = eagerTries.getOrDefault(key, 0)
-                            if (!need || tries >= EAGER_TRIES) return@mapNotNull null
-                            eagerTries[key] = tries + 1
-                            s.title to thumb
+                            if (need && tryCover(s.title)) s.title to thumb else null
                         }, retry = false)
                     }
                 }
@@ -125,7 +120,7 @@ class ReaderWatchService : AccessibilityService() {
     /**
      * 읽는 화면: 본문(웹 화면)은 훑지 않고 이름으로 찾은 요소만 읽는다. 진행률은 아래 줄([ReaderSpec.viewerProgress])에서,
      * 없으면 메뉴의 쪽([ReaderSpec.viewerPages])으로. 제목([ReaderSpec.viewerTitle])은 메뉴를 띄웠을 때만 보인다. 제목이 보이면
-     * 그 책을 편 것으로 보고(서재 칸에 제목이 없는 교보도서관 표지 보기·교보eBook·알라딘 격자 보기), 진행률을 그 책에 적는다.
+     * 그 책을 편 것으로 보고(서재 칸으로는 알 수 없는 교보도서관 표지 보기·교보eBook·알라딘 격자 보기·리디), 진행률을 그 책에 적는다.
      */
     private fun readViewer(spec: ReaderSpec) {
         viewerSpec = null
@@ -136,7 +131,10 @@ class ReaderWatchService : AccessibilityService() {
         fun textOf(n: AccessibilityNodeInfo): String? = n.text?.toString()
             ?: (0 until n.childCount).mapNotNull { n.getChild(it)?.text?.toString() }.joinToString("").ifEmpty { null }
         fun texts(id: String) = roots.flatMap { it.byId(spec, id) }.mapNotNull { textOf(it)?.trim() }.filter { it.isNotEmpty() }
-        val progress = spec.viewerProgress.firstNotNullOfOrNull { id -> texts(id).map { viewerPercent(it, spec.pagesRoundUp) }.firstOrNull { it >= 0 } }
+        // 진행률 줄이 여럿이면 앱이 보여 주는 % 를 쪽으로 셈한 것보다 먼저 쓴다(리디 아래 좌·우는 사용자가 고른 대로 쪽·% 가 놓인다).
+        val lines = spec.viewerProgress.flatMap(::texts)
+        val progress = lines.firstNotNullOfOrNull { percent(it).takeIf { p -> p >= 0 } }
+            ?: lines.firstNotNullOfOrNull { viewerPercent(it, spec.pagesRoundUp).takeIf { p -> p >= 0 } }
             ?: spec.viewerPages?.let { (cur, total) -> pagePercent(texts(cur).firstOrNull(), texts(total).firstOrNull(), spec.pagesRoundUp) }
             ?: -1
         if (progress < 0 && viewerRetries-- > 0) {
@@ -203,6 +201,15 @@ class ReaderWatchService : AccessibilityService() {
         if (web.thumb != null && (book == null || !BookShelf.hasCover(this, book.id))) captureCovers(spec, listOf(web.title to web.thumb))
     }
 
+    /** 찍어도 버려지는 칸(한 가지 색 표지 등)을 계속 찍지 않도록 서재를 볼 때마다 책마다 [EAGER_TRIES]번만 자른다. 더 해 볼 수 있으면 센다. */
+    private fun tryCover(title: String): Boolean {
+        val key = normTitle(title)
+        val tries = eagerTries.getOrDefault(key, 0)
+        if (tries >= EAGER_TRIES) return false
+        eagerTries[key] = tries + 1
+        return true
+    }
+
     /** 잘라 둔 표지 가운데 [title] 의 것(부제·공백 무시)의 열쇠 */
     private fun pendingFor(title: String): String? {
         val n = normTitle(title)
@@ -211,8 +218,76 @@ class ReaderWatchService : AccessibilityService() {
 
     /** 서재에 보이는 책 칸들(읽은 것은 [lastShelf] 에 남긴다) */
     private fun readShelf(spec: ReaderSpec, root: AccessibilityNodeInfo): List<Seen> =
-        spec.titles.flatMap { root.byId(spec, it) }.mapNotNull { title -> cellOf(spec, title)?.let { readCell(spec, it) } }
+        (if (spec.unnamedShelf != null) unnamedCells(spec, root)
+        else spec.titles.flatMap { root.byId(spec, it) }.mapNotNull { title -> cellOf(spec, title)?.let { readCell(spec, it) } })
             .also { if (it.isNotEmpty()) lastShelf[spec.pkg] = it }
+
+    /**
+     * 요소 이름이 없는 서재(리디): 설명이 그 안의 글자(제목)로 시작하고 표지 모양 그림이 든 묶음이 책 칸이다.
+     * 서재 표시 요소([ReaderSpec.unnamedShelf])가 없는 화면(홈·검색 탭)은 읽지 않고, 위에 뜬 화면(작품 화면)에 가려진 칸은 뺀다.
+     * 같은 책이 여럿이면(아래 '최근 본' 줄) 가장 큰 표지.
+     */
+    private fun unnamedCells(spec: ReaderSpec, root: AccessibilityNodeInfo): List<Seen> {
+        val marker = spec.unnamedShelf ?: return emptyList()
+        var shelf = false
+        val found = mutableMapOf<String, Seen>()
+        fun walk(n: AccessibilityNodeInfo, depth: Int) {
+            // 같은 화면이 품은 홈·검색 탭의 웹 화면은 훑지 않는다.
+            if (n.isWebView()) return
+            // React Native 의 요소 이름은 `패키지:id/` 없이 그대로라 이름으로 찾기가 안 되어 훑으면서 본다.
+            if (n.viewIdResourceName == marker) shelf = true
+            val desc = n.contentDescription?.toString()
+            if (!desc.isNullOrEmpty()) unnamedCell(n, desc)?.let { s ->
+                val old = found[s.title]
+                if (!covered(n) && (old?.thumb == null || s.thumb!!.width() > old.thumb.width())) found[s.title] = s
+                return
+            }
+            if (depth < UNNAMED_DEPTH) for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1) }
+        }
+        walk(root, 0)
+        return if (shelf) found.values.toList() else emptyList()
+    }
+
+    /**
+     * [cell] 안의 글자 가운데 설명 [desc] 가 그것으로 시작하는 것(제목)과 표지 모양 그림. 둘 다 있어야 책 칸.
+     * 목록 보기 칸은 설명 뒤에 진행률이 있다(`정의란 무엇인가, 26.7MB, 소장, 48%`).
+     */
+    private fun unnamedCell(cell: AccessibilityNodeInfo, desc: String): Seen? {
+        var title: String? = null
+        var thumb: Rect? = null
+        fun walk(n: AccessibilityNodeInfo, depth: Int) {
+            if (n.isWebView()) return
+            val t = n.text?.toString()?.trim()
+            if (!t.isNullOrEmpty() && desc.startsWith(t) && t.length > (title?.length ?: 0)) title = t
+            if (n.className?.endsWith("ImageView") == true && thumb == null) {
+                val r = Rect().also { n.getBoundsInScreen(it) }
+                if (usableThumb(r) && r.width() >= MIN_UNNAMED_COVER_PX) thumb = r
+            }
+            if (depth < WALK_DEPTH) for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1) }
+        }
+        walk(cell, 0)
+        val bounds = Rect().also { cell.getBoundsInScreen(it) }
+        val t = title ?: return null
+        return Seen(t, "", percent(desc.removePrefix(t)), -1, thumb ?: return null, bounds)
+    }
+
+    private fun AccessibilityNodeInfo.isWebView() = className?.endsWith("WebView") == true
+
+    /** [node] 를 덮는 화면이 있는가: 위로 올라가며 나중에 그려지는(drawingOrder 가 큰) 형제가 [node] 를 다 덮으면 가려졌다. */
+    private fun covered(node: AccessibilityNodeInfo): Boolean {
+        val at = Rect().also { node.getBoundsInScreen(it) }
+        var n = node
+        for (i in 0 until UNNAMED_DEPTH) {
+            val parent = n.parent ?: return false
+            for (j in 0 until parent.childCount) {
+                val sib = parent.getChild(j) ?: continue
+                if (sib == n || sib.drawingOrder <= n.drawingOrder) continue
+                if (Rect().also { sib.getBoundsInScreen(it) }.contains(at)) return true
+            }
+            n = parent
+        }
+        return false
+    }
 
     /**
      * 누른 순간 화면이 이미 읽는 화면으로 넘어가 칸을 못 읽었을 때(북커스): 누른 글자의 첫 줄이 방금 본 서재 칸의 제목과
@@ -350,9 +425,14 @@ class ReaderWatchService : AccessibilityService() {
                     ?.copy(Bitmap.Config.ARGB_8888, false)
                 result.hardwareBuffer.close()
                 shot ?: return
+                // 요소 이름이 없는 서재(리디)는 화면이 움직이는 중이었을 수 있어, 찍은 뒤에도 같은 자리에 있는 칸만 자른다.
+                val still = if (spec.unnamedShelf == null) targets else {
+                    val now = root(spec)?.let { readShelf(spec, it) }.orEmpty().associate { it.title to it.thumb }
+                    targets.filter { (title, rect) -> now[title] == rect }
+                }
                 Bg.run({
                     try {
-                        targets.mapNotNull { (title, rect) ->
+                        still.mapNotNull { (title, rect) ->
                             val r = Rect(rect).apply { intersect(0, 0, shot.width, shot.height) }
                             if (!usableThumb(r)) return@mapNotNull null
                             val crop = trimEdges(Bitmap.createBitmap(shot, r.left, r.top, r.width(), r.height()))
@@ -440,10 +520,15 @@ class ReaderWatchService : AccessibilityService() {
         /** 검색(웹 화면) 책 상세의 읽기 단추 글자 */
         val readNow: Set<String> = emptySet(),
         /**
-         * 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스): 멈추기를 기다리지 않고 표지를 잘라 둔다.
+         * 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스·리디): 멈추기를 기다리지 않고 표지를 잘라 둔다.
          * 밀리는 앱을 다시 열 때 잠깐 칸을 다른 책으로 채우므로 쓰지 않는다.
          */
         val eagerCovers: Boolean = false,
+        /**
+         * 요소 이름이 없는 서재(리디, React Native)의 서재 표시 요소. 이것이 있는 화면에서 칸을 설명·글자·그림으로 찾는다([unnamedCells]).
+         * 화면이 넘어가는 중(작품 화면이 밀려 들어옴)에 찍으면 어긋나므로, 찍은 뒤에도 칸이 그 자리에 있을 때만 쓴다.
+         */
+        val unnamedShelf: String? = null,
     )
 
     companion object {
@@ -466,6 +551,12 @@ class ReaderWatchService : AccessibilityService() {
         private const val MIN_THUMB_PX = 40
         /** 표지 칸의 세로 ÷ 가로가 이보다 작으면 일부만 보이는 칸으로 본다(표지는 1.4~1.5) */
         private const val MIN_COVER_RATIO = 1.1f
+        /**
+         * 요소 이름이 없는 서재(리디)를 훑는 깊이(React Native 는 칸이 60단계쯤 아래에 있다), 표지로 쓸 그림의 최소 폭
+         * (목록 보기 표지 86px 는 받고 아래 '최근 본' 줄의 66px 는 뺀다)
+         */
+        private const val UNNAMED_DEPTH = 100
+        private const val MIN_UNNAMED_COVER_PX = 80
         /** 바로 자르기를 서재 방문마다 책 한 권에 해 보는 최대 횟수 */
         private const val EAGER_TRIES = 3
         /** 목록에 없는 책의 표지를 잘라 둘 최대 권수 */
@@ -532,6 +623,21 @@ class ReaderWatchService : AccessibilityService() {
                 // 하단 정보를 켜면 아래 줄(`ll_page_area`, 쪽 또는 %)이 늘 보인다. 꺼 두면 메뉴의 쪽으로.
                 viewerProgress = listOf("ll_page_area"), viewerTitle = "tv_title", viewerPages = "tv_current_page" to "tv_total_page",
                 pagesRoundUp = true, eagerCovers = true,
+            ),
+            // 리디: 책은 교보eBook처럼 읽는 화면 메뉴의 제목(`title`)으로 안다. 서재(React Native, 내 서재 탭과 작품 화면)는 요소 이름이 없어
+            // 칸 설명·글자로 표지만 잘라 둔다(칸을 눌러도 알림이 없다). 진행률은 뷰어 설정의 '하단 좌/우 정보 표시'를 켜면 아래 좌·우
+            // (`15 / 640`, `2%`), 꺼 두면 메뉴의 쪽(`14 / 626`).
+            ReaderSpec(
+                pkg = "com.initialcoms.ridi", classPrefix = "com.ridi",
+                shelves = setOf("com.ridi.books.viewer.main.activity.MainActivity"),
+                viewers = setOf(
+                    "com.ridi.books.viewer.reader.epub.EPubReaderActivity",
+                    "com.ridi.books.viewer.reader.pagebased.pdf.PDFReaderActivity",
+                    "com.ridi.books.viewer.reader.pagebased.comic.ComicBookReaderActivity",
+                ),
+                titles = emptyList(), thumb = "", author = null, progress = null, due = null,
+                viewerProgress = listOf("reader_right_info", "reader_left_info", "reader_toolbar_page_text"), viewerTitle = "title",
+                unnamedShelf = "libraryGnbMenus", eagerCovers = true,
             ),
         ).associateBy { it.pkg }
 

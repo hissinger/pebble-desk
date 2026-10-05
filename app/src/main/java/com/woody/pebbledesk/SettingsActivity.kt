@@ -176,15 +176,16 @@ class SettingsActivity : EinkActivity() {
             R.string.guide_millie to R.string.guide_millie_desc,
             R.string.guide_aladin to R.string.guide_aladin_desc,
             R.string.guide_bookers to R.string.guide_bookers_desc,
+            R.string.guide_ridi to R.string.guide_ridi_desc,
         )) {
             list.addView(hline(1, Ui.DIVIDER))
-            list.addView(text(getString(name), 21f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), 0) })
+            list.addView(text(getString(name), 21f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), 0) })
             list.addView(text(getString(desc), 17f, color = Ui.GRAY, lines = 3).apply {
-                setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(14))
+                setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(10))
             })
         }
         list.addView(hline(1, Ui.DIVIDER))
-        para(R.string.guide_cover_note, 17f, Ui.GRAY, 18)
+        para(R.string.guide_cover_note, 17f, Ui.GRAY, 12)
     }
 
     private fun openAccessibility() {
