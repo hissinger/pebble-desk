@@ -98,7 +98,7 @@ Android Studio의 JDK로 빌드한다(minSdk 28, targetSdk 34).
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ./gradlew assembleRelease
-adb install -r app/build/outputs/apk/release/PebbleDesk-1.1.0-release.apk
+adb install -r app/build/outputs/apk/release/PebbleDesk-1.2.0-release.apk
 ```
 
 설치한 뒤 설정 > 앱 관리 > `기본 홈 앱으로 설정`에서 Pebble Desk를 홈 앱으로 고른다.

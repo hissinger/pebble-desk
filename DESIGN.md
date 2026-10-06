@@ -126,7 +126,7 @@
     - 마지막으로 누른 버튼: `292  KEYCODE_… · scan 604`. 이 화면에서는 버튼이 쪽을 넘기지 않고 기록만 한다. 뒤로 키는 기록하고 닫는다(다시 열면 보인다).
     - 최근에 뜬 다른 화면(새 것부터 3개, 10분 안): `00:32:26  com.inno.quicksetting / QuickSettings`. 사용 기록에서 앞에 뜬 화면(Activity)을 읽는다(사용 기록 권한이 없으면 안내). 기본 런처·상단 바에서 빠른 설정을 열었다가 돌아오면, 빠른 설정이 따로 된 화면이면 여기 남고 시스템 알림창이면 남지 않는다. 화면에 다시 돌아올 때마다 새로 읽는다.
     - 빠른 설정 시험: `크레마 ›`(`com.epd.drop_down`) · `메이북 ›`(`com.haoqing.action.QUICK_SETTINGS`) · `안드로이드 ›`(`StatusBarManager.expandSettingsPanel`, `EXPAND_STATUS_BAR` 권한). 누르면 아래에 `보냄`/`실패`. 실제로 열렸는지는 찍어 보낸 사람이 알려 준다.
-- 맨 아래 가운데에 `Pebble Desk 1.1.0`.
+- 맨 아래 가운데에 `Pebble Desk 1.2.0`.
 
 ## 자주 쓰는 앱
 
