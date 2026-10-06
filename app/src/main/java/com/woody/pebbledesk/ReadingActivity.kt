@@ -7,15 +7,18 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.TextView
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
+import kotlin.math.sqrt
 
 /**
  * ⑫ 독서 기록: 연속일과 오늘 링, 최근 4주 목표 링 달력(애플 활동 앱처럼), 이번 주·이번 달·올해 합계, 이번 주 앱별 시간.
@@ -57,7 +60,7 @@ class ReadingActivity : EinkActivity() {
         }
 
         val since = ReadingLog.since(this) ?: today
-        body.addView(hero(days, today, frac(today)))
+        body.addView(hero(days, today, goalMs, frac(today)))
         body.addView(calendar(today, since, goalMs, ::frac))
         body.addView(hline(1, Ui.DIVIDER))
         body.addView(totals(days, today, since, goalMs))
@@ -66,21 +69,38 @@ class ReadingActivity : EinkActivity() {
     }
 
     /** 왼쪽 큰 연속일, 오른쪽 오늘 링(가운데 오늘 읽은 시간) */
-    private fun hero(days: ReadingDays, today: LocalDate, todayFrac: Float) = hbox().apply {
+    private fun hero(days: ReadingDays, today: LocalDate, goalMs: Long, todayFrac: Float) = hbox().apply {
         setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), 0)
         addView(text(ReadingLog.streak(days, today).toString(), 80f, Ui.heavy))
         addView(vbox().apply {
             addView(text(getString(R.string.streak_sub, ReadingLog.longestStreak(days)), 15f, Ui.medium, Ui.GRAY))
             addView(text(getString(R.string.streak_days), 28f, Ui.bold), lp(WRAP, WRAP).apply { topMargin = dp(4) })
         }, lp(0, WRAP, 1f).apply { marginStart = dp(10) })
+        val time = text(duration(days.total(today)), 17f, Ui.bold)
+        val goal = if (goalMs > 0) text(getString(R.string.goal_of, duration(goalMs)), 11f, Ui.medium, Ui.GRAY) else null
+        fitInRing(time, goal)
         addView(FrameLayout(context).apply {
-            addView(RingView(context, 14f).apply { frac = todayFrac }, FrameLayout.LayoutParams(MATCH, MATCH))
+            addView(RingView(context, RING_STROKE).apply { frac = todayFrac }, FrameLayout.LayoutParams(MATCH, MATCH))
             addView(vbox().apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                addView(text(duration(days.total(today)), 17f, Ui.bold))
-                if (prefs.readingGoalMin > 0) addView(text(getString(R.string.goal_of, duration(prefs.readingGoalMin * 60_000L)), 11f, Ui.medium, Ui.GRAY))
+                addView(time, lp(WRAP, WRAP))
+                goal?.let { addView(it, lp(WRAP, WRAP)) }
             }, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER))
-        }, lp(dp(86), dp(86)))
+        }, lp(dp(RING), dp(RING)))
+    }
+
+    /** 오늘 링 안쪽 동그라미에 들어가게 [time] 글자를 줄인다(`1시간 34분`처럼 길면 링에 겹친다). */
+    private fun fitInRing(time: TextView, goal: TextView?) {
+        fun TextView.lineH() = paint.fontMetrics.let { it.descent - it.ascent }
+        val r = dpf(RING / 2f - RING_STROKE)
+        var sp = 17f
+        while (sp > 12f) {
+            val half = (time.lineH() + (goal?.lineH() ?: 0f)) / 2
+            val room = 2 * sqrt(r * r - half * half) - dpf(6)
+            if (time.paint.measureText(time.text.toString()) <= room) break
+            sp -= 0.5f
+            time.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
+        }
     }
 
     /** 이번 주의 첫날(설정의 한 주 시작 요일). 달력·이번 주 합계·이번 주 앱별이 모두 따른다. */
@@ -156,6 +176,9 @@ class ReadingActivity : EinkActivity() {
 
     companion object {
         private const val WEEKS = 4
+        /** 오늘 링 지름·굵기(dp) */
+        private const val RING = 104
+        private const val RING_STROKE = 12f
 
         fun intent(context: Context) = Intent(context, ReadingActivity::class.java)
     }
