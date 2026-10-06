@@ -153,8 +153,9 @@ class ReaderWatchService : AccessibilityService() {
             ?: (0 until n.childCount).mapNotNull { n.getChild(it)?.text?.toString() }.joinToString("").ifEmpty { null }
         fun texts(id: String) = roots.flatMap { it.byId(spec, id) }.mapNotNull { textOf(it)?.trim() }.filter { it.isNotEmpty() }
         // 진행률 줄이 여럿이면 앱이 보여 주는 % 를 쪽으로 셈한 것보다 먼저 쓴다(리디 아래 좌·우는 사용자가 고른 대로 쪽·% 가 놓인다).
-        // 책을 막 열었을 때의 `페이지 계산중 - 40%` 는 진행률이 아니다(my YES).
-        val lines = spec.viewerProgress.flatMap(::texts).filterNot { "계산" in it }
+        // 책을 막 열었을 때의 `페이지 계산중 - 40%` 는 진행률이 아니다(my YES). 책을 불러오는 동안 먼저 보이는 `0%` 도 아니다(밀리).
+        val loading by lazy { spec.viewerLoading?.let { texts(it).isNotEmpty() } == true }
+        val lines = spec.viewerProgress.flatMap(::texts).filterNot { "계산" in it || (percent(it) == 0 && loading) }
         val progress = lines.firstNotNullOfOrNull { percent(it).takeIf { p -> p >= 0 } }
             ?: lines.firstNotNullOfOrNull { viewerPercent(it, spec.pagesRoundUp).takeIf { p -> p >= 0 } }
             ?: spec.viewerPages?.let { (cur, total) -> pagePercent(texts(cur).firstOrNull(), texts(total).firstOrNull(), spec.pagesRoundUp) }
@@ -563,6 +564,11 @@ class ReaderWatchService : AccessibilityService() {
         val due: String?,
         /** 읽는 화면의 진행률 줄(앞에서부터 먼저 찾은 것) */
         val viewerProgress: List<String>,
+        /**
+         * 읽는 화면이 책을 불러오는 중에 보이는 요소. 이것이 보이는 동안의 `0%` 는 진행률로 보지 않는다
+         * (밀리는 불러오는 처음 2초쯤 `0%` 를 보이다가 진짜 값으로 바꾸고, 불러오기 문구는 그 뒤로도 20초쯤 남는다).
+         */
+        val viewerLoading: String? = null,
         /** 읽는 화면 메뉴의 책 제목(메뉴를 띄웠을 때만 보인다) */
         val viewerTitle: String? = null,
         /** 쪽 번호가 지금 쪽·전체 쪽 두 요소로 나뉜 읽는 화면(북커스 메뉴) */
@@ -660,7 +666,7 @@ class ReaderWatchService : AccessibilityService() {
                     "kr.co.millie.eink.epub.StoryViewActivity",
                 ),
                 titles = listOf("tv_book_title"), thumbs = listOf("iv_thumbnail"), authors = emptyList(), progress = "bookshelf_cell_reading", due = null,
-                viewerProgress = listOf("tv_viewer_add_on_right"),
+                viewerProgress = listOf("tv_viewer_add_on_right"), viewerLoading = "epub_loading_message",
                 readNow = setOf("바로 읽기", "이어 읽기"),
             ),
             // 알라딘: 격자 보기 칸에는 제목·표지만 있고 눌러도 알림이 없다(서재 아래 '최근 읽은 책'으로 안다).
