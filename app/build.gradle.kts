@@ -11,8 +11,8 @@ android {
         applicationId = "com.woody.pebbledesk"
         minSdk = 28
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.1.0"
     }
 
     buildTypes {
@@ -31,7 +31,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // 빌드 결과 APK 이름에 앱 이름과 버전을 넣는다. 예: PebbleDesk-1.0.1-release.apk
+    // 빌드 결과 APK 이름에 앱 이름과 버전을 넣는다. 예: PebbleDesk-1.1.0-release.apk
     applicationVariants.all {
         outputs.all {
             (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
