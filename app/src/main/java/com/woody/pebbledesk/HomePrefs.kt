@@ -3,6 +3,7 @@ package com.woody.pebbledesk
 import android.content.Context
 import org.json.JSONArray
 import java.time.DayOfWeek
+import java.time.LocalDate
 
 /** 런처 설정과 앱 목록 상태(자주 쓰는 앱·숨긴 앱) */
 class HomePrefs(context: Context) {
@@ -71,10 +72,34 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("reading_time", false)
         set(v) = sp.edit().putBoolean("reading_time", v).apply()
 
-    /** 하루 목표(분). 0 이면 목표 없이 읽은 날만 표시 */
+    /**
+     * 하루 목표(분). 0 이면 목표 없이 읽은 날만 표시. 바꾸면 오늘부터의 목표로 `reading_goal_history` 에 남겨
+     * 지난날은 그날의 목표로 그린다([readingGoals]). 처음 바꿀 때 그 전 목표를 '처음부터'로 함께 남긴다.
+     */
     var readingGoalMin: Int
         get() = sp.getInt("reading_goal_min", 30)
-        set(v) = sp.edit().putInt("reading_goal_min", v).apply()
+        set(v) {
+            if (v == readingGoalMin) return
+            val today = LocalDate.now().toEpochDay()
+            // 같은 날 여러 번 바꾸면 마지막 값만
+            val history = goalHistory().ifEmpty { listOf(Long.MIN_VALUE to readingGoalMin) }.filter { it.first < today } + (today to v)
+            sp.edit().putInt("reading_goal_min", v)
+                .putString("reading_goal_history", history.joinToString(",") { "${it.first}:${it.second}" }).apply()
+        }
+
+    /** (이날부터, 목표 분) 바꾼 순서대로. 바꾼 적이 없으면(이 기능 전 설치 포함) 비어 있다. */
+    private fun goalHistory(): List<Pair<Long, Int>> =
+        sp.getString("reading_goal_history", null).orEmpty().split(',').mapNotNull { e ->
+            val (day, min) = e.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+            day.toLongOrNull()?.let { d -> min.toIntOrNull()?.let { d to it } }
+        }
+
+    /** 날짜별 하루 목표(분): 그날까지 마지막으로 정한 목표. 기록이 없으면 지금 목표. 한 번 읽어 여러 날에 쓴다. */
+    fun readingGoals(): (LocalDate) -> Int {
+        val history = goalHistory()
+        val now = readingGoalMin
+        return { day -> history.lastOrNull { it.first <= day.toEpochDay() }?.second ?: now }
+    }
 
     /** 독서 기록 달력·이번 주의 시작 요일: 월요일(기본) 또는 일요일 */
     var firstDayOfWeek: DayOfWeek

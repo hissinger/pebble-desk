@@ -144,11 +144,17 @@ class SettingsActivity : EinkActivity() {
             }
         }
         if (prefs.readingTime) {
+            // 정해 둔 값 다음에 `직접 입력`. 직접 넣은 값이면 그 줄에 값을 함께 보이고 ✓. 시간은 독서 기록과 같은 꼴(`1시간 30분`)
             val goals = listOf(0, 15, 20, 30, 45, 60)
-            val goalText = { m: Int -> if (m == 0) getString(R.string.none) else getString(R.string.dur_m, m) }
-            row(getString(R.string.daily_goal), goalText(prefs.readingGoalMin), next = true) {
-                choose(getString(R.string.daily_goal), goals.map(goalText), goals.indexOf(prefs.readingGoalMin).coerceAtLeast(0)) {
-                    prefs.readingGoalMin = goals[it]; renderReading()
+            val goalText = { m: Int -> if (m == 0) getString(R.string.none) else duration(m * 60_000L) }
+            val goal = prefs.readingGoalMin
+            row(getString(R.string.daily_goal), goalText(goal), next = true) {
+                val custom = goal !in goals
+                val options = goals.map(goalText) + getString(R.string.custom_goal).let {
+                    if (custom) "$it · ${goalText(goal)}" else it
+                }
+                choose(getString(R.string.daily_goal), options, if (custom) goals.size else goals.indexOf(goal)) {
+                    if (it < goals.size) { prefs.readingGoalMin = goals[it]; renderReading() } else askGoal()
                 }
             }
             // 독서 기록 달력과 '이번 주'의 시작 요일
@@ -160,6 +166,15 @@ class SettingsActivity : EinkActivity() {
             }
         }
         row(getString(R.string.reading_stats), null, next = true, last = true) { startActivity(ReadingActivity.intent(this)) }
+    }
+
+    /** 하루 목표 직접 입력(분). 범위 밖이면 가장 가까운 값으로 */
+    private fun askGoal() {
+        val initial = prefs.readingGoalMin.takeIf { it > 0 }?.toString().orEmpty()
+        Sheet(this).header(getString(R.string.daily_goal), getString(R.string.custom_goal_hint, GOAL_MIN, GOAL_MAX))
+            .input(initial, numeric = true) { v ->
+                v.toLongOrNull()?.let { prefs.readingGoalMin = it.coerceIn(GOAL_MIN, GOAL_MAX).toInt(); renderReading() }
+            }.show()
     }
 
     /** 자동 추가 안내: 공통 안내 한 단락, 앱마다 이름과 한 줄 설명, 표지·제목 안내 */
@@ -248,5 +263,7 @@ class SettingsActivity : EinkActivity() {
         private const val EXTRA_PAGE = "page"
         private const val PAGE_READING = "reading"
         private const val PAGE_GUIDE = "guide"
+        private const val GOAL_MIN = 1L
+        private const val GOAL_MAX = 300L
     }
 }

@@ -52,18 +52,21 @@ class ReadingActivity : EinkActivity() {
             return
         }
         val today = LocalDate.now()
+        // 지난날은 그날 정해져 있던 목표로(목표를 바꿔도 지난 링은 그대로). 제목·오늘 링은 지금 목표.
+        val goals = prefs.readingGoals()
         val goalMs = prefs.readingGoalMin * 60_000L
-        // 목표가 없으면 읽은 날(1분 이상)만 꽉 찬 링으로
+        // 목표가 없던 날은 읽은 날(1분 이상)만 꽉 찬 링으로
         fun frac(day: LocalDate): Float {
             val ms = days.total(day)
-            return if (goalMs > 0) (ms.toFloat() / goalMs).coerceAtMost(1f) else if (ms >= ReadingLog.MIN_DAY_MS) 1f else 0f
+            val goal = goals(day) * 60_000L
+            return if (goal > 0) (ms.toFloat() / goal).coerceAtMost(1f) else if (ms >= ReadingLog.MIN_DAY_MS) 1f else 0f
         }
 
         val since = ReadingLog.since(this) ?: today
         body.addView(hero(days, today, goalMs, frac(today)))
         body.addView(calendar(today, since, goalMs, ::frac))
         body.addView(hline(1, Ui.DIVIDER))
-        body.addView(totals(days, today, since, goalMs))
+        body.addView(totals(days, today, since, goalMs, ::frac))
         body.addView(hline(1, Ui.DIVIDER))
         body.addView(byApp(days, today))
     }
@@ -124,19 +127,19 @@ class ReadingActivity : EinkActivity() {
         addView(View(context), lp(MATCH, dp(14)))
     }
 
-    /** 이번 주 · 이번 달 목표 달성(목표가 없으면 읽은 날) · 올해 */
-    private fun totals(days: ReadingDays, today: LocalDate, since: LocalDate, goalMs: Long) = hbox().apply {
+    /** 이번 주 · 이번 달 목표 달성(그날의 목표로, [progress] 가 꽉 찬 날) · 올해. 지금 목표가 없으면 제목대로 읽은 날을 센다. */
+    private fun totals(days: ReadingDays, today: LocalDate, since: LocalDate, goalMs: Long, progress: (LocalDate) -> Float) = hbox().apply {
         setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), dp(10))
         val locale = resources.configuration.locales[0]
         val weekStart = startOfWeek(today)
         fun sum(from: LocalDate) = days.filterKeys { it in from..today }.keys.sumOf { days.total(it) }
         // 이번 달 중 기록이 있는 날만 센다.
         val monthDays = (1..today.dayOfMonth).map { today.withDayOfMonth(it) }.filter { it >= since }
-        val hit = monthDays.count { days.total(it) >= (if (goalMs > 0) goalMs else ReadingLog.MIN_DAY_MS) }
+        val hits = monthDays.count { if (goalMs > 0) progress(it) >= 1f else days.total(it) >= ReadingLog.MIN_DAY_MS }
         val month = today.format(DateTimeFormatter.ofPattern(getString(R.string.month_fmt), locale))
         listOf(
             getString(R.string.this_week) to duration(sum(weekStart)),
-            getString(if (goalMs > 0) R.string.month_goal else R.string.month_read, month) to getString(R.string.days_of, hit, monthDays.size),
+            getString(if (goalMs > 0) R.string.month_goal else R.string.month_read, month) to getString(R.string.days_of, hits, monthDays.size),
             getString(R.string.this_year) to duration(sum(today.withDayOfYear(1))),
         ).forEach { (label, value) ->
             addView(vbox().apply {

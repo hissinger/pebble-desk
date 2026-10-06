@@ -84,6 +84,8 @@
     <string name="reading_no_access">Turn on Reading time in Settings and allow Pebble Desk in Usage access to see your log.</string>
     <string name="daily_goal">Daily goal</string>
     <string name="dur_m">%1$d min</string>
+    <string name="custom_goal">Custom</string>
+    <string name="custom_goal_hint">Minutes, %1$d–%2$d</string>
     <string name="dur_h">%1$dh</string>
     <string name="dur_hm">%1$dh %2$dm</string>
     <string name="month_fmt">MMM</string>

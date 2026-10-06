@@ -26,6 +26,7 @@ class Sheet(private val context: Context) {
     private val items = mutableListOf<Item>()
     /** 글자 입력 줄(지금 값, 다 쓰면 부를 일). 있으면 머리 아래에 두고 `저장`을 맨 위 항목으로 둔다. */
     private var input: Pair<String, (String) -> Unit>? = null
+    private var numeric = false
 
     fun header(title: String, subtitle: String? = null, app: AppEntry? = null, image: Bitmap? = null) = apply {
         this.title = title; this.subtitle = subtitle; this.app = app; this.image = image
@@ -33,8 +34,10 @@ class Sheet(private val context: Context) {
 
     fun item(label: String, bold: Boolean = false, action: () -> Unit) = apply { items += Item(label, bold, action) }
 
-    /** 한 줄 입력(박스 없이 아래 굵은 선). 빈 글자는 저장하지 않는다. */
-    fun input(initial: String, onDone: (String) -> Unit) = apply { input = initial to onDone }
+    /** 한 줄 입력(박스 없이 아래 굵은 선). 빈 글자는 저장하지 않는다. [numeric] 이면 숫자 키보드. */
+    fun input(initial: String, numeric: Boolean = false, onDone: (String) -> Unit) = apply {
+        input = initial to onDone; this.numeric = numeric
+    }
 
     fun show() {
         val dialog = Dialog(context, R.style.Sheet)
@@ -66,7 +69,7 @@ class Sheet(private val context: Context) {
                 background = null
                 setPadding(0, c.dp(8), 0, c.dp(8))
                 isSingleLine = true
-                inputType = InputType.TYPE_CLASS_TEXT
+                inputType = if (numeric) InputType.TYPE_CLASS_NUMBER else InputType.TYPE_CLASS_TEXT
                 imeOptions = EditorInfo.IME_ACTION_DONE
             }
             val save = {
