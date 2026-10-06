@@ -27,6 +27,13 @@
     <string name="section_apps">Apps</string>
     <string name="set_default_home">Set as default home app</string>
     <string name="device_settings">Open device settings</string>
+    <string name="device_info">Device info</string>
+    <string name="device_model">Model</string>
+    <string name="device_maker">Maker</string>
+    <string name="device_android">Android</string>
+    <string name="device_build">Build</string>
+    <string name="device_screen">Screen</string>
+    <string name="device_crema">Crema features</string>
     <string name="on">On</string>
     <string name="off">Off</string>
     <string name="book_search_title">Add a book</string>

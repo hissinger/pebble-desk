@@ -30,6 +30,13 @@
     <string name="section_apps">앱 관리</string>
     <string name="set_default_home">기본 홈 앱으로 설정</string>
     <string name="device_settings">기기 설정 열기</string>
+    <string name="device_info">기기 정보</string>
+    <string name="device_model">모델</string>
+    <string name="device_maker">제조사</string>
+    <string name="device_android">안드로이드</string>
+    <string name="device_build">빌드</string>
+    <string name="device_screen">화면</string>
+    <string name="device_crema">크레마 기능</string>
     <string name="on">켜짐</string>
     <string name="off">꺼짐</string>
     <string name="book_search_title">책 추가</string>
