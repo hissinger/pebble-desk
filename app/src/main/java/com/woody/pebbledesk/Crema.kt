@@ -2,7 +2,6 @@ package com.woody.pebbledesk
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.os.Build
@@ -61,10 +60,5 @@ object Crema {
             px[i] = (px[i] and 0xFF000000.toInt()) or (l shl 16) or (l shl 8) or l
         }
         bmp.setPixels(px, 0, w, 0, 0, w, h)
-    }
-
-    /** 크레마 상단바를 눌렀을 때와 같은 빠른 설정 창(와이파이·BT·조명·음량)을 연다. */
-    fun openQuickSettings(context: Context) {
-        context.sendBroadcast(Intent("com.epd.drop_down"))
     }
 }

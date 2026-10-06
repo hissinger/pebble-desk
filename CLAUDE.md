@@ -3,6 +3,7 @@
 크레마 페블(전자잉크 6인치, 1072×1456, 300dpi) 전용 글자 중심 런처. 패키지 `com.woody.pebbledesk`.
 화면 규격·동작의 기준은 **DESIGN.md**다. 코드를 바꾸면 DESIGN.md도 같이 맞춘다.
 이북 앱(교보도서관·밀리의서재 등)에서 알아낼 수 있는 것과 없는 것은 **docs/READER_APPS.md** 에 정리했다.
+다른 기기(메이북 등) 호환 조사와 펌웨어 받기·풀기 방법은 **docs/DEVICES.md** 에 정리했다. 새 기기를 조사하면 거기에 더한다.
 
 ## 빌드·설치
 
@@ -49,9 +50,10 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.1.0-release.apk </dev/
 | ReaderWatch | `ReaderWatchService`(접근성): 교보도서관·교보eBook·밀리·알라딘·북커스·리디·YES24(전자도서관·my YES) 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기. 앱별 화면 요소 이름은 `SPECS` |
 | Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 4권, YES24 표지 검색), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
-| AppListActivity / FavoritesActivity / SettingsActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 |
+| AppListActivity / FavoritesActivity / SettingsActivity / DeviceInfoActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 / 기기 정보(사진으로 찍어 보내는 진단 화면: 속성·권한·누른 키·빠른 설정 시험) |
 | PagedRows | 스크롤 없는 페이지 목록(목록·격자, fixedRows) |
-| EinkActivity / Sheet / Ui / TopBarView / Crema / HomePrefs | 공통 화면·아래 메뉴·규격(`PictureView` 포함)·상단·기기 기능·설정 저장 |
+| EinkActivity / Sheet / Ui / TopBarView / HomePrefs | 공통 화면(밀기·페이지 버튼)·아래 메뉴·규격(`PictureView` 포함)·상단·설정 저장 |
+| Device / Crema | 기기 종류(크레마·메이북·기타)와 기기마다 다른 동작(빠른 설정·조명·시스템 속성) / 크레마 전용 화면 보정(대비·가려지는 아래·로고) |
 | Storage | 기기 보호 저장소와 예전 저장소에서 옮기기 |
 
 ## 지금까지 정한 것(요지, 자세한 건 DESIGN.md)

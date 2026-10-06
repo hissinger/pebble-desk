@@ -84,8 +84,7 @@ class HomeActivity : EinkActivity() {
             addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
             addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
         })
-        contentResolver.registerContentObserver(Settings.System.getUriFor("screen_brightness"), false, lightObserver)
-        contentResolver.registerContentObserver(Settings.System.getUriFor("warm_light"), false, lightObserver)
+        Device.lightKeys.forEach { contentResolver.registerContentObserver(Settings.System.getUriFor(it), false, lightObserver) }
         updateStatus()
     }
 
@@ -144,7 +143,7 @@ class HomeActivity : EinkActivity() {
                 super.dispatchDraw(canvas)
             }
         }.apply { orientation = LinearLayout.VERTICAL }
-        topBar = TopBarView(this).apply { setOnClickListener { Crema.openQuickSettings(this@HomeActivity) } }
+        topBar = TopBarView(this).apply { setOnClickListener { Device.openQuickSettings(this@HomeActivity) } }
         root.addView(topBar, lp(MATCH, WRAP))
 
         hero = FrameLayout(this)

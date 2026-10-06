@@ -5,13 +5,14 @@ import android.content.Context
 import android.content.res.Configuration
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import java.util.Locale
 import kotlin.math.abs
 
 /**
- * 전자잉크용 화면 공통: 화면 전환 애니메이션을 끄고, 좌우로 밀면 [onSwipe] 를 부른다.
+ * 전자잉크용 화면 공통: 화면 전환 애니메이션을 끄고, 좌우로 밀거나 페이지 버튼을 누르면 [onSwipe] 를 부른다.
  * 밀기로 끝난 터치는 아래 뷰에 취소로 전달해 눌림(클릭)으로 처리되지 않게 한다.
  */
 abstract class EinkActivity : Activity() {
@@ -46,6 +47,20 @@ abstract class EinkActivity : Activity() {
 
     /** [toLeft] 가 true 면 왼쪽으로 민 것(다음 페이지). 처리했으면 true. */
     protected open fun onSwipe(toLeft: Boolean): Boolean = false
+
+    /**
+     * 페이지 버튼: 메이북 전용 키(291 위·292 아래)와 표준 PAGE_UP·PAGE_DOWN. 아래(다음)는 왼쪽으로 민 것과 같다.
+     * 누르고 있을 때 오는 반복은 넘기지 않는다(한 번 누르면 한 쪽).
+     */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val next = when (keyCode) {
+            MEEBOOK_PAGE_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> true
+            MEEBOOK_PAGE_UP, KeyEvent.KEYCODE_PAGE_UP -> false
+            else -> return super.onKeyDown(keyCode, event)
+        }
+        if (event.repeatCount > 0) return true
+        return onSwipe(next) || super.onKeyDown(keyCode, event)
+    }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
@@ -83,5 +98,11 @@ abstract class EinkActivity : Activity() {
             .item(getString(R.string.hide)) { prefs.hide(app.key); changed() }
             .item(getString(R.string.app_info)) { AppStore.openAppInfo(this, app) }
             .show()
+    }
+
+    private companion object {
+        /** 메이북(Haoqing) 펌웨어의 KeyEvent.KEYCODE_HAOQING_PAGE_UP·DOWN */
+        const val MEEBOOK_PAGE_UP = 291
+        const val MEEBOOK_PAGE_DOWN = 292
     }
 }

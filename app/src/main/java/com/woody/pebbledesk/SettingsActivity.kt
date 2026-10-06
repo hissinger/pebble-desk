@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
@@ -104,24 +103,8 @@ class SettingsActivity : EinkActivity() {
         row(getString(R.string.device_settings), null, next = true) {
             runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
         }
-        row(getString(R.string.device_info), Build.MODEL, next = true, last = true) { showDeviceInfo() }
+        row(getString(R.string.device_info), Build.MODEL, next = true, last = true) { startActivity(DeviceInfoActivity.intent(this)) }
     }
-
-    /** 기기 정보: 기기마다 다르게 동작하는 부분(크레마 전용 기능 등)을 가르는 값들 */
-    private fun showDeviceInfo() {
-        val real = DisplayMetrics()
-        @Suppress("DEPRECATION") windowManager.defaultDisplay.getRealMetrics(real)
-        val fields = listOf(
-            R.string.device_model to "${Build.MODEL} (${Build.DEVICE})",
-            R.string.device_maker to "${Build.MANUFACTURER} · ${Build.BRAND}",
-            R.string.device_android to "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
-            R.string.device_build to Build.DISPLAY,
-            R.string.device_screen to "${real.widthPixels}×${real.heightPixels} · ${resources.displayMetrics.densityDpi}dpi",
-            R.string.device_crema to getString(if (Crema.isCrema) R.string.on else R.string.off),
-        ).map { (label, value) -> getString(label) to value }
-        Sheet(this).header(getString(R.string.device_info)).fields(fields).show()
-    }
-
 
     /** 독서 화면: 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */
     private fun renderReading() {

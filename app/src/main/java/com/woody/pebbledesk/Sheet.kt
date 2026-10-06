@@ -10,8 +10,6 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
-import android.widget.TableLayout
-import android.widget.TableRow
 
 /**
  * 아래에서 올라오는 메뉴. 위쪽 굵은 선, 머리(아이콘·이름·설명), 항목들, 맨 아래 오른쪽 `닫기`.
@@ -25,8 +23,6 @@ class Sheet(private val context: Context) {
     private var image: Bitmap? = null
     private var title: String = ""
     private var subtitle: String? = null
-    /** 머리 아래 이름·값 표(기기 정보). 이름 칸 너비를 가장 긴 이름에 맞춰 값의 왼쪽이 줄을 맞춘다. */
-    private var fields: List<Pair<String, String>> = emptyList()
     private val items = mutableListOf<Item>()
     /** 글자 입력 줄(지금 값, 다 쓰면 부를 일). 있으면 머리 아래에 두고 `저장`을 맨 위 항목으로 둔다. */
     private var input: Pair<String, (String) -> Unit>? = null
@@ -37,8 +33,6 @@ class Sheet(private val context: Context) {
     }
 
     fun item(label: String, bold: Boolean = false, action: () -> Unit) = apply { items += Item(label, bold, action) }
-
-    fun fields(list: List<Pair<String, String>>) = apply { fields = list }
 
     /** 한 줄 입력(박스 없이 아래 굵은 선). 빈 글자는 저장하지 않는다. [numeric] 이면 숫자 키보드. */
     fun input(initial: String, numeric: Boolean = false, onDone: (String) -> Unit) = apply {
@@ -63,16 +57,6 @@ class Sheet(private val context: Context) {
         val names = c.vbox()
         names.addView(c.text(title, 29f, Ui.heavy))
         subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = 6), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
-        if (fields.isNotEmpty()) names.addView(TableLayout(c).apply {
-            setColumnShrinkable(1, true)
-            fields.forEach { (label, value) ->
-                addView(TableRow(c).apply {
-                    setPadding(0, c.dp(3), 0, c.dp(3))
-                    addView(c.text(label, 18f, color = Ui.GRAY).apply { setPadding(0, 0, c.dp(16), 0) })
-                    addView(c.text(value, 18f, lines = 3))
-                })
-            }
-        }, lp(MATCH, WRAP).apply { topMargin = c.dp(10) })
         head.addView(names, lp(0, WRAP, 1f))
         root.addView(head)
 

@@ -11,7 +11,6 @@ import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
-import android.provider.Settings
 import android.view.View
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,7 +39,7 @@ data class DeviceStatus(
                     (context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).isWifiEnabled
                 }.getOrDefault(false),
                 bluetooth = bluetoothOn(),
-                light = lightOn(context),
+                light = Device.lightOn(context),
                 refreshEvery = refreshEvery(),
             )
         }
@@ -50,25 +49,9 @@ data class DeviceStatus(
         private fun bluetoothOn() = runCatching { BluetoothAdapter.getDefaultAdapter()?.isEnabled == true }
             .getOrDefault(false)
 
-        /** 크레마 조명: 백색은 screen_brightness, 온색은 warm_light. 둘 중 하나라도 0보다 크면 켜짐 */
-        private fun lightOn(context: Context): Boolean {
-            if (!Crema.isCrema) return false
-            val cr = context.contentResolver
-            val white = runCatching { Settings.System.getInt(cr, "screen_brightness", 0) }.getOrDefault(0)
-            val warm = runCatching { Settings.System.getInt(cr, "warm_light", 0) }.getOrDefault(0)
-            return white > 0 || warm > 0
-        }
-
-        /** 크레마 상단바와 같은 값(persist.vendor.fullmode_cnt). 일반 앱도 읽을 수 있다. */
-        /** SystemProperties.get 은 숨은 함수라 한 번만 찾아 둔다(배터리 신호마다 불리므로). */
-        private val getProperty by lazy {
-            runCatching { Class.forName("android.os.SystemProperties").getMethod("get", String::class.java, String::class.java) }.getOrNull()
-        }
-
-        private fun refreshEvery(): Int {
-            val value = runCatching { getProperty?.invoke(null, "persist.vendor.fullmode_cnt", "") as? String }.getOrNull().orEmpty()
-            return value.trim().toIntOrNull()?.takeIf { it in 1..99 } ?: 0
-        }
+        /** 크레마 상단바와 같은 값(persist.vendor.fullmode_cnt). */
+        private fun refreshEvery(): Int =
+            Device.prop("persist.vendor.fullmode_cnt").toIntOrNull()?.takeIf { it in 1..99 } ?: 0
     }
 }
 
