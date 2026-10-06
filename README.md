@@ -7,6 +7,10 @@
 - 바뀐 곳만 다시 그려 화면 깜빡임을 줄인다.
 - 기기가 잠금 해제되기 전에도 바로 뜬다(부팅 화면 직후 홈).
 
+| 홈 | 독서 기록 | 모든 앱 | 설정 |
+|---|---|---|---|
+| <img src="docs/screenshots/home.png" width="200"> | <img src="docs/screenshots/reading.png" width="200"> | <img src="docs/screenshots/apps.png" width="200"> | <img src="docs/screenshots/settings.png" width="200"> |
+
 ## 홈 화면
 
 위에서부터 네 구역으로 나뉜다.
