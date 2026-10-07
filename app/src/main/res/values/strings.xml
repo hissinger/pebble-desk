@@ -36,6 +36,7 @@
     <string name="device_android">안드로이드</string>
     <string name="device_build">빌드</string>
     <string name="device_screen">화면</string>
+    <string name="device_screen_app">앱 기준</string>
     <string name="device_kind">기기 종류</string>
     <string name="device_kind_crema">크레마</string>
     <string name="device_kind_meebook">메이북</string>

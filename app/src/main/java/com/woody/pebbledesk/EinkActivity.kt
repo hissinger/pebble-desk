@@ -22,11 +22,16 @@ abstract class EinkActivity : Activity() {
     /** 이 화면을 만들 때 쓴 언어. 설정에서 바뀌었으면 돌아올 때 다시 만든다. */
     private var createdEnglish = false
 
-    /** 설정의 언어(한국어/영어)로 화면 글자와 날짜 형식을 정한다. */
+    /**
+     * 설정의 언어(한국어/영어)로 화면 글자와 날짜 형식을 정하고, 화면 폭이 [Ui.DESIGN_WIDTH_DP] 가 되도록 밀도를 다시 정한다.
+     * 모든 dp·sp 값이 페블 기준이라, 픽셀 수는 거의 같은데 밀도만 다르게 선언한 기기(메이북 E6: 320dpi → 536dp)에서도
+     * 같은 물리 크기로 그려진다. 페블(1072px, 300dpi)은 그대로 300 이 나온다.
+     */
     override fun attachBaseContext(newBase: Context) {
         createdEnglish = HomePrefs.isEnglish(newBase)
         val config = Configuration(newBase.resources.configuration)
         config.setLocale(if (createdEnglish) Locale.ENGLISH else Locale.KOREAN)
+        config.densityDpi = Ui.designDensityDpi(newBase)
         super.attachBaseContext(newBase.createConfigurationContext(config))
     }
 

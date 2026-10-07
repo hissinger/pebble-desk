@@ -1,7 +1,6 @@
 package com.woody.pebbledesk
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
@@ -28,9 +27,10 @@ class SettingsActivity : EinkActivity() {
         root.addView(hline(2))
         list = vbox()
         root.addView(list, lp(MATCH, 0, 1f))
-        val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
-        if (page == null) root.addView(text("Pebble Desk $version", 15f, color = Ui.LIGHT_GRAY).apply {
+        // 바닥글: 앱 이름·버전과 기기 정보로 가는 길(따로 줄을 두면 세로가 짧은 기기에서 목록이 넘친다)
+        if (page == null) root.addView(text("Pebble Desk ${appVersion()}  ·  ${getString(R.string.device_info)}  ›", 15f, color = Ui.GRAY).apply {
             gravity = Gravity.CENTER
+            setOnClickListener { startActivity(DeviceInfoActivity.intent(this@SettingsActivity)) }
         }, lp(MATCH, dp(44)))
         setContentView(root)
     }
@@ -100,10 +100,9 @@ class SettingsActivity : EinkActivity() {
             startActivity(AppListActivity.intent(this, AppListActivity.Mode.HIDDEN))
         }
         row(getString(R.string.set_default_home), null, next = true) { openHomeSettings() }
-        row(getString(R.string.device_settings), null, next = true) {
+        row(getString(R.string.device_settings), null, next = true, last = true) {
             runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
         }
-        row(getString(R.string.device_info), Build.MODEL, next = true, last = true) { startActivity(DeviceInfoActivity.intent(this)) }
     }
 
     /** 독서 화면: 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */

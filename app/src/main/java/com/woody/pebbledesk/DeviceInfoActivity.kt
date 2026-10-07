@@ -36,10 +36,12 @@ class DeviceInfoActivity : EinkActivity() {
         list.addView(text(getString(R.string.device_photo_hint), 15f, color = Ui.GRAY, lines = 3),
             lp(MATCH, WRAP).apply { topMargin = dp(8) })
 
+        // 화면: 기기가 선언한 밀도·dp(앱 밀도를 바꾸지 않은 applicationContext)와 앱이 그리는 밀도·dp(EinkActivity 가 맞춘 것)
         val real = DisplayMetrics()
         @Suppress("DEPRECATION") windowManager.defaultDisplay.getRealMetrics(real)
+        val sys = applicationContext.resources.displayMetrics
         val dm = resources.displayMetrics
-        val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
+        fun dpSize(density: Float) = "${(real.widthPixels / density).roundToInt()}×${(real.heightPixels / density).roundToInt()}dp"
         val kind = getString(when (Device.kind) {
             Device.Kind.CREMA -> R.string.device_kind_crema
             Device.Kind.MEEBOOK -> R.string.device_kind_meebook
@@ -51,9 +53,9 @@ class DeviceInfoActivity : EinkActivity() {
             getString(R.string.device_maker) to "${Build.MANUFACTURER} · ${Build.BRAND}",
             getString(R.string.device_android) to "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
             getString(R.string.device_build) to Build.DISPLAY,
-            getString(R.string.device_screen) to "${real.widthPixels}×${real.heightPixels} · ${dm.densityDpi}dpi · " +
-                "${(real.widthPixels / dm.density).roundToInt()}×${(real.heightPixels / dm.density).roundToInt()}dp",
-            getString(R.string.device_kind) to "$kind · Pebble Desk $version",
+            getString(R.string.device_screen) to "${real.widthPixels}×${real.heightPixels} · ${sys.densityDpi}dpi · ${dpSize(sys.density)}" +
+                (if (dm.densityDpi != sys.densityDpi) "\n${getString(R.string.device_screen_app)} ${dm.densityDpi}dpi · ${dpSize(dm.density)}" else ""),
+            getString(R.string.device_kind) to "$kind · Pebble Desk ${appVersion()}",
         )))
 
         // 기기마다 다른 동작을 가르는 시스템 속성·설정 값. 없으면 `-`.

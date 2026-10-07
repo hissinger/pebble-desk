@@ -33,6 +33,7 @@
     <string name="device_android">Android</string>
     <string name="device_build">Build</string>
     <string name="device_screen">Screen</string>
+    <string name="device_screen_app">App uses</string>
     <string name="device_kind">Device type</string>
     <string name="device_kind_crema">Crema</string>
     <string name="device_kind_meebook">Meebook</string>

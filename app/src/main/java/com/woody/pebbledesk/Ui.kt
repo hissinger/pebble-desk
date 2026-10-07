@@ -18,9 +18,20 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import kotlin.math.roundToInt
 
-/** 화면 크기·색·글꼴. 시안(폭 402) 기준 값을 페블 화면(폭 약 572dp)에 맞춰 1.42배 한 값이다. */
+/** 화면 크기·색·글꼴. 시안(폭 402) 기준 값을 페블 화면(폭 572dp)에 맞춰 1.42배 한 값이다. 다른 기기도 이 폭이 되도록 밀도를 맞춘다([designDensityDpi]). */
 object Ui {
+    /** 모든 dp 값의 기준 화면 폭(크레마 페블 1072px / 1.875). 세로 모양 화면의 짧은 변이 이 폭이 되게 밀도를 정한다. */
+    const val DESIGN_WIDTH_DP = 572
+
+    /** 화면 짧은 변이 [DESIGN_WIDTH_DP] 가 되는 밀도(dpi). 페블 300, 메이북 E6·M6C(1072px) 300, 1404px 7.8인치면 393. */
+    fun designDensityDpi(context: Context): Int {
+        val dm = context.resources.displayMetrics
+        val shortPx = minOf(dm.widthPixels, dm.heightPixels)
+        return (shortPx * 160f / DESIGN_WIDTH_DP).roundToInt()
+    }
+
     const val BLACK = Color.BLACK
     const val GRAY = 0xFF555555.toInt()
     const val LIGHT_GRAY = 0xFF888888.toInt()
@@ -47,6 +58,10 @@ object Ui {
     val medium: Typeface = Typeface.create(Typeface.DEFAULT, 500, false)
     val regular: Typeface = Typeface.create(Typeface.DEFAULT, 400, false)
 }
+
+/** 앱 버전 이름(설정 바닥글·기기 정보). 못 읽으면 빈 글자. */
+fun Context.appVersion(): String =
+    runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
 
 fun Context.dp(v: Number): Int = TypedValue.applyDimension(
     TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics
