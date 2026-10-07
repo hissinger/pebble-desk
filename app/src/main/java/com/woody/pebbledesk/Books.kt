@@ -280,7 +280,9 @@ object BookShelf {
         // 저자는 비어 있을 때만 채운다(읽는 화면 메뉴의 제목으로 먼저 들어온 책).
         val a = book.author.ifBlank { author }
         if (p == book.progress && d == book.due && a == book.author) return
-        write(context, books.map { if (it.id == id) it.copy(progress = p, due = d, author = a) else it })
+        // 저자가 채워지면 빈 표지를 다시 그리도록 updatedAt 도 새로.
+        val updated = if (a != book.author) System.currentTimeMillis() else book.updatedAt
+        write(context, books.map { if (it.id == id) it.copy(progress = p, due = d, author = a, updatedAt = updated) else it })
     }
 
     fun hasCover(context: Context, id: String) = coverFile(context, id).length() > 0
@@ -344,10 +346,16 @@ object BookShelf {
         if (fixed != books) write(context, fixed)
     }
 
-    /** 제목을 바꾼다(제목이 잘렸거나 없는 책). 빈 표지가 새 제목으로 다시 그려지도록 updatedAt 도 새로. */
-    @Synchronized fun setTitle(context: Context, id: String, title: String) {
+    /** 제목을 바꾼다(제목이 잘렸거나 없는 책). */
+    fun setTitle(context: Context, id: String, title: String) = edit(context, id) { it.copy(title = title) }
+
+    /** 저자를 직접 넣거나 고친다(이북 앱이 저자를 보여 주지 않은 책). */
+    fun setAuthor(context: Context, id: String, author: String) = edit(context, id) { it.copy(author = author) }
+
+    /** 빈 표지에 들어가는 제목·저자를 고친다. 표지가 다시 그려지도록 updatedAt 도 새로. */
+    @Synchronized private fun edit(context: Context, id: String, change: (ShelfBook) -> ShelfBook) {
         val now = System.currentTimeMillis()
-        write(context, list(context).map { if (it.id == id) it.copy(title = title, updatedAt = now) else it })
+        write(context, list(context).map { if (it.id == id) change(it).copy(updatedAt = now) else it })
     }
 
     @Synchronized fun setApp(context: Context, id: String, app: String?) =

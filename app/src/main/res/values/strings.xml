@@ -147,8 +147,10 @@
     <string name="guide_myyes">my YES</string>
     <string name="guide_myyes_desc">표지를 가져올 수 없어 빈 표지입니다.</string>
     <string name="guide_progress_note">읽는 중 진행률은 이북 앱 뷰어 설정에서 화면 아래 정보(쪽·진행률) 표시를 켜 두면 들어옵니다.</string>
-    <string name="guide_cover_note">표지는 서재 화면의 표지를 잘라 옵니다. 제목이 잘리거나 다르면 홈에서 책을 길게 눌러 고치세요.</string>
+    <string name="guide_cover_note">표지는 서재 화면의 표지를 잘라 옵니다. 제목이 잘리거나 다르면 홈에서 책을 길게 눌러 고치세요. 저자도 같은 메뉴에서 넣거나 고칠 수 있습니다.</string>
     <string name="edit_title">제목 고치기</string>
+    <string name="add_author">저자 입력</string>
+    <string name="edit_author">저자 고치기</string>
     <string name="save">저장</string>
     <string name="reader_watch_desc">교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES) 서재·검색 화면의 책 제목·저자·진행률·반납일과 표지, 읽는 화면의 책 제목·진행률만 읽어 읽고 있는 책 목록에 넣습니다. 본문과 다른 앱 화면은 받지 않고, 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
 </resources>
