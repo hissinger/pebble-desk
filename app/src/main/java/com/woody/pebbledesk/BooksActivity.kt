@@ -20,7 +20,6 @@ class BooksActivity : EinkActivity() {
     private lateinit var pageText: TextView
     private lateinit var empty: View
     private lateinit var addLink: TextView
-    private lateinit var hint: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,10 +29,6 @@ class BooksActivity : EinkActivity() {
             addView(titleCount, lp(WRAP, WRAP).apply { marginStart = dp(14); topMargin = dp(6) })
         })
         root.addView(hline(2))
-        hint = text("", 15f, color = Ui.GRAY, lines = 4).apply {
-            setPadding(dp(Ui.MARGIN), dp(12), dp(Ui.MARGIN), dp(4))
-        }
-        root.addView(hint)
 
         empty = vbox().apply {
             setPadding(dp(Ui.MARGIN), dp(56), dp(Ui.MARGIN), 0)
@@ -86,10 +81,6 @@ class BooksActivity : EinkActivity() {
         addLink.isEnabled = !full
         addLink.setTextColor(if (full) Ui.LIGHT_GRAY else Ui.BLACK)
         empty.visibility = if (books.isEmpty()) View.VISIBLE else View.GONE
-        // 자동 추가를 켰으면 그 규칙을, 아니면 순서 바꾸기를 안내한다.
-        hint.text = if (prefs.autoBooks) getString(R.string.books_auto_hint, BookShelf.MAX, BookShelf.HOME)
-        else getString(R.string.books_order_hint, BookShelf.HOME)
-        hint.visibility = if (books.size > 1 || prefs.autoBooks) View.VISIBLE else View.GONE
 
         rows.setRows(books.mapIndexed { i, book -> { bookRow(book, i, books.size, apps) } })
     }

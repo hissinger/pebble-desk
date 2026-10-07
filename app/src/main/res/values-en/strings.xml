@@ -79,7 +79,6 @@
     <string name="add_book_link">Add a book  ›</string>
     <string name="books_count">%1$d / %2$d</string>
     <string name="remove">Remove</string>
-    <string name="books_order_hint">The top %1$d books show on Home (the first one large). Use ↑ ↓ to reorder; tap a row to change its app, long-press to change its cover.</string>
     <string name="favorites_none">No favorites yet</string>
     <string name="add_app_link">Add app  ›</string>
     <string name="add_app">Add app</string>
@@ -148,6 +147,5 @@
     <string name="guide_cover_note">Covers are cut from the shelf screen. If a title is cut off or wrong, long-press the book on the home screen to edit it.</string>
     <string name="edit_title">Edit title</string>
     <string name="save">Save</string>
-    <string name="books_auto_hint">Books you open in Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi or YES24 (Library, my YES) are added to the top automatically; once %1$d books are in the list, new ones are not added. The top %2$d show on Home; long-press to change a cover.</string>
     <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, of Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi and YES24 (Library, my YES) to fill your reading list. Book text and other apps are not seen, and nothing leaves the device.</string>
 </resources>
