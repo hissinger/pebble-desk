@@ -48,7 +48,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.2.1-release.apk </dev/
 | ReadingActivity | ⑫ 독서 기록: 연속일·오늘 링, 4주 링 달력(뷰 하나로 그림), 합계, 이번 주 앱별 |
 | Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간 계산, `reading.json` 저장, 연속일 |
 | ReaderWatch | `ReaderWatchService`(접근성): 교보도서관·교보eBook·밀리·알라딘·북커스·리디·YES24(전자도서관·my YES) 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기. 앱별 화면 요소 이름은 `SPECS` |
-| Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 4권, YES24 표지 검색), 책 목록 관리 |
+| Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 10권, 홈에는 4권, YES24 표지 검색), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
 | AppListActivity / FavoritesActivity / SettingsActivity / DeviceInfoActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 / 기기 정보(사진으로 찍어 보내는 진단 화면: 속성·권한·누른 키·빠른 설정 시험) |
 | PagedRows | 스크롤 없는 페이지 목록(목록·격자, fixedRows) |
@@ -59,7 +59,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.2.1-release.apk </dev/
 ## 지금까지 정한 것(요지, 자세한 건 DESIGN.md)
 
 - 전자잉크 원칙: 애니메이션 없음, 스크롤 대신 페이지, 바뀐 것만 다시 그림, 그리기 전에 채워 빈 화면 한 번 그리지 않기.
-- 책: 최대 4권, 맨 앞 책이 크게(표지가 남는 높이만큼), 나머지는 `함께 읽는 책` 3칸. 책이 없으면 스켈레톤(회색 표지 + `+`, 회색 막대).
+- 책: 최대 10권, 홈에는 앞 4권. 빼는 건 사용자만(다 차면 새 책을 넣지 않고 밀어내지 않는다). 맨 앞 책이 크게(표지가 남는 높이만큼), 다음 3권은 `함께 읽는 책` 3칸. 책이 없으면 스켈레톤(회색 표지 + `+`, 회색 막대).
 - 자주 쓰는 앱: 직접 정한 순서, 높이는 목록 3줄로 고정(격자 4×2, 칸 가운데 정렬). 여러 쪽이면 제목 오른쪽 끝 `1 / 2 ›`.
 - 하단 줄 56dp(모든 화면). 홈 가운데에 `오늘 42분 · 5일째`, 누르면 독서 기록.
 - 오늘 읽은 시간: 설정에서 켜고 **사용 기록 액세스** 권한(`PACKAGE_USAGE_STATS`)이 필요. 어떤 책인지는 알 수 없어 하루 합계·앱별로만 센다. 읽는 화면은 클래스 이름 규칙(`READER` 정규식)으로 가린다. 연속일 = 1분 이상 읽은 날. 하루 목표 기본 30분(설정, 없음 / 15분~1시간 / 직접 입력 1~300분). 바꿔도 지난날은 그날의 목표로 센다.

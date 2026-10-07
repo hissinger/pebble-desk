@@ -129,7 +129,7 @@ Pebble Desk 1.2.0 을 기본 홈으로 쓰는 E6 의 홈·설정·기기 정보 
 ## 에뮬레이터로 화면 크기 보기
 
 - 펌웨어 자체는 에뮬레이터에서 부팅되지 않는다(Rockchip 커널·HAL). 펌웨어 앱만 옮겨 심는 것도 수정된 `framework.jar`(`android.util.haoqing`, `EinkManager`)·플랫폼 서명에 묶여 있어 사실상 시스템 이미지를 통째로 바꾸는 일이다. 전자잉크 갱신·대비는 어차피 재현되지 않는다.
-- 화면 규격만 맞춘 AVD 로 배치를 본다. 예: `MeebookE6_A11` = `system-images;android-30;google_apis;arm64-v8a`, `hw.lcd.width=1072`, `hw.lcd.height=1448`, `hw.lcd.density=320`, `hw.mainKeys=yes`(내비게이션 바 없음). 페블은 `CremaPebble`(밀도 300).
+- 화면 규격만 맞춘 AVD 로 배치를 본다. 예: `MeebookE6_A11` = `system-images;android-30;google_apis;arm64-v8a`, `hw.lcd.width=1072`, `hw.lcd.height=1448`, `hw.lcd.density=320`, `hw.mainKeys=yes`(내비게이션 바 없음). 페블은 `CremaPebble_A11`(같은 이미지, `hw.lcd.height=1456`, `hw.lcd.density=300`, `hw.mainKeys=yes`). AVD 는 실제 기기와 같게 만든다(안드로이드 버전·해상도·밀도·내비게이션 바 없음). 예전 `CremaPebble`(안드로이드 15·1448px·내비게이션 바 있음)은 앱 높이가 실기기보다 45px+ 작아 홈 책 자리가 잘려 보인다.
 - 깔고 홈으로: `adb install -r …apk`, `adb shell cmd package set-home-activity com.woody.pebbledesk/.HomeActivity`.
 - **기기 이름을 메이북으로 바꾸기**(앱의 `Build.*`·`Device.kind` 시험용). 에뮬레이터 `-prop` 으로는 `ro.product.*` 가 바뀌지 않는다. 시스템을 쓸 수 있게 켜서 `build.prop` 을 고친다.
   ```bash

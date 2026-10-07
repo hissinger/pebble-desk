@@ -165,21 +165,26 @@ class BookSearchActivity : EinkActivity() {
     private fun pick(book: BookResult) {
         if (busy) return
         replaceId?.let { old -> replaceCover(old, book); return }
-        if (BookShelf.isFull(this, book.id)) {
-            status.text = getString(R.string.books_full, BookShelf.MAX)
+        // 다 차면 목록의 `책 추가` 가 흐려져 여기 오지 않는다. 검색하는 사이 자동 추가로 다 찼으면 목록으로 돌아간다.
+        if (BookShelf.isFull(this)) {
+            finish()
             return
         }
         busy = true
         status.setText(R.string.cover_loading)
         Bg.run({
             val bytes = runCatching { BookSearch.download(book.coverUrl) }.getOrElse { BookSearch.download(book.thumbUrl) }
-            BookShelf.add(this, book, bytes, app = null)
+            BookShelf.add(this, book, bytes)
         }) { result ->
             busy = false
             if (isDestroyed) return@run
             result.onSuccess { added ->
-                // 이미 앱을 정해 둔 책을 다시 고른 것이면 앞으로만 옮기고 끝
-                if (added.app == null) startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, added.id))
+                // 표지를 받는 사이 자동 추가로 다 찼으면 넣지 않고(있던 책을 밀어내지 않는다) 목록으로 돌아간다.
+                if (added == null) {
+                    finish()
+                    return@onSuccess
+                }
+                startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, added.id))
                 finish()
             }.onFailure { status.text = errorText(R.string.cover_error, it) }
         }

@@ -122,7 +122,8 @@ class ReaderWatchService : AccessibilityService() {
                         captureCovers(spec, readShelf(spec, root).distinctBy { it.title }.mapNotNull { s ->
                             val thumb = s.thumb?.takeIf(::usableThumb) ?: return@mapNotNull null
                             val book = BookShelf.findByTitle(this, s.title)
-                            val need = if (book == null) pendingFor(s.title) == null else !BookShelf.hasCover(this, book.id)
+                            // 목록에 없는 책은 들어올 때 붙일 표지를 미리 찍어 둔다(목록이 다 찼으면 들어올 수 없어 찍지 않는다).
+                            val need = if (book == null) !BookShelf.isFull(this) && pendingFor(s.title) == null else !BookShelf.hasCover(this, book.id)
                             if (need && tryCover(s.title)) s.title to thumb else null
                         }, retry = false)
                     }
@@ -400,19 +401,22 @@ class ReaderWatchService : AccessibilityService() {
     }
 
     /**
-     * 책을 폈다: 목록에 있으면 맨 앞으로, 없으면 새로 넣는다. 인터넷 검색은 하지 않고, 표지는 이북 앱 서재에 보이는
-     * 그 책의 표지 칸을 화면에서 잘라 온다(안 되면 빈 표지).
+     * 책을 폈다: 목록에 있으면 맨 앞으로, 없으면 새로 넣는다(목록이 다 찼으면 넣지 않는다). 인터넷 검색은 하지 않고,
+     * 표지는 이북 앱 서재에 보이는 그 책의 표지 칸을 화면에서 잘라 온다(안 되면 빈 표지).
      */
     private fun bookOpened(spec: ReaderSpec, seen: Seen) {
         webBook.remove(spec.pkg)
         val book = BookShelf.findByTitle(this, seen.title)?.also {
             BookShelf.moveToFront(this, it.id)
             BookShelf.updateStatus(this, it.id, seen.progress, seen.due, seen.author)
-        } ?: run {
+        } ?: if (BookShelf.isFull(this)) null else {
+            // 다 찼으면 앱 목록(시스템 호출)도 보지 않는다. 다 찬 동안 목록에 없는 책을 읽으면 화면 이벤트마다 여기 온다.
             val app = AppStore.load(this).firstOrNull { it.pkg == spec.pkg }?.key
-            BookShelf.addOpened(this, autoBookId(seen.title), seen.title, seen.author, app, seen.progress, seen.due)
+            BookShelf.addOpened(this, seen.title, seen.author, app, seen.progress, seen.due)
         }
-        setOpened(spec.pkg, book.title)
+        // 넣지 못한 책도 연 책으로 적는다(그래야 읽는 화면의 진행률이 앞서 연 다른 책에 붙지 않는다).
+        setOpened(spec.pkg, book?.title ?: seen.title)
+        if (book == null) return
         // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 알라딘 서재)
         pendingFor(book.title)?.let { key ->
             val bytes = pendingCovers.remove(key) ?: return@let

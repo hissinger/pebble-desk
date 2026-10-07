@@ -203,7 +203,8 @@ class HomeActivity : EinkActivity() {
     private fun refresh() {
         val iconsChanged = AppIcons.clearIfPackagesChanged(this)
         apps = AppStore.loadAndPrune(this, prefs)
-        val books = BookShelf.list(this)
+        // 홈에는 앞 몇 권만 보인다(나머지는 읽고 있는 책 목록에만).
+        val books = BookShelf.list(this).take(BookShelf.HOME)
         // 맨 앞 책의 앱이 곧 읽고 있는 앱이다.
         val reading = books.firstOrNull()?.app?.let(::findApp)
         // 자주 쓰는 앱은 직접 넣고 뺀 그대로 보인다(위의 책·앱과 상관없다).
@@ -307,7 +308,7 @@ class HomeActivity : EinkActivity() {
                             addView(smallBook(book), lp(0, WRAP, 1f).apply { if (i > 0) marginStart = dp(GAP_DP) })
                         }
                         // 두 권·세 권일 때도 표지 폭이 같도록 빈 칸을 채운다.
-                        repeat(BookShelf.MAX - books.size) { addView(View(context), lp(0, 1, 1f).apply { marginStart = dp(GAP_DP) }) }
+                        repeat(BookShelf.HOME - books.size) { addView(View(context), lp(0, 1, 1f).apply { marginStart = dp(GAP_DP) }) }
                     })
                 }
                 // 함께 읽는 책 줄 높이를 먼저 재고, 남는 높이를 맨 앞 책 표지에 준다.

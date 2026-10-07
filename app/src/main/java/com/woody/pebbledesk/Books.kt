@@ -14,6 +14,7 @@ import org.json.JSONObject
 import java.io.File
 import java.time.LocalDate
 import java.io.IOException
+import java.util.UUID
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -121,7 +122,10 @@ object Bg {
     }
 }
 
-/** 읽고 있는 책 한 권: 표지는 앱 전용 저장소의 `books/<id>.jpg`, [app] 은 그 책을 읽는 앱(없으면 null). */
+/**
+ * 읽고 있는 책 한 권: 표지는 앱 전용 저장소의 `books/<id>.jpg`, [app] 은 그 책을 읽는 앱(없으면 null).
+ * [id] 는 넣을 때 런처가 만든다(`b-` + UUID). 같은 책을 두 번 넣어도 따로 다룬다(합치지 않는다).
+ */
 data class ShelfBook(
     val id: String,
     val title: String,
@@ -132,6 +136,8 @@ data class ShelfBook(
     val progress: Int = -1,
     /** 교보도서관 반납일(epochDay). 모르면 -1 */
     val due: Long = -1,
+    /** 자동으로 넣을 때 이북 앱이 보여 준 제목. 사용자가 제목을 고쳐도 다음에 펼 때 이 책으로 찾는다. 직접 넣은 책은 "" */
+    val seenTitle: String = "",
 )
 
 /** 홈·목록에 붙이는 진행률·반납일 `[47% 읽음, 반납 4일 남음]`. 모르는 값은 뺀다(홈은 한 줄씩, 목록은 이어서). */
@@ -153,9 +159,6 @@ fun Context.bookStatus(book: ShelfBook, today: LocalDate = LocalDate.now()): Lis
 fun normTitle(title: String): String =
     title.substringBefore(':').filter { it.isLetterOrDigit() }.lowercase()
 
-/** 이북 앱에서 편 책을 자동으로 넣을 때의 id(앱이 보여 준 제목으로 만든다) */
-fun autoBookId(title: String) = "auto-${normTitle(title)}"
-
 /** 같은 책으로 볼 만한가: 정리한 제목이 같거나, 한쪽이 다른 쪽의 앞부분(두 글자 이상) */
 fun sameTitle(a: String, b: String): Boolean {
     val x = normTitle(a)
@@ -165,12 +168,14 @@ fun sameTitle(a: String, b: String): Boolean {
 }
 
 /**
- * 읽고 있는 책 목록(최대 [MAX]권). 맨 앞 책이 홈에 크게 보이고, 그 책의 앱이 '읽고 있는 앱'이다.
+ * 읽고 있는 책 목록(최대 [MAX]권). 앞 [HOME]권이 홈에 보이고(맨 앞 책은 크게), 맨 앞 책의 앱이 '읽고 있는 앱'이다.
  * 목록은 books/books.json, 표지는 books/<id>.jpg.
  */
 object BookShelf {
-    const val MAX = 4
-    private val covers = LruCache<String, Bitmap>(8)
+    const val MAX = 10
+    /** 홈에 보이는 책 수: 맨 앞 책 + 함께 읽는 책 3칸 */
+    const val HOME = 4
+    private val covers = LruCache<String, Bitmap>(16)
 
     private fun dir(context: Context) = File(Storage.of(context).filesDir, "books").apply { mkdirs() }
     private fun index(context: Context) = File(dir(context), "books.json")
@@ -182,11 +187,16 @@ object BookShelf {
      */
     @Volatile private var cached: List<ShelfBook>? = null
 
-    fun list(context: Context): List<ShelfBook> {
+    fun list(context: Context): List<ShelfBook> = cached ?: load(context)
+
+    @Synchronized private fun load(context: Context): List<ShelfBook> {
         cached?.let { return it }
         migrateSingleBook(context)
-        return readIndex(context).also { cached = it }
+        return migrateIds(context, readIndex(context)).also { cached = it }
     }
+
+    private const val ID_PREFIX = "b-"
+    private fun newId() = ID_PREFIX + UUID.randomUUID()
 
     private fun readIndex(context: Context): List<ShelfBook> {
         val f = index(context)
@@ -196,7 +206,7 @@ object BookShelf {
             (0 until arr.length()).map { arr.getJSONObject(it) }.map {
                 ShelfBook(it.getString("id"), it.optString("title"), it.optString("author"),
                     it.optString("app").ifEmpty { null }, it.optLong("updated_at"),
-                    it.optInt("progress", -1), it.optLong("due", -1))
+                    it.optInt("progress", -1), it.optLong("due", -1), it.optString("seen_title"))
             }
         }.getOrElse {
             // 읽지 못하는 목록은 빈 목록으로 시작하되, 다음 저장이 덮어쓰기 전에 되살릴 수 있게 따로 둔다.
@@ -227,39 +237,38 @@ object BookShelf {
         return bmp
     }
 
-    /** 맨 앞에 넣는다(이미 있으면 앞으로 옮긴다). 새 책인데 [MAX]권이 차 있으면 넣지 않는다([isFull] 로 먼저 확인). 이미지가 아니면 IOException. */
+    /**
+     * 검색에서 고른 책을 새 책으로 맨 앞에 넣는다. [MAX]권이 차 있으면 넣지 않고 null.
+     * 책은 사용자가 직접 뺄 때만 빠진다(자동으로 밀어내지 않는다). 이미지가 아니면 IOException.
+     */
     @Throws(IOException::class)
-    @Synchronized fun add(context: Context, book: BookResult, coverBytes: ByteArray, app: String?): ShelfBook {
-        saveCover(context, book.id, coverBytes)
-        val old = list(context)
-        val prev = old.find { it.id == book.id }
-        val added = ShelfBook(book.id, book.title, book.author, prev?.app ?: app, System.currentTimeMillis(),
-            prev?.progress ?: -1, prev?.due ?: -1)
-        write(context, (listOf(added) + old.filter { it.id != book.id }).take(MAX))
+    @Synchronized fun add(context: Context, book: BookResult, coverBytes: ByteArray): ShelfBook? {
+        if (isFull(context)) return null
+        val added = ShelfBook(newId(), book.title, book.author, null, System.currentTimeMillis())
+        saveCover(context, added.id, coverBytes)
+        write(context, listOf(added) + list(context))
         return added
     }
 
     /**
      * 이북 앱에서 편 책을 맨 앞에 표지 그림 없이 넣는다(읽고 있는 책 자동 추가, 빈 표지로 보인다).
-     * [MAX]권이 넘으면 맨 뒤(가장 오래 안 편 책)가 빠진다.
+     * [MAX]권이 차 있으면 넣지 않고 null(있던 책을 빼지 않는다. 사용자가 목록에서 직접 뺀다).
      */
-    @Synchronized fun addOpened(context: Context, id: String, title: String, author: String, app: String?, progress: Int, due: Long): ShelfBook {
-        val added = ShelfBook(id, title, author, app, System.currentTimeMillis(), progress, due)
-        val old = list(context)
-        val kept = (listOf(added) + old.filter { it.id != id }).take(MAX)
-        (old - kept.toSet()).forEach { dropFiles(context, it.id) }
-        write(context, kept)
+    @Synchronized fun addOpened(context: Context, title: String, author: String, app: String?, progress: Int, due: Long): ShelfBook? {
+        if (isFull(context)) return null
+        val added = ShelfBook(newId(), title, author, app, System.currentTimeMillis(), progress, due, seenTitle = title)
+        write(context, listOf(added) + list(context))
         return added
     }
 
-    /** 표지를 다시 고른 책: 자리·앱·진행률은 두고 표지·제목·저자만 바꾼다. */
-    @Synchronized fun replace(context: Context, oldId: String, book: BookResult, coverBytes: ByteArray) {
+    /** 표지를 다시 고른 책: 자리·앱·진행률은 두고 표지·제목·저자만 바꾼다(줄인 표지는 원본이 새로워 다시 만든다). */
+    @Throws(IOException::class)
+    @Synchronized fun replace(context: Context, id: String, book: BookResult, coverBytes: ByteArray) {
         val books = list(context)
-        val old = books.find { it.id == oldId } ?: return
-        saveCover(context, book.id, coverBytes)
-        val new = old.copy(id = book.id, title = book.title, author = book.author, updatedAt = System.currentTimeMillis())
-        write(context, books.filter { it.id != book.id || it.id == oldId }.map { if (it.id == oldId) new else it })
-        if (oldId != book.id) dropFiles(context, oldId)
+        if (books.none { it.id == id }) return
+        saveCover(context, id, coverBytes)
+        val now = System.currentTimeMillis()
+        write(context, books.map { if (it.id == id) it.copy(title = book.title, author = book.author, updatedAt = now) else it })
     }
 
     /** 이북 앱 서재에서 본 진행률·반납일(저자는 비어 있을 때만)을 적는다(순서는 그대로). 바뀐 게 없으면 쓰지 않는다. */
@@ -286,12 +295,14 @@ object BookShelf {
     }
 
     /**
-     * 제목이 같은 책(부제·공백 무시). 사용자가 제목을 고친 자동 추가 책은 앱이 보여 준 제목으로 만든 id 로도 찾는다
-     * (그러지 않으면 다음에 펼 때 새 책으로 들어가며 고친 제목이 되돌아간다).
+     * 제목이 같은 책(부제·공백 무시). 사용자가 제목을 고친 자동 추가 책은 앱이 보여 준 제목([ShelfBook.seenTitle])으로도 찾는다
+     * (그러지 않으면 다음에 펼 때 새 책으로 들어간다).
      */
     fun findByTitle(context: Context, title: String): ShelfBook? {
         val books = list(context)
-        return books.firstOrNull { sameTitle(it.title, title) } ?: books.firstOrNull { it.id == autoBookId(title) }
+        val norm = normTitle(title)
+        return books.firstOrNull { sameTitle(it.title, title) }
+            ?: books.firstOrNull { it.seenTitle.isNotEmpty() && normTitle(it.seenTitle) == norm }
     }
 
     @Throws(IOException::class)
@@ -307,11 +318,8 @@ object BookShelf {
         dir(context).listFiles { f -> f.name.startsWith("${id}_") }?.forEach { it.delete() }
     }
 
-    /** 새 책을 더 넣을 수 없으면 true. 이미 있는 책([id])을 다시 고르는 것은 괜찮다. */
-    fun isFull(context: Context, id: String? = null): Boolean {
-        val books = list(context)
-        return books.size >= MAX && books.none { it.id == id }
-    }
+    /** 새 책을 더 넣을 수 없으면 true */
+    fun isFull(context: Context): Boolean = list(context).size >= MAX
 
     @Synchronized fun moveToFront(context: Context, id: String) {
         val books = list(context)
@@ -355,7 +363,7 @@ object BookShelf {
         books.forEach {
             arr.put(JSONObject().put("id", it.id).put("title", it.title).put("author", it.author)
                 .put("app", it.app ?: "").put("updated_at", it.updatedAt)
-                .put("progress", it.progress).put("due", it.due))
+                .put("progress", it.progress).put("due", it.due).put("seen_title", it.seenTitle))
         }
         writeAtomically(index(context)) { it.writeText(arr.toString()) }
         cached = books
@@ -369,12 +377,44 @@ object BookShelf {
         if (!info.exists() || index(context).exists()) return
         val json = runCatching { JSONObject(info.readText()) }.getOrNull()
         if (json != null && cover.length() > 0) {
-            val id = "legacy"
+            val id = newId()
             cover.copyTo(coverFile(context, id), overwrite = true)
             val app = HomePrefs(context).legacyReadingApp
             write(context, listOf(ShelfBook(id, json.optString("title"), json.optString("author"), app, json.optLong("updated_at"))))
         }
         oldDir.deleteRecursively()
+    }
+
+    /**
+     * 예전 id(YES24 상품 번호, 자동 추가는 `auto-<정리한 제목>`, 옛 한 권은 `legacy`)를 런처가 만든 id 로 바꾼다(1.2.1 이전 데이터).
+     * `auto-` 책은 id 의 제목을 [ShelfBook.seenTitle] 로 옮겨, 제목을 고친 책도 계속 찾는다.
+     * 중간에 꺼져도 책·표지를 잃지 않게: 표지를 새 이름으로 **복사** → 목록 저장 → 예전 파일 지우기.
+     * 표지 복사나 목록 저장이 실패하면 예전 id 그대로 쓰고(id 는 이름일 뿐이라 그대로도 동작한다) 다음에 다시 한다.
+     */
+    private fun migrateIds(context: Context, books: List<ShelfBook>): List<ShelfBook> {
+        if (books.all { it.id.startsWith(ID_PREFIX) }) return books
+        val moved = books.map { b ->
+            if (b.id.startsWith(ID_PREFIX)) return@map b
+            val seen = b.seenTitle.ifEmpty { if (b.id.startsWith("auto-")) b.id.removePrefix("auto-") else "" }
+            b.copy(id = newId(), seenTitle = seen)
+        }
+        val copied = runCatching {
+            books.zip(moved).filter { (old, new) -> old.id != new.id }.forEach { (old, new) ->
+                val cover = coverFile(context, old.id)
+                if (cover.exists()) cover.copyTo(coverFile(context, new.id), overwrite = true)
+            }
+            write(context, moved)
+        }
+        if (copied.isFailure) {
+            moved.filter { m -> books.none { it.id == m.id } }.forEach { coverFile(context, it.id).delete() }
+            return books
+        }
+        // 목록에 없는 표지·줄인 표지(예전 id 의 것, 앞서 실패한 복사본)를 지운다.
+        val keep = moved.map { it.id }
+        dir(context).listFiles { f ->
+            (f.name.endsWith(".jpg") || f.name.endsWith(".png")) && keep.none { f.name.startsWith("$it.") || f.name.startsWith("${it}_") }
+        }?.forEach { it.delete() }
+        return moved
     }
 
     private fun writeAtomically(target: File, write: (File) -> Unit) {
