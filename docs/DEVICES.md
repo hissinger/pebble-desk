@@ -18,8 +18,8 @@ Pebble Desk 를 크레마 페블 말고 다른 전자잉크 기기에서 쓸 수
 | 펌웨어 만든 곳 | wetao / into1 (`ZlSystemUI`, `ZlSettings`) | Haoqing (`SystemUI` 수정판, `Haoqing-*` 앱) | Haoqing |
 | 안드로이드 하단 내비게이션 바 | 없음 | 없음 (`config_showNavigationBar=false`) | 없음. 대신 **상단 바**에 홈·뒤로·새로고침·조명 버튼과 최근 앱 버튼(약 50dp, 사진으로 어림) |
 | 빠른 설정 | 크레마 전용 앱 `com.inno.quicksetting` | 안드로이드 기본 패널을 고친 것, 타일 2줄×6칸 | M6C 와 같음 (실기기 사진) |
-| 빠른 설정 여는 방송 | `com.epd.drop_down` | `com.haoqing.action.QUICK_SETTINGS` | 기기 정보의 시험 버튼으로 패널이 열렸다. **세 방법 중 어느 것인지 미확인** |
-| 안드로이드 기본 펼치기(`expandSettingsPanel`) | 열림: 크레마식 시스템 알림창(밝기·음량·대비) | **(미확인)** (에뮬레이터에서는 열림) | **(미확인)** |
+| 빠른 설정 여는 방송 | `com.epd.drop_down` | `com.haoqing.action.QUICK_SETTINGS` | 같음. `메이북 ›` 로 열림(2026-10-07 사용자 확인). `크레마 ›` 는 아무 일 없음 |
+| 안드로이드 기본 펼치기(`expandSettingsPanel`) | 열림: 크레마식 시스템 알림창(밝기·음량·대비) | **(미확인)** (에뮬레이터에서는 열림) | 열림. 메이북 방송과 같은 패널 |
 | 화면 대비 | `hq_contrast`(기본 56), 앱 화면을 밝기^(1/s) 로 어둡게, s = 1 − c×90/8000 | `hq_contrast`(기본 34), 하드웨어 합성 단계 1.5 − c×0.018 | `Settings.System hq_contrast` 키가 **없다**(기기 정보에 `-`). 다른 곳에 두는 듯 **(미확인)** |
 | 페이지 버튼 | 없음 | 없음 (키 코드만 있음: 291·292) | 2개 + 화면 아래 정전식 버튼. `persist.haoqing.pagekeys=41`. 키 코드 **(미확인)** |
 | 기본 홈 바꾸기 | 됨 (지금 쓰는 중) | 표준 안드로이드 11 방식, 막는 코드 없음 | 됨 (기기 정보 `기본 홈 켜짐`, 홈 화면 사진) |
@@ -93,7 +93,7 @@ jadx --no-res -d src/SystemUI fs/system_ext/priv-app/SystemUI/SystemUI.apk
 - 리뷰([Good e-Reader 영상](https://www.youtube.com/watch?v=hsDaqbdV1-I) 2:10)의 빠른 설정은 **M6C 와 타일·순서·배치까지 같다**: Refresh Settings · Wi-Fi · Bluetooth · Sound · Rotation Manually · 배터리% / Screen Record · Location · Screenshot · Screen Cast · Battery Saver · Airplane mode. 상단 바 버튼도 같다.
 - 하드웨어: 페이지 버튼 2개, 화면 아래 정전식 버튼 1개(helpix), 1.8GHz 4코어·3GB·32GB·2200mAh, 180g, $189.99~199. 칩은 helpix 도 RK3566 으로 추정만 한다. M6(2023)와 거의 같고(helpix: "один к одному") 버튼·패널이 다르다.
 - 빠른 시작 안내서(한 장을 12면으로 접은 것, 중국어·영어)는 A2 빠른 갱신 켜기("[A2] super speed refreshing"), 상단 바 【작업 관리】("[Task manage] at top bar")로 작업 정리, 【앱】 화면 왼쪽 【눈송이】("[Snow] icon", 백그라운드 앱 관리)만 언급한다. 빠른 설정 설명은 없다.
-- **(미확인)** 페이지 버튼·정전식 버튼의 키 코드, 빠른 설정 세 방법 중 어느 것이 통하는지, 대비 설정 키, 눈송이가 접근성 서비스에 주는 영향.
+- **(미확인)** 페이지 버튼·정전식 버튼의 키 코드, 대비 설정 키, 눈송이가 접근성 서비스에 주는 영향.
 
 ### E6 에서 확인한 것 (V2.0.0-2026071718, 2026-10-07 사용자 사진 5장)
 
@@ -109,13 +109,13 @@ Pebble Desk 1.2.0 을 기본 홈으로 쓰는 E6 의 홈·설정·기기 정보 
 - **권한**: `자동 추가 꺼짐 · 오늘 읽은 시간 켜짐 · 기본 홈 켜짐`. 사용 기록 권한을 주면 홈 하단에 `오늘 28분 · 2일째` 가 나오고, 밀리의서재 E ink(`kr.co.millie.eink`)의 `EPubViewActivity` 가 읽는 화면으로 잡혔다.
 - **최근에 뜬 다른 화면**: `kr.co.millie.eink / EPubViewActivity · BookshelfActivity · SplashActivity`, `com.haoqing.wallpaper / DreamActivity`(슬립 화면이 Activity 로 뜬다 → 사용 기록에 남는다), `com.android.systemui / RecentsActivity`(상단 바의 최근 앱 버튼). 빠른 설정 패널은 Activity 가 아니라 남지 않았다.
 - **버튼**: `4 KEYCODE_BACK · scan 0` 만 기록됐다(스캔 코드 0 = 상단 바의 뒤로 버튼으로 보인다). 페이지 버튼·정전식 버튼은 사진에 없다. 다음에 그 버튼을 누른 기기 정보 사진을 받는다.
-- **빠른 설정**: 기기 정보 화면 위로 열렸다. 먼저 아이콘 한 줄(새로고침·Wi-Fi·BT·소리·회전·배터리)과 손잡이만 보이는 접힌 상태, 당기면 두 줄 타일에 한국어 이름 `새로고침 모드 · Wi-Fi · 블루투스 · 소리 · 수동 회전 · 83% / 화면 녹화 시작 · 위치 · 캡처 · 화면 전송(…지 않음) · 절전 모드 · 비행기 모드` 와 아래 연필(편집)·톱니(설정). M6C 펌웨어의 타일 목록과 같다. **어느 시험 버튼(크레마·메이북·안드로이드)으로 열렸는지는 못 들었다.**
+- **빠른 설정**: 기기 정보 화면 위로 열렸다. 먼저 아이콘 한 줄(새로고침·Wi-Fi·BT·소리·회전·배터리)과 손잡이만 보이는 접힌 상태, 당기면 두 줄 타일에 한국어 이름 `새로고침 모드 · Wi-Fi · 블루투스 · 소리 · 수동 회전 · 83% / 화면 녹화 시작 · 위치 · 캡처 · 화면 전송(…지 않음) · 절전 모드 · 비행기 모드` 와 아래 연필(편집)·톱니(설정). M6C 펌웨어의 타일 목록과 같다. `메이북 ›`(`com.haoqing.action.QUICK_SETTINGS`)과 `안드로이드 ›`(`expandSettingsPanel`) 둘 다 이 패널을 연다(사용자 확인). 홈 상단 줄 누르기(`Device.openQuickSettings`)도 그래서 통한다.
 
 ## Pebble Desk 에 넣은 것
 
 | 내용 | 기기 구분 | 확인 |
 |---|---|---|
-| 상단 줄을 누르면 `com.epd.drop_down` 과 `com.haoqing.action.QUICK_SETTINGS`(`com.android.systemui` 지정)를 둘 다 보낸다(`Device.openQuickSettings`). 받는 쪽이 없는 방송은 아무 일도 하지 않는다 | 가리지 않음 | 페블은 그대로 열림. E6 는 기기 정보의 시험 버튼으로 패널이 열렸으나 어느 방송인지 **(미확인)** |
+| 상단 줄을 누르면 `com.epd.drop_down` 과 `com.haoqing.action.QUICK_SETTINGS`(`com.android.systemui` 지정)를 둘 다 보낸다(`Device.openQuickSettings`). 받는 쪽이 없는 방송은 아무 일도 하지 않는다 | 가리지 않음 | 페블은 그대로 열림. E6 는 메이북 방송으로 패널이 열림(사용자 확인) |
 | 기기 종류 `Device.kind`: 크레마(`Build.DEVICE`) → 메이북(`ro.haoqing.brand` 있음) → 기타. 모델명을 몰라도 메이북 전 기종을 잡는다. 설정 › 기기 정보의 `기기 종류` | — | 에뮬레이터에 `ro.haoqing.brand` 를 넣어 `메이북` 확인. E6 실기기에서도 `메이북` |
 | 조명 켜짐: 크레마 `screen_brightness`·`warm_light` > 0, 메이북 `isLightOn == "true"`(꺼도 밝기 값은 남는다). 그 키를 지켜보다 바뀌면 상태 줄을 다시 그린다 | 기기 종류 | 에뮬레이터에서 `isLightOn` 을 바꿔 아이콘이 나타나고 사라지는 것 확인. E6 는 `isLightOn=false` 인 사진과 ☀ 가 보이는 홈 사진이 섞여 있어 **확인 필요** |
 | 페이지 버튼: 메이북 키 291(위)·292(아래)와 표준 `PAGE_UP`·`PAGE_DOWN` → `EinkActivity.onSwipe`. 모든 목록 화면에 적용. 누르고 있을 때 오는 반복은 넘기지 않는다 | 가리지 않음 | 표준 키·길게 누르기(한 쪽만)는 에뮬레이터에서 확인. 단 표준 PAGE 키는 이동 키라, 터치 모드를 벗어나면서 포커스 받을 뷰가 생기면 첫 누름을 안드로이드가 먹는다(`ViewRootImpl.checkForLeavingTouchModeAndConsume`). 에뮬레이터 모든 앱 화면에서 그랬다. 291·292 는 일반 안드로이드에 없는 키 코드라 메이북 실기기에서만 확인 가능 **(미확인)** |
@@ -124,7 +124,7 @@ Pebble Desk 1.2.0 을 기본 홈으로 쓰는 E6 의 홈·설정·기기 정보 
 
 넣지 않은 것: `com.haoqing.action.FULL_REFRESH`(잔상 제거 버튼).
 
-- **안드로이드 기본 빠른 설정 펼치기**: `getSystemService("statusbar")` 의 `expandSettingsPanel()`(숨은 함수, `EXPAND_STATUS_BAR` 는 일반 권한)를 일반 앱(릴리스, targetSdk 34)이 리플렉션으로 불러 안드로이드 11 에뮬레이터와 페블에서 열렸다(페블은 크레마 빠른 설정 앱이 아니라 밝기·음량·대비가 있는 시스템 알림창). 메이북 빠른 설정은 안드로이드 기본 패널을 고친 것이라 메이북 방송 대신 이 방법으로도 열릴 가능성이 크다 **(메이북 실기기 미확인)**. 지금은 기기 정보의 시험 버튼에만 쓴다.
+- **안드로이드 기본 빠른 설정 펼치기**: `getSystemService("statusbar")` 의 `expandSettingsPanel()`(숨은 함수, `EXPAND_STATUS_BAR` 는 일반 권한)를 일반 앱(릴리스, targetSdk 34)이 리플렉션으로 불러 안드로이드 11 에뮬레이터와 페블에서 열렸다(페블은 크레마 빠른 설정 앱이 아니라 밝기·음량·대비가 있는 시스템 알림창). 메이북 빠른 설정은 안드로이드 기본 패널을 고친 것이라 메이북 방송 대신 이 방법으로도 열릴 가능성이 크다 E6 실기기에서 열렸다(메이북 방송과 같은 패널). 지금은 기기 정보의 시험 버튼에만 쓴다.
 
 ## 에뮬레이터로 화면 크기 보기
 
