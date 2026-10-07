@@ -58,13 +58,11 @@ class DeviceInfoActivity : EinkActivity() {
             getString(R.string.device_kind) to "$kind · Pebble Desk ${appVersion()}",
         )))
 
-        // 기기마다 다른 동작을 가르는 시스템 속성·설정 값. 없으면 `-`.
+        // 기기마다 다른 동작을 가르는 시스템 속성·설정 값: 이미 아는 키(크레마·메이북)와 이름으로 찾은 기기 고유 값 중 있는 것만.
         section(list, R.string.device_section_values)
-        val props = PROPS.joinToString(" · ") { "$it=${Device.prop(it).ifEmpty { "-" }}" }
-        val settings = SETTINGS.joinToString(" · ") { key ->
-            "$key=${runCatching { Settings.System.getString(contentResolver, key) }.getOrNull() ?: "-"}"
+        listOf(vendorProps(), vendorSettings()).forEach {
+            list.addView(text(it.ifEmpty { "-" }, 14f, lines = 3).apply { setLineSpacing(0f, 1.15f) })
         }
-        list.addView(text("$props\n$settings", 14f, lines = 6).apply { setLineSpacing(0f, 1.15f) })
 
         section(list, R.string.device_section_perms)
         val home = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
@@ -134,6 +132,43 @@ class DeviceInfoActivity : EinkActivity() {
         return if (keyCode == KeyEvent.KEYCODE_BACK) super.onKeyDown(keyCode, event) else true
     }
 
+    /** 시스템 속성 중 아는 키와 이름이 [VENDOR_KEY] 에 맞는 것(`getprop` 전체 목록에서). 읽지 못하면 아는 키만. */
+    private fun vendorProps(): String {
+        val all = runCatching {
+            ProcessBuilder("getprop").redirectErrorStream(true).start().inputStream.bufferedReader().useLines { lines ->
+                lines.mapNotNull { PROP_LINE.matchEntire(it)?.destructured?.let { (k, v) -> k to v } }.toMap()
+            }
+        }.getOrDefault(emptyMap())
+        val keys = PROPS + all.keys.filter { vendorKey(it) }.sorted()
+        return keys.distinct().mapNotNull { key -> (all[key] ?: Device.prop(key)).ifEmpty { null }?.let { "$key=${short(it)}" } }
+            .joinToString(" · ")
+    }
+
+    /** `Settings.System` 중 아는 키와 이름이 [VENDOR_KEY]·[SETTING_KEY] 에 맞는 것(전체 목록에서). 목록을 못 읽으면 아는 키만. */
+    private fun vendorSettings(): String {
+        val all = runCatching {
+            contentResolver.query(Settings.System.CONTENT_URI, arrayOf("name", "value"), null, null, null)?.use { c ->
+                buildMap { while (c.moveToNext()) c.getString(0)?.let { put(it, c.getString(1).orEmpty()) } }
+            }
+        }.getOrNull().orEmpty()
+        val keys = SETTINGS + all.keys.filter { (vendorKey(it) || SETTING_KEY.containsMatchIn(it)) && !AOSP_SETTING.matches(it) }.sorted()
+        return keys.distinct().mapNotNull { key ->
+            (all[key] ?: runCatching { Settings.System.getString(contentResolver, key) }.getOrNull())?.let { "$key=${short(it)}" }
+        }.joinToString(" · ")
+    }
+
+    /** 기기 고유 값으로 보이는 이름: 전자잉크·조명 낱말이나 제조사·브랜드 이름이 들어 있다. */
+    private fun vendorKey(key: String): Boolean {
+        val k = key.lowercase()
+        return VENDOR_KEY.containsMatchIn(k) || makerWords.any { it in k }
+    }
+
+    private val makerWords by lazy {
+        listOf(Build.MANUFACTURER, Build.BRAND).flatMap { it.lowercase().split(' ', '-', '_') }.filter { it.length >= 4 }.distinct()
+    }
+
+    private fun short(value: String) = if (value.length > VALUE_MAX) value.take(VALUE_MAX) + "…" else value
+
     private fun onOff(on: Boolean) = getString(if (on) R.string.on else R.string.off)
 
     private fun section(list: LinearLayout, title: Int) {
@@ -159,8 +194,21 @@ class DeviceInfoActivity : EinkActivity() {
         private const val RECENT_MS = 10 * 60 * 1000L
         private const val RECENT_COUNT = 3
 
-        private val PROPS = listOf("ro.haoqing.brand", "persist.haoqing.updatemodel", "persist.haoqing.pagekeys", "ro.sf.lcd_density")
-        private val SETTINGS = listOf("isLightOn", "light_mode", "screen_brightness", "warm_light", "haoqing_warm_light", "hq_contrast")
+        /** 이미 아는 기기의 키(크레마·메이북). 없는 기기에서는 보이지 않는다. */
+        private val PROPS = listOf("ro.haoqing.brand", "persist.haoqing.updatemodel", "persist.haoqing.pagekeys", "persist.vendor.fullmode_cnt")
+        private val SETTINGS = listOf("screen_brightness", "warm_light", "isLightOn", "light_mode", "haoqing_warm_light", "hq_contrast")
+
+        /** 처음 보는 기기의 고유 값을 이름으로 찾는다: 전자잉크·화면 갱신·조명·버튼 낱말, 알려진 펌웨어 회사 이름. */
+        private val VENDOR_KEY = Regex("eink|epd|ebc|fullmode|pagekey|backlight|frontlight|warm|contrast|haoqing|wisky|viwoods|crema|wetao|onyx|boox|bigme")
+
+        /** `Settings.System` 에서 더 보는 낱말(조명·버튼·제스처·화면 갱신). 시스템 속성에는 이름이 비슷한 안드로이드 기본 값이 많아 쓰지 않는다. */
+        private val SETTING_KEY = Regex("light|bright|key|gesture|refresh|ghost", RegexOption.IGNORE_CASE)
+
+        /** 이름은 맞지만 안드로이드 기본에 있는 설정 */
+        private val AOSP_SETTING = Regex("screen_brightness_(mode|float|for_vr.*)|notification_light_pulse|show_key_presses|.*vibration.*|.*haptic.*")
+
+        private val PROP_LINE = Regex("""\[(.+?)]: \[(.*)]""")
+        private const val VALUE_MAX = 32
 
         /** 빠른 설정 여는 방법들([Device]). 어느 것을 눌렀을 때 실제로 열리는지 사용자가 보고 알려 준다. */
         private val QUICK_SETTINGS: List<Pair<Int, (Context) -> Boolean>> = listOf(

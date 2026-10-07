@@ -64,7 +64,7 @@
    - 와이파이·BT·조명은 켜져 있을 때만 아이콘을 넣는다. 조명은 크레마는 백색(`screen_brightness`)이나 온색(`warm_light`) 중 하나라도 0보다 크면, 메이북은 SystemUI 의 `isLightOn` 이 `true` 면 켜진 것으로 본다(`Device.lightOn`).
    - 배터리는 숫자로 쓰고, 충전 중이면 숫자 앞에 작은 번개 아이콘을 붙인다(`⚡46%`).
    - 잔상 제거 횟수는 원문자(⑮)로 쓴다. 값은 `persist.vendor.fullmode_cnt`. 0이거나 읽지 못하면 뺀다.
-   - 위 두 줄을 누르면 기기의 빠른 설정(와이파이·BT·조명·음량)을 연다. 크레마 `com.epd.drop_down`, 메이북 `com.haoqing.action.QUICK_SETTINGS` 를 둘 다 보낸다(받는 쪽이 없는 방송은 아무 일도 하지 않는다).
+   - 위 두 줄을 누르면 기기의 빠른 설정(와이파이·BT·조명·음량)을 연다. 크레마 `com.epd.drop_down`, 메이북 `com.haoqing.action.QUICK_SETTINGS` 를 둘 다 보낸다(받는 쪽이 없는 방송은 아무 일도 하지 않는다). 그 밖의 기기(Viwoods AiPaper Mini 등)는 기기 자체 제스처(화면 위에서 끌어내리기)로 연다.
    - 시계는 1분마다, 나머지는 상태가 바뀔 때만 다시 그린다. 이 두 줄만 갱신한다.
 2. **지금 읽는 책**(A안): 왼쪽에 표지(흑백, 1dp 회색 테두리), 오른쪽에 제목(34sp 아주 굵게)·저자(16sp 회색), 바로 아래 읽고 있는 앱(`리디 ›`, 20sp 굵게, 아이콘을 켜면 26dp). 화면에서 가장 큰 글자는 책 제목 하나다.
    - 표지·제목·읽고 있는 앱 어디를 눌러도 읽고 있는 앱을 연다.
@@ -122,7 +122,7 @@
   - 기기 정보 `CREMA PEBBLE ›` → **기기 정보** 화면. 다른 기기를 쓰는 사람이 사진 한 장으로 찍어 보낼 수 있게 한 화면에 모은다(스크롤 없음). 설정은 제목 80 + 줄 11개 + 바닥글 44 ≈ 708dp 라 상단 바를 뺀 세로가 714dp 인 E6(밀도 맞춤 뒤)에 여유 6dp 로 들어간다. 줄을 더 넣으려면 독서처럼 하위 화면으로 뺀다.
     - 맨 위 안내: 문제가 있으면 이 화면을 사진으로 찍어 보내 달라, 버튼을 눌러 보면 키 번호가, 빠른 설정을 열었다가 돌아오면 그 화면 이름이 나온다.
     - 기기: 이름·값 표로 모델(`Build.MODEL` (`Build.DEVICE`))·제조사·브랜드·안드로이드·빌드·화면(px · 기기가 선언한 dpi·dp. 앱이 맞춘 밀도가 다르면 둘째 줄에 `앱 기준 300dpi · 572×772dp`)·기기 종류(크레마 / 메이북 / 기타, `Device.kind`)와 앱 버전.
-    - 시스템 속성·설정 값(작은 글자, `이름=값` 을 이어 씀): `ro.haoqing.brand`, `persist.haoqing.updatemodel`, `persist.haoqing.pagekeys`, `ro.sf.lcd_density` / `isLightOn`·`light_mode`·`screen_brightness`·`warm_light`·`haoqing_warm_light`·`hq_contrast`. 없으면 `-`.
+    - 시스템 속성·설정 값(작은 글자, `이름=값` 을 이어 씀, 각 3줄까지): 있는 값만 보인다. 아는 키(크레마·메이북: `ro.haoqing.brand`, `persist.haoqing.updatemodel`, `persist.haoqing.pagekeys`, `persist.vendor.fullmode_cnt` / `screen_brightness`·`warm_light`·`isLightOn`·`light_mode`·`haoqing_warm_light`·`hq_contrast`)에 더해, 처음 보는 기기의 고유 값을 이름으로 찾는다: `getprop` 전체와 `Settings.System` 전체에서 전자잉크·조명·대비 낱말(`eink`·`epd`·`backlight`·`warm`·`contrast` 등)이나 알려진 펌웨어 회사·제조사·브랜드 이름이 든 키, 설정은 `light`·`bright`·`key`·`gesture`·`refresh` 도(안드로이드 기본 설정 `screen_brightness_mode`·`notification_light_pulse`·진동 등은 뺀다). 값은 32자까지. 하나도 없으면 `-`.
     - 권한 한 줄: `자동 추가 켜짐 · 오늘 읽은 시간 켜짐 · 기본 홈 켜짐`.
     - 마지막으로 누른 버튼: `292  KEYCODE_… · scan 604`. 이 화면에서는 버튼이 쪽을 넘기지 않고 기록만 한다. 뒤로 키는 기록하고 닫는다(다시 열면 보인다).
     - 최근에 뜬 다른 화면(새 것부터 3개, 10분 안): `00:32:26  com.inno.quicksetting / QuickSettings`. 사용 기록에서 앞에 뜬 화면(Activity)을 읽는다(사용 기록 권한이 없으면 안내). 기본 런처·상단 바에서 빠른 설정을 열었다가 돌아오면, 빠른 설정이 따로 된 화면이면 여기 남고 시스템 알림창이면 남지 않는다. 화면에 다시 돌아올 때마다 새로 읽는다.
