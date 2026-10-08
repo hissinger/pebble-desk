@@ -22,6 +22,7 @@ import kotlin.math.sqrt
 
 /**
  * ⑫ 독서 기록: 연속일과 오늘 링, 최근 4주 목표 링 달력(애플 활동 앱처럼), 이번 달 목표 달성, 이번 주·이번 달·올해 합계, 이번 주 책별 시간.
+ * 제목 오른쪽 `올해 읽은 책 ›` 은 올해 읽은 책([YearBooksActivity]).
  * 홈 하단의 `오늘 42분`이나 설정 > 독서 기록으로 연다. 숫자는 [ReadingLog] 에서 온다.
  */
 class ReadingActivity : EinkActivity() {
@@ -32,7 +33,14 @@ class ReadingActivity : EinkActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = vbox()
-        root.addView(titleRow(getString(R.string.reading_stats)) { finish() })
+        root.addView(titleRow(getString(R.string.reading_stats)) { finish() }.apply {
+            addView(View(context), lp(0, 0, 1f))
+            // 올해 읽은 책
+            addView(text(getString(R.string.year_books_link), 17f, Ui.bold).apply {
+                setPadding(dp(16), dp(20), 0, dp(20))
+                setOnClickListener { startActivity(YearBooksActivity.intent(this@ReadingActivity)) }
+            }, lp(WRAP, WRAP))
+        })
         root.addView(hline(2))
         body = vbox()
         root.addView(body, lp(MATCH, 0, 1f))
@@ -130,21 +138,45 @@ class ReadingActivity : EinkActivity() {
     /** 이번 주의 첫날(설정의 한 주 시작 요일). 달력·이번 주 합계·이번 주 책별이 모두 따른다. */
     private fun startOfWeek(today: LocalDate): LocalDate = today.with(TemporalAdjusters.previousOrSame(prefs.firstDayOfWeek))
 
-    /** 최근 4주 링 달력. 날짜는 링 위에 작게, 오늘은 검은 동그라미 안에. 기록 전([since] 전)·앞날은 흐린 빈 링. */
+    /**
+     * 4주 링 달력(처음에는 이번 주까지 최근 4주). 날짜는 링 위에 작게, 오늘은 검은 동그라미 안에. 기록 전([since] 전)·앞날은 흐린 빈 링.
+     * 제목 줄 오른쪽 `9월 14일 – 10월 11일  ‹ ›` 로 4주씩 넘긴다(달력만 다시 그린다). 기록 시작 전으로·이번 주 뒤로는 가지 않는다(흐리게).
+     */
     private fun calendar(today: LocalDate, since: LocalDate, goalMs: Long, progress: (LocalDate) -> Float) = vbox().apply {
         val locale = resources.configuration.locales[0]
-        val start = startOfWeek(today).minusWeeks(WEEKS - 1L)
-        val end = start.plusDays(WEEKS * 7L - 1)
+        val latest = startOfWeek(today).minusWeeks(WEEKS - 1L)
         val dateFmt = DateTimeFormatter.ofPattern(getString(R.string.date_short_fmt), locale)
+        val yearFmt = DateTimeFormatter.ofPattern(getString(R.string.date_year_fmt), locale)
+        // 요일 줄과 4주치 날짜·링을 뷰 하나에 그린다(칸마다 뷰를 만들면 백 개가 넘어 느리다).
+        val cal = RingCalendar(context, latest, today, since, WEEKS, progress)
+        val range = text("", 12f, Ui.medium, Ui.LIGHT_GRAY)
+        fun arrow(symbol: String) = text(symbol, 20f, Ui.bold).apply { gravity = Gravity.CENTER; minWidth = dp(40) }
+        val prev = arrow("‹")
+        val next = arrow("›")
+        fun show(start: LocalDate) {
+            cal.start = start
+            val end = start.plusDays(WEEKS * 7L - 1)
+            // 지난해까지 넘기면 연도를 붙인다.
+            range.text = "${start.format(if (start.year != today.year) yearFmt else dateFmt)} – ${end.format(if (end.year != today.year) yearFmt else dateFmt)}"
+            val canPrev = start > since
+            val canNext = start < latest
+            prev.setTextColor(if (canPrev) Ui.BLACK else Ui.DIVIDER)
+            next.setTextColor(if (canNext) Ui.BLACK else Ui.DIVIDER)
+            prev.setOnClickListener { if (canPrev) show(start.minusWeeks(WEEKS.toLong())) }
+            next.setOnClickListener { if (canNext) show(start.plusWeeks(WEEKS.toLong())) }
+        }
+        show(latest)
         addView(hbox().apply {
-            setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), dp(8))
+            setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN - 12), dp(2))
             val title = if (goalMs > 0) getString(R.string.goal_title, duration(goalMs)) else getString(R.string.read_days_title)
             addView(text(title, 13f, Ui.bold, Ui.GRAY), lp(0, WRAP, 1f))
-            addView(text("${start.format(dateFmt)} – ${end.format(dateFmt)}", 12f, Ui.medium, Ui.LIGHT_GRAY))
+            // 범위 글자 길이가 바뀌어도 이어 누를 수 있게 `‹ ›` 는 오른쪽 끝에 나란히 고정한다.
+            addView(range, lp(WRAP, WRAP).apply { marginEnd = dp(4) })
+            addView(prev, lp(WRAP, WRAP))
+            addView(next, lp(WRAP, WRAP))
         })
         addView(hline(1))
-        // 요일 줄과 4주치 날짜·링을 뷰 하나에 그린다(칸마다 뷰를 만들면 백 개가 넘어 느리다).
-        addView(RingCalendar(context, start, today, since, WEEKS, progress), lp(MATCH, WRAP))
+        addView(cal, lp(MATCH, WRAP))
         addView(View(context), lp(MATCH, dp(24)))
     }
 
@@ -273,12 +305,15 @@ class RingView(context: Context, strokeDp: Float) : View(context) {
  */
 private class RingCalendar(
     context: Context,
-    private val start: LocalDate,
+    start: LocalDate,
     private val today: LocalDate,
     private val since: LocalDate,
     private val weeks: Int,
     private val progress: (LocalDate) -> Float,
 ) : View(context) {
+    /** 첫 주의 첫날. 바꾸면(달력 넘기기) 다시 그린다. 늘 같은 요일(한 주 시작 요일)이다. */
+    var start: LocalDate = start
+        set(v) { field = v; invalidate() }
     /** [start] 의 요일부터 일주일 */
     private val weekdays = (0L..6L).map { start.dayOfWeek.plus(it).getDisplayName(TextStyle.NARROW, context.resources.configuration.locales[0]) }
     private val margin = context.dpf(Ui.MARGIN)

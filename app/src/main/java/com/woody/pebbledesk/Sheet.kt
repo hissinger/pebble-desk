@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
@@ -27,6 +28,15 @@ class Sheet(private val context: Context) {
     /** 글자 입력 줄(지금 값, 다 쓰면 부를 일). 있으면 머리 아래에 두고 `저장`을 맨 위 항목으로 둔다. */
     private var input: Pair<String, (String) -> Unit>? = null
     private var numeric = false
+    /** 아래 `닫기` 줄을 두는가. 확인 창은 `취소`를 항목으로 두고 닫기를 뺀다. */
+    private var closeRow = true
+
+    fun noClose() = apply { closeRow = false }
+
+    /** 머리 오른쪽 위에 둘 뱃지(올해 읽은 책의 `✓ 다 읽음`) */
+    private var badge: View? = null
+
+    fun badge(view: View) = apply { badge = view }
 
     fun header(title: String, subtitle: String? = null, app: AppEntry? = null, image: Bitmap? = null) = apply {
         this.title = title; this.subtitle = subtitle; this.app = app; this.image = image
@@ -58,6 +68,7 @@ class Sheet(private val context: Context) {
         names.addView(c.text(title, 29f, Ui.heavy))
         subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = 6), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
         head.addView(names, lp(0, WRAP, 1f))
+        badge?.let { head.addView(it, lp(WRAP, WRAP).apply { gravity = Gravity.TOP; marginStart = c.dp(12) }) }
         root.addView(head)
 
         input?.let { (initial, onDone) ->
@@ -96,7 +107,7 @@ class Sheet(private val context: Context) {
             }, lp(MATCH, c.dp(Ui.ROW_DP)))
         }
         root.addView(c.hline(1, Ui.DIVIDER))
-        root.addView(c.text(c.getString(R.string.close), 21f, Ui.bold).apply {
+        if (closeRow) root.addView(c.text(c.getString(R.string.close), 21f, Ui.bold).apply {
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
             setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
             setOnClickListener { dialog.dismiss() }
@@ -112,6 +123,14 @@ class Sheet(private val context: Context) {
         }
         dialog.show()
     }
+}
+
+/**
+ * 되돌리기 어려운 일 확인: 머리 [title]·[subtitle], 아래에 두 줄 `[action]`(굵게, 누르면 [onConfirm]) / `취소`.
+ * (`닫기`보다 할 일과 그만두기가 맞서 보여 고르기 쉽다)
+ */
+fun Context.confirm(title: String, subtitle: String?, action: String, onConfirm: () -> Unit) {
+    Sheet(this).header(title, subtitle).item(action, bold = true) { onConfirm() }.item(getString(R.string.cancel)) {}.noClose().show()
 }
 
 /** 고르기 메뉴: 지금 값은 굵게 + ✓ */

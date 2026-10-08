@@ -9,6 +9,7 @@
     <string name="fav_add">Add to Favorites</string>
     <string name="hide">Hide</string>
     <string name="app_info">App info</string>
+    <string name="cancel">Cancel</string>
     <string name="close">Close</string>
     <string name="hidden_apps">Hidden apps</string>
     <string name="hidden_empty">No hidden apps</string>
@@ -72,6 +73,19 @@
     <string name="reading_in">Reading in %1$s</string>
     <string name="no_network">Can\'t reach the internet. Check Wi-Fi.</string>
     <string name="also_reading">Also reading</string>
+    <string name="finish_book">Finished</string>
+    <string name="read_again">Read again</string>
+    <string name="forget_book">Remove from log</string>
+    <string name="year_books">Books this year</string>
+    <string name="year_books_of">Books in %1$d</string>
+    <string name="pick_year">Year</string>
+    <string name="year_books_link">Books this year ›</string>
+    <string name="year_books_empty">No books this year yet. Mark a book Finished from its menu, or turn on Reading time to collect the books you read.</string>
+    <string name="since_date">since %1$s</string>
+    <string name="date_year_fmt">MMM d, yyyy</string>
+    <string name="reading_now">Reading</string>
+    <string name="total_time">%1$s in total</string>
+    <string name="remove_confirm">Remove from your reading list?</string>
     <string name="remove_book">Remove book</string>
     <string name="books_more">%1$s + %2$d more</string>
     <string name="books_empty">No books yet</string>

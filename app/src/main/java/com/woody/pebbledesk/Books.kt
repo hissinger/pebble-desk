@@ -9,7 +9,8 @@ import android.os.Handler
 import android.os.Looper
 import android.text.Html
 import android.util.LruCache
-import org.json.JSONArray
+import com.woody.pebbledesk.Db.rows
+import com.woody.pebbledesk.Db.tx
 import org.json.JSONObject
 import java.io.File
 import java.time.LocalDate
@@ -140,6 +141,12 @@ data class ShelfBook(
     val seenTitle: String = "",
 )
 
+/**
+ * 읽고 있는 책 목록에서 나간 책: 다 읽은 책([finished] 다 읽은 날) 또는 뺀 책(null). 올해 읽은 책 목록에 보인다.
+ * 표지는 읽던 때 그대로 `books/<id>.jpg`. [hidden] 은 올해 읽은 책에서 지운 책(읽은 시간이 남아 있어도 다시 보이지 않게).
+ */
+data class PastBook(val book: ShelfBook, val finished: LocalDate?, val leftAt: Long, val hidden: Boolean = false)
+
 /** 홈·목록에 붙이는 진행률·반납일 `[47% 읽음, 반납 4일 남음]`. 모르는 값은 뺀다(홈은 한 줄씩, 목록은 이어서). */
 fun Context.bookStatus(book: ShelfBook, today: LocalDate = LocalDate.now()): List<String> {
     val parts = mutableListOf<String>()
@@ -169,7 +176,7 @@ fun sameTitle(a: String, b: String): Boolean {
 
 /**
  * 읽고 있는 책 목록(최대 [MAX]권). 앞 [HOME]권이 홈에 보이고(맨 앞 책은 크게), 맨 앞 책의 앱이 '읽고 있는 앱'이다.
- * 목록은 books/books.json, 표지는 books/<id>.jpg.
+ * 목록은 DB([Db]) `shelf`, 나간 책은 `past`, 표지는 books/<id>.jpg.
  */
 object BookShelf {
     const val MAX = 10
@@ -178,16 +185,104 @@ object BookShelf {
     private val covers = LruCache<String, Bitmap>(16)
 
     private fun dir(context: Context) = File(Storage.of(context).filesDir, "books").apply { mkdirs() }
-    private fun index(context: Context) = File(dir(context), "books.json")
     private fun coverFile(context: Context, id: String) = File(dir(context), "$id.jpg")
 
     /**
-     * 이 런처만 쓰는 파일이라 쓸 때 함께 바꾸는 메모리 사본(돌아올 때마다 파일을 읽지 않도록).
+     * 이 런처만 쓰는 데이터라 쓸 때 함께 바꾸는 메모리 사본(돌아올 때마다 DB를 읽지 않도록).
      * 화면(메인 스레드)과 접근성 서비스(표지 잘라 넣기는 다른 스레드)가 함께 고치므로 고치는 함수는 모두 @Synchronized.
      */
     @Volatile private var cached: List<ShelfBook>? = null
 
     fun list(context: Context): List<ShelfBook> = cached ?: load(context)
+
+    @Volatile private var cachedHistory: List<PastBook>? = null
+
+    /** 나간 책(다 읽은 책·뺀 책·지운 책), 나간 순서대로 */
+    fun history(context: Context): List<PastBook> = cachedHistory ?: loadHistory(context)
+
+    @Synchronized private fun loadHistory(context: Context): List<PastBook> {
+        cachedHistory?.let { return it }
+        return Db.get(context).rows(
+            "SELECT id, title, author, app, updated_at, progress, seen_title, finished, left_at, hidden FROM past ORDER BY pos"
+        ) { c ->
+            PastBook(
+                ShelfBook(c.getString(0), c.getString(1).orEmpty(), c.getString(2).orEmpty(), c.getString(3)?.ifEmpty { null },
+                    c.getLong(4), c.getInt(5), seenTitle = c.getString(6).orEmpty()),
+                if (c.isNull(7)) null else LocalDate.ofEpochDay(c.getLong(7)), c.getLong(8), c.getInt(9) != 0,
+            )
+        }.also { cachedHistory = it }
+    }
+
+    /** 나간 책 목록을 쓴다(지우지 않는다. 지운 책도 읽은 시간이 남아 있어 다시 보이지 않게 남긴다). 한 트랜잭션으로 통째로 바꾼다. */
+    private fun writeHistory(context: Context, past: List<PastBook>) {
+        Db.get(context).tx {
+            delete("past", null, null)
+            past.forEachIndexed { i, p ->
+                val b = p.book
+                insertOrThrow("past", null, Db.values(
+                    "pos" to i, "id" to b.id, "title" to b.title, "author" to b.author, "app" to b.app.orEmpty(),
+                    "updated_at" to b.updatedAt, "progress" to b.progress, "seen_title" to b.seenTitle,
+                    "finished" to p.finished?.toEpochDay(), "left_at" to p.leftAt, "hidden" to p.hidden,
+                ))
+            }
+        }
+        cachedHistory = past
+    }
+
+    /** 읽고 있는 책을 목록에서 내보낸다: [finished] 면 다 읽은 책(오늘 다 읽음), 아니면 뺀 책. 표지는 남긴다. */
+    @Synchronized private fun leave(context: Context, id: String, finished: Boolean) {
+        val books = list(context)
+        val book = books.find { it.id == id } ?: return
+        writeHistory(context, history(context) + PastBook(book, if (finished) LocalDate.now() else null, System.currentTimeMillis()))
+        write(context, books.filter { it.id != id })
+    }
+
+    /** 다 읽었다: 읽고 있는 책에서 빼고 다 읽은 책으로 남긴다. */
+    fun finish(context: Context, id: String) = leave(context, id, finished = true)
+
+    /** 나간 책(뺀 책) 또는 목록에 없던 책([title], 그 책을 읽은 [app])을 [on] 에 다 읽은 책으로 */
+    @Synchronized fun finishPast(context: Context, pastId: String?, title: String, app: String?, on: LocalDate = LocalDate.now()) {
+        val past = history(context)
+        writeHistory(context, if (past.any { it.book.id == pastId }) past.map { if (it.book.id == pastId) it.copy(finished = on) else it }
+            else past + PastBook(ShelfBook(newId(), title, "", app, System.currentTimeMillis(), seenTitle = title), on, System.currentTimeMillis()))
+    }
+
+    /**
+     * 다시 읽기: 나간 책([pastId]) 또는 목록에 없던 책([title])을 읽고 있는 책 맨 앞으로(표지·앱 그대로).
+     * 목록이 다 찼으면 넣지 않고 false.
+     */
+    @Synchronized fun restore(context: Context, pastId: String?, title: String, app: String?): Boolean {
+        if (isFull(context)) return false
+        val past = history(context)
+        val book = past.find { it.book.id == pastId }?.book
+            ?: ShelfBook(newId(), title, "", app, System.currentTimeMillis(), seenTitle = title)
+        write(context, listOf(book.copy(updatedAt = System.currentTimeMillis())) + list(context))
+        if (past.any { it.book.id == pastId }) writeHistory(context, past.filter { it.book.id != pastId })
+        return true
+    }
+
+    /** 올해 읽은 책에서 지운다(읽은 시간은 합계에 그대로). 목록에 없던 책은 그 제목을 지운 책으로 적어 둔다. 표지는 버린다. */
+    @Synchronized fun forget(context: Context, pastId: String?, title: String) {
+        val past = history(context)
+        val now = System.currentTimeMillis()
+        writeHistory(context, if (past.any { it.book.id == pastId }) past.map { if (it.book.id == pastId) it.copy(hidden = true, leftAt = now) else it }
+            else past + PastBook(ShelfBook(newId(), title, "", null, now, seenTitle = title), null, now, hidden = true))
+        pastId?.let { dropFiles(context, it) }
+    }
+
+    /** 나간 책 중 제목이 같은 책(지운 책 포함). 고친 제목이면 앱이 보여 준 제목으로도 찾는다. */
+    fun findPast(context: Context, title: String): PastBook? {
+        val norm = normTitle(title)
+        return history(context).lastOrNull { sameTitle(it.book.title, title) }
+            ?: history(context).lastOrNull { it.book.seenTitle.isNotEmpty() && normTitle(it.book.seenTitle) == norm }
+    }
+
+    /**
+     * 자동 추가로 넣어도 되는가: 목록에 자리가 있고, 다 읽은 책이 아니다
+     * (다 읽은 책을 확인하러 잠깐 열어도 다시 들어오지 않게. 다시 읽으려면 올해 읽은 책에서 `다시 읽기`).
+     */
+    fun canAutoAdd(context: Context, title: String): Boolean =
+        !isFull(context) && findPast(context, title)?.let { it.finished != null && !it.hidden } != true
 
     @Synchronized private fun load(context: Context): List<ShelfBook> {
         cached?.let { return it }
@@ -198,22 +293,11 @@ object BookShelf {
     private const val ID_PREFIX = "b-"
     private fun newId() = ID_PREFIX + UUID.randomUUID()
 
-    private fun readIndex(context: Context): List<ShelfBook> {
-        val f = index(context)
-        if (!f.exists()) return emptyList()
-        return runCatching {
-            val arr = JSONArray(f.readText())
-            (0 until arr.length()).map { arr.getJSONObject(it) }.map {
-                ShelfBook(it.getString("id"), it.optString("title"), it.optString("author"),
-                    it.optString("app").ifEmpty { null }, it.optLong("updated_at"),
-                    it.optInt("progress", -1), it.optLong("due", -1), it.optString("seen_title"))
-            }
-        }.getOrElse {
-            // 읽지 못하는 목록은 빈 목록으로 시작하되, 다음 저장이 덮어쓰기 전에 되살릴 수 있게 따로 둔다.
-            runCatching { f.copyTo(File(f.parentFile, "${f.name}.bad"), overwrite = true) }
-            emptyList()
+    private fun readIndex(context: Context): List<ShelfBook> =
+        Db.get(context).rows("SELECT id, title, author, app, updated_at, progress, due, seen_title FROM shelf ORDER BY pos") { c ->
+            ShelfBook(c.getString(0), c.getString(1).orEmpty(), c.getString(2).orEmpty(), c.getString(3)?.ifEmpty { null },
+                c.getLong(4), c.getInt(5), c.getLong(6), c.getString(7).orEmpty())
         }
-    }
 
     /** 흑백으로 줄인 표지. 표지 그림이 없거나 읽지 못하면 제목·저자·앱 이름으로 그린 빈 표지([BlankCover]). */
     fun cover(context: Context, book: ShelfBook, widthPx: Int): Bitmap {
@@ -361,19 +445,20 @@ object BookShelf {
     @Synchronized fun setApp(context: Context, id: String, app: String?) =
         write(context, list(context).map { if (it.id == id) it.copy(app = app) else it })
 
-    @Synchronized fun remove(context: Context, id: String) {
-        write(context, list(context).filter { it.id != id })
-        dropFiles(context, id)
-    }
+    /** 책 빼기: 읽고 있는 책에서 빼서 뺀 책으로 남긴다(올해 읽은 시간이 있으면 올해 읽은 책에 보인다). */
+    fun remove(context: Context, id: String) = leave(context, id, finished = false)
 
+    /** 읽고 있는 책 목록을 한 트랜잭션으로 통째로 바꾼다(순서 = pos). */
     private fun write(context: Context, books: List<ShelfBook>) {
-        val arr = JSONArray()
-        books.forEach {
-            arr.put(JSONObject().put("id", it.id).put("title", it.title).put("author", it.author)
-                .put("app", it.app ?: "").put("updated_at", it.updatedAt)
-                .put("progress", it.progress).put("due", it.due).put("seen_title", it.seenTitle))
+        Db.get(context).tx {
+            delete("shelf", null, null)
+            books.forEachIndexed { i, b ->
+                insertOrThrow("shelf", null, Db.values(
+                    "pos" to i, "id" to b.id, "title" to b.title, "author" to b.author, "app" to b.app.orEmpty(),
+                    "updated_at" to b.updatedAt, "progress" to b.progress, "due" to b.due, "seen_title" to b.seenTitle,
+                ))
+            }
         }
-        writeAtomically(index(context)) { it.writeText(arr.toString()) }
         cached = books
     }
 
@@ -382,7 +467,7 @@ object BookShelf {
         val oldDir = File(context.filesDir, "now_reading")
         val info = File(oldDir, "info.json")
         val cover = File(oldDir, "cover.jpg")
-        if (!info.exists() || index(context).exists()) return
+        if (!info.exists() || readIndex(context).isNotEmpty()) return
         val json = runCatching { JSONObject(info.readText()) }.getOrNull()
         if (json != null && cover.length() > 0) {
             val id = newId()
@@ -417,8 +502,8 @@ object BookShelf {
             moved.filter { m -> books.none { it.id == m.id } }.forEach { coverFile(context, it.id).delete() }
             return books
         }
-        // 목록에 없는 표지·줄인 표지(예전 id 의 것, 앞서 실패한 복사본)를 지운다.
-        val keep = moved.map { it.id }
+        // 목록에 없는 표지·줄인 표지(예전 id 의 것, 앞서 실패한 복사본)를 지운다. 나간 책의 표지는 남긴다.
+        val keep = moved.map { it.id } + history(context).map { it.book.id }
         dir(context).listFiles { f ->
             (f.name.endsWith(".jpg") || f.name.endsWith(".png")) && keep.none { f.name.startsWith("$it.") || f.name.startsWith("${it}_") }
         }?.forEach { it.delete() }

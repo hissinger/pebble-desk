@@ -126,7 +126,7 @@ class ReaderWatchService : AccessibilityService() {
                             val thumb = s.thumb?.takeIf(::usableThumb) ?: return@mapNotNull null
                             val book = BookShelf.findByTitle(this, s.title)
                             // 목록에 없는 책은 들어올 때 붙일 표지를 미리 찍어 둔다(목록이 다 찼으면 들어올 수 없어 찍지 않는다).
-                            val need = if (book == null) !BookShelf.isFull(this) && pendingFor(s.title) == null else !BookShelf.hasCover(this, book.id)
+                            val need = if (book == null) BookShelf.canAutoAdd(this, s.title) && pendingFor(s.title) == null else !BookShelf.hasCover(this, book.id)
                             if (need && tryCover(s.title)) s.title to thumb else null
                         }, retry = false)
                     }
@@ -413,7 +413,7 @@ class ReaderWatchService : AccessibilityService() {
         val book = BookShelf.findByTitle(this, seen.title)?.also {
             BookShelf.moveToFront(this, it.id)
             BookShelf.updateStatus(this, it.id, seen.progress, seen.due, seen.author)
-        } ?: if (BookShelf.isFull(this)) null else {
+        } ?: if (!BookShelf.canAutoAdd(this, seen.title)) null else {
             // 다 찼으면 앱 목록(시스템 호출)도 보지 않는다. 다 찬 동안 목록에 없는 책을 읽으면 화면 이벤트마다 여기 온다.
             val app = AppStore.load(this).firstOrNull { it.pkg == spec.pkg }?.key
             BookShelf.addOpened(this, seen.title, seen.author, app, seen.progress, seen.due)

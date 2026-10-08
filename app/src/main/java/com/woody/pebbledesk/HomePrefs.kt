@@ -62,6 +62,11 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("fav_grid", false)
         set(v) = sp.edit().putBoolean("fav_grid", v).apply()
 
+    /** 올해 읽은 책을 표지 격자(한 줄에 4권)로. false 면 목록 */
+    var yearGrid: Boolean
+        get() = sp.getBoolean("year_grid", false)
+        set(v) = sp.edit().putBoolean("year_grid", v).apply()
+
     /** 교보도서관·밀리의서재에서 편 책을 읽고 있는 책에 자동으로 넣기(접근성 서비스 필요) */
     var autoBooks: Boolean
         get() = sp.getBoolean("auto_books", false)

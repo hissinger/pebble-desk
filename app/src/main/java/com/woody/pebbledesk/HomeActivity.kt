@@ -429,7 +429,7 @@ class HomeActivity : EinkActivity() {
 
     private fun coverView(book: ShelfBook, widthPx: Int): View = coverImage(BookShelf.cover(this, book, widthPx))
 
-    /** 책을 길게 누르면: 읽고 있는 앱 바꾸기 / 제목 고치기 / 저자 입력·고치기 / 표지 다시 찾기 / 책 빼기. 머리에 작은 표지. */
+    /** 책을 길게 누르면: 읽고 있는 앱 바꾸기 / 제목 고치기 / 저자 입력·고치기 / 표지 다시 찾기 / 다 읽음 / 책 빼기. 머리에 작은 표지. */
     private fun showBookMenu(book: ShelfBook) {
         // 이북 앱이 저자를 보여 주지 않아(읽는 화면 메뉴로 들어온 책 등) 비어 있으면 `저자 입력`, 있으면 `저자 고치기`.
         val authorLabel = if (book.author.isBlank()) R.string.add_author else R.string.edit_author
@@ -447,7 +447,10 @@ class HomeActivity : EinkActivity() {
                 Sheet(this).header(getString(authorLabel)).input(book.author) { BookShelf.setAuthor(this, book.id, it); refresh() }.show()
             }
             .item(getString(R.string.find_cover)) { startActivity(BookSearchActivity.intent(this, replace = book)) }
-            .item(getString(R.string.remove_book)) { BookShelf.remove(this, book.id); refresh() }
+            .item(getString(R.string.finish_book)) { BookShelf.finish(this, book.id); refresh() }
+            .item(getString(R.string.remove_book)) {
+                confirm(getString(R.string.remove_confirm), book.title, getString(R.string.remove_book)) { BookShelf.remove(this, book.id); refresh() }
+            }
             .show()
     }
 

@@ -9,9 +9,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.File
+import com.woody.pebbledesk.Db.rows
+import com.woody.pebbledesk.Db.tx
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -23,10 +22,22 @@ data class ReadingSummary(val todayMs: Long, val streak: Int)
 typealias ReadingDays = Map<LocalDate, Map<String, Long>>
 
 private fun readingKey(pkg: String, title: String?) = if (title == null) pkg else "$pkg/$title"
+/** [readingKey] 의 패키지 */
+fun readingPkg(key: String) = key.substringBefore('/')
 /** [readingKey] 의 책 제목(모르면 null) */
 fun readingTitle(key: String) = key.substringAfter('/', "").ifEmpty { null }
 
 fun ReadingDays.total(day: LocalDate): Long = this[day]?.values?.sum() ?: 0
+
+/** 한 책([readingKey])을 한 해 동안 읽은 시간과 처음·마지막으로 읽은 날(1분 이상 읽은 날만, 없으면 null) */
+data class ReadSpan(val ms: Long = 0, val first: LocalDate? = null, val last: LocalDate? = null) {
+    /** [day] 에 [dayMs] 를 더 읽었다 */
+    fun plus(day: LocalDate, dayMs: Long): ReadSpan = if (dayMs < ReadingLog.MIN_DAY_MS) copy(ms = ms + dayMs)
+        else ReadSpan(ms + dayMs, first?.let { minOf(it, day) } ?: day, last?.let { maxOf(it, day) } ?: day)
+}
+
+/** 해마다 책([readingKey])별 [ReadSpan] */
+typealias ReadingYears = Map<Int, Map<String, ReadSpan>>
 
 /** 읽은 시간 표시: `1시간 5분` · `42분` · `86시간`(열 시간이 넘으면 시간만) */
 fun Context.duration(ms: Long): String {
@@ -42,7 +53,7 @@ fun Context.duration(ms: Long): String {
  * 오늘 읽은 시간·연속 독서일. 안드로이드 사용 기록(사용 기록 액세스 권한)에서 이북 앱의 '읽는 화면'이
  * 앞에 떠 있던 시간을 더한다. 어떤 책인지는 접근성 서비스가 그 앱에서 마지막으로 편 책([bookOpened])으로 나누고,
  * 그 앱에서 편 책을 한 번도 몰랐으면 앱으로만 센다(서비스를 끈 동안 읽은 시간도 마지막으로 편 책으로 들어간다).
- * 사용 기록은 며칠만 남으므로 끝난 날의 합계는 files/reading.json 에 남겨 둔다.
+ * 사용 기록은 며칠만 남으므로 끝난 날의 합계는 DB([Db]) `reading_day` 에 남겨 둔다(지우지 않는다. 지난해 읽은 책을 보려고).
  */
 object ReadingLog {
     /**
@@ -104,11 +115,24 @@ object ReadingLog {
         val c = counter?.takeIf { it.from == from && it.packages == packages && it.zone == zone }
             ?: Counter(from, packages, zone).also { counter = it }
         c.feed(context)
-        val days = saved.days + c.totals(opens(context))
+        val counted = c.totals(opens(context))
         // 기록이 시작된 날(그 전은 '안 읽음'이 아니라 '기록 없음')
         val since = saved.since ?: (saved.days.keys + from).min()
-        if (saved.through != today.minusDays(1) || saved.since == null) save(context, Saved(today.minusDays(1), since, days - today))
+        val days = saved.days + counted
+        // 새로 끝난 날(센 날 중 오늘 빼고)만 저장한다.
+        if (saved.through != today.minusDays(1) || saved.since == null) save(context, Saved(today.minusDays(1), since, days - today), counted - today)
         return days
+    }
+
+    /** 해마다 책별 읽은 시간과 처음·마지막으로 읽은 날. 권한이 없으면 null. */
+    fun years(context: Context, packages: Set<String>): ReadingYears? {
+        val days = days(context, packages) ?: return null
+        val out = mutableMapOf<Int, MutableMap<String, ReadSpan>>()
+        days.forEach { (day, keys) ->
+            val year = out.getOrPut(day.year) { mutableMapOf() }
+            keys.forEach { (key, ms) -> year[key] = (year[key] ?: ReadSpan()).plus(day, ms) }
+        }
+        return out
     }
 
     /** 접근성 서비스가 알아낸 '[at] 에 [pkg] 에서 [title] 을 폈다'. 읽는 화면 시간을 그때 편 책으로 센다. */
@@ -116,17 +140,14 @@ object ReadingLog {
 
     @Volatile private var opens: List<Open>? = null
 
-    private fun opensFile(context: Context) = File(Storage.of(context).filesDir, "opened.json")
-
     /**
-     * 파일이 없으면(이 기능 전) 접근성 서비스가 기억해 둔 앱마다 마지막에 편 책부터 시작한다.
+     * DB `book_open`(편 때 순). 비어 있으면(이 기능 전) 접근성 서비스가 기억해 둔 앱마다 마지막에 편 책부터 시작한다.
      * [bookOpened] 와 같은 잠금으로 읽는다(처음 읽는 동안 새로 편 책이 옛 목록에 덮이지 않게).
      */
     @Synchronized
-    private fun opens(context: Context): List<Open> = opens ?: runCatching {
-        val a = JSONArray(opensFile(context).readText())
-        (0 until a.length()).map { a.getJSONArray(it).let { o -> Open(o.getLong(0), o.getString(1), o.getString(2)) } }
-    }.getOrElse {
+    private fun opens(context: Context): List<Open> = opens ?: Db.get(context).rows("SELECT at, pkg, title FROM book_open ORDER BY at") {
+        Open(it.getLong(0), it.getString(1), it.getString(2))
+    }.ifEmpty {
         Storage.of(context).getSharedPreferences("reader_watch", Context.MODE_PRIVATE).all.mapNotNull { (k, v) ->
             if (k.startsWith("opened_") && v is String) Open(0, k.removePrefix("opened_"), v) else null
         }
@@ -146,7 +167,12 @@ object ReadingLog {
             mine.filter { it.at >= old || it === last }
         }.sortedBy { it.at }
         opens = kept
-        runCatching { opensFile(context).writeText(JSONArray(kept.map { JSONArray().put(it.at).put(it.pkg).put(it.title) }).toString()) }
+        runCatching {
+            Db.get(context).tx {
+                delete("book_open", null, null)
+                kept.forEach { insertOrThrow("book_open", null, Db.values("at" to it.at, "pkg" to it.pkg, "title" to it.title)) }
+            }
+        }
     }
 
     /** [pkg] 에서 [t] 까지 마지막으로 편 책(모르면 null) */
@@ -248,32 +274,40 @@ object ReadingLog {
 
     private class Saved(val through: LocalDate?, val since: LocalDate?, val days: ReadingDays)
 
-    private fun file(context: Context) = File(Storage.of(context).filesDir, "reading.json")
-
-    /** `{"through": "2026-10-03", "since": "2026-09-27", "days": {"2026-10-03": {"kr.co.millie.eink/책 제목": 1234, "kr.co.millie.eink": 56}}}` */
-    /** 이 런처만 쓰는 파일이라 쓸 때 함께 바꾸는 메모리 사본 */
+    /** 메모리 사본(돌아올 때마다 DB를 읽지 않도록). 쓸 때 함께 바꾼다. */
     @Volatile private var cached: Saved? = null
 
     private fun load(context: Context): Saved = cached ?: read(context).also { cached = it }
 
-    private fun read(context: Context): Saved = runCatching {
-        val json = JSONObject(file(context).readText())
-        val days = json.getJSONObject("days")
-        Saved(LocalDate.parse(json.getString("through")), json.optString("since").takeIf { it.isNotEmpty() }?.let(LocalDate::parse), days.keys().asSequence().associate { key ->
-            // 처음 만든 형식(앱 구분 없는 하루 합계)이면 getJSONObject 가 실패해 버리고, 사용 기록에서 다시 센다.
-            val o = days.getJSONObject(key)
-            LocalDate.parse(key) to o.keys().asSequence().associateWith { o.getLong(it) }
-        })
-    }.getOrElse { Saved(null, null, emptyMap()) }
-
-    private fun save(context: Context, saved: Saved) {
-        cached = saved
-        val days = JSONObject()
-        // '올해' 합계와 연속일에 충분한 1년여치만 남긴다.
-        val oldest = LocalDate.now().minusDays(400)
-        saved.days.filterKeys { it >= oldest }.forEach { (d, apps) ->
-            days.put(d.toString(), JSONObject().apply { apps.forEach { (pkg, ms) -> put(pkg, ms) } })
+    /** DB `reading_day`(날·책·ms)와 `reading_meta`(through·since) */
+    private fun read(context: Context): Saved {
+        val db = Db.get(context)
+        val days = mutableMapOf<LocalDate, MutableMap<String, Long>>()
+        db.rows("SELECT day, key, ms FROM reading_day") { c ->
+            days.getOrPut(LocalDate.ofEpochDay(c.getLong(0))) { mutableMapOf() }[c.getString(1)] = c.getLong(2)
         }
-        runCatching { file(context).writeText(JSONObject().put("through", saved.through.toString()).put("since", saved.since.toString()).put("days", days).toString()) }
+        val meta = db.rows("SELECT name, value FROM reading_meta") { it.getString(0) to it.getString(1) }.toMap()
+        fun date(name: String) = meta[name]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        return Saved(date("through"), date("since"), days)
+    }
+
+    /**
+     * [saved] 를 메모리 사본으로 두고, [changed] 날들(그날의 책별 시간을 통째로)과 through·since 를 한 트랜잭션으로 저장한다.
+     * 날마다 기록은 지우지 않는다.
+     */
+    private fun save(context: Context, saved: Saved, changed: ReadingDays) {
+        cached = saved
+        runCatching {
+            Db.get(context).tx {
+                changed.forEach { (day, keys) ->
+                    val d = day.toEpochDay()
+                    delete("reading_day", "day = ?", arrayOf(d.toString()))
+                    keys.forEach { (key, ms) -> insertOrThrow("reading_day", null, Db.values("day" to d, "key" to key, "ms" to ms)) }
+                }
+                for ((name, value) in listOf("through" to saved.through, "since" to saved.since)) {
+                    replaceOrThrow("reading_meta", null, Db.values("name" to name, "value" to value?.toString()))
+                }
+            }
+        }
     }
 }

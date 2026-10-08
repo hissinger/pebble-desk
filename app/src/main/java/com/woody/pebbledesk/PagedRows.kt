@@ -10,12 +10,14 @@ import android.widget.LinearLayout
  * 전자잉크라 넘길 때 애니메이션을 쓰지 않는다.
  * [fixedRows] 가 0보다 크면 높이에 맞추지 않고 늘 그 줄 수(격자면 그 높이 안에 gridRows 줄)를 쓴다. 높이는 WRAP 으로 둔다.
  * [insetDividers] 가 false 면 줄 사이 선을 좌우 여백 없이 끝까지 긋는다(이미 여백 안에 놓인 좁은 칸).
+ * [dividers] 가 false 면 줄 사이 선을 긋지 않는다(표지 격자처럼 줄마다 칸이 나뉘어 보이는 목록). 높이 계산은 같다.
  */
 class PagedRows(
     context: Context,
     private val listRowPx: Int,
     private val fixedRows: Int = 0,
     private val insetDividers: Boolean = true,
+    private val dividers: Boolean = true,
 ) : LinearLayout(context) {
     private var rows: List<() -> View> = emptyList()
     private val dividerPx = context.dp(1)
@@ -155,7 +157,10 @@ class PagedRows(
         val from = page * perPage
         val to = minOf(rows.size, from + perPage)
         for (i in from until to) {
-            if (i > from && gridRows == 0) addView(context.hline(1, Ui.DIVIDER, insetDividers))
+            if (i > from && gridRows == 0) {
+                // 선을 긋지 않아도 같은 높이를 비워 둔다(들어가는 줄 수 계산이 같도록).
+                if (dividers) addView(context.hline(1, Ui.DIVIDER, insetDividers)) else addView(View(context), lp(MATCH, dividerPx))
+            }
             addView(rows[i](), lp(MATCH, rowHeightPx))
         }
         // 덜 찬 페이지도 같은 높이를 쓴다(아래를 비워 제목·선 위치가 움직이지 않게).
