@@ -29,16 +29,6 @@ fun readingTitle(key: String) = key.substringAfter('/', "").ifEmpty { null }
 
 fun ReadingDays.total(day: LocalDate): Long = this[day]?.values?.sum() ?: 0
 
-/** 한 책([readingKey])을 한 해 동안 읽은 시간과 처음·마지막으로 읽은 날(1분 이상 읽은 날만, 없으면 null) */
-data class ReadSpan(val ms: Long = 0, val first: LocalDate? = null, val last: LocalDate? = null) {
-    /** [day] 에 [dayMs] 를 더 읽었다 */
-    fun plus(day: LocalDate, dayMs: Long): ReadSpan = if (dayMs < ReadingLog.MIN_DAY_MS) copy(ms = ms + dayMs)
-        else ReadSpan(ms + dayMs, first?.let { minOf(it, day) } ?: day, last?.let { maxOf(it, day) } ?: day)
-}
-
-/** 해마다 책([readingKey])별 [ReadSpan] */
-typealias ReadingYears = Map<Int, Map<String, ReadSpan>>
-
 /** 읽은 시간 표시: `1시간 5분` · `42분` · `86시간`(열 시간이 넘으면 시간만) */
 fun Context.duration(ms: Long): String {
     val min = ms / 60_000
@@ -122,17 +112,6 @@ object ReadingLog {
         // 새로 끝난 날(센 날 중 오늘 빼고)만 저장한다.
         if (saved.through != today.minusDays(1) || saved.since == null) save(context, Saved(today.minusDays(1), since, days - today), counted - today)
         return days
-    }
-
-    /** 해마다 책별 읽은 시간과 처음·마지막으로 읽은 날. 권한이 없으면 null. */
-    fun years(context: Context, packages: Set<String>): ReadingYears? {
-        val days = days(context, packages) ?: return null
-        val out = mutableMapOf<Int, MutableMap<String, ReadSpan>>()
-        days.forEach { (day, keys) ->
-            val year = out.getOrPut(day.year) { mutableMapOf() }
-            keys.forEach { (key, ms) -> year[key] = (year[key] ?: ReadSpan()).plus(day, ms) }
-        }
-        return out
     }
 
     /** 접근성 서비스가 알아낸 '[at] 에 [pkg] 에서 [title] 을 폈다'. 읽는 화면 시간을 그때 편 책으로 센다. */

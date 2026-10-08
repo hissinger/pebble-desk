@@ -2,11 +2,14 @@ package com.woody.pebbledesk
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -162,6 +165,41 @@ class PictureView(context: Context, private val crop: Boolean = false) : View(co
         val l = paddingLeft + (w - fw) / 2
         val t = paddingTop + (h - fh) / 2
         dst.set(l, t, l + fw, t + fh)
+    }
+}
+
+/**
+ * 오른쪽에 완독 도장(`drawable-nodpi/stamp_completed.png`, 회색 [Ui.LIGHT_GRAY] 로 칠한다)을 찍은 가로 줄. 도장은 글자보다
+ * 먼저(아래에) 그리고 줄 밖으로 나간 부분은 잘린다(종이 끝에 걸쳐 찍은 것처럼. 부모가 clipChildren=false 면 넘쳐 그린다). 지름 [sizeDp], 가운데는 오른쪽 끝에서 [endDp] 안쪽,
+ * 위에서 [topDp] 아래(null 이면 줄 가운데). 글자가 도장에 덮이지 않게 부르는 쪽이 글자 칸 오른쪽을 비운다.
+ */
+class StampedRow(context: Context, private val sizeDp: Int, private val endDp: Int, private val topDp: Int? = null) : LinearLayout(context) {
+    private val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG).apply {
+        colorFilter = PorterDuffColorFilter(Ui.LIGHT_GRAY, PorterDuff.Mode.SRC_IN)
+    }
+    private val dst = RectF()
+
+    init {
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        val r = context.dp(sizeDp) / 2f
+        val cx = width - context.dp(endDp).toFloat()
+        val cy = topDp?.let { context.dp(it).toFloat() } ?: (height / 2f)
+        dst.set(cx - r, cy - r, cx + r, cy + r)
+        canvas.drawBitmap(stamp(context), null, dst, paint)
+        super.dispatchDraw(canvas)
+    }
+
+    companion object {
+        @Volatile private var bitmap: Bitmap? = null
+
+        /** 도장 그림(420px, 한 번 읽어 둔다) */
+        private fun stamp(context: Context): Bitmap = bitmap ?: BitmapFactory.decodeResource(
+            context.resources, R.drawable.stamp_completed, BitmapFactory.Options().apply { inScaled = false },
+        ).also { bitmap = it }
     }
 }
 

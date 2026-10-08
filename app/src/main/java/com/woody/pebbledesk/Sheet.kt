@@ -20,10 +20,10 @@ class Sheet(private val context: Context) {
     private class Item(val label: String, val bold: Boolean, val action: () -> Unit)
 
     private var app: AppEntry? = null
-    /** 앱 아이콘 대신 보여 줄 그림(책 표지). 세로로 긴 비율로 그린다. */
+    /** 앱 아이콘 대신 보여 줄 그림(책 표지). 폭 [SHEET_COVER_DP], 2:3 으로 그린다. */
     private var image: Bitmap? = null
     private var title: String = ""
-    private var subtitle: String? = null
+    private var subtitle: CharSequence? = null
     private val items = mutableListOf<Item>()
     /** 글자 입력 줄(지금 값, 다 쓰면 부를 일). 있으면 머리 아래에 두고 `저장`을 맨 위 항목으로 둔다. */
     private var input: Pair<String, (String) -> Unit>? = null
@@ -33,12 +33,17 @@ class Sheet(private val context: Context) {
 
     fun noClose() = apply { closeRow = false }
 
-    /** 머리 오른쪽 위에 둘 뱃지(올해 읽은 책의 `✓ 다 읽음`) */
-    private var badge: View? = null
+    /** 머리와 항목 사이에 두는 칸(책 상세의 회차별 기록). 머리 아래 옅은 선 다음에 화면 폭으로(좌우 여백 안). */
+    private var note: View? = null
 
-    fun badge(view: View) = apply { badge = view }
+    fun note(view: View) = apply { note = view }
 
-    fun header(title: String, subtitle: String? = null, app: AppEntry? = null, image: Bitmap? = null) = apply {
+    /** 머리 오른쪽 위에 완독 도장(위 끝은 메뉴 위 선에서 잘리고 아래는 기록 칸에 조금 걸친다) */
+    private var stamped = false
+
+    fun stamp() = apply { stamped = true }
+
+    fun header(title: String, subtitle: CharSequence? = null, app: AppEntry? = null, image: Bitmap? = null) = apply {
         this.title = title; this.subtitle = subtitle; this.app = app; this.image = image
     }
 
@@ -55,21 +60,36 @@ class Sheet(private val context: Context) {
         val root = c.vbox()
         Crema.reserveHiddenBottom(root)
         root.addView(c.hline(2, inset = false))
+        // 도장은 머리 아래로 조금 넘쳐 기록 칸 위에 걸친다(뒤에 그리는 선·글자가 위에 온다).
+        if (stamped) root.clipChildren = false
 
-        val head = c.hbox().apply { setPadding(c.dp(Ui.MARGIN), c.dp(22), c.dp(Ui.MARGIN), c.dp(20)) }
+        val head = (if (stamped) StampedRow(c, STAMP_DP, STAMP_END_DP, STAMP_TOP_DP) else c.hbox())
+            .apply { setPadding(c.dp(Ui.MARGIN), c.dp(22), c.dp(Ui.MARGIN), c.dp(20)) }
         app?.let {
             head.addView(c.picture(AppIcons.gray(c, it, c.dp(45))),
                 lp(c.dp(45), c.dp(45)).apply { marginEnd = c.dp(16) })
         }
         image?.let {
-            head.addView(c.coverImage(it), lp(c.dp(38), c.dp(56)).apply { marginEnd = c.dp(16) })
+            // 표지는 제목 윗변에 맞춘다(글자 줄이 많아도 표지가 내려가지 않게).
+            head.addView(c.coverImage(it), lp(c.dp(SHEET_COVER_DP), c.dp(SHEET_COVER_DP) * 3 / 2).apply {
+                marginEnd = c.dp(16); gravity = Gravity.TOP; topMargin = c.dp(6)
+            })
         }
         val names = c.vbox()
         names.addView(c.text(title, 29f, Ui.heavy))
-        subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = 6), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
-        head.addView(names, lp(0, WRAP, 1f))
-        badge?.let { head.addView(it, lp(WRAP, WRAP).apply { gravity = Gravity.TOP; marginStart = c.dp(12) }) }
+        subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = 12), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
+        head.addView(names, lp(0, WRAP, 1f).apply {
+            if (image != null) gravity = Gravity.TOP
+            // 제목이 도장에 덮이지 않게 도장 왼쪽 끝까지 비운다.
+            if (stamped) marginEnd = c.dp(STAMP_END_DP + STAMP_DP / 2 - Ui.MARGIN)
+        })
         root.addView(head)
+        note?.let {
+            root.addView(c.hline(1, Ui.DIVIDER))
+            root.addView(it, lp(MATCH, WRAP).apply {
+                marginStart = c.dp(Ui.MARGIN); marginEnd = c.dp(Ui.MARGIN); topMargin = c.dp(10); bottomMargin = c.dp(14)
+            })
+        }
 
         input?.let { (initial, onDone) ->
             val field = EditText(c).apply {
@@ -124,6 +144,14 @@ class Sheet(private val context: Context) {
         dialog.show()
     }
 }
+
+/** 머리의 표지 폭(책 상세. 띠 글자가 읽히게 크게) */
+const val SHEET_COVER_DP = 76
+
+/** 머리의 완독 도장: 지름, 가운데가 오른쪽 끝에서 안쪽으로, 위에서 아래로(지름의 절반보다 작아 위가 잘리고, 아래는 머리 밖으로 조금 넘친다) */
+private const val STAMP_DP = 220
+private const val STAMP_END_DP = 110
+private const val STAMP_TOP_DP = 64
 
 /**
  * 되돌리기 어려운 일 확인: 머리 [title]·[subtitle], 아래에 두 줄 `[action]`(굵게, 누르면 [onConfirm]) / `취소`.

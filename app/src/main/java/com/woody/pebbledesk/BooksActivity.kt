@@ -12,7 +12,7 @@ import android.widget.TextView
 /**
  * 읽고 있는 책 목록(설정 > 읽고 있는 책). 줄마다 표지·제목·읽고 있는 앱, 오른쪽에 `↑ ↓`(순서)와 `빼기`.
  * 위 [BookShelf.HOME]권이 홈에 보인다(맨 위 책은 크게). 줄을 누르면 그 책의 앱을 바꾸고, 하단 `책 추가 ›` 로 책을 찾는다.
- * 한 화면에 다 들어가지 않으면 페이지로 넘긴다(하단 오른쪽 `1 / 2 ›`).
+ * 한 화면에 다 들어가지 않으면 페이지로 넘긴다(하단 오른쪽 `‹ 1 / 2 ›`).
  */
 class BooksActivity : EinkActivity() {
     private lateinit var titleCount: TextView
@@ -51,12 +51,12 @@ class BooksActivity : EinkActivity() {
         pageText = text("", 21f).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(24), 0, dp(Ui.MARGIN), 0)
-            setOnClickListener { rows.next() }
+            pagesClick(rows)
         }
         footer.addView(pageText, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.END))
         root.addView(footer, lp(MATCH, dp(Ui.FOOTER_DP)))
         rows.onPageChanged = {
-            pageText.text = if (rows.pageCount <= 1) "" else "${rows.page + 1} / ${rows.pageCount}   ›"
+            pageText.text = pageLabel(rows)
         }
         setContentView(root)
     }

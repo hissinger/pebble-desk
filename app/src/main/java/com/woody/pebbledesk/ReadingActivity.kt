@@ -250,13 +250,10 @@ class ReadingActivity : EinkActivity() {
                 setPadding(0, dp(8), 0, 0)
             }
         }
-        // 자주 쓰는 앱처럼 [BOOKS]줄씩, 넘치면 제목 오른쪽 `1 / 2 ›`(누르거나 밀면 다음 쪽). 덜 찬 쪽도 높이는 같다.
+        // 자주 쓰는 앱처럼 [BOOKS]줄씩, 넘치면 제목 오른쪽 `‹ 1 / 2 ›`(누르거나 밀면 다음 쪽). 덜 찬 쪽도 높이는 같다.
         val rows = PagedRows(this, dp(BOOK_ROW), fixedRows = BOOKS, insetDividers = false)
-        rows.onPageChanged = {
-            val n = rows.pageCount
-            page.text = if (n <= 1) "" else "${rows.page + 1} / $n   ›"
-        }
-        page.setOnClickListener { rows.next() }
+        rows.onPageChanged = { page.text = pageLabel(rows) }
+        page.pagesClick(rows)
         rows.setRows(books.map { (label, ms) -> {
             hbox().apply {
                 addView(text(label, 16f), lp(0, WRAP, 1f))

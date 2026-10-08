@@ -155,10 +155,9 @@ class HomeActivity : EinkActivity() {
         }
 
         // 자주 쓰는 앱: 책 수와 상관없이 늘 목록 세 줄(격자는 그 높이 안에 두 줄) 높이
-        // 페이지 표시는 제목과 같은 글자·여백으로 오른쪽 끝에. 누르면 다음 쪽(마지막 쪽에서는 처음으로).
+        // 페이지 표시 `‹ 1 / 2 ›` 는 제목과 같은 글자·여백으로 오른쪽 끝에. 왼쪽 절반은 앞 쪽, 오른쪽 절반은 다음 쪽(목록을 만든 뒤 연결).
         favPage = text("", 13f, Ui.bold, Ui.GRAY).apply {
             setPadding(dp(24), dp(18), dp(Ui.MARGIN), dp(8))
-            setOnClickListener { favRows.next() }
         }
         favHeader = hbox().apply {
             layoutParams = lp(MATCH, WRAP)
@@ -168,6 +167,7 @@ class HomeActivity : EinkActivity() {
         }
         favLine = hline(1)
         favRows = PagedRows(this, dp(Ui.ROW_DP), fixedRows = FAV_ROWS).apply { header = listOf(favHeader, favLine) }
+        favPage.pagesClick(favRows)
         root.addView(favRows, lp(MATCH, WRAP))
 
         root.addView(hline(1, inset = false))
@@ -192,8 +192,7 @@ class HomeActivity : EinkActivity() {
         root.addView(footer, lp(MATCH, dp(Ui.FOOTER_DP)))
 
         favRows.onPageChanged = {
-            val n = favRows.pageCount
-            favPage.text = if (n <= 1) "" else "${favRows.page + 1} / $n   ›"
+            favPage.text = pageLabel(favRows)
         }
         setContentView(root)
         window.setBackgroundDrawable(null)
@@ -429,30 +428,8 @@ class HomeActivity : EinkActivity() {
 
     private fun coverView(book: ShelfBook, widthPx: Int): View = coverImage(BookShelf.cover(this, book, widthPx))
 
-    /** 책을 길게 누르면: 읽고 있는 앱 바꾸기 / 제목 고치기 / 저자 입력·고치기 / 표지 다시 찾기 / 다 읽음 / 책 빼기. 머리에 작은 표지. */
-    private fun showBookMenu(book: ShelfBook) {
-        // 이북 앱이 저자를 보여 주지 않아(읽는 화면 메뉴로 들어온 책 등) 비어 있으면 `저자 입력`, 있으면 `저자 고치기`.
-        val authorLabel = if (book.author.isBlank()) R.string.add_author else R.string.edit_author
-        Sheet(this).header(
-            book.title, book.app?.let(::findApp)?.let { getString(R.string.reading_in, it.label) },
-            image = BookShelf.cover(this, book, dp(SMALL_COVER_DP)),
-        )
-            .item(getString(R.string.change_reader)) {
-                startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, book.id))
-            }
-            .item(getString(R.string.edit_title)) {
-                Sheet(this).header(getString(R.string.edit_title)).input(book.title) { BookShelf.setTitle(this, book.id, it); refresh() }.show()
-            }
-            .item(getString(authorLabel)) {
-                Sheet(this).header(getString(authorLabel)).input(book.author) { BookShelf.setAuthor(this, book.id, it); refresh() }.show()
-            }
-            .item(getString(R.string.find_cover)) { startActivity(BookSearchActivity.intent(this, replace = book)) }
-            .item(getString(R.string.finish_book)) { BookShelf.finish(this, book.id); refresh() }
-            .item(getString(R.string.remove_book)) {
-                confirm(getString(R.string.remove_confirm), book.title, getString(R.string.remove_book)) { BookShelf.remove(this, book.id); refresh() }
-            }
-            .show()
-    }
+    /** 책을 길게 누르면 올해 읽은 책과 같은 책 상세([showBookDetail]). 기록은 지금 읽는 것과 완독 횟수만. */
+    private fun showBookMenu(book: ShelfBook) = showBookDetail(BookRecord.of(this, book), full = false) { refresh() }
 
     companion object {
         /** 자주 쓰는 앱 고정 줄 수 */

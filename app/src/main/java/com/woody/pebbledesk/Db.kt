@@ -15,7 +15,8 @@ import java.time.LocalDate
  * - `reading_day`·`reading_meta`: 날마다 책별 읽은 시간과 어디까지 셌는지([ReadingLog])
  * - `book_open`: 이북 앱에서 책을 편 때([ReadingLog.bookOpened])
  * - `shelf`·`past`: 읽고 있는 책과 나간 책([BookShelf]). 표지 그림은 파일(`books/<id>.jpg`), 설정은 SharedPreferences.
- * 처음 열 때 예전 JSON 파일을 옮기고 `<이름>.migrated` 로 바꿔 둔다([importFiles]).
+ * - `finish`: 책(id)마다 완독한 날(여러 번 완독하면 여러 줄). 다시 읽어도 지우지 않는다.
+ * 처음 열 때 1.2.1 까지의 JSON 파일을 옮기고 `<이름>.migrated` 로 바꿔 둔다([importFiles]).
  */
 object Db {
     private const val NAME = "pebble.db"
@@ -47,8 +48,9 @@ object Db {
             )
             db.execSQL(
                 "CREATE TABLE past (pos INTEGER NOT NULL, id TEXT PRIMARY KEY, title TEXT, author TEXT, app TEXT, " +
-                    "updated_at INTEGER, progress INTEGER, seen_title TEXT, finished INTEGER, left_at INTEGER, hidden INTEGER)"
+                    "updated_at INTEGER, progress INTEGER, seen_title TEXT, left_at INTEGER, hidden INTEGER)"
             )
+            db.execSQL("CREATE TABLE finish (book_id TEXT NOT NULL, day INTEGER NOT NULL, PRIMARY KEY (book_id, day))")
         }
 
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
@@ -80,7 +82,7 @@ object Db {
     }
 
     /**
-     * 예전 버전이 쓰던 JSON 파일을 DB로 옮긴다. 파일마다 한 트랜잭션으로 넣고 `.migrated` 로 이름을 바꾼다(다시 옮기지 않게, 되살릴 수 있게).
+     * 1.2.1 까지 쓰던 JSON 파일(`reading.json`, `books/books.json`)을 DB로 옮긴다. 책 id·표지 이름은 [BookShelf] 가 읽을 때 새 방식으로 바꾼다. 파일마다 한 트랜잭션으로 넣고 `.migrated` 로 이름을 바꾼다(다시 옮기지 않게, 되살릴 수 있게).
      * 읽지 못하는 파일은 `.bad` 로 따로 두고 넘어간다. DB에 이미 있는 것은 덮어쓰지 않는다.
      */
     private fun importFiles(device: Context, db: SQLiteDatabase) {
@@ -90,7 +92,7 @@ object Db {
             runCatching { db.tx { import(file.readText()) } }.onFailure { keepBadCopy(file) }
             file.renameTo(File(file.parentFile, "${file.name}.migrated"))
         }
-        // {"through": "2026-10-03", "since": "2026-09-27", "days": {"2026-10-03": {"pkg/제목": ms}}}
+        // {"through": "2026-10-07", "since": "2026-09-28", "days": {"2026-10-07": {"kr.co.kyobo.elib": ms}}} (앱별 하루 합계)
         move(File(files, "reading.json")) { text ->
             val json = JSONObject(text)
             val days = json.getJSONObject("days")
@@ -107,14 +109,6 @@ object Db {
                 }
             }
         }
-        // [[at, pkg, title], ...]
-        move(File(files, "opened.json")) { text ->
-            val a = JSONArray(text)
-            for (i in 0 until a.length()) {
-                val o = a.getJSONArray(i)
-                db.insert("book_open", null, values("at" to o.getLong(0), "pkg" to o.getString(1), "title" to o.getString(2)))
-            }
-        }
         val books = File(files, "books")
         move(File(books, "books.json")) { text ->
             if (count(db, "shelf") > 0) return@move
@@ -124,20 +118,7 @@ object Db {
                 db.insert("shelf", null, values(
                     "pos" to i, "id" to o.getString("id"), "title" to o.optString("title"), "author" to o.optString("author"),
                     "app" to o.optString("app"), "updated_at" to o.optLong("updated_at"), "progress" to o.optInt("progress", -1),
-                    "due" to o.optLong("due", -1), "seen_title" to o.optString("seen_title"),
-                ))
-            }
-        }
-        move(File(books, "history.json")) { text ->
-            if (count(db, "past") > 0) return@move
-            val a = JSONArray(text)
-            for (i in 0 until a.length()) {
-                val o = a.getJSONObject(i)
-                db.insert("past", null, values(
-                    "pos" to i, "id" to o.getString("id"), "title" to o.optString("title"), "author" to o.optString("author"),
-                    "app" to o.optString("app"), "updated_at" to o.optLong("updated_at"), "progress" to o.optInt("progress", -1),
-                    "seen_title" to o.optString("seen_title"), "finished" to o.optLong("finished", -1).takeIf { it >= 0 },
-                    "left_at" to o.optLong("left_at"), "hidden" to o.optBoolean("hidden"),
+                    "due" to o.optLong("due", -1),
                 ))
             }
         }

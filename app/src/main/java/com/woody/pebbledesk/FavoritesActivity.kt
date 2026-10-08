@@ -49,12 +49,12 @@ class FavoritesActivity : EinkActivity() {
         pageText = text("", 21f).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(24), 0, dp(Ui.MARGIN), 0)
-            setOnClickListener { rows.next() }
+            pagesClick(rows)
         }
         footer.addView(pageText, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.END))
         root.addView(footer, lp(MATCH, dp(Ui.FOOTER_DP)))
         rows.onPageChanged = {
-            pageText.text = if (rows.pageCount <= 1) "" else "${rows.page + 1} / ${rows.pageCount}   ›"
+            pageText.text = pageLabel(rows)
         }
         setContentView(root)
     }

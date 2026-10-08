@@ -70,7 +70,6 @@
     <string name="pick_reader_desc">Pick the app you read this book in. Tapping the cover on Home opens it.</string>
     <string name="pick_reader_link">Choose reading app  ›</string>
     <string name="change_reader">Change reading app</string>
-    <string name="reading_in">Reading in %1$s</string>
     <string name="no_network">Can\'t reach the internet. Check Wi-Fi.</string>
     <string name="also_reading">Also reading</string>
     <string name="finish_book">Finished</string>
@@ -81,10 +80,15 @@
     <string name="pick_year">Year</string>
     <string name="year_books_link">Books this year ›</string>
     <string name="year_books_empty">No books this year yet. Mark a book Finished from its menu, or turn on Reading time to collect the books you read.</string>
-    <string name="since_date">since %1$s</string>
     <string name="date_year_fmt">MMM d, yyyy</string>
-    <string name="reading_now">Reading</string>
-    <string name="total_time">%1$s in total</string>
+    <string name="finish_nth">#%1$d</string>
+    <string name="edit_book">Edit book info ›</string>
+    <string name="forget_confirm">Remove from your books read?</string>
+    <string name="since_date">Since %1$s</string>
+    <string name="filter_all">All</string>
+    <string name="year_finished_empty">No books finished this year.</string>
+    <string name="finish_confirm">Mark this book as finished?</string>
+    <string name="finish_summary">Finished %1$d× · last %2$s</string>
     <string name="remove_confirm">Remove from your reading list?</string>
     <string name="remove_book">Remove book</string>
     <string name="books_more">%1$s + %2$d more</string>

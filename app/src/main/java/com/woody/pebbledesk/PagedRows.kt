@@ -1,9 +1,15 @@
 package com.woody.pebbledesk
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.text.SpannableString
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.LinearLayout
+import android.widget.TextView
 
 /**
  * 스크롤 없이 페이지 단위로 넘기는 목록. 주어진 높이에 들어가는 만큼만 줄을 그리고, 줄 사이에 가는 회색 선을 둔다.
@@ -73,8 +79,9 @@ class PagedRows(
         render()
     }
 
-    fun next() = showPage(if (page + 1 >= pageCount) 0 else page + 1)
-    fun prev() = showPage(if (page == 0) pageCount - 1 else page - 1)
+    /** 다음·앞 쪽(끝에서 멈춘다. 쪽 표시의 `‹ ›` 와 맞게 처음·끝을 돌지 않는다) */
+    fun next() = showPage(page + 1)
+    fun prev() = showPage(page - 1)
 
     /** [index] 번째 줄이 있는 페이지 */
     fun pageOf(index: Int) = if (perPage <= 0) 0 else index / perPage
@@ -169,5 +176,42 @@ class PagedRows(
         val gap = if (gridRows > 0) 0 else dividerPx
         if (missing > 0) addView(View(context), lp(MATCH, missing * (rowHeightPx + gap)))
         onPageChanged?.invoke()
+    }
+}
+
+/**
+ * 쪽 표시 `‹   2 / 3   ›`: 갈 수 있는 쪽 화살표는 글자색 그대로, 갈 수 없는 쪽(첫 쪽의 `‹`, 끝 쪽의 `›`)은 흐리게
+ * (독서 기록 달력의 `‹ ›` 처럼). 숫자 자리는 쪽마다 그대로다. 한 쪽뿐이면 빈 글자.
+ */
+fun pageLabel(rows: PagedRows): CharSequence {
+    if (rows.pageCount <= 1) return ""
+    fun arrow(s: String, on: Boolean) = SpannableString(s).apply {
+        if (!on) setSpan(ForegroundColorSpan(Ui.DIVIDER), 0, s.length, 0)
+    }
+    return SpannableStringBuilder()
+        .append(arrow("‹   ", rows.page > 0))
+        .append("${rows.page + 1} / ${rows.pageCount}")
+        .append(arrow("   ›", rows.page < rows.pageCount - 1))
+}
+
+/**
+ * 쪽 표시를 누르면: 왼쪽 절반(`‹`)은 앞 쪽, 오른쪽 절반(`›`)은 다음 쪽. 그쪽으로 갈 수 없으면 반대쪽으로
+ * (마지막 쪽에서 아무 데나 누르면 앞 쪽). 손가락 위치 없이 눌리면(다른 곳을 눌러 대신 누를 때) 다음 쪽, 끝이면 앞 쪽.
+ */
+@SuppressLint("ClickableViewAccessibility")
+fun TextView.pagesClick(rows: PagedRows) = pagesClick { rows }
+
+/** [pagesClick] 를 누를 때마다 [current] 로 지금 보이는 목록에(목록·격자를 바꾸는 화면) */
+@SuppressLint("ClickableViewAccessibility")
+fun TextView.pagesClick(current: () -> PagedRows) {
+    var downX = -1f
+    setOnTouchListener { _, e -> if (e.action == MotionEvent.ACTION_DOWN) downX = e.x; false }
+    setOnClickListener {
+        val rows = current()
+        val wantPrev = downX >= 0 && downX < width / 2f
+        downX = -1f
+        val canPrev = rows.page > 0
+        val canNext = rows.page < rows.pageCount - 1
+        if ((wantPrev && canPrev) || !canNext) rows.prev() else rows.next()
     }
 }

@@ -72,6 +72,11 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("year_grid", false)
         set(v) = sp.edit().putBoolean("year_grid", v).apply()
 
+    /** 올해 읽은 책에서 그해 완독한 책만. false 면 전체 */
+    var yearFinishedOnly: Boolean
+        get() = sp.getBoolean("year_finished_only", false)
+        set(v) = sp.edit().putBoolean("year_finished_only", v).apply()
+
     /** 교보도서관·밀리의서재에서 편 책을 읽고 있는 책에 자동으로 넣기(접근성 서비스 필요) */
     var autoBooks: Boolean
         get() = sp.getBoolean("auto_books", false)
