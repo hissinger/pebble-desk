@@ -113,9 +113,10 @@
     <string name="streak_days">일 연속</string>
     <string name="streak_sub">읽는 중 · 최장 %1$d일</string>
     <string name="goal_of">/ %1$s</string>
-    <string name="goal_title">하루 목표 %1$s</string>
-    <string name="read_days_title">읽은 날</string>
     <string name="read_time">읽은 시간</string>
+    <string name="view_calendar">달력</string>
+    <string name="view_graph">그래프</string>
+    <string name="goal_line">목표 %1$s</string>
     <string name="this_week">이번 주</string>
     <string name="this_month">이번 달</string>
     <string name="month_goal">%1$s 목표 달성</string>

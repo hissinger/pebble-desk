@@ -110,9 +110,10 @@
     <string name="streak_days">day streak</string>
     <string name="streak_sub">Current · best %1$d days</string>
     <string name="goal_of">/ %1$s</string>
-    <string name="goal_title">Daily goal %1$s</string>
-    <string name="read_days_title">Days read</string>
     <string name="read_time">Time read</string>
+    <string name="view_calendar">Calendar</string>
+    <string name="view_graph">Graph</string>
+    <string name="goal_line">Goal %1$s</string>
     <string name="this_week">This week</string>
     <string name="this_month">This month</string>
     <string name="month_goal">%1$s goal met</string>

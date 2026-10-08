@@ -4,9 +4,13 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.os.Bundle
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -74,7 +78,7 @@ class ReadingActivity : EinkActivity() {
 
         val since = ReadingLog.since(this) ?: today
         body.addView(hero(days, today, goalMs, frac(today), monthGoal(days, today, since, goalMs, ::frac)))
-        body.addView(calendar(today, since, goalMs, ::frac))
+        body.addView(calendar(days, today, since, goalMs, ::frac))
         // 아래: 왼쪽 합계 · 오른쪽 이번 주 읽은 책. 칸마다 달력처럼 제목과 그 아래 선(두 칸 모두 위에 맞춘다).
         body.addView(hbox().apply {
             gravity = Gravity.TOP
@@ -139,22 +143,40 @@ class ReadingActivity : EinkActivity() {
     private fun startOfWeek(today: LocalDate): LocalDate = today.with(TemporalAdjusters.previousOrSame(prefs.firstDayOfWeek))
 
     /**
-     * 4주 링 달력(처음에는 이번 주까지 최근 4주). 날짜는 링 위에 작게, 오늘은 검은 동그라미 안에. 기록 전([since] 전)·앞날은 흐린 빈 링.
-     * 제목 줄 오른쪽 `9월 14일 – 10월 11일  ‹ ›` 로 4주씩 넘긴다(달력만 다시 그린다). 기록 시작 전으로·이번 주 뒤로는 가지 않는다(흐리게).
+     * 4주 링 달력 또는 막대그래프(처음에는 이번 주까지 최근 4주). 제목 줄 왼쪽 `달력 · 그래프`로 바꾸고 기억한다(같은 높이, 이 칸만 다시 그린다).
+     * 달력: 날짜는 링 위에 작게, 오늘은 검은 동그라미 안에. 기록 전([since] 전)·앞날은 흐린 빈 링.
+     * 제목 줄 오른쪽 `9월 14일 – 10월 11일  ‹ ›` 로 두 보기를 함께 4주씩 넘긴다. 기록 시작 전으로·이번 주 뒤로는 가지 않는다(흐리게).
      */
-    private fun calendar(today: LocalDate, since: LocalDate, goalMs: Long, progress: (LocalDate) -> Float) = vbox().apply {
+    private fun calendar(days: ReadingDays, today: LocalDate, since: LocalDate, goalMs: Long, progress: (LocalDate) -> Float) = vbox().apply {
         val locale = resources.configuration.locales[0]
         val latest = startOfWeek(today).minusWeeks(WEEKS - 1L)
         val dateFmt = DateTimeFormatter.ofPattern(getString(R.string.date_short_fmt), locale)
         val yearFmt = DateTimeFormatter.ofPattern(getString(R.string.date_year_fmt), locale)
         // 요일 줄과 4주치 날짜·링을 뷰 하나에 그린다(칸마다 뷰를 만들면 백 개가 넘어 느리다).
         val cal = RingCalendar(context, latest, today, since, WEEKS, progress)
+        // 그래프는 달력 자리에 겹쳐 두고 달력 높이를 그대로 쓴다(달력은 숨길 때 INVISIBLE 로 자리를 지킨다).
+        val graph = ReadingGraph(context, latest, today, since, WEEKS, goalMs, { days.total(it) }, { progress(it) >= 1f })
+        val toggle = text("", 13f, Ui.bold)
+        fun showView() {
+            val graphOn = prefs.readingGraph
+            toggle.text = SpannableStringBuilder().apply {
+                listOf(R.string.view_calendar to !graphOn, R.string.view_graph to graphOn).forEachIndexed { i, (res, on) ->
+                    if (i > 0) append("  ·  ", ForegroundColorSpan(Ui.LIGHT_GRAY), 0)
+                    append(getString(res), ForegroundColorSpan(if (on) Ui.BLACK else Ui.LIGHT_GRAY), 0)
+                }
+            }
+            cal.visibility = if (graphOn) View.INVISIBLE else View.VISIBLE
+            graph.visibility = if (graphOn) View.VISIBLE else View.GONE
+        }
+        toggle.setOnClickListener { prefs.readingGraph = !prefs.readingGraph; showView() }
+        showView()
         val range = text("", 12f, Ui.medium, Ui.LIGHT_GRAY)
         fun arrow(symbol: String) = text(symbol, 20f, Ui.bold).apply { gravity = Gravity.CENTER; minWidth = dp(40) }
         val prev = arrow("‹")
         val next = arrow("›")
         fun show(start: LocalDate) {
             cal.start = start
+            graph.start = start
             val end = start.plusDays(WEEKS * 7L - 1)
             // 지난해까지 넘기면 연도를 붙인다.
             range.text = "${start.format(if (start.year != today.year) yearFmt else dateFmt)} – ${end.format(if (end.year != today.year) yearFmt else dateFmt)}"
@@ -168,15 +190,18 @@ class ReadingActivity : EinkActivity() {
         show(latest)
         addView(hbox().apply {
             setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN - 12), dp(2))
-            val title = if (goalMs > 0) getString(R.string.goal_title, duration(goalMs)) else getString(R.string.read_days_title)
-            addView(text(title, 13f, Ui.bold, Ui.GRAY), lp(0, WRAP, 1f))
+            // 하루 목표는 오늘 링(`/ 30분`)과 그래프의 목표선에 보인다.
+            addView(toggle, lp(0, WRAP, 1f))
             // 범위 글자 길이가 바뀌어도 이어 누를 수 있게 `‹ ›` 는 오른쪽 끝에 나란히 고정한다.
             addView(range, lp(WRAP, WRAP).apply { marginEnd = dp(4) })
             addView(prev, lp(WRAP, WRAP))
             addView(next, lp(WRAP, WRAP))
         })
         addView(hline(1))
-        addView(cal, lp(MATCH, WRAP))
+        addView(FrameLayout(context).apply {
+            addView(cal, FrameLayout.LayoutParams(MATCH, WRAP))
+            addView(graph, FrameLayout.LayoutParams(MATCH, MATCH))
+        }, lp(MATCH, WRAP))
         addView(View(context), lp(MATCH, dp(24)))
     }
 
@@ -284,6 +309,8 @@ private class RingPainter(stroke: Float) {
 
 /** 링 바탕(크레마는 연한 회색을 어둡게 그려서 디자인 값보다 밝게 잡는다) */
 private const val RING_TRACK = 0xFFF2F2F2.toInt()
+/** 목표를 못 채운 날의 막대(크레마는 연한 회색을 어둡게 그려 #888 은 검정과 잘 구분되지 않는다) */
+private const val UNMET_BAR = 0xFFBBBBBB.toInt()
 /** 앞날·기록 전 날의 링 바탕 */
 private const val NO_DATA_TRACK = 0xFFF9F9F9.toInt()
 
@@ -318,28 +345,22 @@ private class RingCalendar(
     private val weekdays = (0L..6L).map { start.dayOfWeek.plus(it).getDisplayName(TextStyle.NARROW, context.resources.configuration.locales[0]) }
     private val margin = context.dpf(Ui.MARGIN)
     private val weekdayTop = context.dpf(8)
-    private val weekdayH = context.dpf(22)
-    private val rowGap = context.dpf(4)
-    private val labelH = context.dpf(17)
+    private val weekdayH = context.dpf(CAL_WEEKDAY_DP)
+    private val rowGap = context.dpf(CAL_ROW_GAP_DP)
+    private val labelH = context.dpf(CAL_LABEL_DP)
     private val pillHalf = context.dpf(10)
-    private val ringGap = context.dpf(2)
-    private val ring = context.dpf(28)
+    private val ringGap = context.dpf(CAL_RING_GAP_DP)
+    private val ring = context.dpf(CAL_RING_DP)
     private val rowH = rowGap + labelH + ringGap + ring
     private val painter = RingPainter(context.dpf(6))
     private val oval = RectF()
-    private fun textPaint(sp: Float, face: android.graphics.Typeface, color: Int) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        textSize = sp * context.resources.displayMetrics.scaledDensity
-        typeface = face
-        this.color = color
-    }
-    private val weekdayPaint = textPaint(12f, Ui.medium, Ui.LIGHT_GRAY)
-    private val datePaint = textPaint(11f, Ui.medium, Ui.GRAY)
-    private val todayPaint = textPaint(11f, Ui.bold, Color.WHITE)
+    private val weekdayPaint = context.calPaint(12f, Ui.medium, Ui.LIGHT_GRAY)
+    private val datePaint = context.calPaint(11f, Ui.medium, Ui.GRAY)
+    private val todayPaint = context.calPaint(11f, Ui.bold, Color.WHITE)
     private val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Ui.BLACK }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), (weekdayH + weeks * rowH).toInt())
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), ringCalendarHeight(context, weeks))
     }
 
     /** [cy] 에 세로 가운데로 */
@@ -365,6 +386,134 @@ private class RingCalendar(
             val ringTop = top + labelH + ringGap
             oval.set(cx - ring / 2 + painter.inset, ringTop + painter.inset, cx + ring / 2 - painter.inset, ringTop + ring - painter.inset)
             painter.draw(canvas, oval, if (noData) 0f else progress(day), if (noData) NO_DATA_TRACK else RING_TRACK)
+        }
+    }
+}
+
+/** 링 달력 치수(dp): 요일 줄, 주마다 위 여백 · 날짜 · 날짜와 링 사이 · 링 */
+private const val CAL_WEEKDAY_DP = 22
+private const val CAL_ROW_GAP_DP = 4
+private const val CAL_LABEL_DP = 17
+private const val CAL_RING_GAP_DP = 2
+private const val CAL_RING_DP = 28
+
+/** 링 달력 높이. 같은 자리의 그래프도 이 높이를 쓴다. */
+private fun ringCalendarHeight(context: Context, weeks: Int): Int =
+    context.dpf(CAL_WEEKDAY_DP + weeks * (CAL_ROW_GAP_DP + CAL_LABEL_DP + CAL_RING_GAP_DP + CAL_RING_DP)).toInt()
+
+/** 달력·그래프 글자 붓 */
+private fun Context.calPaint(sp: Float, face: android.graphics.Typeface, color: Int, align: Paint.Align = Paint.Align.CENTER) =
+    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = align
+        textSize = sp * resources.displayMetrics.scaledDensity
+        typeface = face
+        this.color = color
+    }
+
+/**
+ * [weeks]주를 날마다 막대 하나로(독서 기록의 `그래프`). 높이는 같은 자리의 링 달력과 같다.
+ * 하루 목표([goalMs])에 점선과 `목표 30분`, 목표를 채운 날([met])은 검정·못 채운 날은 회색 막대.
+ * 가장 많이 읽은 날과 오늘은 막대 위에 시간, 아래에는 주마다 첫날 `10/5`, 오늘은 검은 동그라미 안 날짜. 기록 전 날짜는 흐리게.
+ */
+private class ReadingGraph(
+    context: Context,
+    start: LocalDate,
+    private val today: LocalDate,
+    private val since: LocalDate,
+    private val weeks: Int,
+    private val goalMs: Long,
+    private val ms: (LocalDate) -> Long,
+    private val met: (LocalDate) -> Boolean,
+) : View(context) {
+    /** 첫날. 바꾸면(넘기기) 다시 그린다. */
+    var start: LocalDate = start
+        set(v) { field = v; invalidate() }
+    private val margin = context.dpf(Ui.MARGIN)
+    /** 위(막대 위 시간)·아래(날짜) 글자 자리 */
+    private val topRoom = context.dpf(34)
+    private val bottomRoom = context.dpf(28)
+    private val valuePaint = context.calPaint(12f, Ui.bold, Ui.BLACK)
+    private val datePaint = context.calPaint(11f, Ui.medium, Ui.GRAY)
+    private val todayPaint = context.calPaint(11f, Ui.bold, Color.WHITE)
+    private val goalLabelPaint = context.calPaint(11f, Ui.medium, Ui.GRAY, Paint.Align.LEFT)
+    private val barPaint = Paint()
+    private val basePaint = Paint().apply { color = Ui.DIVIDER; strokeWidth = context.dpf(1) }
+    private val goalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Ui.GRAY; strokeWidth = context.dpf(1); style = Paint.Style.STROKE
+        pathEffect = DashPathEffect(floatArrayOf(context.dpf(4), context.dpf(4)), 0f)
+    }
+    private val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Ui.BLACK }
+    private val pillHalf = context.dpf(10)
+    private val pillH = context.dpf(17)
+    private val minBar = context.dpf(2)
+    private val goalLine = Path()
+    /** `목표 30분` 뒤의 흰 바탕 */
+    private val labelBg = Paint().apply { color = Color.WHITE }
+
+    private fun Canvas.centerText(s: String, cx: Float, cy: Float, p: Paint) = drawText(s, cx, cy - (p.ascent() + p.descent()) / 2, p)
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), ringCalendarHeight(context, weeks))
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val n = weeks * 7
+        val days = (0 until n).map { start.plusDays(it.toLong()) }
+        // 기록이 있는 날(기록 시작일~오늘)만 센다.
+        val values = days.map { if (it in since..today) ms(it) else 0L }
+        val bottom = height - bottomRoom
+        val top = topRoom
+        // 막대 높이 기준: 가장 많이 읽은 날, 목표의 1.5배, 1분 중 큰 값
+        val peak = maxOf(values.maxOrNull() ?: 0L, goalMs * 3 / 2, ReadingLog.MIN_DAY_MS).toFloat()
+        fun y(v: Long) = bottom - (bottom - top) * v / peak
+        val slot = (width - 2 * margin) / n
+        val barW = slot * 0.6f
+        canvas.drawLine(margin, bottom, width - margin, bottom, basePaint)
+        val gy = y(goalMs)
+        if (goalMs > 0) {
+            goalLine.reset(); goalLine.moveTo(margin, gy); goalLine.lineTo(width - margin, gy)
+            canvas.drawPath(goalLine, goalPaint)
+        }
+        val best = values.indices.maxByOrNull { values[it] }?.takeIf { values[it] >= ReadingLog.MIN_DAY_MS }?.let { days[it] }
+        days.forEachIndexed { i, day ->
+            val cx = margin + slot * (i + 0.5f)
+            val v = values[i]
+            if (v > 0) {
+                barPaint.color = if (met(day)) Ui.BLACK else UNMET_BAR
+                canvas.drawRect(cx - barW / 2, minOf(y(v), bottom - minBar), cx + barW / 2, bottom, barPaint)
+            }
+            val labelY = bottom + context.dpf(4) + pillH / 2
+            if (day == today) {
+                canvas.drawOval(cx - pillHalf, labelY - pillH / 2, cx + pillHalf, labelY + pillH / 2, pillPaint)
+                canvas.centerText(day.dayOfMonth.toString(), cx, labelY, todayPaint)
+            } else if (i % 7 == 0) {
+                datePaint.color = if (day < since || day > today) Ui.DIVIDER else Ui.GRAY
+                canvas.centerText("${day.monthValue}/${day.dayOfMonth}", cx, labelY, datePaint)
+            }
+        }
+        // 오늘과 가장 많이 읽은 날은 막대 위에 시간. 옆 막대에 가리지 않게 막대를 다 그린 뒤에, 화면 밖으로 나가지 않게 안쪽으로.
+        // 두 글자가 겹치면(가까운 날) 오늘 것만.
+        val drawn = mutableListOf<RectF>()
+        listOfNotNull(today, best).distinct().forEach { day ->
+            val i = days.indexOf(day).takeIf { it >= 0 } ?: return@forEach
+            val v = values[i]
+            if (v < ReadingLog.MIN_DAY_MS) return@forEach
+            val label = context.duration(v)
+            val half = valuePaint.measureText(label) / 2
+            val cx = (margin + slot * (i + 0.5f)).coerceIn(margin + half, width - margin - half)
+            val base = y(v) - context.dpf(5)
+            val box = RectF(cx - half, base + valuePaint.ascent(), cx + half, base + valuePaint.descent())
+            if (drawn.any { RectF.intersects(it, box) }) return@forEach
+            drawn += box
+            canvas.drawText(label, cx, base, valuePaint)
+        }
+        // 목표 이름은 막대 뒤에 가리지 않게 마지막에 흰 바탕 위에 쓴다.
+        if (goalMs > 0) {
+            val label = context.getString(R.string.goal_line, context.duration(goalMs))
+            val pad = context.dpf(3)
+            val base = gy - context.dpf(4)
+            canvas.drawRect(margin, base + goalLabelPaint.ascent() - pad, margin + goalLabelPaint.measureText(label) + 2 * pad, base + goalLabelPaint.descent(), labelBg)
+            canvas.drawText(label, margin + pad, base, goalLabelPaint)
         }
     }
 }

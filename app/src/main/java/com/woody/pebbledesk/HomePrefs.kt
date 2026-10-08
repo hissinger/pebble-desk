@@ -62,6 +62,11 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("fav_grid", false)
         set(v) = sp.edit().putBoolean("fav_grid", v).apply()
 
+    /** 독서 기록의 4주를 날마다 막대그래프로. false 면 링 달력 */
+    var readingGraph: Boolean
+        get() = sp.getBoolean("reading_graph", false)
+        set(v) = sp.edit().putBoolean("reading_graph", v).apply()
+
     /** 올해 읽은 책을 표지 격자(한 줄에 4권)로. false 면 목록 */
     var yearGrid: Boolean
         get() = sp.getBoolean("year_grid", false)
