@@ -21,11 +21,13 @@ import java.time.temporal.TemporalAdjusters
 import kotlin.math.sqrt
 
 /**
- * ⑫ 독서 기록: 연속일과 오늘 링, 최근 4주 목표 링 달력(애플 활동 앱처럼), 이번 주·이번 달·올해 합계, 이번 주 앱별 시간.
+ * ⑫ 독서 기록: 연속일과 오늘 링, 최근 4주 목표 링 달력(애플 활동 앱처럼), 이번 달 목표 달성, 이번 주·이번 달·올해 합계, 이번 주 책별 시간.
  * 홈 하단의 `오늘 42분`이나 설정 > 독서 기록으로 연다. 숫자는 [ReadingLog] 에서 온다.
  */
 class ReadingActivity : EinkActivity() {
     private lateinit var body: LinearLayout
+    /** 이번 주 읽은 책(다섯 권이 넘으면 쪽을 넘긴다). 읽은 책이 없으면 null. */
+    private var bookRows: PagedRows? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,21 +65,40 @@ class ReadingActivity : EinkActivity() {
         }
 
         val since = ReadingLog.since(this) ?: today
-        body.addView(hero(days, today, goalMs, frac(today)))
+        body.addView(hero(days, today, goalMs, frac(today), monthGoal(days, today, since, goalMs, ::frac)))
         body.addView(calendar(today, since, goalMs, ::frac))
-        body.addView(hline(1, Ui.DIVIDER))
-        body.addView(totals(days, today, since, goalMs, ::frac))
-        body.addView(hline(1, Ui.DIVIDER))
-        body.addView(byApp(days, today))
+        // 아래: 왼쪽 합계 · 오른쪽 이번 주 읽은 책. 칸마다 달력처럼 제목과 그 아래 선(두 칸 모두 위에 맞춘다).
+        body.addView(hbox().apply {
+            gravity = Gravity.TOP
+            setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), 0)
+            addView(section(getString(R.string.read_time), totals(days, today)), lp(dp(TOTALS_W), WRAP))
+            val page = text("", 13f, Ui.bold, Ui.GRAY)
+            addView(section(getString(R.string.books_this_week), byBook(days, today, page), page), lp(0, WRAP, 1f).apply { marginStart = dp(BOOKS_GAP) })
+        })
     }
 
-    /** 왼쪽 큰 연속일, 오른쪽 오늘 링(가운데 오늘 읽은 시간) */
-    private fun hero(days: ReadingDays, today: LocalDate, goalMs: Long, todayFrac: Float) = hbox().apply {
+    /** 제목(오른쪽 끝에 [page]: 쪽 표시) · 그 아래 선 · [content] */
+    private fun section(title: String, content: View, page: TextView? = null) = vbox().apply {
+        addView(hbox().apply {
+            addView(text(title, 13f, Ui.bold, Ui.GRAY), lp(0, WRAP, 1f))
+            // 쪽 표시가 작아 누르기 어려우므로 제목 줄 어디를 눌러도 넘긴다.
+            page?.let { addView(it, lp(WRAP, WRAP)); setOnClickListener { _ -> it.performClick() } }
+        }, lp(MATCH, WRAP).apply { bottomMargin = dp(8) })
+        addView(hline(1, inset = false))
+        addView(content, lp(MATCH, WRAP).apply { topMargin = dp(4) })
+    }
+
+    /** 왼쪽 큰 연속일과 이번 달 목표 달성([month]: 제목 to 값), 오른쪽 오늘 링(가운데 오늘 읽은 시간) */
+    private fun hero(days: ReadingDays, today: LocalDate, goalMs: Long, todayFrac: Float, month: Pair<String, String>) = hbox().apply {
         setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), 0)
         addView(text(ReadingLog.streak(days, today).toString(), 80f, Ui.heavy))
         addView(vbox().apply {
             addView(text(getString(R.string.streak_sub, ReadingLog.longestStreak(days)), 15f, Ui.medium, Ui.GRAY))
             addView(text(getString(R.string.streak_days), 28f, Ui.bold), lp(WRAP, WRAP).apply { topMargin = dp(4) })
+            addView(hbox().apply {
+                addView(text(month.first, 15f, Ui.medium, Ui.GRAY))
+                addView(text(month.second, 15f, Ui.bold), lp(WRAP, WRAP).apply { marginStart = dp(6) })
+            }, lp(WRAP, WRAP).apply { topMargin = dp(8) })
         }, lp(0, WRAP, 1f).apply { marginStart = dp(10) })
         val time = text(duration(days.total(today)), 17f, Ui.bold)
         val goal = if (goalMs > 0) text(getString(R.string.goal_of, duration(goalMs)), 11f, Ui.medium, Ui.GRAY) else null
@@ -106,7 +127,7 @@ class ReadingActivity : EinkActivity() {
         }
     }
 
-    /** 이번 주의 첫날(설정의 한 주 시작 요일). 달력·이번 주 합계·이번 주 앱별이 모두 따른다. */
+    /** 이번 주의 첫날(설정의 한 주 시작 요일). 달력·이번 주 합계·이번 주 책별이 모두 따른다. */
     private fun startOfWeek(today: LocalDate): LocalDate = today.with(TemporalAdjusters.previousOrSame(prefs.firstDayOfWeek))
 
     /** 최근 4주 링 달력. 날짜는 링 위에 작게, 오늘은 검은 동그라미 안에. 기록 전([since] 전)·앞날은 흐린 빈 링. */
@@ -124,61 +145,86 @@ class ReadingActivity : EinkActivity() {
         addView(hline(1))
         // 요일 줄과 4주치 날짜·링을 뷰 하나에 그린다(칸마다 뷰를 만들면 백 개가 넘어 느리다).
         addView(RingCalendar(context, start, today, since, WEEKS, progress), lp(MATCH, WRAP))
-        addView(View(context), lp(MATCH, dp(14)))
+        addView(View(context), lp(MATCH, dp(24)))
     }
 
-    /** 이번 주 · 이번 달 목표 달성(그날의 목표로, [progress] 가 꽉 찬 날) · 올해. 지금 목표가 없으면 제목대로 읽은 날을 센다. */
-    private fun totals(days: ReadingDays, today: LocalDate, since: LocalDate, goalMs: Long, progress: (LocalDate) -> Float) = hbox().apply {
-        setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), dp(10))
-        val locale = resources.configuration.locales[0]
-        val weekStart = startOfWeek(today)
-        fun sum(from: LocalDate) = days.filterKeys { it in from..today }.keys.sumOf { days.total(it) }
-        // 이번 달 중 기록이 있는 날만 센다.
+    /** 이번 달 목표 달성(그날의 목표로, [progress] 가 꽉 찬 날, 기록이 있는 날 중). 지금 목표가 없으면 제목대로 읽은 날을 센다. */
+    private fun monthGoal(days: ReadingDays, today: LocalDate, since: LocalDate, goalMs: Long, progress: (LocalDate) -> Float): Pair<String, String> {
         val monthDays = (1..today.dayOfMonth).map { today.withDayOfMonth(it) }.filter { it >= since }
         val hits = monthDays.count { if (goalMs > 0) progress(it) >= 1f else days.total(it) >= ReadingLog.MIN_DAY_MS }
-        val month = today.format(DateTimeFormatter.ofPattern(getString(R.string.month_fmt), locale))
+        val month = today.format(DateTimeFormatter.ofPattern(getString(R.string.month_fmt), resources.configuration.locales[0]))
+        return getString(if (goalMs > 0) R.string.month_goal else R.string.month_read, month) to getString(R.string.days_of, hits, monthDays.size)
+    }
+
+    /** 왼쪽 칸: 이번 주 · 이번 달 · 올해 읽은 시간(위아래로) */
+    private fun totals(days: ReadingDays, today: LocalDate) = vbox().apply {
+        setPadding(0, dp(6), 0, 0)
+        fun sum(from: LocalDate) = days.filterKeys { it in from..today }.keys.sumOf { days.total(it) }
         listOf(
-            getString(R.string.this_week) to duration(sum(weekStart)),
-            getString(if (goalMs > 0) R.string.month_goal else R.string.month_read, month) to getString(R.string.days_of, hits, monthDays.size),
+            getString(R.string.this_week) to duration(sum(startOfWeek(today))),
+            getString(R.string.this_month) to duration(sum(today.withDayOfMonth(1))),
             getString(R.string.this_year) to duration(sum(today.withDayOfYear(1))),
-        ).forEach { (label, value) ->
-            addView(vbox().apply {
-                addView(text(label, 13f, Ui.medium, Ui.GRAY))
-                addView(text(value, 20f, Ui.bold), lp(WRAP, WRAP).apply { topMargin = dp(4) })
-            }, lp(0, WRAP, 1f))
+        ).forEachIndexed { i, (label, value) ->
+            addView(text(label, 13f, Ui.medium, Ui.GRAY), lp(WRAP, WRAP).apply { if (i > 0) topMargin = dp(14) })
+            addView(text(value, 20f, Ui.bold), lp(WRAP, WRAP).apply { topMargin = dp(4) })
         }
     }
 
-    /** 이번 주 앱별 시간(많은 순 세 개). 막대는 가장 많은 앱 기준. */
-    private fun byApp(days: ReadingDays, today: LocalDate) = vbox().apply {
-        setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), 0)
-        addView(text(getString(R.string.apps_this_week), 13f, Ui.bold, Ui.GRAY))
-        val weekStart = startOfWeek(today)
-        val perApp = mutableMapOf<String, Long>()
-        days.filterKeys { it in weekStart..today }.values.forEach { apps -> apps.forEach { (pkg, ms) -> perApp[pkg] = (perApp[pkg] ?: 0) + ms } }
-        val top = perApp.filterValues { it >= 60_000 }.entries.sortedByDescending { it.value }.take(3)
-        if (top.isEmpty()) {
-            addView(text(getString(R.string.reading_empty), 15f, color = Ui.LIGHT_GRAY), lp(WRAP, WRAP).apply { topMargin = dp(8) })
-            return@apply
+    /**
+     * 오른쪽 칸: 이번 주 책별 시간(많은 순, 한 쪽에 [BOOKS]권). 한 줄에 책 이름(목록에서 고친 이름으로) · 시간, 줄 사이에 옅은 선.
+     * 어떤 책인지 모르는 시간(이 기능 전, 그 앱에서 편 책을 한 번도 몰랐을 때)은 합계에만 들어가고 여기에는 보이지 않는다.
+     */
+    private fun byBook(days: ReadingDays, today: LocalDate, page: TextView): View {
+        bookRows = null
+        val week = days.filterKeys { it in startOfWeek(today)..today }.values
+        val perBook = mutableMapOf<String, Long>()
+        week.forEach { keys ->
+            keys.forEach { (key, ms) ->
+                val title = readingTitle(key) ?: return@forEach
+                val label = BookShelf.findByTitle(this, title)?.title ?: title
+                perBook[label] = (perBook[label] ?: 0) + ms
+            }
         }
-        val apps = AppStore.load(context)
-        val max = top.first().value.toFloat()
-        top.forEachIndexed { i, (pkg, ms) ->
-            addView(hbox().apply {
-                val label = apps.firstOrNull { it.pkg == pkg }?.label ?: pkg
-                addView(text(label, 16f), lp(0, WRAP, 4f))
-                // 막대: 칸을 이 앱 시간 : 나머지 비율로 나눈다.
-                addView(hbox().apply {
-                    addView(View(context).apply { setBackgroundColor(if (i == 0) Ui.BLACK else Ui.GRAY) }, lp(0, dp(8), ms.toFloat()))
-                    addView(View(context), lp(0, dp(8), max - ms))
-                }, lp(0, dp(8), 4f))
-                addView(text(duration(ms), 15f, Ui.medium).apply { gravity = Gravity.END }, lp(0, WRAP, 2f))
-            }, lp(MATCH, WRAP).apply { topMargin = dp(6) })
+        val books = perBook.filterValues { it >= 60_000 }.entries.sortedByDescending { it.value }
+        if (books.isEmpty()) {
+            // 읽긴 했는데 어떤 책인지 모르면 자동 추가를 켜라고 알린다.
+            val read = week.sumOf { it.values.sum() } >= 60_000
+            return text(getString(if (read) R.string.books_unknown else R.string.reading_empty), 15f, color = Ui.LIGHT_GRAY, lines = 3).apply {
+                setPadding(0, dp(8), 0, 0)
+            }
         }
+        // 자주 쓰는 앱처럼 [BOOKS]줄씩, 넘치면 제목 오른쪽 `1 / 2 ›`(누르거나 밀면 다음 쪽). 덜 찬 쪽도 높이는 같다.
+        val rows = PagedRows(this, dp(BOOK_ROW), fixedRows = BOOKS, insetDividers = false)
+        rows.onPageChanged = {
+            val n = rows.pageCount
+            page.text = if (n <= 1) "" else "${rows.page + 1} / $n   ›"
+        }
+        page.setOnClickListener { rows.next() }
+        rows.setRows(books.map { (label, ms) -> {
+            hbox().apply {
+                addView(text(label, 16f), lp(0, WRAP, 1f))
+                addView(text(duration(ms), 15f, Ui.medium), lp(WRAP, WRAP).apply { marginStart = dp(12) })
+            }
+        } })
+        bookRows = rows
+        return rows
+    }
+
+    override fun onSwipe(toLeft: Boolean): Boolean {
+        val rows = bookRows?.takeIf { it.pageCount > 1 } ?: return false
+        if (toLeft) rows.next() else rows.prev()
+        return true
     }
 
     companion object {
         private const val WEEKS = 4
+        /** 아래 왼쪽 합계 칸 폭(dp) */
+        private const val TOTALS_W = 150
+        /** 왼쪽 합계 칸과 오른쪽 책 칸 사이(dp) */
+        private const val BOOKS_GAP = 24
+        /** 이번 주 읽은 책 한 쪽의 줄 수와 줄 높이(dp) */
+        private const val BOOKS = 5
+        private const val BOOK_ROW = 36
         /** 오늘 링 지름·굵기(dp) */
         private const val RING = 104
         private const val RING_STROKE = 12f

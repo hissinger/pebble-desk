@@ -101,12 +101,15 @@
     <string name="goal_of">/ %1$s</string>
     <string name="goal_title">하루 목표 %1$s</string>
     <string name="read_days_title">읽은 날</string>
+    <string name="read_time">읽은 시간</string>
     <string name="this_week">이번 주</string>
+    <string name="this_month">이번 달</string>
     <string name="month_goal">%1$s 목표 달성</string>
     <string name="month_read">%1$s 읽은 날</string>
     <string name="days_of">%1$d / %2$d일</string>
     <string name="this_year">올해</string>
-    <string name="apps_this_week">이번 주 앱별</string>
+    <string name="books_this_week">이번 주 읽은 책</string>
+    <string name="books_unknown">읽는 책 자동 추가를 켜면 책별로 보입니다</string>
     <string name="reading_empty">이번 주에 읽은 기록이 아직 없습니다</string>
     <string name="reading_no_access">설정에서 오늘 읽은 시간을 켜고 사용 기록 액세스에서 Pebble Desk를 허용하면 기록이 보입니다.</string>
     <string name="daily_goal">하루 목표</string>

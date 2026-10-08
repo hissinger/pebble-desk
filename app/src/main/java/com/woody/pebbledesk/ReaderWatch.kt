@@ -54,6 +54,8 @@ class ReaderWatchService : AccessibilityService() {
     private val eagerTries = mutableMapOf<String, Int>()
     /** 서재에서 읽는 화면으로 갔다 온 앱(서재의 '최근 읽은 책' 줄로 어떤 책인지 안다) */
     private val readSince = mutableSetOf<String>()
+    /** [readSince] 앱마다 서재를 떠나 읽는 화면이 처음 열린 때(돌아와서야 어떤 책인지 아는 앱의 읽은 시간을 그 책으로 세게) */
+    private val readerAt = mutableMapOf<String, Long>()
     private var lastShot = 0L
     private val handler = Handler(Looper.getMainLooper())
     /** 화면이 멈추면 다시 읽을 서재 */
@@ -80,7 +82,8 @@ class ReaderWatchService : AccessibilityService() {
                     lastTransition = System.currentTimeMillis()
                     screen[spec.pkg] = it
                     if (ReadingLog.isReaderScreen(it)) {
-                        if (spec.recent != null) readSince += spec.pkg
+                        // 서재를 떠나 처음 연 읽는 화면의 때만 적는다(읽는 중 목차 같은 다른 화면에 갔다 와도 처음부터 그 책으로 세게).
+                        if (spec.recent != null && readSince.add(spec.pkg)) readerAt[spec.pkg] = System.currentTimeMillis()
                         webBook.remove(spec.pkg)?.let { book -> bookOpened(spec, book) }
                         clicked.remove(spec.pkg)?.takeIf { System.currentTimeMillis() - it.second < CLICK_OPEN_MS }?.let { bookOpened(spec, it.first) }
                     }
@@ -403,8 +406,9 @@ class ReaderWatchService : AccessibilityService() {
     /**
      * 책을 폈다: 목록에 있으면 맨 앞으로, 없으면 새로 넣는다(목록이 다 찼으면 넣지 않는다). 인터넷 검색은 하지 않고,
      * 표지는 이북 앱 서재에 보이는 그 책의 표지 칸을 화면에서 잘라 온다(안 되면 빈 표지).
+     * [at] 은 그 책을 편 때(서재로 돌아와서야 알면 읽는 화면이 열린 때). 읽은 시간을 이때부터 이 책으로 센다.
      */
-    private fun bookOpened(spec: ReaderSpec, seen: Seen) {
+    private fun bookOpened(spec: ReaderSpec, seen: Seen, at: Long? = null) {
         webBook.remove(spec.pkg)
         val book = BookShelf.findByTitle(this, seen.title)?.also {
             BookShelf.moveToFront(this, it.id)
@@ -416,6 +420,7 @@ class ReaderWatchService : AccessibilityService() {
         }
         // 넣지 못한 책도 연 책으로 적는다(그래야 읽는 화면의 진행률이 앞서 연 다른 책에 붙지 않는다).
         setOpened(spec.pkg, book?.title ?: seen.title)
+        ReadingLog.bookOpened(this, spec.pkg, book?.title ?: seen.title, at ?: System.currentTimeMillis())
         if (book == null) return
         // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 알라딘 서재)
         pendingFor(book.title)?.let { key ->
@@ -444,7 +449,7 @@ class ReaderWatchService : AccessibilityService() {
         spec.recent?.takeIf { spec.pkg in readSince }?.let { id ->
             val title = root.byId(spec, id).firstOrNull()?.text?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: return@let
             readSince -= spec.pkg
-            bookOpened(spec, seen.firstOrNull { sameTitle(it.title, title) } ?: Seen(title, "", -1, -1, null, Rect()))
+            bookOpened(spec, seen.firstOrNull { sameTitle(it.title, title) } ?: Seen(title, "", -1, -1, null, Rect()), readerAt[spec.pkg])
         }
         val targets = mutableListOf<Pair<String, Rect>>()
         // 검색 화면의 책 상세에 보이는 표지(목록에 있는데 표지가 없으면)

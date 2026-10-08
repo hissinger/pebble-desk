@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.time.Instant
@@ -18,8 +19,12 @@ import java.time.ZoneId
 /** 오늘 읽은 시간과 연속 독서일(오늘까지, 오늘 아직 안 읽었으면 어제까지) */
 data class ReadingSummary(val todayMs: Long, val streak: Int)
 
-/** 날마다 앱(패키지)별 읽은 시간(ms) */
+/** 날마다 읽은 시간(ms). 키는 [readingKey]: 어떤 책인지 알면 `패키지/제목`, 모르면 패키지만. */
 typealias ReadingDays = Map<LocalDate, Map<String, Long>>
+
+private fun readingKey(pkg: String, title: String?) = if (title == null) pkg else "$pkg/$title"
+/** [readingKey] 의 책 제목(모르면 null) */
+fun readingTitle(key: String) = key.substringAfter('/', "").ifEmpty { null }
 
 fun ReadingDays.total(day: LocalDate): Long = this[day]?.values?.sum() ?: 0
 
@@ -35,7 +40,8 @@ fun Context.duration(ms: Long): String {
 
 /**
  * 오늘 읽은 시간·연속 독서일. 안드로이드 사용 기록(사용 기록 액세스 권한)에서 이북 앱의 '읽는 화면'이
- * 앞에 떠 있던 시간을 더한다. 어떤 책인지는 알 수 없으므로 책과 상관없이 하루 합계만 센다.
+ * 앞에 떠 있던 시간을 더한다. 어떤 책인지는 접근성 서비스가 그 앱에서 마지막으로 편 책([bookOpened])으로 나누고,
+ * 그 앱에서 편 책을 한 번도 몰랐으면 앱으로만 센다(서비스를 끈 동안 읽은 시간도 마지막으로 편 책으로 들어간다).
  * 사용 기록은 며칠만 남으므로 끝난 날의 합계는 files/reading.json 에 남겨 둔다.
  */
 object ReadingLog {
@@ -84,7 +90,7 @@ object ReadingLog {
     }
 
     /**
-     * [packages] (이북 앱) 의 날마다 앱별 읽은 시간. 권한이 없으면 null.
+     * [packages] (이북 앱) 의 날마다 책([readingKey])별 읽은 시간. 권한이 없으면 null.
      * 끝난 날은 한 번만 계산해 저장하고, 오늘은 부를 때마다 다시 센다.
      */
     fun days(context: Context, packages: Set<String>): ReadingDays? {
@@ -98,12 +104,53 @@ object ReadingLog {
         val c = counter?.takeIf { it.from == from && it.packages == packages && it.zone == zone }
             ?: Counter(from, packages, zone).also { counter = it }
         c.feed(context)
-        val days = saved.days + c.totals.mapValues { it.value.toMap() }
+        val days = saved.days + c.totals(opens(context))
         // 기록이 시작된 날(그 전은 '안 읽음'이 아니라 '기록 없음')
         val since = saved.since ?: (saved.days.keys + from).min()
         if (saved.through != today.minusDays(1) || saved.since == null) save(context, Saved(today.minusDays(1), since, days - today))
         return days
     }
+
+    /** 접근성 서비스가 알아낸 '[at] 에 [pkg] 에서 [title] 을 폈다'. 읽는 화면 시간을 그때 편 책으로 센다. */
+    private class Open(val at: Long, val pkg: String, val title: String)
+
+    @Volatile private var opens: List<Open>? = null
+
+    private fun opensFile(context: Context) = File(Storage.of(context).filesDir, "opened.json")
+
+    /**
+     * 파일이 없으면(이 기능 전) 접근성 서비스가 기억해 둔 앱마다 마지막에 편 책부터 시작한다.
+     * [bookOpened] 와 같은 잠금으로 읽는다(처음 읽는 동안 새로 편 책이 옛 목록에 덮이지 않게).
+     */
+    @Synchronized
+    private fun opens(context: Context): List<Open> = opens ?: runCatching {
+        val a = JSONArray(opensFile(context).readText())
+        (0 until a.length()).map { a.getJSONArray(it).let { o -> Open(o.getLong(0), o.getString(1), o.getString(2)) } }
+    }.getOrElse {
+        Storage.of(context).getSharedPreferences("reader_watch", Context.MODE_PRIVATE).all.mapNotNull { (k, v) ->
+            if (k.startsWith("opened_") && v is String) Open(0, k.removePrefix("opened_"), v) else null
+        }
+    }.also { opens = it }
+
+    /**
+     * [pkg] 에서 [title] 을 폈다([at] 부터 읽은 시간은 이 책). 다시 셀 수 있는 날([BACKFILL_DAYS]) 남짓만 남기고,
+     * 그보다 오래됐어도 앱마다 마지막 책은 남긴다(이북 앱은 마지막 책을 바로 다시 연다).
+     */
+    @Synchronized
+    fun bookOpened(context: Context, pkg: String, title: String, at: Long = System.currentTimeMillis()) {
+        val list = opens(context)
+        if (list.filter { it.pkg == pkg }.maxByOrNull { it.at }?.title == title) return
+        val old = at - (BACKFILL_DAYS + 3) * 24 * 60 * 60 * 1000L
+        val kept = (list + Open(at, pkg, title)).groupBy { it.pkg }.values.flatMap { mine ->
+            val last = mine.maxBy { it.at }
+            mine.filter { it.at >= old || it === last }
+        }.sortedBy { it.at }
+        opens = kept
+        runCatching { opensFile(context).writeText(JSONArray(kept.map { JSONArray().put(it.at).put(it.pkg).put(it.title) }).toString()) }
+    }
+
+    /** [pkg] 에서 [t] 까지 마지막으로 편 책(모르면 null) */
+    private fun List<Open>.bookAt(pkg: String, t: Long) = filter { it.pkg == pkg && it.at <= t }.maxByOrNull { it.at }?.title
 
     /** 기록이 시작된 날. 그 전 날은 읽었는지 알 수 없다. 아직 기록이 없으면 null. */
     fun since(context: Context): LocalDate? = load(context).since
@@ -135,12 +182,15 @@ object ReadingLog {
     @Volatile private var counter: Counter? = null
 
     /**
-     * [from] 부터 날마다 앱별로 읽는 화면이 앞에 떠 있던 시간. [feed] 를 부를 때마다 지난번 이후의 사용 기록만 읽어
-     * 이어서 센다(읽는 화면이 열려 있던 상태도 이어 간다).
+     * [from] 부터 읽는 화면이 앞에 떠 있던 구간. [feed] 를 부를 때마다 지난번 이후의 사용 기록만 읽어
+     * 이어서 센다(읽는 화면이 열려 있던 상태도 이어 간다). 어느 책인지는 [totals] 에서 그때까지 알아낸 편 책으로 나눈다
+     * (알라딘처럼 서재로 돌아와서야 책을 아는 앱도 나중에 맞게 세도록).
      */
     private class Counter(val from: LocalDate, val packages: Set<String>, val zone: ZoneId) {
         private val start = from.atStartOfDay(zone).toInstant().toEpochMilli()
-        val totals = mutableMapOf<LocalDate, MutableMap<String, Long>>()
+        /** [pkg] 의 읽는 화면이 [a]~[b] 에 앞에 있었다. */
+        private class Span(val pkg: String, val a: Long, val b: Long)
+        private val spans = mutableListOf<Span>()
         /** 여기까지 읽었다. 처음에는 자정 직전에 펼친 책도 세도록 조금 앞에서부터. */
         private var until = start - LOOKBACK_MS
         private var openAt = -1L
@@ -148,14 +198,25 @@ object ReadingLog {
         private var openClass: String? = null
 
         private fun add(pkg: String, a: Long, b: Long) {
-            var t = maxOf(a, start)
-            while (t < b) {
-                val day = Instant.ofEpochMilli(t).atZone(zone).toLocalDate()
-                val end = minOf(b, day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
-                val apps = totals.getOrPut(day) { mutableMapOf() }
-                apps[pkg] = (apps[pkg] ?: 0) + (end - t)
-                t = end
+            if (b > start) spans += Span(pkg, maxOf(a, start), b)
+        }
+
+        /** 날마다 책([readingKey])별 시간. 구간마다 닫힐 때까지 그 앱에서 마지막으로 편 책([opens])으로 센다. */
+        @Synchronized
+        fun totals(opens: List<Open>): ReadingDays {
+            val totals = mutableMapOf<LocalDate, MutableMap<String, Long>>()
+            for (s in spans) {
+                val key = readingKey(s.pkg, opens.bookAt(s.pkg, s.b))
+                var t = s.a
+                while (t < s.b) {
+                    val day = Instant.ofEpochMilli(t).atZone(zone).toLocalDate()
+                    val end = minOf(s.b, day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
+                    val keys = totals.getOrPut(day) { mutableMapOf() }
+                    keys[key] = (keys[key] ?: 0) + (end - t)
+                    t = end
+                }
             }
+            return totals
         }
 
         @Synchronized
@@ -189,7 +250,7 @@ object ReadingLog {
 
     private fun file(context: Context) = File(Storage.of(context).filesDir, "reading.json")
 
-    /** `{"through": "2026-10-03", "since": "2026-09-27", "days": {"2026-10-03": {"kr.co.millie.eink": 1234}}}` */
+    /** `{"through": "2026-10-03", "since": "2026-09-27", "days": {"2026-10-03": {"kr.co.millie.eink/책 제목": 1234, "kr.co.millie.eink": 56}}}` */
     /** 이 런처만 쓰는 파일이라 쓸 때 함께 바꾸는 메모리 사본 */
     @Volatile private var cached: Saved? = null
 
