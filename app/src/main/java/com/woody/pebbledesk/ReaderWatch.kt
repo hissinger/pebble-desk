@@ -73,7 +73,6 @@ class ReaderWatchService : AccessibilityService() {
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         val spec = SPECS[e.packageName?.toString()] ?: return
-        if (!HomePrefs(this).autoBooks) return
         // 서재는 화면이 바뀌는 동안(칸을 다시 채우는 중, 표지를 불러오는 중, 누른 칸이 반전된 순간) 읽지 않고 멈출 때까지 미룬다.
         if (settleSpec?.pkg == spec.pkg) scheduleSettle(spec)
         when (e.eventType) {

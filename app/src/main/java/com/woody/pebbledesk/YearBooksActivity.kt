@@ -35,6 +35,8 @@ class YearBooksActivity : EinkActivity() {
     /** 보고 있는 해(처음에는 올해). 제목 오른쪽 `2026 ▾` 로 고른다. */
     private var year = LocalDate.now().year
     private lateinit var titleText: TextView
+    /** 제목 옆 권수(모든 앱의 앱 수와 같은 꼴). 지금 거른 목록의 수 */
+    private lateinit var titleCount: TextView
     private lateinit var yearPick: TextView
 
     /** 한 줄: 책의 기록, 그해 마지막으로 읽은 날과 완독한 날 중 늦은 날(목록 순서), 그해 완독했는가(`완독` 거르기) */
@@ -47,8 +49,10 @@ class YearBooksActivity : EinkActivity() {
         super.onCreate(savedInstanceState)
         val root = vbox()
         root.addView(titleRow("") { finish() }.apply {
-            // 제목 줄: `‹` · 제목 · (빈 자리) · `2026 ▾`(고를 해가 둘 이상일 때)
+            // 제목 줄: `‹` · 제목 · 권수 · (빈 자리) · `2026 ▾`(고를 해가 둘 이상일 때)
             titleText = getChildAt(1) as TextView
+            titleCount = text("", 21f, color = Ui.GRAY)
+            addView(titleCount, lp(WRAP, WRAP).apply { marginStart = dp(14); topMargin = dp(6) })
             addView(View(context), lp(0, 0, 1f))
             yearPick = text("", 21f, Ui.bold).apply { setPadding(dp(16), dp(20), 0, dp(20)) }
             addView(yearPick, lp(WRAP, WRAP))
@@ -118,6 +122,7 @@ class YearBooksActivity : EinkActivity() {
         val finishedOnly = prefs.yearFinishedOnly
         val list = if (finishedOnly) all.filter { it.doneInYear } else all
         titleText.text = if (year == today.year) getString(R.string.year_books) else getString(R.string.year_books_of, year)
+        titleCount.text = if (list.isEmpty()) "" else getString(R.string.year_books_count, list.size)
         yearPick.text = "$year ▾"
         yearPick.visibility = if (years.size > 1) View.VISIBLE else View.GONE
         yearPick.setOnClickListener {

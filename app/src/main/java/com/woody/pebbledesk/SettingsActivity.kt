@@ -70,8 +70,8 @@ class SettingsActivity : EinkActivity() {
         toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint)) { prefs.showIcons = it }
         // 독서(읽는 책 자동 추가·오늘 읽은 시간·하루 목표·한 주 시작)는 줄이 많아 따로 한 화면에 둔다.
         val reading = listOfNotNull(
-            getString(R.string.auto_books_short).takeIf { prefs.autoBooks },
-            getString(R.string.reading_time).takeIf { prefs.readingTime },
+            getString(R.string.auto_books_short).takeIf { ReaderWatchService.isEnabled(this) },
+            getString(R.string.reading_time).takeIf { ReadingLog.hasAccess(this) },
         )
         row(getString(R.string.reading_settings), reading.joinToString(" · ").ifEmpty { getString(R.string.off) },
             on = reading.isNotEmpty(), next = true) {
@@ -108,41 +108,24 @@ class SettingsActivity : EinkActivity() {
     /** 독서 화면: 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */
     private fun renderReading() {
         list.removeAllViews()
-        // 읽는 책 자동 추가: 켜려면 안드로이드 접근성에서 이 앱을 켜야 한다(앱이 대신 켤 수 없다).
+        // 읽는 책 자동 추가 = 안드로이드 접근성에서 이 앱이 켜져 있음(앱이 대신 켜고 끌 수 없다).
+        // 켜져 있든 꺼져 있든 무엇을 읽는지 안내 창(켜고 끄기는 그 창의 `접근성 설정 열기`).
         val watching = ReaderWatchService.isEnabled(this)
-        val needWatch = prefs.autoBooks && !watching
         row(
-            getString(R.string.auto_books),
-            getString(if (needWatch) R.string.allow_access else if (prefs.autoBooks) R.string.on else R.string.off),
-            on = prefs.autoBooks, next = needWatch, hint = getString(R.string.auto_books_hint),
-        ) {
-            when {
-                // 안드로이드 13+ 은 '제한된 설정'에 막혀 돌아왔을 수 있어 푸는 길(앱 정보)과 함께 다시 보인다.
-                needWatch -> if (ReaderWatchService.mayBeRestricted) autoBooksSheet() else ReaderWatchService.openSettings(this)
-                prefs.autoBooks -> { prefs.autoBooks = false; renderReading() }
-                watching -> { prefs.autoBooks = true; renderReading() }
-                else -> autoBooksSheet()
-            }
-        }
+            getString(R.string.auto_books), getString(if (watching) R.string.on else R.string.off),
+            on = watching, next = true, hint = getString(R.string.auto_books_hint),
+        ) { autoBooksSheet(watching) }
         // 무엇을 어떻게 읽는지(서재 화면에 보이는 것만, 앱마다 되는 화면) 안내
         row(getString(R.string.auto_books_guide), null, next = true) {
             startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, PAGE_GUIDE))
         }
-        // 켜 두었는데 권한이 없으면 값 자리에 '권한 허용'을 두고, 누르면 시스템 화면으로 보낸다.
+        // 오늘 읽은 시간 = 사용 기록 액세스 허용. 켜고 끄기 모두 그 시스템 화면에서 한다.
         val access = ReadingLog.hasAccess(this)
-        val needAccess = prefs.readingTime && !access
         row(
-            getString(R.string.reading_time),
-            getString(if (needAccess) R.string.allow_access else if (prefs.readingTime) R.string.on else R.string.off),
-            on = prefs.readingTime, next = needAccess, hint = getString(R.string.reading_time_hint),
-        ) {
-            when {
-                needAccess -> ReadingLog.openAccessSettings(this)
-                prefs.readingTime -> { prefs.readingTime = false; renderReading() }
-                else -> { prefs.readingTime = true; if (!access) ReadingLog.openAccessSettings(this) else renderReading() }
-            }
-        }
-        if (prefs.readingTime) {
+            getString(R.string.reading_time), getString(if (access) R.string.on else R.string.off),
+            on = access, next = true, hint = getString(R.string.reading_time_hint),
+        ) { ReadingLog.openAccessSettings(this) }
+        if (access) {
             // 정해 둔 값 다음에 `직접 입력`. 직접 넣은 값이면 그 줄에 값을 함께 보이고 ✓. 시간은 독서 기록과 같은 꼴(`1시간 30분`)
             val goals = listOf(0, 15, 20, 30, 45, 60)
             val goalText = { m: Int -> if (m == 0) getString(R.string.none) else duration(m * 60_000L) }
@@ -215,13 +198,16 @@ class SettingsActivity : EinkActivity() {
         list.addView(hline(1, Ui.DIVIDER))
     }
 
-    /** 자동 추가를 켜는 창: 무엇을 읽는지 + `접근성 설정 열기`. 안드로이드 13+ 이면 제한된 설정 안내와 `앱 정보 열기` 도 */
-    private fun autoBooksSheet() {
+    /**
+     * 자동 추가 창: 무엇을 읽는지 + `접근성 설정 열기`. 안드로이드 13+ 이면 늘 `앱 정보 열기` 도 두고,
+     * 꺼져 있으면([watching] 이 false) 제한된 설정 안내를 설명에 붙인다.
+     */
+    private fun autoBooksSheet(watching: Boolean) {
         val restricted = ReaderWatchService.mayBeRestricted
-        val desc = getString(R.string.auto_books_desc) + if (restricted) "\n\n" + getString(R.string.restricted_hint) else ""
+        val desc = getString(R.string.auto_books_desc) + if (restricted && !watching) "\n\n" + getString(R.string.restricted_hint) else ""
         val sheet = Sheet(this).header(getString(R.string.auto_books), desc)
-            .item(getString(R.string.open_accessibility), bold = true) { prefs.autoBooks = true; ReaderWatchService.openSettings(this) }
-        if (restricted) sheet.item(getString(R.string.open_app_info)) { prefs.autoBooks = true; ReaderWatchService.openAppInfo(this) }
+            .item(getString(R.string.open_accessibility), bold = true) { ReaderWatchService.openSettings(this) }
+        if (restricted) sheet.item(getString(R.string.open_app_info)) { ReaderWatchService.openAppInfo(this) }
         sheet.show()
     }
 

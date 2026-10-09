@@ -77,22 +77,12 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("year_finished_only", false)
         set(v) = sp.edit().putBoolean("year_finished_only", v).apply()
 
-    /** 교보도서관·밀리의서재에서 편 책을 읽고 있는 책에 자동으로 넣기(접근성 서비스 필요) */
-    var autoBooks: Boolean
-        get() = sp.getBoolean("auto_books", false)
-        set(v) = sp.edit().putBoolean("auto_books", v).apply()
+    // 읽는 책 자동 추가·오늘 읽은 시간은 따로 켜짐 값을 두지 않는다. 시스템의 접근성(ReaderWatchService.isEnabled)·
+    // 사용 기록 액세스(ReadingLog.hasAccess)가 곧 켜짐이다(1.3.1 까지의 `auto_books`·`reading_time` 은 읽지 않는다).
 
-    /** 하단에 오늘 읽은 시간·연속 독서일(사용 기록 액세스 권한 필요) */
-    var readingTime: Boolean
-        get() = sp.getBoolean("reading_time", false)
-        set(v) = sp.edit().putBoolean("reading_time", v).apply()
-
-    /**
-     * 시작하기(온보딩)를 이미 보였는가. 자동 추가·오늘 읽은 시간을 한 번이라도 켜거나 끈 적이 있으면(예전 버전 포함)
-     * 둘 다 아는 사람이라 보인 것으로 친다.
-     */
+    /** 시작하기(온보딩)를 한 번 띄웠는가(둘 다 이미 켜져 있어 건너뛴 경우도) */
     var onboarded: Boolean
-        get() = sp.getBoolean("onboarded", false) || sp.contains("auto_books") || sp.contains("reading_time")
+        get() = sp.getBoolean("onboarded", false)
         set(v) = sp.edit().putBoolean("onboarded", v).apply()
 
     /**

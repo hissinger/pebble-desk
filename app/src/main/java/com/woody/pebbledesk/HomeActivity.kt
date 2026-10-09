@@ -64,12 +64,7 @@ class HomeActivity : EinkActivity() {
         refresh()
         // 읽은 시간은 다른 앱에서 돌아올 때만 바뀐다(레이아웃 때의 refresh 에서는 다시 세지 않는다).
         updateReading()
-        // 처음 설치했으면 꺼져 있는 독서 두 기능을 켜도록 시작하기를 한 번 띄운다. 띄우는 순간 본 것으로 적어
-        // 두 번 뜨지 않게 하고, 시스템 설정에 갔다가 홈 버튼으로 나가도 다시 띄우지 않는다(설정 › 독서에 같은 것이 있다).
-        if (OnboardingActivity.shouldShow(this, prefs)) {
-            prefs.onboarded = true
-            startActivity(OnboardingActivity.intent(this))
-        }
+        OnboardingActivity.showOnce(this, prefs)
     }
 
     /**
@@ -273,10 +268,10 @@ class HomeActivity : EinkActivity() {
 
     private fun findApp(key: String): AppEntry? = apps.find { it.key == key }
 
-    /** 하단 가운데의 `오늘 42분 · 5일째`. 꺼 두었거나 사용 기록 권한이 없으면 비운다. */
+    /** 하단 가운데의 `오늘 42분 · 5일째`. 사용 기록 액세스가 없으면(= 오늘 읽은 시간 꺼짐) 비운다. */
     private fun updateReading() {
-        // 어느 책인지는 알 수 없어 하루 합계만 센다.
-        val summary = if (prefs.readingTime) ReadingLog.summary(this, ReadingLog.readerPackages(this)) else null
+        // 어느 책인지는 알 수 없어 하루 합계만 센다. 권한이 없으면 null.
+        val summary = ReadingLog.summary(this, ReadingLog.readerPackages(this))
         val line = summary?.let {
             val today = getString(R.string.reading_today, duration(it.todayMs))
             // 연속일은 이틀째부터
