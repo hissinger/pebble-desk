@@ -3,11 +3,14 @@ package com.woody.pebbledesk
 import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import java.io.ByteArrayOutputStream
 import android.view.Display
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.graphics.Rect
 import android.graphics.Bitmap
 import android.provider.Settings
@@ -862,6 +865,31 @@ class ReaderWatchService : AccessibilityService() {
             val me = ComponentName(context, ReaderWatchService::class.java)
             val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
             return enabled.split(':').any { ComponentName.unflattenFromString(it) == me }
+        }
+
+        /**
+         * 안드로이드 13+ 의 '제한된 설정': 파일(APK)로 직접 깐 앱은 접근성에서 흐리게 막힌다. 앱 정보 › ⋮ ›
+         * `제한된 설정 허용` 으로 풀어야 한다(그 창을 한 번 본 뒤에야 메뉴가 생긴다). 막혔는지는 알 수 없어 13+ 이면 안내한다.
+         */
+        val mayBeRestricted: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+        /** 시스템 접근성 설정 */
+        fun openSettings(context: Context) {
+            runCatching { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        }
+
+        /**
+         * 이 앱의 앱 정보(제한된 설정 허용). 기기 설정 아이콘을 숨긴 기기(iReader)에서도 직접 열린다.
+         * 안드로이드 13 설정 앱은 ⋮ 메뉴를 만들 때 앱 uid 를 앱 목록이 넘기는 인자나 extra `uId` 에서만 읽어,
+         * 없으면 -1 로 묻다가 실패해 `제한된 설정 허용` 이 빠진다(에뮬레이터 API 33 에서 확인). 그래서 uid 를 함께 넘긴다.
+         */
+        fun openAppInfo(context: Context) {
+            runCatching {
+                context.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                        .putExtra("uId", Process.myUid())
+                )
+            }
         }
     }
 }

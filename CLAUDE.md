@@ -56,6 +56,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.3.0-release.apk </dev/
 | Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 10권, 홈에는 4권, YES24 표지 검색)과 나간 책(완독·뺀 책, `BookShelf.history`), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
 | AppListActivity / FavoritesActivity / SettingsActivity / DeviceInfoActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 / 기기 정보(사진으로 찍어 보내는 진단 화면: 속성·권한·누른 키·빠른 설정 시험) |
+| OnboardingActivity | ⑭ 시작하기: 처음 한 번, 읽는 책 자동 추가·오늘 읽은 시간을 설명하고 켜게 한다(안드로이드 13+ 제한된 설정 안내 포함) |
 | PagedRows | 스크롤 없는 페이지 목록(목록·격자, fixedRows) |
 | EinkActivity / Sheet / Ui / TopBarView / HomePrefs | 공통 화면(밀기·페이지 버튼·언어·밀도 맞춤)·아래 메뉴·규격(`PictureView`, 완독 도장을 찍는 줄 `StampedRow`, 기준 폭 572dp 포함)·상단·설정 저장 |
 | Device / Crema | 기기 종류(크레마·메이북·기타)와 기기마다 다른 동작(빠른 설정·조명·시스템 속성) / 크레마 전용 화면 보정(대비·가려지는 아래·로고) |
@@ -89,4 +90,5 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.3.0-release.apk </dev/
   - 알라딘(`aladinreader://?view=viewer&itemid=…&isShortcut=true`)·리디(실행 extra `book_id`)는 특정 책을 열 수 있다. 교보eBook은 `kyoboebookeink://mylibrary`(서재)까지.
   - 알라딘·리디·교보eBook은 "홈 화면에 바로가기 추가"를 보내므로, 런처가 핀 바로가기(`ACTION_CONFIRM_PIN_SHORTCUT`)를 받으면 제목·앱·바로 열기 링크를 얻는다. 표지는 알라딘만 쓸 만하고(리디는 아래가 잘림, 교보는 찌그러짐) YES24 검색으로 보완.
   - 받아 둔 책 파일은 다른 앱 저장소(안드로이드 11 제한)·DRM 이라 읽을 수 없다.
-- 첫 설치 개선 후보: 빈 자주 쓰는 앱의 추가 동작, 크레마 기본 앱 기본 숨김, 기본 홈 앱 안내.
+- 첫 설치 개선 후보: 빈 자주 쓰는 앱의 추가 동작, 크레마 기본 앱 기본 숨김, 기본 홈 앱 안내. (자동 추가·읽은 시간 켜기는 ⑭ 시작하기로 했다)
+- 페이지 버튼이 음량 키(`VOLUME_UP`·`DOWN`)로 오는 기기(iReader Ocean): 지금은 목록이 안 넘어간다. 음량 키를 넘김으로 쓸지 정해야 한다.

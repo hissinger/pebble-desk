@@ -8,22 +8,22 @@ Pebble Desk 를 크레마 페블 말고 다른 전자잉크 기기에서 쓸 수
 
 | | 크레마 페블 | Meebook M6C | Meebook E6 | Viwoods AiPaper Mini | iReader Ocean (오션) |
 |---|---|---|---|---|---|
-| 근거 | 실제 기기 | 전체 OTA 펌웨어 분석 | 실제 기기 사진(2026-10-07, 기기 정보 화면) + 리뷰 | 실제 기기 사진(2026-10-07, 홈 화면·기기 정보 화면) + 리뷰·판매 페이지·다른 개발자 기록 | 사용자 홈 사진 1장(2026-10-09) + Musnap Ocean 설명서(2025-12, 만든 곳 Shenzhen Zhangyue) + 리뷰 |
-| 화면 | 6" 1072×1456, 밀도 300 (1dp = 1.875px) | 6" 컬러 1072×1448, 밀도 320 (1dp = 2px) | 6" Carta 1300 1072×1448, 밀도 320 (1dp = 2px) | 8.2" Carta 1000 1440×1920, 약 293ppi(제조사는 297·292), 밀도 320 (1dp = 2px) | 7" Carta 1300 1264×1680, 300ppi. 밀도 **(미확인)** |
-| dp 크기 | 572×777dp | 536×724dp | 536×724dp | 720×960dp → 앱 기준 572×762dp(밀도 맞춤 403) | 앱 기준 572×760dp(밀도 맞춤 약 354) **(추정)** |
-| 칩 · OS | RK3566 · 안드로이드 11 (API 30) | RK3566 · 안드로이드 11 (API 30, 64비트) | RK3566 (`updatemodel`) · 안드로이드 11 (API 30) | MediaTek MT8788 (판매 페이지) · 안드로이드 13 (API 33), `Build.DISPLAY=3.15.15` | 8코어 2.2GHz(Ocean 5 Pro·Musnap. 표준 Ocean 5 는 4코어) · 안드로이드 14 (SmartOS 3.1, 시스템 버전 `3.1.10.183.0`) |
-| `Build.MODEL` | `CREMA PEBBLE` | `M6C` | `E6` | `Viwoods AiPaper Mini`. 제조사 모델 번호는 `SE05`(FCC ID `2BKO6-SE05`) | **(미확인)**. Musnap Ocean 모델 번호 `SM07A-AKDW`(FCC ID `2BQD6-SM07A-OCEAN`) |
+| 근거 | 실제 기기 | 전체 OTA 펌웨어 분석 | 실제 기기 사진(2026-10-07, 기기 정보 화면) + 리뷰 | 실제 기기 사진(2026-10-07, 홈 화면·기기 정보 화면) + 리뷰·판매 페이지·다른 개발자 기록 | 사용자 사진: 홈(2026-10-09)·기기 정보·접근성(2026-10-10, Ocean 5 Pro) + Musnap Ocean 설명서(2025-12, 만든 곳 Shenzhen Zhangyue) + 리뷰 |
+| 화면 | 6" 1072×1456, 밀도 300 (1dp = 1.875px) | 6" 컬러 1072×1448, 밀도 320 (1dp = 2px) | 6" Carta 1300 1072×1448, 밀도 320 (1dp = 2px) | 8.2" Carta 1000 1440×1920, 약 293ppi(제조사는 297·292), 밀도 320 (1dp = 2px) | 7" Carta 1300 1264×1680, 300ppi, 밀도 320 (632×840dp) |
+| dp 크기 | 572×777dp | 536×724dp | 536×724dp | 720×960dp → 앱 기준 572×762dp(밀도 맞춤 403) | 앱 기준 571×759dp(밀도 맞춤 354, 기기 정보) |
+| 칩 · OS | RK3566 · 안드로이드 11 (API 30) | RK3566 · 안드로이드 11 (API 30, 64비트) | RK3566 (`updatemodel`) · 안드로이드 11 (API 30) | MediaTek MT8788 (판매 페이지) · 안드로이드 13 (API 33), `Build.DISPLAY=3.15.15` | 8코어 2.2GHz(Ocean 5 Pro·Musnap. 표준 Ocean 5 는 4코어) · 안드로이드 14 (API 34, 빌드 `UP1A.231005.007`, SmartOS 3.1) |
+| `Build.MODEL` | `CREMA PEBBLE` | `M6C` | `E6` | `Viwoods AiPaper Mini`. 제조사 모델 번호는 `SE05`(FCC ID `2BKO6-SE05`) | `Ocean 5 Pro`, 모델 번호 `SM07A-CKDA`(기기 정보). Musnap Ocean 모델 번호 `SM07A-AKDW`(FCC ID `2BQD6-SM07A-OCEAN`) |
 | `Build.DEVICE` | `CREMA_PEBBLE` | `M6C` | `E6` | `Viwoods` | **(미확인)** |
-| `Build.MANUFACTURER` · `BRAND` | `into1` · `YES24` | `Haoqing` · `Haoqing` | `Haoqing` · `MEEBOOK` (브랜드가 M6C 와 다르다) | `Viwoods` · `Viwoods AiPaper Mini` | **(미확인)**. 만든 곳 Shenzhen Zhangyue Technology(掌阅 iReader) |
+| `Build.MANUFACTURER` · `BRAND` | `into1` · `YES24` | `Haoqing` · `Haoqing` | `Haoqing` · `MEEBOOK` (브랜드가 M6C 와 다르다) | `Viwoods` · `Viwoods AiPaper Mini` | `iReader` · `iReader`. 만든 곳 Shenzhen Zhangyue Technology(掌阅 iReader) |
 | 펌웨어 만든 곳 | wetao / into1 (`ZlSystemUI`, `ZlSettings`) | Haoqing (`SystemUI` 수정판, `Haoqing-*` 앱) | Haoqing | ODM **Wisky**(`ro.build.user=wisky`, 시스템 앱 `com.wisky.*`), 위에 Viwoods 앱. 펌웨어 3.x, 두 달쯤마다 업데이트. Rockchip 계열이 아니다 | 掌阅 iReader **SmartOS** 3.x. Musnap 은 같은 기기에 이름만 바꾼 것 |
 | 안드로이드 하단 내비게이션 바 | 없음 | 없음 (`config_showNavigationBar=false`) | 없음. 대신 **상단 바**에 홈·뒤로·새로고침·조명 버튼과 최근 앱 버튼(약 50dp, 사진으로 어림) | 없음(사진). 화면 아래 정전식 버튼 3개: 뒤로·홈·AI | 없음 **(추정)**. 아래 가장자리 끌어올리기: 왼쪽 = 작업 관리자, 가운데 = 홈, 오른쪽 = 표시 최적화(리뷰). 모든 화면 위에 시스템 상단 바(시각 · BT · 조명 · 배터리 · `···`, 설명서 그림) |
 | 빠른 설정 | 크레마 전용 앱 `com.inno.quicksetting` | 안드로이드 기본 패널을 고친 것, 타일 2줄×6칸 | M6C 와 같음 (실기기 사진) | Viwoods **제어 센터**: 오른쪽 위에서 손가락으로 끌어내림, 화면 오른쪽 절반 세로 패널. Wi-Fi·BT·새로고침·대비·버튼 잠금·새로고침 모드·밝기 등. 알림창은 없다. 왼쪽 위 끌어내리기 = 새로고침 | **제어 패널**: 화면 위에서 끌어내린다. 오른쪽 위 모서리에서 끌어내리면 캡처·노트·작업 전환 패널(Musnap 리뷰). 손동작은 설정 › 보조 기능 › 전역 손동작에서 바꿀 수 있다 |
 | 빠른 설정 여는 방송 | `com.epd.drop_down` | `com.haoqing.action.QUICK_SETTINGS` | 같음. `메이북 ›` 로 열림(2026-10-07 사용자 확인). `크레마 ›` 는 아무 일 없음 | 없음. 크레마·메이북 방송으로는 안 열리고 안드로이드 기본 펼치기로 열린다 | **(미확인)**. 크레마·메이북 방송으로는 안 열릴 것 **(추정)** |
 | 안드로이드 기본 펼치기(`expandSettingsPanel`) | 열림: 크레마식 시스템 알림창(밝기·음량·대비) | **(미확인)** (에뮬레이터에서는 열림) | 열림. 메이북 방송과 같은 패널 | 열림: Viwoods 제어 센터(기기 정보 `안드로이드 ›`, 사용자 확인) | **(미확인)** |
 | 화면 대비 | `hq_contrast`(기본 56), 앱 화면을 밝기^(1/s) 로 어둡게, s = 1 − c×90/8000 | `hq_contrast`(기본 34), 하드웨어 합성 단계 1.5 − c×0.018 | `Settings.System hq_contrast` 키가 **없다**(기기 정보에 `-`). 다른 곳에 두는 듯 **(미확인)** | 제어 센터의 대비 + 펌웨어 3.12(2026-01)부터 앱별 `App Display`(대비·연한 색 지우기). 키 **(미확인)** | 앱별 표시 최적화(대비·선명도·전체 새로고침 간격·다크 모드). 키 **(미확인)** |
-| 페이지 버튼 | 없음 | 없음 (키 코드만 있음: 291·292) | 2개 + 화면 아래 정전식 버튼. `persist.haoqing.pagekeys=41`. 키 코드 **(미확인)** | 없음. 정전식 뒤로·홈·AI 버튼, 전원 겸 지문 버튼. AI 버튼 키 코드 **(미확인)** | 오른쪽 손잡이에 2개. 페이지 넘김이 필요 없는 앱에서는 **음량 키**로 동작(Musnap 리뷰) → Pebble Desk 목록은 안 넘어갈 것 **(추정)** |
+| 페이지 버튼 | 없음 | 없음 (키 코드만 있음: 291·292) | 2개 + 화면 아래 정전식 버튼. `persist.haoqing.pagekeys=41`. 키 코드 **(미확인)** | 없음. 정전식 뒤로·홈·AI 버튼, 전원 겸 지문 버튼. AI 버튼 키 코드 **(미확인)** | 오른쪽 손잡이에 2개. 페이지 넘김이 필요 없는 앱에서는 **음량 키**로 동작(Musnap 리뷰) → 기기 정보에서 `24 KEYCODE_VOLUME_UP`(scan 115) 확인. Pebble Desk 목록은 안 넘어간다 |
 | 기본 홈 바꾸기 | 됨 (지금 쓰는 중) | 표준 안드로이드 11 방식, 막는 코드 없음 | 됨 (기기 정보 `기본 홈 켜짐`, 홈 화면 사진) | 됨 (Pebble Desk 홈 사진. 리뷰에서도 Nova·inkOS 를 안드로이드 설정 › 앱 › 기본 앱 › 홈 으로 씀) | 됨 (Pebble Desk 홈 사진) |
-| Pebble Desk 판정 `Device.kind` | `CREMA` (`Build.DEVICE` 가 `CREMA` 로 시작) | `MEEBOOK` (`ro.haoqing.brand` 있음) | `MEEBOOK` (기기 정보 `메이북`) | `OTHER` (기기 정보 `기타`) | `OTHER` **(추정)** |
+| Pebble Desk 판정 `Device.kind` | `CREMA` (`Build.DEVICE` 가 `CREMA` 로 시작) | `MEEBOOK` (`ro.haoqing.brand` 있음) | `MEEBOOK` (기기 정보 `메이북`) | `OTHER` (기기 정보 `기타`) | `OTHER` (기기 정보 `기타`) |
 
 - 크레마와 메이북은 둘 다 **Rockchip 전자잉크 개발 키트**에서 나왔다(Viwoods 는 MediaTek 이라 다르다). 안드로이드 빌드 기반(`RQ2A.210505.003`), `android.os.EinkManager`, SystemUI 의 `EinkSettingsManager`·`EinkSettingsProvider`(`content://com.android.systemui.eink/einksettings`) 이름이 같다. 그 위를 회사마다 따로 고쳤다.
 - `Build.DEVICE` 는 기기 코드명(`ro.product.device`)이다. 안드로이드 11 은 `ro.product.device` 가 직접 설정돼 있지 않으면 `ro.product.property_source_order`(기본 product, odm, vendor, system_ext, system) 순서로 `ro.product.<파티션>.device` 중 처음 비어 있지 않은 값을 쓴다(`init/property_service.cpp`). `MODEL`·`MANUFACTURER`·`BRAND` 도 같다.
@@ -234,13 +234,22 @@ Pebble Desk(1.2.x)를 기본 홈으로 쓰는 홈 화면. 책 1권(밀리의서�
 - **하단 줄**: `모든 앱 ›` · 톱니. 가운데가 비어 있다 → 오늘 읽은 시간을 켜지 않았다. 사용자가 "기록이 어떻게 쌓이는지 모르겠다" 고 해서, 꺼져 있을 때 하단에 `읽은 시간 켜기` 를 보이는 시안을 만들었다(`design-review/reading_off_sheet.png`).
 - **내비게이션 바 없음**: 하단 줄이 화면 맨 아래에 다 보인다.
 
+### 실기기 사진에서 본 것 (2026-10-10 00:16, 다른 사용자, Ocean 5 Pro, Pebble Desk 1.3.0)
+
+- **기기 정보**: 위 표에 넣었다. 시스템 속성에 `persist.sys.eink.*`(contrast=30 · color.filter · gesture.width · regal) · `persist.sys.dither.contrast=102` · `persist.eink.dither256.disable` · `ro.eink.fpga.bridg…`, 설정 값에 `EinkLightStep` · `down_key_long_function=4` · `eink_wallpaper_name` 이 보인다.
+- **오늘 읽은 시간**: 켜짐(사용 기록 권한 됨). 최근 화면에 `kr.co.millie.millieshelf/MillieViewerActivity`, `kr.co.kyobobook.KEL/B2BViewerEpubMainActivity` 가 잡혔다. 둘 다 `READER` 정규식에 맞으니 읽은 시간은 쌓인다.
+- **읽는 책 자동 추가가 켜지지 않는다**: 접근성 › 다운로드한 앱 › Pebble Desk 가 흐리게 `사용 안함`, 누르면 `제한된 설정 — 보안을 위해 이 설정은 현재 사용할 수 없습니다`. iReader 고유 제한이 아니라 **안드로이드 13+ 의 제한된 설정**이다: 파일(APK)로 직접 깐 앱은 접근성·알림 접근 같은 권한을 켜지 못하게 막는다(앱 장터의 세션 설치는 해당 없음). 같은 화면의 Smart Launcher Gestures 는 흐리지 않다(Play 로 깐 것으로 보인다).
+  - 푸는 법: 설정 › 앱 › Pebble Desk › 앱 정보 오른쪽 위 `⋮` › **제한된 설정 허용** → 다시 접근성에서 켠다. 안드로이드 14 는 `제한된 설정` 창을 한 번 본 뒤에야 `⋮` 메뉴에 이 항목이 생긴다. SmartOS 앱 정보 화면에 `⋮` 가 있는지는 **(미확인)**.
+  - 안 되면 PC 에서 `adb shell appops set com.woody.pebbledesk ACCESS_RESTRICTED_SETTINGS allow`(adb 가 되는 경우) 또는 adb 로 다시 설치(`adb install` 은 제한이 걸리지 않는다).
+  - 페블·메이북(안드로이드 11)에는 이 제한이 없다. AiPaper Mini(안드로이드 13)는 같은 제한이 있을 텐데 보고가 없었다 **(미확인)**.
+
 ### 다음에 받을 것
 
-1. 설정 › 기기 정보 사진(모델·제조사·화면 dp·기기 종류).
+1. ~~설정 › 기기 정보 사진~~ 받음(2026-10-10). 빠른 설정 시험 결과는 아직.
 2. 기기 정보의 빠른 설정 시험 세 버튼(`크레마 ›` · `메이북 ›` · `안드로이드 ›`) 가운데 무엇이 제어 패널을 여는지.
-3. 페이지 버튼 두 개를 누른 뒤 기기 정보의 키 번호·스캔 코드(음량 키인지).
+3. ~~페이지 버튼 키 번호~~ 위 버튼 = `VOLUME_UP`(scan 115). 아래 버튼은 `VOLUME_DOWN` **(추정)**.
 4. Pebble Desk 홈에서 위에서 끌어내리기가 제어 패널을 한 번에 여는지.
-5. 접근성(읽는 책 자동 추가)이 켜지는지, 하루 뒤에도 켜져 있는지.
+5. 접근성(읽는 책 자동 추가): 제한된 설정을 푼 뒤 켜지는지, 하루 뒤에도 켜져 있는지.
 
 ## Pebble Desk 에 넣은 것
 
@@ -252,6 +261,7 @@ Pebble Desk(1.2.x)를 기본 홈으로 쓰는 홈 화면. 책 1권(밀리의서�
 | 페이지 버튼: 메이북 키 291(위)·292(아래)와 표준 `PAGE_UP`·`PAGE_DOWN` → `EinkActivity.onSwipe`. 모든 목록 화면에 적용. 누르고 있을 때 오는 반복은 넘기지 않는다 | 가리지 않음 | 표준 키·길게 누르기(한 쪽만)는 에뮬레이터에서 확인. 단 표준 PAGE 키는 이동 키라, 터치 모드를 벗어나면서 포커스 받을 뷰가 생기면 첫 누름을 안드로이드가 먹는다(`ViewRootImpl.checkForLeavingTouchModeAndConsume`). 에뮬레이터 모든 앱 화면에서 그랬다. 291·292 는 일반 안드로이드에 없는 키 코드라 메이북 실기기에서만 확인 가능 **(미확인)** |
 | 화면 폭 572dp 맞춤: 짧은 변이 572dp 가 되도록 앱 밀도를 다시 정한다(`Ui.designDensityDpi`, `EinkActivity.attachBaseContext`). E6 는 320 → 300dpi, 572×772dp 로 페블과 같은 물리 크기. 기기 정보의 `화면` 줄에 기기 값과 `앱 기준` 값을 함께 보인다 | — | E6 크기 에뮬레이터(536×724dp)에서 1.2.0 은 책 3권일 때 **함께 읽는 책 줄 아래 32dp 가 잘렸고**(큰 표지가 최소 136dp 에 걸려 책 자리가 58dp 넘침), 상단 바 54dp 를 흉내 내면(`wm size 1072x1388`) 설정 마지막 줄이 40dp 잘렸다. 밀도 맞춤 뒤 셋 다 들어감(설정은 상단 바 54dp 를 빼도 약 714dp 라 708dp 가 여유 6dp 로 들어간다). 페블 실기기 **(미확인)**. AiPaper Mini(1440px → 403dpi, 572×762dp) 실기기 홈 사진에서 그대로 들어감 |
 | 기기 정보 화면(사진으로 찍어 보내는 진단). 시스템 속성·설정 값은 아는 키에 더해 `getprop`·`Settings.System` 전체에서 전자잉크·조명 낱말이나 제조사 이름이 든 키를 찾아 있는 것만 보인다(1.2.1 까지는 크레마·메이북 키만 보여 AiPaper Mini 의 고유 값이 안 나왔다) | — | 에뮬레이터(M6C 이름)에서 한 화면에 들어감, 볼륨 키가 `24 KEYCODE_VOLUME_UP` 로 기록됨. E6 실기기에서도 상단 바 아래에 다 들어감 |
+| 안드로이드 13+ **제한된 설정** 안내: 설정 › 독서의 자동 추가 창과 ⑭ 시작하기(켜려다 못 켜고 돌아왔을 때)에 `앱 정보 › ⋮ › 제한된 설정 허용` 안내와 `앱 정보 열기`. 앱 정보는 `ACTION_APPLICATION_DETAILS_SETTINGS` + extra `uId`(안드로이드 13 설정 앱 `AppInfoDashboardFragment.getUid()` 는 인자 `uid` 나 extra `uId` 만 읽어, 없으면 -1 로 묻다 실패해 ⋮ 메뉴가 빠진다) | 안드로이드 13+ | 에뮬레이터 API 33(`CremaPebble_A13`): 파일 앱으로 깐 APK 가 `packageSource=3`·`ACCESS_RESTRICTED_SETTINGS: deny` 로 막힘 → 막힌 창 → 시작하기에 안내·`앱 정보 열기` → ⋮ `Allow restricted settings` → 접근성 켜짐 → `켜짐 ✓`. `uId` 없이 열면 ⋮ 가 없다(설정 › 앱 목록에서 들어가면 있다). iReader(안드로이드 14) **(미확인)** |
 
 넣지 않은 것: `com.haoqing.action.FULL_REFRESH`(잔상 제거 버튼).
 

@@ -117,12 +117,11 @@ class SettingsActivity : EinkActivity() {
             on = prefs.autoBooks, next = needWatch, hint = getString(R.string.auto_books_hint),
         ) {
             when {
-                needWatch -> openAccessibility()
+                // 안드로이드 13+ 은 '제한된 설정'에 막혀 돌아왔을 수 있어 푸는 길(앱 정보)과 함께 다시 보인다.
+                needWatch -> if (ReaderWatchService.mayBeRestricted) autoBooksSheet() else ReaderWatchService.openSettings(this)
                 prefs.autoBooks -> { prefs.autoBooks = false; renderReading() }
                 watching -> { prefs.autoBooks = true; renderReading() }
-                else -> Sheet(this).header(getString(R.string.auto_books), getString(R.string.auto_books_desc))
-                    .item(getString(R.string.open_accessibility), bold = true) { prefs.autoBooks = true; openAccessibility() }
-                    .show()
+                else -> autoBooksSheet()
             }
         }
         // 무엇을 어떻게 읽는지(서재 화면에 보이는 것만, 앱마다 되는 화면) 안내
@@ -216,8 +215,14 @@ class SettingsActivity : EinkActivity() {
         list.addView(hline(1, Ui.DIVIDER))
     }
 
-    private fun openAccessibility() {
-        runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+    /** 자동 추가를 켜는 창: 무엇을 읽는지 + `접근성 설정 열기`. 안드로이드 13+ 이면 제한된 설정 안내와 `앱 정보 열기` 도 */
+    private fun autoBooksSheet() {
+        val restricted = ReaderWatchService.mayBeRestricted
+        val desc = getString(R.string.auto_books_desc) + if (restricted) "\n\n" + getString(R.string.restricted_hint) else ""
+        val sheet = Sheet(this).header(getString(R.string.auto_books), desc)
+            .item(getString(R.string.open_accessibility), bold = true) { prefs.autoBooks = true; ReaderWatchService.openSettings(this) }
+        if (restricted) sheet.item(getString(R.string.open_app_info)) { prefs.autoBooks = true; ReaderWatchService.openAppInfo(this) }
+        sheet.show()
     }
 
     private fun section(title: String) {

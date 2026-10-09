@@ -84,6 +84,12 @@
             android:screenOrientation="portrait" />
 
         <activity
+            android:name=".OnboardingActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".SettingsActivity"
             android:excludeFromRecents="true"
             android:exported="false"

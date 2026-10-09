@@ -88,6 +88,14 @@ class HomePrefs(context: Context) {
         set(v) = sp.edit().putBoolean("reading_time", v).apply()
 
     /**
+     * 시작하기(온보딩)를 이미 보였는가. 자동 추가·오늘 읽은 시간을 한 번이라도 켜거나 끈 적이 있으면(예전 버전 포함)
+     * 둘 다 아는 사람이라 보인 것으로 친다.
+     */
+    var onboarded: Boolean
+        get() = sp.getBoolean("onboarded", false) || sp.contains("auto_books") || sp.contains("reading_time")
+        set(v) = sp.edit().putBoolean("onboarded", v).apply()
+
+    /**
      * 하루 목표(분). 0 이면 목표 없이 읽은 날만 표시. 바꾸면 오늘부터의 목표로 `reading_goal_history` 에 남겨
      * 지난날은 그날의 목표로 그린다([readingGoals]). 처음 바꿀 때 그 전 목표를 '처음부터'로 함께 남긴다.
      */
