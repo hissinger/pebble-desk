@@ -159,6 +159,7 @@
     <string name="guide_kyobo">교보eBook</string>
     <string name="guide_kyobo_desc">읽다가 메뉴를 띄워야 책이 추가됩니다. 표지는 빈 표지입니다.</string>
     <string name="guide_millie">밀리의서재</string>
+    <string name="guide_millie_mobile">밀리의서재(휴대폰)</string>
     <string name="guide_aladin">알라딘</string>
     <string name="guide_aladin_desc">격자 보기 서재에서는 읽다가 메뉴를 띄워야 책이 추가됩니다.\n서재를 거치지 않고 열면 빈 표지일 수 있습니다.</string>
     <string name="guide_bookers">북커스</string>

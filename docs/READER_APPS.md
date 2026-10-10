@@ -13,6 +13,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 알라딘 `kr.co.aladin.ebook` | O | O (알라딘 상품번호) | O | O | `Android/data` |
 | 리디 `com.initialcoms.ridi` | O | O (리디 책 번호) | O `ridi://Library` | O | 앱 전용 저장소 |
 | 교보eBook `com.kyobo.ebook.eink` | O | 기기 안 번호라 사실상 X | O `kyoboebookeink://mylibrary` | O | `Android/data` |
+| 밀리의서재 휴대폰 판 `kr.co.millie.millieshelf` | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | YES24 eBook `com.yes24.ebook.fourth`(휴대폰·태블릿용) | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | 문리더 `com.flyersoft.moonreader`(내 파일, DRM 없음) | `ActivityTxt` | O (파일 위치를 알면 `ACTION_VIEW`) | O | X | 사용자가 둔 곳(공유 저장소) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
@@ -186,6 +187,21 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **저장소**: 표지 캐시가 `/sdcard/Books/.MoonReader/<파일 이름>_1.png` 에 남는다. DB·진행률은 앱 전용 저장소에 있다. `BookViewProvider` 는 공개되지 않는다.
 - 책장의 묶음 칸은 진행률 줄(`progressLay`)을 감춘다 → 진행률이 없는 칸은 책으로 보지 않는다.
 - **유료판** `com.flyersoft.moonreaderp`: 요소 이름 앞이 `com.flyersoft.moonreaderp:id/` 가 될 것 **(미확인)**.
+
+### 밀리의서재 휴대폰 판 `kr.co.millie.millieshelf` (2026-10-10, 갤럭시 A23 안드로이드 14, 5.47.0.0, **지원**)
+
+크레마의 `kr.co.millie.eink` 와 다른 앱이다(코드도 화면 이름도 다르다).
+
+- **화면**: 첫 화면 `kotlin.ui.MainTabActivity`(아래 탭: 투데이·웹툰웹소·검색·피드·내서재). 읽는 화면 `kotlin.ui.viewer.millieviewer.MillieViewerActivity`, 그 밖에 `StoryViewerActivity`·`webtoon.ui.WebtoonViewerActivity`·`pdf.ui.PdfViewerActivity`·`viewer.pdf.ui.PDFWebViewActivity`, 챗북 `legacy.ui.chatbook.ChatBookActivity`, 오디오 `StoryAudioViewerActivity`·`MillieViewerMp3Activity`. '최근 책' 위젯(`AppWidgetConfigureActivity`)이 있다.
+- **내서재 탭**: 통째로 웹 화면(`mWebview`). 접근성 트리는 처음 한 번 요청받은 뒤에야 채워진다.
+  - 도서 줄의 책마다 단추 둘: 표지 `팩트풀니스/한스 로슬링, 올라 로슬링, 안나 로슬링 뢴룬드 지음 / 이창신 옮김 썸네일`, 제목 `팩트풀니스 한스 로슬링, …`. 오디오북은 앞에 `오디오북 리더 오디오북 리더 완독 완독` 같은 표시가 붙는다. 진행률은 없다.
+  - 책장 줄은 `도서 섬네일 빌려쓰는 책장_영성 9 권`(설명).
+  - 책을 누르면 `TYPE_VIEW_CLICKED`(`Button`) 의 글자는 비어 있다. 누른 요소의 글자로 안다.
+  - 아래에 '이어 읽기' 막대(`compose_player_container`, 표지·제목)가 떠서 도서 줄 아래를 가린다.
+- **읽는 화면**: 화면 캡처가 막혀 있다. 열 때 '○○일 ○○시에 읽던 페이지가 있습니다' 안내 창(`common.dialog.DialogCommon`, 제목 `tv_title`=`안내`, `btn_two_cancel`·`btn_two_confirm`)이 뜨기도 한다(다른 기기에서 읽던 자리. 취소하면 앞쪽 자리가 저장될 수 있다).
+  - 가운데를 눌러 메뉴: 위 막대 `viewer_top_bar` 에 제목 `tv_title`·`tv_content`, 아래에 쪽 `tv_current_page`/`tv_total_page`(`2`/`1518`), 종이책 쪽 `tv_paper_page`, 진행률 `tv_per`(`0%`). 몇 초 뒤 저절로 닫힌다.
+  - 아래 줄 `tv_viewer_add_on_left`/`tv_viewer_add_on_right_parent`(e-ink 판과 같은 이름)는 기본으로 비어 있다.
+- **시험 때 주의**: 실제로 읽는 책을 휴대폰에서 열면 그 자리가 서버에 저장돼 다른 기기(페블)의 위치가 바뀔 수 있다.
 
 ### YES24 eBook `com.yes24.ebook.fourth` (2026-10-10, 갤럭시 A23 안드로이드 14, 3.4.43, **지원**)
 

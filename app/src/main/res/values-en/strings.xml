@@ -156,6 +156,7 @@
     <string name="guide_kyobo">Kyobo eBook</string>
     <string name="guide_kyobo_desc">Open the menu while reading to add the book. The cover stays blank.</string>
     <string name="guide_millie">Millie</string>
+    <string name="guide_millie_mobile">Millie (phone)</string>
     <string name="guide_aladin">Aladin</string>
     <string name="guide_aladin_desc">In grid view, open the menu while reading to add the book.\nOpened without the shelf, the cover may be blank.</string>
     <string name="guide_bookers">Bookers</string>

@@ -175,6 +175,7 @@ class SettingsActivity : EinkActivity() {
             R.string.guide_kel to R.string.guide_kel_desc,
             R.string.guide_kyobo to R.string.guide_kyobo_desc,
             R.string.guide_millie to null,
+            R.string.guide_millie_mobile to null,
             R.string.guide_aladin to R.string.guide_aladin_desc,
             R.string.guide_bookers to null,
             R.string.guide_ridi to R.string.guide_ridi_desc,

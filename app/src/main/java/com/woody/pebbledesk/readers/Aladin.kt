@@ -5,7 +5,7 @@ package com.woody.pebbledesk.readers
  * 목록 보기 칸에는 제목·저자·진행률·대여 기한이 있고 누르면 알림이 온다. 읽는 화면은 메뉴의 제목으로 알고,
  * 아래 쪽 표시(`6 / 368　 저자소개`, 쪽·장 이름)로 진행률을 셈한다.
  */
-val Aladin = ReaderSpec(
+object Aladin : ReaderSpec(
     pkg = "kr.co.aladin.ebook", classPrefix = "kr.co.aladin",
     shelves = setOf("kr.co.aladin.ebook.MainActivity"),
     viewers = setOf("kr.co.aladin.epubreader.readonbook.bookrender.ReadONBookRenderActivity"),
