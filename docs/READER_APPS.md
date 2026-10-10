@@ -13,6 +13,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 알라딘 `kr.co.aladin.ebook` | O | O (알라딘 상품번호) | O | O | `Android/data` |
 | 리디 `com.initialcoms.ridi` | O | O (리디 책 번호) | O `ridi://Library` | O | 앱 전용 저장소 |
 | 교보eBook `com.kyobo.ebook.eink` | O | 기기 안 번호라 사실상 X | O `kyoboebookeink://mylibrary` | O | `Android/data` |
+| 교보eBook 휴대폰 판 `com.kyobo.ebook.common.b2c` | O(크레마 판과 같은 화면 이름) | ? | ? | ? | ? |
 | 밀리의서재 휴대폰 판 `kr.co.millie.millieshelf` | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | YES24 eBook `com.yes24.ebook.fourth`(휴대폰·태블릿용) | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | 문리더 `com.flyersoft.moonreader`(내 파일, DRM 없음) | `ActivityTxt` | O (파일 위치를 알면 `ACTION_VIEW`) | O | X | 사용자가 둔 곳(공유 저장소) |
@@ -234,3 +235,14 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
   - 진행률·반납일·밑줄·서재 목록(화면 글자를 읽는 접근성 서비스 말고는 길이 없음)
   - 받은 책 파일
   - 교보도서관·밀리의서재의 특정 책 바로 열기
+
+### 교보eBook 휴대폰 판 `com.kyobo.ebook.common.b2c` (2026-10-11, 갤럭시 A23 안드로이드 14, 3.9.14, **지원**)
+
+크레마의 `com.kyobo.ebook.eink` 와 다른 앱이지만 같은 공통 코드다. 화면 이름·요소 이름이 크레마 판과 같다.
+
+- **서재**: `common.b2c.ui.mainV3.activity.MainV3Activity`(Compose, 탭 기본책장·내 책장·다운로드). 요소 이름이 없다. 격자 보기 칸은 표지·`소장` 뿐 제목이 없고, 목록 보기 칸에 제목·저자 글자(이름 없음). 묶음(시리즈) 칸은 `9권`. 서재는 읽지 않는다.
+- **읽는 화면**: `com.kyobo.ebook.common.b2c.viewer.epub.ViewerEpubMainActivity`(PDF·만화도 크레마 판과 같은 이름). 화면 캡처가 막혀 있다(빈 그림).
+  - 늘 보이는 `bookIndicator` = `0% (1/1755p)`(처음엔 `- % ( - /787p)`).
+  - 처음 열면 사용 안내 겹 화면(`viewer_guide_layout`)이 뜬다. 누르면 닫힌다.
+  - 가운데를 눌러 메뉴를 띄우면 `viewer_top_booktitle` = `1984(한글판+영문판)`, `viewer_bottom_pagecount` = `0% (1/1755p)`.
+- 책 칸을 누르면 받지 않은 책은 내려받기만 하고, 받은 책은 바로 읽는 화면을 연다.
