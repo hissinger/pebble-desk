@@ -5,6 +5,7 @@ package com.woody.pebbledesk.readers
  * 목록 보기 칸에는 제목·저자·진행률·대여 기한이 있고 누르면 알림이 온다. 읽는 화면은 메뉴의 제목으로 알고,
  * 아래 쪽 표시(`6 / 368　 저자소개`, 쪽·장 이름)로 진행률을 셈한다. PDF·만화(CPUB)는 다른 읽는 화면(`cpviewer.ViewerActivity`)인데
  * 메뉴의 제목 이름은 같고 쪽 표시만 `viewermenu_text_page_info`(`6 / 368`)다.
+ * 서재 편집(`편집` → 전체·이동·삭제)에서는 격자 보기 칸을 눌러도 알림이 오고 칸에 고르기 동그라미가 그려진다.
  */
 object Aladin : ReaderSpec(
     pkg = "kr.co.aladin.ebook", classPrefix = "kr.co.aladin",
@@ -16,5 +17,5 @@ object Aladin : ReaderSpec(
     titles = listOf("txt_title", "text_title"), thumbs = listOf("img_cover"), authors = listOf("text_author"), progress = "txt_read_percent",
     due = "text_rent_date", viewerProgress = listOf("bookrender_txt_page_onepage", "viewermenu_text_pageinfo", "viewermenu_text_page_info"),
     viewerTitle = "viewer_header_title",
-    recent = "reading_book_tv_book_title", eagerCovers = true,
+    recent = "reading_book_tv_book_title", eagerCovers = true, shelfEditing = "edit_cl_btn_container",
 )

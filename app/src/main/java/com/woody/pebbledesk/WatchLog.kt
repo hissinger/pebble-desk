@@ -35,6 +35,8 @@ object WatchLog {
         OPENED,
         /** 읽는 화면의 진행률(%). [Entry.detail] 은 읽는 화면에서 읽은 제목(없으면 빈 글자) */
         PROGRESS,
+        /** 읽고 돌아온 서재 아래 '최근 읽은 책'([Entry.arg])이 읽으러 가기 전 그대로라 바뀌기를 기다린다(그 책을 편 것으로 보지 않는다) */
+        RECENT_WAIT,
     }
 
     enum class Role { SHELF, VIEWER, OTHER }

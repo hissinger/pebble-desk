@@ -77,6 +77,7 @@
     <string name="wl_opened_front">moved to front</string>
     <string name="wl_opened_full">list full</string>
     <string name="wl_opened_finished">finished book, not added</string>
+    <string name="wl_recent_wait">Recent book on the shelf \'%1$s\' unchanged · waiting</string>
     <string name="wl_progress">Progress %s</string>
     <string name="device_section_system">System screen test (opened by this app)</string>
     <string name="device_system_a11y">Accessibility</string>

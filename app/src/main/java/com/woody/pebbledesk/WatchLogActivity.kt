@@ -102,6 +102,7 @@ class WatchLogActivity : EinkActivity() {
             }))
             WatchLog.Kind.PROGRESS -> getString(R.string.wl_progress, if (e.arg == "-1") "?" else "${e.arg}%") +
                 if (e.detail.isEmpty()) "" else " · ${e.detail}"
+            WatchLog.Kind.RECENT_WAIT -> getString(R.string.wl_recent_wait, e.arg)
         }
         val time = if (DateUtils.isToday(e.at)) clock(e.at) else "${MD.format(e.at)} ${clock(e.at)}"
         val app = if (e.pkg.isEmpty()) "" else "  ${WatchLog.shortPkg(e.pkg)}"

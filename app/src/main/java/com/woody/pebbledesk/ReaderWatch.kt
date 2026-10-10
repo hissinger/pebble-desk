@@ -42,6 +42,12 @@ class ReaderWatchService : AccessibilityService() {
     private fun setOpened(pkg: String, title: String?) {
         if (opened(pkg) != title) openedPrefs.edit().putString("opened_$pkg", title).apply()
     }
+    /** 읽으러 가기 전에 본 서재의 '최근 읽은 책'([ReaderSpec.recent]) */
+    private fun recentBefore(pkg: String) = openedPrefs.getString("recent_$pkg", null)
+    /** [title] 이 null 이면 지운다(모른다) */
+    private fun setRecentBefore(pkg: String, title: String?) {
+        if (recentBefore(pkg) != title) openedPrefs.edit().putString("recent_$pkg", title).apply()
+    }
     /** 검색(웹 화면)에서 보고 있는 책 상세. 여기서 읽는 화면으로 넘어가면 이 책을 편 것으로 본다(`바로 읽기` 클릭에는 글자가 없다). */
     private val webBook = mutableMapOf<String, Cell>()
     /** 눌렀지만 아직 읽는 화면이 열리지 않은 책 칸과 누른 때([ReaderSpec.openOnViewer] 인 앱) */
@@ -74,6 +80,8 @@ class ReaderWatchService : AccessibilityService() {
     private val readerAt = mutableMapOf<String, Long>()
     /** [readSince] 앱 가운데 읽는 화면 메뉴로 이미 책을 안 앱('최근 읽은 책' 줄은 늦게 바뀌어 앞서 읽은 책이 보이기도 해 다시 보지 않는다) */
     private val readKnown = mutableSetOf<String>()
+    /** [readSince] 앱 가운데 서재로 돌아왔는데 '최근 읽은 책' 줄이 아직 읽으러 가기 전 그대로인 앱(바뀌기를 기다린다) */
+    private val recentWait = mutableSetOf<String>()
     private var lastShot = 0L
     private val handler = Handler(Looper.getMainLooper())
     /** 화면이 멈추면 다시 읽을 서재 */
@@ -110,7 +118,8 @@ class ReaderWatchService : AccessibilityService() {
                     screen[spec.pkg] = it
                     if (ReadingLog.isReaderScreen(it)) {
                         // 서재를 떠나 처음 연 읽는 화면의 때만 적는다(읽는 중 목차 같은 다른 화면에 갔다 와도 처음부터 그 책으로 세게).
-                        if (spec.recent != null && readSince.add(spec.pkg)) readerAt[spec.pkg] = now
+                        // 줄이 바뀌기를 기다리다 서재에서 다시 읽으러 갔으면 이번 책의 때로 다시 적는다.
+                        if (spec.recent != null && (readSince.add(spec.pkg) || recentWait.remove(spec.pkg))) readerAt[spec.pkg] = now
                         unknownClick.remove(spec.pkg)?.takeIf { now - it < CLICK_OPEN_MS }?.let {
                             unknownOpen[spec.pkg] = now
                             setOpened(spec.pkg, null)
@@ -123,7 +132,9 @@ class ReaderWatchService : AccessibilityService() {
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> readScreen(spec, force = false)
             AccessibilityEvent.TYPE_VIEW_CLICKED -> if (screen[spec.pkg] in spec.shelves) {
-                val cell = spec.clickedCell(e.source, e.text, windowsOf(spec), lastShelf[spec.pkg])?.let { c ->
+                val windows = windowsOf(spec)
+                if (windows.all.any(spec::editing)) return
+                val cell = spec.clickedCell(e.source, e.text, windows, lastShelf[spec.pkg])?.let { c ->
                     // 방금 읽어 둔 칸으로 맞춘 것은 그 뒤 읽는 화면에서 진행률이 바뀌었을 수 있어 목록에 이미 있는 책에는 쓰지 않는다(반납일은 그대로).
                     if (c.stale && BookShelf.findByTitle(this, c.title) != null) c.copy(progress = -1) else c
                 }
@@ -153,7 +164,11 @@ class ReaderWatchService : AccessibilityService() {
                 val shelfRoot by lazy { root(spec) }
                 if (force || now - lastWebRead >= THROTTLE_MS) {
                     lastWebRead = now
-                    shelfRoot?.let { root -> spec.webBook(root)?.let { webBook[spec.pkg] = it } ?: webBook.remove(spec.pkg) }
+                    shelfRoot?.let { root ->
+                        spec.webBook(root)?.let { webBook[spec.pkg] = it } ?: webBook.remove(spec.pkg)
+                        // 서재를 잠깐만 보고 책으로 넘어가도 읽으러 가기 전의 '최근 읽은 책' 줄을 알도록 멈추기를 기다리지 않는다.
+                        rememberRecent(spec, root)
+                    }
                 }
                 // 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스·리디·YES24 전자도서관)은 멈추기를 기다리지 않고 표지가 보이는 대로 잘라 둔다.
                 // 화면이 막 바뀐 때(읽는 화면에서 돌아오는 중이면 화면 캡처가 막힌 읽는 화면이 검게 찍힌다)와 아직 찍을 수 없을 때는 건너뛴다.
@@ -198,9 +213,11 @@ class ReaderWatchService : AccessibilityService() {
             handler.postDelayed(viewerLater, VIEWER_RETRY_MS)
         }
         info.title?.let { title ->
-            if (spec.pkg in readSince) readKnown += spec.pkg
+            // '최근 읽은 책' 줄로 아는 앱은 서재를 떠난 뒤 메뉴로 처음 안 책은 앞서 편 책과 같아도 편 것으로 본다(맨 앞으로).
+            // 같은 책을 다시 읽으면 그 줄이 그대로라 서재로 돌아와서는 알 수 없다.
+            val first = spec.pkg in readSince && readKnown.add(spec.pkg)
             val current = opened(spec.pkg)?.let { BookShelf.findByTitle(this, it) }
-            if (current == null || BookShelf.findByTitle(this, title)?.id != current.id) {
+            if (first || current == null || BookShelf.findByTitle(this, title)?.id != current.id) {
                 bookOpened(spec, Cell(title, info.author, progress, -1, null, Rect()), unknownOpen[spec.pkg])
                 return
             }
@@ -237,9 +254,18 @@ class ReaderWatchService : AccessibilityService() {
         return pendingCovers.keys.firstOrNull { sameTitle(it, n) }
     }
 
-    /** 서재에 보이는 책 칸들(읽은 것은 [lastShelf] 에 남긴다) */
+    /**
+     * 읽으러 가기 전의 '최근 읽은 책' 줄을 적어 둔다(돌아와 아직 기다리는 동안은 고치지 않는다).
+     * 줄이 안 보이면(아직 안 그려짐) 지운다: 앞서 적은 줄과 비교하면 그사이 바뀐 줄을 방금 편 책으로 잘못 본다.
+     */
+    private fun rememberRecent(spec: ReaderSpec, root: AccessibilityNodeInfo) {
+        if (spec.recent == null || spec.pkg in readSince) return
+        setRecentBefore(spec.pkg, spec.recentTitle(root))
+    }
+
+    /** 서재에 보이는 책 칸들(읽은 것은 [lastShelf] 에 남긴다). 서재 편집 중이면 읽지 않는다(고르기 표시가 표지에 찍힌다). */
     private fun readShelf(spec: ReaderSpec, root: AccessibilityNodeInfo): List<Cell> =
-        spec.shelfCells(root).also { if (it.isNotEmpty()) lastShelf[spec.pkg] = it }
+        if (spec.editing(root)) emptyList() else spec.shelfCells(root).also { if (it.isNotEmpty()) lastShelf[spec.pkg] = it }
 
     /**
      * 책을 폈다: 목록에 있으면 맨 앞으로, 없으면 새로 넣는다(목록이 다 찼으면 넣지 않는다). 인터넷 검색은 하지 않고,
@@ -293,13 +319,21 @@ class ReaderWatchService : AccessibilityService() {
         val seen = readShelf(spec, root)
         WatchLog.add(this, WatchLog.Kind.SHELF, spec.pkg, "${seen.size}")
         // 책 칸을 눌러도 알림이 오지 않는 앱(알라딘): 읽는 화면에서 돌아오면 서재 아래 '최근 읽은 책'이 방금 편 책이다.
+        // 그 줄이 읽으러 가기 전 그대로(모르면 그대로로 본다)면 믿지 않고 바뀌기를 기다린다: 알라딘은 줄을 늦게 바꾸고, 내 파일(PDF 등)은 줄에 오르지 않는다.
+        val recent = spec.recentTitle(root)
         if (spec.pkg in readSince) {
             if (readKnown.remove(spec.pkg)) readSince -= spec.pkg
-            else spec.recentTitle(root)?.let { title ->
+            else if (recent != null && recentBefore(spec.pkg).let { it == null || it == recent }) {
+                // 몰랐으면 처음 본 줄을 읽으러 가기 전의 줄로 적어 둔다(그래야 바뀌면 알아본다).
+                setRecentBefore(spec.pkg, recent)
+                if (recentWait.add(spec.pkg)) WatchLog.add(this, WatchLog.Kind.RECENT_WAIT, spec.pkg, recent)
+            } else recent?.let { title ->
                 readSince -= spec.pkg
+                recentWait -= spec.pkg
                 bookOpened(spec, seen.firstOrNull { sameTitle(it.title, title) } ?: Cell(title, "", -1, -1, null, Rect()), readerAt[spec.pkg])
             }
         }
+        rememberRecent(spec, root)
         val targets = mutableListOf<Pair<String, Rect>>()
         // 검색 화면의 책 상세에 보이는 표지(목록에 있는데 표지가 없으면)
         spec.webBook(root)?.let { web ->

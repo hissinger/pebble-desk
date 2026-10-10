@@ -48,6 +48,8 @@ open class ReaderSpec(
     val openOnViewer: Boolean = false,
     /** 앱 화면 전체가 화면 캡처를 막아(검게 찍힌다) 표지를 자르지 않는다(my YES) */
     val secure: Boolean = false,
+    /** 서재 편집(지우기·옮기기) 중에만 보이는 요소. 그동안은 칸을 눌러도 책을 고르는 것이라 서재를 읽지 않는다(알라딘) */
+    val shelfEditing: String? = null,
 ) {
     /** 서재에 보이는 책 칸들. 기본: 제목 요소마다 그것이 든 칸을 찾아 읽는다. */
     open fun shelfCells(root: AccessibilityNodeInfo): List<Cell> =
@@ -94,6 +96,9 @@ open class ReaderSpec(
 
     /** 읽는 화면 제목 글자 → 제목·저자. 기본: 글자 그대로가 제목 */
     protected open fun splitTitle(text: String): Pair<String, String> = text to ""
+
+    /** 서재 편집 중인가([shelfEditing]) */
+    fun editing(root: AccessibilityNodeInfo): Boolean = shelfEditing?.let { root.byId(pkg, it).isNotEmpty() } == true
 
     /** 서재의 '최근 읽은 책' 제목([recent], 없으면 null) */
     fun recentTitle(root: AccessibilityNodeInfo): String? =
