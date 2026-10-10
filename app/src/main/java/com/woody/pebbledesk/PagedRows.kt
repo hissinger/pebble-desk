@@ -195,8 +195,8 @@ fun pageLabel(rows: PagedRows): CharSequence {
 }
 
 /**
- * 쪽 표시를 누르면: 왼쪽 절반(`‹`)은 앞 쪽, 오른쪽 절반(`›`)은 다음 쪽. 그쪽으로 갈 수 없으면 반대쪽으로
- * (마지막 쪽에서 아무 데나 누르면 앞 쪽). 손가락 위치 없이 눌리면(다른 곳을 눌러 대신 누를 때) 다음 쪽, 끝이면 앞 쪽.
+ * 쪽 표시를 누르면: 왼쪽 절반(`‹`)은 앞 쪽, 오른쪽 절반(`›`)은 다음 쪽. 그쪽으로 갈 수 없으면(흐린 화살표) 그대로.
+ * 손가락 위치 없이 눌리면(다른 곳을 눌러 대신 누를 때) 다음 쪽, 끝이면 앞 쪽.
  */
 @SuppressLint("ClickableViewAccessibility")
 fun TextView.pagesClick(rows: PagedRows) = pagesClick { rows }
@@ -205,13 +205,22 @@ fun TextView.pagesClick(rows: PagedRows) = pagesClick { rows }
 @SuppressLint("ClickableViewAccessibility")
 fun TextView.pagesClick(current: () -> PagedRows) {
     var downX = -1f
-    setOnTouchListener { _, e -> if (e.action == MotionEvent.ACTION_DOWN) downX = e.x; false }
+    // 밀기로 취소되면 위치를 지운다(남아 있으면 제목 줄로 대신 누를 때 그 위치로 방향을 정한다).
+    setOnTouchListener { _, e ->
+        when (e.action) {
+            MotionEvent.ACTION_DOWN -> downX = e.x
+            MotionEvent.ACTION_CANCEL -> downX = -1f
+        }
+        false
+    }
     setOnClickListener {
         val rows = current()
-        val wantPrev = downX >= 0 && downX < width / 2f
+        val x = downX
         downX = -1f
-        val canPrev = rows.page > 0
-        val canNext = rows.page < rows.pageCount - 1
-        if ((wantPrev && canPrev) || !canNext) rows.prev() else rows.next()
+        when {
+            x < 0 -> if (rows.page < rows.pageCount - 1) rows.next() else rows.prev()
+            x < width / 2f -> rows.prev()
+            else -> rows.next()
+        }
     }
 }
