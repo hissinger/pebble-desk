@@ -191,6 +191,7 @@
     <string name="sample_app">Kyobo Library</string>
     <string name="onboarding_next">Next  ›</string>
     <string name="onboarding_prev">‹  Back</string>
+    <string name="onboarding_later">Later</string>
     <string name="onboarding_steps">How to turn it on</string>
     <string name="onboarding_open_accessibility">Accessibility  ›</string>
     <string name="onboarding_open_app_info">App info  ›</string>

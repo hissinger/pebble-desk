@@ -194,6 +194,7 @@
     <string name="sample_app">교보도서관</string>
     <string name="onboarding_next">다음  ›</string>
     <string name="onboarding_prev">‹  이전</string>
+    <string name="onboarding_later">나중에 하기</string>
     <string name="onboarding_steps">켜는 방법</string>
     <string name="onboarding_open_accessibility">접근성 열기  ›</string>
     <string name="onboarding_open_app_info">앱 정보 열기  ›</string>

@@ -14,7 +14,7 @@ import android.widget.TextView
 /**
  * ⑭ 시작하기(온보딩). 처음 한 번, 기본으로 꺼져 있는 두 기능을 한 쪽에 하나씩 설명하고 켜게 한다.
  * 1쪽 읽는 책 자동 추가, 2쪽 오늘 읽은 시간. 둘 다 이 앱의 기본 기능이라 켜져야 넘어간다(1쪽 `다음 ›`, 2쪽 `시작하기 ›`.
- * 그 전에는 흐리게, 누르지 않는다. 그만두려면 뒤로 키). 항목마다 설명 · 켜면 홈에 생기는 모습(작게) · `켜는 방법` 단계(켠 뒤에도
+ * 그 전에는 흐리게, 누르지 않는다). 켤 수 없는 기기(시스템 화면이 막힌 기기 등)에서도 나갈 수 있게 하단 바 바로 위에 `나중에 하기`. 항목마다 설명 · 켜면 홈에 생기는 모습(작게) · `켜는 방법` 단계(켠 뒤에도
  * 그대로 둔다. 단계 옆 버튼이 그 시스템 화면을 연다. 돌아오면 이름 옆에 `켜짐 ✓`). 닫으면 다시 나오지 않는다.
  * 스크롤하지 않으므로 쓸 수 있는 높이(기기·시스템 줄마다 다르다)에 넘치면 쪽 안의 글자를 줄여 그린다([fitPage]).
  */
@@ -50,6 +50,13 @@ class OnboardingActivity : EinkActivity() {
         content.viewTreeObserver.addOnPreDrawListener {
             if (content.height == available) true else { available = content.height; shownState = null; render(); false }
         }
+
+        // 하단 바 바로 위: `나중에 하기`(두 쪽 모두. 켜지 않고 닫는다. 설정 › 독서에서 언제든 켤 수 있다)
+        root.addView(text(getString(R.string.onboarding_later), 17f, color = Ui.GRAY).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(Ui.MARGIN), 0, dp(24), 0)
+            setOnClickListener { finish() }
+        }, lp(WRAP, dp(LATER_DP)))
 
         // 하단: 왼쪽 `‹ 이전`(2쪽), 가운데 쪽 번호, 오른쪽 `다음 ›`(1쪽) / `시작하기 ›`(2쪽)
         root.addView(hline(1, inset = false))
@@ -241,6 +248,8 @@ class OnboardingActivity : EinkActivity() {
     }
 
     companion object {
+        /** `나중에 하기` 줄의 높이(누르는 자리 최소 44dp) */
+        private const val LATER_DP = 44
         /** 오른쪽 미리 보기 칸 폭 */
         private const val PREVIEW_DP = 176
         private const val SAMPLE_COVER_DP = 52
