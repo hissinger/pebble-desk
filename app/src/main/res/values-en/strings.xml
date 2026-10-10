@@ -52,7 +52,7 @@
     <string name="device_service_restricted">Background restricted</string>
     <string name="watch_log">Auto-add log</string>
     <string name="watch_log_open">View log ›</string>
-    <string name="watch_log_hint">Tap Clear log, open a book in your e-book app, come back and take a photo of this screen.</string>
+    <string name="watch_log_hint">Tap Clear log, open a book and show its menu, then come back and take a photo.</string>
     <string name="watch_log_clear">Clear log</string>
     <string name="watch_log_service">Service %1$s · connected %2$s · stops %3$d</string>
     <string name="watch_log_since">Since %1$s · first event %2$s · unreadable %3$d</string>
@@ -190,7 +190,7 @@
     <string name="guide_millie">Millie</string>
     <string name="guide_millie_mobile">Millie (phone)</string>
     <string name="guide_aladin">Aladin</string>
-    <string name="guide_aladin_desc">In grid view, open the menu while reading to add the book.\nOpened without the shelf, the cover may be blank.</string>
+    <string name="guide_aladin_desc">Books opened from grid view or by resuming are added when you open the menu while reading.\nA resumed book may have a blank cover until you go back to the shelf.</string>
     <string name="guide_bookers">Bookers</string>
     <string name="guide_ridi">Ridi</string>
     <string name="guide_ridi_desc">Open the menu while reading to add the book.\nOpened without the shelf, the cover may be blank.</string>

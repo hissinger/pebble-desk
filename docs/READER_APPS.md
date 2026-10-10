@@ -64,7 +64,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 
 - **알라딘**
   - `aladinreader://?view=viewer&itemid=<알라딘 eBook ItemId>&isShortcut=true` 로 특정 책을 연다(없으면 내려받은 뒤 연다). 마지막과 같은 주소는 무시하므로 `&ts=…` 같은 값을 붙인다. 그 밖에 `view=purchase`(구매 목록), `setting` 등.
-  - 읽는 화면 `cpviewer.ViewerActivity`, `epubreader.readonbook.bookrender.ReadONBookRenderActivity`.
+  - 읽는 화면 `epubreader.readonbook.bookrender.ReadONBookRenderActivity`(EPUB), `cpviewer.ViewerActivity`(PDF·만화 CPUB. 메뉴 `cpviewer.dialog.MenuDialogFragment` 의 제목 `viewer_header_title`, 쪽 `viewermenu_text_page_info`).
   - 표지를 `/sdcard/sleep/.bookcover/bookcover.png` 에 쓰고 `com.keph.crema.shine.book_cover_added` 를 방송하는 코드(`CremaUtil`)가 있다. 페블에는 그 폴더가 없다(다른 크레마 기종용으로 보임). 폴더를 만들어 두고 책을 열어 봐도 쓰지 않았다(2026-10-05).
   - 소리로 읽기(TTS) 음성 데이터, 책장 목록 `files/bookshelf.json`(런처 접근 불가).
 - **리디**

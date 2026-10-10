@@ -184,7 +184,7 @@ class ReaderWatchService : AccessibilityService() {
     /**
      * 읽는 화면: 진행률·제목은 앱이 읽는다([ReaderSpec.readViewer]). 진행률이 아직 비어 있으면 조금 뒤 다시 읽는다(메뉴의 쪽 정보는 늦게
      * 채워지고 그때 알림이 없다). 제목이 보이면 그 책을 편 것으로 보고(서재 칸으로는 알 수 없는 교보도서관 표지 보기·교보eBook·알라딘 격자 보기·
-     * 리디·문리더 홈 탭), 진행률을 그 책에 적는다.
+     * 리디·문리더 홈 탭, 서재 없이 바로 열린 책), 진행률을 그 책에 적는다.
      */
     private fun readViewer(spec: ReaderSpec) {
         viewerSpec = null
