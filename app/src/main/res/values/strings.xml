@@ -212,4 +212,6 @@
     <string name="onboarding_time_s1">사용 기록 액세스 화면을 엽니다.</string>
     <string name="onboarding_time_s2">목록에서 Pebble Desk 를 눌러 허용을 켜고 돌아옵니다.</string>
     <string name="year_books_count">%1$d권</string>
+    <string name="boox_frozen_help">BOOX 가 얼려 둔 앱이라 열지 못했어요. BOOX 얼리기 설정에서 이 앱을 빼 주세요.</string>
+    <string name="boox_freeze_settings">얼리기 설정 열기</string>
 </resources>

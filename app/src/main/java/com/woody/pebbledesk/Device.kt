@@ -1,8 +1,16 @@
 package com.woody.pebbledesk
 
+import android.content.ComponentName
+import android.content.ContentProviderClient
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
+import android.os.Process
 import android.provider.Settings
+import java.util.concurrent.Executors
 
 /**
  * 기기 종류와 기기마다 다른 동작(빠른 설정, 조명). 크레마 전용 화면 보정은 [Crema].
@@ -51,6 +59,72 @@ object Device {
         // 메이북: Haoqing SystemUI 가 받아 알림창(빠른 설정)을 펼친다.
         context.sendBroadcast(Intent("com.haoqing.action.QUICK_SETTINGS").setPackage("com.android.systemui"))
     }
+
+    /**
+     * BOOX 런처(`com.onyx`)가 있다. BOOX 는 앱 얼리기로 다른 회사 앱을 쓰지 않을 때 꺼 두고(DISABLED_USER),
+     * 얼린 앱은 이 런처가 풀고 연다(docs/DEVICES.md › Onyx BOOX).
+     */
+    fun hasBooxLauncher(context: Context): Boolean =
+        runCatching { context.packageManager.getPackageInfo(BOOX_LAUNCHER, 0) }.isSuccess
+
+    /**
+     * BOOX 가 얼려 둔 앱인가(앱 단위로 꺼짐). BOOX 인지는 [hasBooxLauncher] 로 따로 본다.
+     * BOOX 가 얼리지 않는 Onyx·시스템 앱(펌웨어 `ActivityManagerHelper.isOnyxOrSystemApp`)과, 같은 방법으로 끄는
+     * Google Play 끄기(`ApplicationFreezeHelper.disableGooglePlay`)의 앱은 빼 둔다(누르면 사용자가 끈 Play 가 켜진다).
+     */
+    fun isFrozen(pm: PackageManager, pkg: String): Boolean {
+        if ("com.onyx" in pkg || pkg in GOOGLE_PLAY) return false
+        return runCatching {
+            val info = pm.getApplicationInfo(pkg, PackageManager.MATCH_DISABLED_COMPONENTS)
+            info.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0 &&
+                pm.getApplicationEnabledSetting(pkg) == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER
+        }.getOrDefault(false)
+    }
+
+    /** 얼린 앱을 BOOX 런처에 풀고 열어 달라고 한다(BOOX 플로팅 버튼도 같은 방법을 쓴다). 런처가 떠 있어야 받는다. */
+    fun sendOpenFrozenApp(context: Context, component: ComponentName) {
+        context.sendBroadcast(Intent("onyx.action.open_frozen_app").setPackage(BOOX_LAUNCHER)
+            .putExtra("args_pkg", component.packageName)
+            .putExtra("args_class", component.className)
+            // UserHandle.hashCode 가 곧 사용자 번호다(getIdentifier 는 숨은 함수).
+            .putExtra("args_user_id", Process.myUserHandle().hashCode()))
+    }
+
+    /** BOOX 런처의 앱 얼리기 설정 화면을 열어 달라고 한다(BOOX 플로팅 버튼의 얼리기 바로가기와 같다). */
+    fun openBooxFreezeSettings(context: Context) {
+        context.sendBroadcast(Intent("com.onyx.app.freeze.page").setPackage(BOOX_LAUNCHER))
+    }
+
+    /**
+     * BOOX 런처를 띄워 둔다. 얼린 앱 열기 방송은 런처가 떠 있을 때만 받는데(실행 중에 등록하는 받는 곳),
+     * 런처는 부팅 때 스스로 뜨지 않아 Pebble Desk 가 기본 홈이면 꺼져 있을 수 있다.
+     * 런처의 공개 데이터 창구에 연결만 해 두면(읽고 쓰지 않음) 안드로이드가 런처 프로세스를 띄우고 이 앱만큼 살려 둔다.
+     * 홈이 보일 때마다 다시 잡는다(런처가 죽었으면 새로 띄운다). 불안정(unstable) 연결이라 런처가 죽어도 이 앱은 괜찮다.
+     * 다 잡으면 [then] 을 화면 스레드에서 부른다.
+     */
+    fun keepBooxLauncher(context: Context, then: (() -> Unit)? = null) {
+        // 잠금이 풀리기 전에는 런처(잠금 전에 뜨지 않는 앱)를 띄울 수 없다.
+        if (!Storage.isUnlocked(context) || !hasBooxLauncher(context)) {
+            then?.invoke()
+            return
+        }
+        val resolver = context.applicationContext.contentResolver
+        booxLinker.execute {
+            // 런처가 꺼져 있으면 뜰 때까지 기다린다. 못 잡으면 전 연결을 그대로 둔다.
+            runCatching { resolver.acquireUnstableContentProviderClient(BOOX_PROVIDER) }.getOrNull()?.let { client ->
+                booxLink?.close()
+                booxLink = client
+            }
+            then?.let { Handler(Looper.getMainLooper()).post(it) }
+        }
+    }
+
+    /** 연결은 한 줄로 차례대로 잡는다(겹친 요청이 순서를 바꿔 새 연결을 덮지 않게). [booxLink] 도 여기서만 만진다. */
+    private val booxLinker = Executors.newSingleThreadExecutor()
+    private var booxLink: ContentProviderClient? = null
+    private const val BOOX_LAUNCHER = "com.onyx"
+    private const val BOOX_PROVIDER = "com.onyx.system.database.ContentProvider"
+    private val GOOGLE_PLAY = setOf("com.android.vending", "com.google.android.gms", "com.google.android.gsf")
 
     /** SystemProperties.get 은 숨은 함수라 한 번만 찾아 둔다(배터리 신호마다 불리므로). */
     private val getProperty by lazy {

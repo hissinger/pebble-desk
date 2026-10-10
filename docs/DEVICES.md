@@ -361,6 +361,52 @@ Pebble Desk(1.2.x)를 기본 홈으로 쓰는 홈 화면. 책 1권(밀리의서�
 2. ~~빈자리를 눌렀을 때 켜지는지~~ 안 된다(18:25). 접근성 확인 창 전체 사진(화면 아래 끝까지), 화면을 돌리면 단추가 보이는지.
 3. adb 를 쓸 수 있는지(위 3 의 명령으로 켤 수 있는지).
 
+## Onyx BOOX 펌웨어 (Leaf2·Poke6·Palma2·Tab Ultra C Pro 에서 확인)
+
+### 펌웨어 얻기·풀기
+
+- 업데이트 서버: `GET http://data.onyx-international.cn/api/firmware/update?where={"buildNumber":0,"buildType":"user","deviceMAC":"","lang":"en_US","model":"Leaf2","submodel":"","fingerprint":""}`(`where` 는 URL 인코딩). 답의 `downloadUrlList` 가 다운로드 주소, `md5`·`size`·`fingerprint` 도 온다. 없으면 빈 답.
+  - Leaf2: V4.0(`2025-04-02_13-00_v4.0-rel_77d3ae190`, 1.76GB, `en_US`). Poke6 은 `en_US` 로는 빈 답이고 `zh_CN` 으로만 3.5.4(2024-10-17) 가 왔다. Poke6S 는 `zh_CN` 으로 v4.0-beta4.
+  - 2026-10-10 에 본 다른 기종(모두 `BooxKeys.csv` 에 키 있음): Poke5·Leaf3C 3.5.4(`zh_CN`), Page·Tab Mini C 4.0, Palma 4.0.2, Note Air3 4.1.1, Go 10.3·Go Color 7·Go6·Note Air4 C 4.2, Palma2 4.2(2026-08), Tab Ultra C Pro 4.2.1(2026-08).
+  - `firmware.boox.com`(중국 CDN) 주소는 연결이 멈추곤 한다. `curl -C - --speed-limit 30000 --speed-time 30` 으로 이어받기를 되풀이하면 받아진다. `firmware-us.boox.com` 에는 같은 파일이 없다(404).
+- 받은 파일은 `~/Downloads/Pebble Desk/boox/<기종>/update.upx`(+ `source.txt`: 주소·md5). 푼 것은 분석 뒤 지웠다.
+- 파일 `update.upx` 는 AES-128-CFB 로 암호화돼 있다. 기종별 키·IV 는 GitHub `Hagb/decryptBooxUpdateUpx` 의 `BooxKeys.csv`(Leaf2·Poke6 둘 다 있다). 푼 결과는 A/B 전체 OTA(`payload.bin`)라 메이북과 같은 순서로 푼다.
+
+```bash
+openssl enc -d -aes-128-cfb -K <키> -iv <IV> -nopad -in update.upx -out update.zip   # 첫 4바이트가 PK 면 맞는 키
+python3 tools/ota_payload.py update.zip img system system_ext product
+7zz x -snl -ofs/system img/system.img
+jadx --no-res -d src/framework fs/system/system/framework/framework.jar
+```
+
+- BOOX 런처는 `system/priv-app/kcb-release`(패키지 `com.onyx`). Onyx 가 더한 시스템 코드는 `framework.jar` 의 `android.onyx.*`.
+
+### 기종·버전별로 맞춰 본 것
+
+| | Poke6 3.5.4 | Leaf2 4.0 | Palma2 4.2 (휴대폰형) | Tab Ultra C Pro 4.2.1 (태블릿형, 런처를 Kotlin 으로 새로 씀) |
+|---|---|---|---|---|
+| 얼리기 = `DISABLED_USER`(3), Onyx·시스템 앱 제외 | 같음 | 같음 | 같음 | 같음 |
+| 런처 `com.onyx`(`priv-app/kcb-release`) | 같음 | 같음 | 같음 | 같음 |
+| 받는 곳 `onyx.action.open_frozen_app`, extra `args_pkg`·`args_class`·`args_user_id`, `Application.onCreate` 에서 등록 | 같음 | 같음 | 같음 | 같음 |
+| 데이터 창구 `com.onyx.system.database.ContentProvider`(exported, 권한 없음) | 같음 | 같음 | 같음 | 같음 |
+| 얼리기 설정 `com.onyx.app.freeze.page` | 같음 | 같음 | 같음 | 같음 |
+| 매니페스트의 BOOT_COMPLETED 받는 곳 | 없음 | 없음 | 없음 | 없음 |
+
+- 같은 회사가 2024-09 ~ 2026-08 사이에 낸 3.5 ~ 4.2 계열이 모두 같아, 다른 기종도 같을 것으로 본다 **(추정)**. 확인 스크립트는 펌웨어마다 `framework.jar` 의 `ApplicationFreezeHelper`, 런처의 `EACStatusChangedReceiver`·`BroadcastHelper`·`ContentBrowserApplication` 만 `jadx --single-class` 로 풀어 본다.
+
+### 앱 얼리기 (2026-10-10 댓글: 자주 쓰는 앱·책의 앱이 사라진다, Leaf2·Poke6)
+
+- 얼리기 = 앱을 **꺼 둔다**(`setApplicationEnabledSettingAsUser(pkg, COMPONENT_ENABLED_STATE_DISABLED_USER)`, `android.onyx.utils.ApplicationFreezeHelper`). 숨김(hidden)·정지(suspend)가 아니다. Onyx·시스템 앱과 `appFreezeWhiteList` 는 얼리지 않는다. 단 Google Play 끄기(`disableGooglePlay`, Play 스토어·GMS·GSF)도 같은 `DISABLED_USER` 라, Pebble Desk 는 시스템 앱을 얼린 앱으로 보지 않는다.
+- 언제: 앱마다 `autoFreeze` 설정(BOOX 설정의 얼리기 관리). 그 앱에서 다른 앱으로 넘어가면 얼릴 차례에 넣고, 약 30초마다 보다가 그 앱이 화면 맨 위가 아니고 포그라운드 서비스도 없으면 작업을 지우고 끈다(`ApplicationFreezeController`). `새로 설치한 앱 얼리기`(`isFreezeNewlyInstalledApplication`)가 켜져 있으면 설치하는 앱마다 켜진다.
+- 그래서 앱을 쓰는 동안만 런처 조회(`queryIntentActivities`)에 나오고, 끄고 나면 빠진다. 꺼 둔 앱은 `getPackageInfo` 로는 찾아져 Pebble Desk 설정에서 지워지지는 않는다(목록에서만 사라짐).
+- 얼린 앱 열기: BOOX 런처가 동적으로(권한 없이) 받는 방송 `onyx.action.open_frozen_app`(extra `args_pkg`·`args_class`·`args_user_id`)을 받으면 앱을 풀고 연다(`EACStatusChangedReceiver`). BOOX 플로팅 버튼은 같은 일을 `com.onyx.floatbutton.open.apps` 로 한다.
+- Pebble Desk 는 `com.onyx` 가 있으면 앱 단위로 꺼진(`DISABLED_USER`) 앱의 실행 화면도 목록에 넣고, 누르면 위 방송을 보낸다(아래 표). 실기기 **(미확인)**.
+- BOOX 런처 띄워 두기: 방송을 받는 곳은 런처가 떠 있을 때 코드로 등록한 것이고(`ContentBrowserApplication` → `EACStatusChangedReceiver`), 런처에는 부팅 완료를 받는 매니페스트 항목이 없어 Pebble Desk 가 기본 홈이면 부팅 뒤 꺼져 있을 수 있다(시스템 UI 도 사용자가 `앱 최적화` 를 누를 때만 런처를 부른다). 공개 서비스 `EACService` 는 붙으면 포그라운드 알림을 띄워 쓰지 않는다. 대신 권한 없이 열린 데이터 창구 `com.onyx.system.database.ContentProvider` 에 불안정(unstable) 연결만 해 둔다(`Device.keepBooxLauncher`). 창구는 시작할 때 DB 라이브러리 초기화만 한다(`FlowManager.init`). 안드로이드가 런처를 띄우고 이 앱과 같은 중요도로 살려 둔다(불안정 연결도 `OomAdjuster` 가 똑같이 센다. 런처가 죽어도 이 앱은 죽지 않는다). 홈이 보일 때·잠금이 풀릴 때·화면이 켜질 때 다시 잡는다(잠금 전에는 런처를 띄울 수 없다). 연결은 한 줄(단일 스레드)로 차례대로 잡고, 못 잡으면 전 연결을 둔다.
+- 얼린 앱을 누르면: 연결을 다시 잡아(런처가 죽었으면 띄운다) 방송을 보낸다. 막 뜬 런처는 창구를 내놓은 뒤 `Application.onCreate` 에서 받는 곳을 등록하므로 그 사이 방송을 놓칠 수 있다. 그래서 2초 뒤에도 홈이 초점을 갖고 있으면 — 앱이 이미 풀렸으면 직접 열고, 아직 얼려 있으면 한 번 더 보낸다. 그래도 2초 안에 안 열리면 안내 창(`얼리기 설정 열기` → `com.onyx.app.freeze.page`, `앱 정보`).
+- 얼린 앱 판정에서 뺀 것: 시스템 앱(`FLAG_SYSTEM`·`FLAG_UPDATED_SYSTEM_APP`), 이름에 `com.onyx` 가 든 앱(펌웨어 `isOnyxOrSystemApp` 과 같게), Google Play·GMS·GSF(`disableGooglePlay` 가 같은 방법으로 끈다. 누르면 사용자가 끈 Play 가 다시 켜진다).
+- codex 리뷰(2026-10-10, gpt-5.6-sol high): 방법은 "조건부"로 맞음. 반영한 것 — 누를 때 다시 띄우기·재시도, 연결 직렬화·실패 시 전 연결 유지, 시스템 판정을 펌웨어와 같게, Google Play 제외. 기각한 것 — "얼리기·풀기 때 앱 변경 순번이 안 바뀐다"(Leaf2 `PackageManagerService.setEnabledSetting` 명령 덤프에 `updateSequenceNumberLP` 호출이 있다), "런처를 늘 띄워 두는 비용"(기본 홈이 BOOX 런처일 때와 같은 상태).
+- 재현: 에뮬레이터에서 `pm disable-user <패키지>` 가 얼리기와 같다(시스템 앱이 아닌 시험 앱으로. 끈 직후 재부팅하면 상태가 아직 파일에 안 써져 풀린다). BOOX 런처 대신 가짜 `com.onyx` 앱(같은 이름의 데이터 창구, `Application.onCreate` 에서 `onyx.action.open_frozen_app`·`com.onyx.app.freeze.page` 받는 곳을 등록해 로그를 남기고 자기 화면을 띄움)을 깐다. "열림"은 `appops set com.onyx SYSTEM_ALERT_WINDOW allow`(백그라운드에서 화면 띄우기 허용), "안 열림"은 `deny` 로 흉내 낸다. 꺼진 런처는 `am force-stop com.onyx` 나 재부팅으로 만든다.
+
 ## Pebble Desk 에 넣은 것
 
 | 내용 | 기기 구분 | 확인 |
@@ -372,6 +418,7 @@ Pebble Desk(1.2.x)를 기본 홈으로 쓰는 홈 화면. 책 1권(밀리의서�
 | 화면 폭 572dp 맞춤: 짧은 변이 572dp 가 되도록 앱 밀도를 다시 정한다(`Ui.designDensityDpi`, `EinkActivity.attachBaseContext`). E6 는 320 → 300dpi, 572×772dp 로 페블과 같은 물리 크기. 기기 정보의 `화면` 줄에 기기 값과 `앱 기준` 값을 함께 보인다 | — | E6 크기 에뮬레이터(536×724dp)에서 1.2.0 은 책 3권일 때 **함께 읽는 책 줄 아래 32dp 가 잘렸고**(큰 표지가 최소 136dp 에 걸려 책 자리가 58dp 넘침), 상단 바 54dp 를 흉내 내면(`wm size 1072x1388`) 설정 마지막 줄이 40dp 잘렸다. 밀도 맞춤 뒤 셋 다 들어감(설정은 상단 바 54dp 를 빼도 약 714dp 라 708dp 가 여유 6dp 로 들어간다). 페블 실기기 **(미확인)**. AiPaper Mini(1440px → 403dpi, 572×762dp) 실기기 홈 사진에서 그대로 들어감. Minimal Phone(4.3", 600px → 168dpi)은 거꾸로 밀도를 낮춰 모든 것이 페블의 약 0.7배로 작아진다(아래 기기 절) |
 | 기기 정보 화면(사진으로 찍어 보내는 진단). 시스템 속성·설정 값은 아는 키에 더해 `getprop`·`Settings.System` 전체에서 전자잉크·조명 낱말이나 제조사 이름이 든 키를 찾아 있는 것만 보인다(1.2.1 까지는 크레마·메이북 키만 보여 AiPaper Mini 의 고유 값이 안 나왔다). 제조사·브랜드 낱말 중 `phone` 같은 흔한 낱말은 쓰지 않는다(Minimal Phone 에서 전화 관련 기본 키만 잔뜩 나왔다) | — | 에뮬레이터(M6C 이름)에서 한 화면에 들어감, 볼륨 키가 `24 KEYCODE_VOLUME_UP` 로 기록됨. E6 실기기에서도 상단 바 아래에 다 들어감 |
 | 안드로이드 13+ **제한된 설정** 안내: ⑭ 시작하기 1쪽의 `켜는 방법` 단계(접근성에서 눌러 보기 → 막힌 창 닫기 → `앱 정보 열기` › ⋮ › 제한된 설정 허용 → 다시 켜기)와 설정 › 독서의 자동 추가 창(늘 `앱 정보 열기`). 앱 정보는 `ACTION_APPLICATION_DETAILS_SETTINGS` + extra `uId`(안드로이드 13 설정 앱 `AppInfoDashboardFragment.getUid()` 는 인자 `uid` 나 extra `uId` 만 읽어, 없으면 -1 로 묻다 실패해 ⋮ 메뉴가 빠진다) | 안드로이드 13+ | 에뮬레이터 API 33(`CremaPebble_A13`): 파일 앱으로 깐 APK 가 `packageSource=3`·`ACCESS_RESTRICTED_SETTINGS: deny` 로 막힘 → 막힌 창 → 시작하기에 안내·`앱 정보 열기` → ⋮ `Allow restricted settings` → 접근성 켜짐 → `켜짐 ✓`. `uId` 없이 열면 ⋮ 가 없다(설정 › 앱 목록에서 들어가면 있다). iReader(안드로이드 14) **(미확인)** |
+| BOOX 앱 얼리기: `com.onyx`(BOOX 런처)가 있으면 BOOX 가 얼린 앱(위 판정)의 실행 화면도 앱 목록에 넣는다(앱이 스스로 끈 실행 화면은 빼고). 누르면 `onyx.action.open_frozen_app` 을 `com.onyx` 로 보내 BOOX 런처가 풀고 연다(`AppStore.openFrozen`, 재시도·안내 창). 방송을 받도록 BOOX 런처를 띄워 둔다(`Device.keepBooxLauncher`). 숨긴(hidden) 앱도 지워진 앱으로 보지 않는다 | `com.onyx` 설치 여부 | 에뮬레이터 API 30 + 가짜 `com.onyx`: 얼린 시험 앱이 자주 쓰는 앱에 남음, 시스템 앱(Calendar)·실행 화면만 끈 앱은 안 나옴, 가짜 런처가 없으면 전처럼 빠짐. 누르기: 열림 → 방송 1번 / 안 열림 → 재시도 뒤 안내 창 / 런처 죽은 채로 → 다시 떠서 열림 / 풀렸는데 안 열림 → 직접 열림. 런처를 끄고 홈 복귀·재부팅(기본 홈 Pebble Desk)·화면 끄고 켜기 → 런처가 다시 뜸. BOOX 실기기 **(미확인)** |
 
 넣지 않은 것: `com.haoqing.action.FULL_REFRESH`(잔상 제거 버튼).
 

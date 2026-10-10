@@ -209,4 +209,6 @@
     <string name="onboarding_time_s1">Open Usage access.</string>
     <string name="onboarding_time_s2">Tap Pebble Desk in the list, allow it and come back.</string>
     <string name="year_books_count">%1$d</string>
+    <string name="boox_frozen_help">BOOX froze this app, so it couldn\'t open. Remove it from BOOX app freeze settings.</string>
+    <string name="boox_freeze_settings">Open freeze settings</string>
 </resources>

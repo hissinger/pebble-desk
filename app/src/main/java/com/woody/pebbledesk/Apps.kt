@@ -1,13 +1,17 @@
 package com.woody.pebbledesk
 
+import android.app.Activity
 import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.util.LruCache
 import com.woody.pebbledesk.readers.ReaderApps
@@ -82,7 +86,9 @@ object AppStore {
     private fun queryApps(context: Context): List<AppEntry> {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        return pm.queryIntentActivities(intent, MATCH_ALL_BOOT_STATES)
+        val found = pm.queryIntentActivities(intent, MATCH_ALL_BOOT_STATES)
+        val frozen = if (Device.hasBooxLauncher(context)) frozenActivities(pm, intent) else emptyList()
+        return (found + frozen)
             .filter { it.activityInfo.packageName != context.packageName }
             .map {
                 AppEntry(
@@ -94,12 +100,32 @@ object AppStore {
             .sortedWith { a, b -> collator.compare(a.label, b.label) }
     }
 
+    /**
+     * BOOX 가 얼려 둔 앱의 실행 화면. BOOX 는 앱을 꺼 두는 것(DISABLED_USER)으로 얼려 보통 조회에는 빠진다.
+     * 앱이 스스로 끈 실행 화면(아이콘 바꾸기 별칭 등)은 넣지 않는다. 누르면 BOOX 런처가 풀고 연다([launch]).
+     */
+    private fun frozenActivities(pm: PackageManager, intent: Intent): List<ResolveInfo> =
+        pm.queryIntentActivities(intent, MATCH_ALL_BOOT_STATES or PackageManager.MATCH_DISABLED_COMPONENTS)
+            // 켜진 앱의 화면은 보통 조회에 이미 있다(꺼진 화면이면 앱이 스스로 끈 것).
+            .filter { !it.activityInfo.applicationInfo.enabled && Device.isFrozen(pm, it.activityInfo.packageName) }
+            .filter {
+                val a = it.activityInfo
+                when (runCatching { pm.getComponentEnabledSetting(ComponentName(a.packageName, a.name)) }.getOrNull()) {
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> true
+                    PackageManager.COMPONENT_ENABLED_STATE_DEFAULT -> a.enabled
+                    else -> false
+                }
+            }
+
     /** 앱 목록을 읽고, 지워진 앱을 설정과 읽고 있는 책에서 정리한다. */
     fun loadAndPrune(context: Context, prefs: HomePrefs): List<AppEntry> {
         val apps = load(context)
         // 잠금 해제 전에는 앱 정보가 덜 보일 수 있어, 지워진 앱 정리는 잠금이 풀린 뒤에만 한다.
         if (!Storage.isUnlocked(context)) return apps
-        val fix = keyFixer(apps) { pkg -> runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess }
+        // 숨긴(hidden) 앱도 설치된 것으로 본다. 기본 조회로는 지워진 앱처럼 못 찾는다.
+        val fix = keyFixer(apps) { pkg ->
+            runCatching { context.packageManager.getPackageInfo(pkg, PackageManager.MATCH_UNINSTALLED_PACKAGES) }.isSuccess
+        }
         prefs.prune(fix)
         BookShelf.pruneApps(context, fix)
         return apps
@@ -126,6 +152,7 @@ object AppStore {
     }
 
     fun launch(context: Context, app: AppEntry) {
+        if (Device.hasBooxLauncher(context) && Device.isFrozen(context.packageManager, app.pkg)) return openFrozen(context, app)
         val intent = Intent(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_LAUNCHER)
             .setComponent(app.component)
@@ -137,6 +164,47 @@ object AppStore {
             // 지워졌거나 열 수 없는 앱. 다음에 홈으로 돌아올 때 목록에서 빠진다.
         }
     }
+
+    /**
+     * BOOX 가 얼린 앱을 BOOX 런처에 풀고 열어 달라고 한다. 런처가 죽어 있었으면 먼저 다시 띄우는데, 막 뜬 런처는
+     * 받는 곳을 등록하기 전에 온 방송을 놓칠 수 있다. 그래서 조금 뒤에도 이 화면이 그대로면 한 번 더 보내고,
+     * 그래도 안 열리면 얼리기에서 빼라고 안내한다. 다시 누르면 앞의 재시도는 그만둔다.
+     */
+    private fun openFrozen(context: Context, app: AppEntry) {
+        val activity = context as? Activity
+        // 앱이 열리거나 사용자가 다른 데로 가면 이 화면이 초점을 잃는다.
+        val left = { activity != null && (activity.isFinishing || !activity.hasWindowFocus()) }
+        main.removeCallbacksAndMessages(FROZEN_RETRY)
+        // 런처를 띄우는 동안 다시 누르면 앞의 것은 그만둔다(재시도·안내가 겹치지 않게).
+        val tap = ++frozenTaps
+        Device.keepBooxLauncher(context) {
+            // 그 사이 다른 데로 갔으면 열지 않는다.
+            if (tap != frozenTaps || left()) return@keepBooxLauncher
+            Device.sendOpenFrozenApp(context, app.component)
+            main.postDelayed({
+                if (left()) return@postDelayed
+                // BOOX 런처가 풀기는 했는데 열지 못했으면 직접 연다.
+                if (!Device.isFrozen(context.packageManager, app.pkg)) return@postDelayed launch(context, app)
+                Device.sendOpenFrozenApp(context, app.component)
+                main.postDelayed({ if (!left() && activity != null) showFrozenHelp(activity, app) }, FROZEN_RETRY, FROZEN_WAIT_MS)
+            }, FROZEN_RETRY, FROZEN_WAIT_MS)
+        }
+    }
+
+    private fun showFrozenHelp(activity: Activity, app: AppEntry) {
+        Sheet(activity).header(app.label, activity.getString(R.string.boox_frozen_help), app = app)
+            .item(activity.getString(R.string.boox_freeze_settings), bold = true) { Device.openBooxFreezeSettings(activity) }
+            .item(activity.getString(R.string.app_info)) { openAppInfo(activity, app) }
+            .show()
+    }
+
+    private val main = Handler(Looper.getMainLooper())
+    /** 얼린 앱 열기 재시도의 표(다시 누르면 지운다) */
+    private val FROZEN_RETRY = Any()
+    /** 얼린 앱을 누른 횟수. 런처를 띄운 뒤 이어 할 일이 마지막 누름의 것인지 본다. */
+    private var frozenTaps = 0
+    /** 얼린 앱을 열어 달라고 한 뒤 열렸는지 볼 때까지(BOOX 런처가 풀고 여는 시간을 넉넉히) */
+    private const val FROZEN_WAIT_MS = 2000L
 
     fun openAppInfo(context: Context, app: AppEntry) {
         runCatching {
@@ -178,7 +246,7 @@ object AppIcons {
         val pm = context.packageManager
         // 못 찾으면 기본 아이콘을 쓰되 기억하지 않는다(다음에 다시 찾는다).
         val found = runCatching {
-            pm.getActivityInfo(app.component, MATCH_ALL_BOOT_STATES).loadIcon(pm)
+            pm.getActivityInfo(app.component, MATCH_ALL_BOOT_STATES or PackageManager.MATCH_DISABLED_COMPONENTS).loadIcon(pm)
         }.getOrNull()
         val drawable = found ?: pm.defaultActivityIcon
         val color = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)

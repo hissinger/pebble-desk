@@ -48,6 +48,8 @@ class HomeActivity : EinkActivity() {
             updateStatus()
             // 날이 바뀌면 오늘 읽은 시간을 0 부터. 부팅 직후 잠금이 풀리면 그때부터 읽은 시간을 셀 수 있다.
             if (intent.action == Intent.ACTION_DATE_CHANGED || intent.action == Intent.ACTION_USER_UNLOCKED) updateReading()
+            // BOOX 런처는 잠금이 풀려야 띄울 수 있고, 화면이 꺼진 동안 죽었을 수 있다.
+            if (intent.action == Intent.ACTION_USER_UNLOCKED || intent.action == Intent.ACTION_SCREEN_ON) Device.keepBooxLauncher(context)
         }
     }
     private val lightObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
@@ -65,6 +67,7 @@ class HomeActivity : EinkActivity() {
         // 읽은 시간은 다른 앱에서 돌아올 때만 바뀐다(레이아웃 때의 refresh 에서는 다시 세지 않는다).
         updateReading()
         OnboardingActivity.showOnce(this, prefs)
+        Device.keepBooxLauncher(this)
     }
 
     /**
