@@ -5,7 +5,6 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
@@ -85,8 +84,8 @@ class DeviceInfoActivity : EinkActivity() {
         ).joinToString("  ·  ") { (label, on) -> "$label ${onOff(on)}" }, 16f, lines = 2))
 
         // 자동 추가(접근성 서비스)가 저절로 꺼지는 기기에서 언제·왜 끊겼는지: 서비스 연결·끊김, 이 앱이 끝난 까닭(안드로이드 11+),
-        // 백그라운드에서 앱을 끄는 설정들.
-        section(list, R.string.device_section_service)
+        // 백그라운드에서 앱을 끄는 설정들. 서비스가 받은 알림·한 일은 따로 된 화면(`기록 보기 ›`, 이 화면에 더 넣을 자리가 없다).
+        section(list, R.string.device_section_service) { startActivity(WatchLogActivity.intent(this)) }
         serviceLog().forEachIndexed { i, line ->
             list.addView(text(line, 14f, lines = if (i == 2) 2 else 1).apply { setLineSpacing(0f, 1.15f) })
         }
@@ -259,8 +258,15 @@ class DeviceInfoActivity : EinkActivity() {
 
     private fun onOff(on: Boolean) = getString(if (on) R.string.on else R.string.off)
 
-    private fun section(list: LinearLayout, title: Int) {
-        list.addView(text(getString(title), 15f, color = Ui.LIGHT_GRAY), lp(MATCH, WRAP).apply { topMargin = dp(9); bottomMargin = dp(2) })
+    /** 절 제목. [more] 가 있으면 같은 줄 오른쪽 끝에 `기록 보기 ›`(줄을 늘리지 않는다). */
+    private fun section(list: LinearLayout, title: Int, more: (() -> Unit)? = null) {
+        val head = text(getString(title), 15f, color = Ui.LIGHT_GRAY)
+        val row = if (more == null) head else hbox().apply {
+            addView(head, lp(0, WRAP, 1f))
+            addView(text(getString(R.string.watch_log_open), 15f, Ui.bold))
+            setOnClickListener { more() }
+        }
+        list.addView(row, lp(MATCH, WRAP).apply { topMargin = dp(9); bottomMargin = dp(2) })
     }
 
     companion object {
@@ -290,13 +296,13 @@ class DeviceInfoActivity : EinkActivity() {
         private const val VALUE_MAX = 32
 
         /**
-         * 이 앱이 여는 시스템 화면들(앱이 여는 것과 같은 인텐트). 사용 기록은 앱이 여는 목록 화면과, 그게 안 열리는 기기를 위해
-         * 이 앱만 보이는 화면(같은 동작 + `package:` 주소)도.
+         * 이 앱이 여는 시스템 화면들(앱이 여는 것과 같은 인텐트). 사용 기록은 앱이 여는 이 앱만 보이는 화면과, 그 화면이 없는
+         * 기기에서 대신 여는 목록 화면을 따로 시험한다.
          */
         private val SYSTEM_SCREENS: List<Pair<Int, (Context) -> Intent>> = listOf(
             R.string.device_system_a11y to { _ -> ReaderWatchService.settingsIntent() },
             R.string.device_system_usage to { _ -> ReadingLog.accessSettingsIntent() },
-            R.string.device_system_usage_app to { c -> ReadingLog.accessSettingsIntent().setData(Uri.parse("package:${c.packageName}")) },
+            R.string.device_system_usage_app to ReadingLog::appAccessSettingsIntent,
             R.string.device_system_app_info to ReaderWatchService::appInfoIntent,
         )
 
