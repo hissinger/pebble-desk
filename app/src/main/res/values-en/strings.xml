@@ -139,8 +139,8 @@
     <string name="reading_settings">Reading</string>
     <string name="auto_books">Auto-add books</string>
     <string name="auto_books_short">Auto-add</string>
-    <string name="auto_books_hint">Kyobo · Millie · Aladin · Bookers · Ridi · YES24</string>
-    <string name="auto_books_desc">When you open a book in Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi or YES24 (Library, my YES), it goes to the top of your reading list. Only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, are read; book text and other apps are never seen. Turn on Pebble Desk in Accessibility.</string>
+    <string name="auto_books_hint">Kyobo · Millie · Aladin · Bookers · Ridi · YES24 · Moon+</string>
+    <string name="auto_books_desc">When you open a book in Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi, YES24 (Library, my YES) or Moon+ Reader, it goes to the top of your reading list. Only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, are read; book text and other apps are never seen. Turn on Pebble Desk in Accessibility.</string>
     <string name="open_accessibility">Open Accessibility</string>
     <string name="progress_pct">%1$d%% read</string>
     <string name="due_days">Due in %1$d days</string>
@@ -164,13 +164,15 @@
     <string name="guide_yes24lib">YES24 Library</string>
     <string name="guide_myyes">my YES</string>
     <string name="guide_myyes_desc">Covers cannot be taken, so they stay blank.</string>
+    <string name="guide_moon">Moon+ Reader</string>
+    <string name="guide_moon_desc">Opened from a cover in the Home tab\'s recent row, open the menu while reading to add the book.</string>
     <string name="guide_progress_note">For progress while reading, turn on the bottom info (page or progress) in the e-book app\'s viewer settings.</string>
     <string name="guide_cover_note">Covers are cut from the shelf screen. If a title or author is cut off, wrong or missing, long-press the book on the home screen to fix it.</string>
     <string name="edit_title">Edit title</string>
     <string name="add_author">Add author</string>
     <string name="edit_author">Edit author</string>
     <string name="save">Save</string>
-    <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, of Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi and YES24 (Library, my YES) to fill your reading list. Book text and other apps are not seen, and nothing leaves the device.</string>
+    <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, of Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi, YES24 (Library, my YES) and Moon+ Reader to fill your reading list. Book text and other apps are not seen, and nothing leaves the device.</string>
     <string name="open_app_info">Open App info</string>
     <string name="restricted_hint">If Pebble Desk is greyed out in Accessibility (restricted setting), tap it once and close the notice first, then open App info › ⋮ at the top right › Allow restricted settings and turn it on again.</string>
     <string name="onboarding_title">Getting started</string>

@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import java.io.ByteArrayOutputStream
 import android.view.Display
@@ -20,7 +21,7 @@ import java.time.LocalDate
 import kotlin.math.abs
 
 /**
- * 읽고 있는 책 자동 추가(접근성 서비스). 교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES)의 **서재 화면**에 보이는 제목·저자·진행률·반납일과
+ * 읽고 있는 책 자동 추가(접근성 서비스). 교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES)·문리더의 **서재 화면**에 보이는 제목·저자·진행률·반납일과
  * 사용자가 누른 책 칸만 읽는다. 다른 앱은 시스템이 아예 보내지 않고(`res/xml/reader_watch.xml` 의 packageNames),
  * 읽는 화면은 본문(웹 화면)을 훑지 않고 진행률 줄·메뉴 제목만 이름으로 읽는다. 읽은 내용은 책 목록에만 적고 밖으로 보내지 않는다.
  */
@@ -33,13 +34,21 @@ class ReaderWatchService : AccessibilityService() {
      */
     private val openedPrefs by lazy { Storage.of(this).getSharedPreferences("reader_watch", MODE_PRIVATE) }
     private fun opened(pkg: String) = openedPrefs.getString("opened_$pkg", null)
-    private fun setOpened(pkg: String, title: String) {
+    /** [title] 이 null 이면 지운다(어떤 책을 폈는지 모른다) */
+    private fun setOpened(pkg: String, title: String?) {
         if (opened(pkg) != title) openedPrefs.edit().putString("opened_$pkg", title).apply()
     }
     /** 검색(웹 화면)에서 보고 있는 책 상세. 여기서 읽는 화면으로 넘어가면 이 책을 편 것으로 본다(`바로 읽기` 클릭에는 글자가 없다). */
     private val webBook = mutableMapOf<String, Seen>()
     /** 눌렀지만 아직 읽는 화면이 열리지 않은 책 칸과 누른 때([ReaderSpec.openOnViewer] 인 앱) */
     private val clicked = mutableMapOf<String, Pair<Seen, Long>>()
+    /** 서재에서 책 칸으로 알아보지 못한 것을 누른 때(문리더 홈 탭·교보도서관 표지 보기의 표지만 있는 칸은 눌러도 제목이 오지 않는다) */
+    private val unknownClick = mutableMapOf<String, Long>()
+    /**
+     * 그렇게 누른 뒤 읽는 화면이 열려 어떤 책인지 모르는 앱과 열린 때. 앞서 편 책과 다른 책일 수 있어 마지막으로 편 책을 지워 두고
+     * (진행률을 적지 않는다. 서비스가 다시 시작돼도), 읽는 화면 메뉴의 제목으로 알면 열린 때부터 그 책으로 센다.
+     */
+    private val unknownOpen = mutableMapOf<String, Long>()
     private var lastWebRead = 0L
     /**
      * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 알라딘 서재가 잠깐 보일 때
@@ -59,6 +68,8 @@ class ReaderWatchService : AccessibilityService() {
     private val readSince = mutableSetOf<String>()
     /** [readSince] 앱마다 서재를 떠나 읽는 화면이 처음 열린 때(돌아와서야 어떤 책인지 아는 앱의 읽은 시간을 그 책으로 세게) */
     private val readerAt = mutableMapOf<String, Long>()
+    /** [readSince] 앱 가운데 읽는 화면 메뉴로 이미 책을 안 앱('최근 읽은 책' 줄은 늦게 바뀌어 앞서 읽은 책이 보이기도 해 다시 보지 않는다) */
+    private val readKnown = mutableSetOf<String>()
     private var lastShot = 0L
     private val handler = Handler(Looper.getMainLooper())
     /** 화면이 멈추면 다시 읽을 서재 */
@@ -77,17 +88,22 @@ class ReaderWatchService : AccessibilityService() {
         if (settleSpec?.pkg == spec.pkg) scheduleSettle(spec)
         when (e.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                // 대화상자 같은 것은 빼고 그 앱의 화면만 기억한다.
-                e.className?.toString()?.takeIf { it.startsWith(spec.classPrefix) }?.let {
+                // 대화상자 같은 것은 빼고 그 앱의 화면만 기억한다(문리더 목차 `PrefChapters` 처럼 앱 안의 대화상자도 이름이 앱 것이라 액티비티인지 본다).
+                e.className?.toString()?.takeIf { it.startsWith(spec.classPrefix) && isActivity(spec.pkg, it) }?.let {
                     // 화면이 새로 열릴 때마다(홈에서 돌아온 서재 포함) 바로 자르기 횟수를 다시 센다.
                     eagerTries.clear()
-                    lastTransition = System.currentTimeMillis()
+                    val now = System.currentTimeMillis()
+                    lastTransition = now
                     screen[spec.pkg] = it
                     if (ReadingLog.isReaderScreen(it)) {
                         // 서재를 떠나 처음 연 읽는 화면의 때만 적는다(읽는 중 목차 같은 다른 화면에 갔다 와도 처음부터 그 책으로 세게).
-                        if (spec.recent != null && readSince.add(spec.pkg)) readerAt[spec.pkg] = System.currentTimeMillis()
+                        if (spec.recent != null && readSince.add(spec.pkg)) readerAt[spec.pkg] = now
+                        unknownClick.remove(spec.pkg)?.takeIf { now - it < CLICK_OPEN_MS }?.let {
+                            unknownOpen[spec.pkg] = now
+                            setOpened(spec.pkg, null)
+                        }
                         webBook.remove(spec.pkg)?.let { book -> bookOpened(spec, book) }
-                        clicked.remove(spec.pkg)?.takeIf { System.currentTimeMillis() - it.second < CLICK_OPEN_MS }?.let { bookOpened(spec, it.first) }
+                        clicked.remove(spec.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.let { bookOpened(spec, it.first) }
                     }
                 }
                 readScreen(spec, force = true)
@@ -96,7 +112,11 @@ class ReaderWatchService : AccessibilityService() {
             AccessibilityEvent.TYPE_VIEW_CLICKED -> if (screen[spec.pkg] in spec.shelves) {
                 val cell = e.source?.let { clickedCell(spec, it) } ?: fromClickText(spec, e.text) ?: shelfCellByText(spec, e.text)
                 when {
-                    cell == null -> rememberWebBook(spec)
+                    cell == null -> {
+                        // 표지만 있는 칸일 수 있다(누르자마자 읽는 화면으로 넘어가 누른 요소도 읽을 수 없다). 메뉴에 제목이 없는 앱은 알 길이 없어 두지 않는다.
+                        if (spec.viewerTitle != null) unknownClick[spec.pkg] = System.currentTimeMillis()
+                        rememberWebBook(spec)
+                    }
                     // 누르면 내려받기·기간 만료 안내가 먼저 뜨는 앱은 읽는 화면이 열릴 때 편 것으로 본다. 기간이 지난 책은 열리지 않는다.
                     spec.openOnViewer -> if (cell.due in 0 until LocalDate.now().toEpochDay()) clicked.remove(spec.pkg)
                         else clicked[spec.pkg] = cell to System.currentTimeMillis()
@@ -171,10 +191,12 @@ class ReaderWatchService : AccessibilityService() {
             handler.postDelayed(viewerLater, VIEWER_RETRY_MS)
         }
         // 제목은 하나만 보일 때만 믿는다(같은 이름이 여럿이면 목차 같은 목록이다. 북커스는 흔한 이름 `tv_title`).
-        spec.viewerTitle?.let { id -> texts(id).distinct().singleOrNull() }?.let { title ->
+        spec.viewerTitle?.let { id -> texts(id).distinct().singleOrNull() }?.let { text ->
+            val (title, author) = if (spec.viewerTitleAuthor) titleAuthor(text) else text to ""
+            if (spec.pkg in readSince) readKnown += spec.pkg
             val current = opened(spec.pkg)?.let { BookShelf.findByTitle(this, it) }
             if (current == null || BookShelf.findByTitle(this, title)?.id != current.id) {
-                bookOpened(spec, Seen(title, "", progress, -1, null, Rect()))
+                bookOpened(spec, Seen(title, author, progress, -1, null, Rect()), unknownOpen[spec.pkg])
                 return
             }
         }
@@ -387,9 +409,11 @@ class ReaderWatchService : AccessibilityService() {
         walk(cell, 0)
         fun text(id: String?) = id?.let { texts[it] }.orEmpty()
         val title = spec.titles.map(::text).firstOrNull { it.isNotEmpty() } ?: return null
+        val progress = percent(text(spec.progress))
+        if (spec.cellNeedsProgress && progress < 0) return null
         val bounds = Rect().also { cell.getBoundsInScreen(it) }
         val author = spec.authors.map(::text).firstOrNull { it.isNotEmpty() }.orEmpty()
-        return Seen(title, authorName(author), percent(text(spec.progress)), dueDate(text(spec.due)), thumb, bounds)
+        return Seen(title, authorName(author), progress, dueDate(text(spec.due)), thumb, bounds)
     }
 
     /**
@@ -400,8 +424,10 @@ class ReaderWatchService : AccessibilityService() {
         val items = list.map { it.toString().trim() }.filter { it.isNotEmpty() }
         val progress = items.firstNotNullOfOrNull { percent(it).takeIf { p -> p >= 0 } } ?: return null
         val title = items.firstOrNull()?.takeIf { percent(it) < 0 && !STATUS_ONLY.matches(it) } ?: return null
-        val due = if (spec.due != null) items.firstOrNull { "반납" in it || "만료" in it }?.let(::dueDate) ?: -1 else -1
-        val author = if (spec.authors.isNotEmpty()) authorName(items.getOrNull(1)?.takeIf { "%" !in it && "반납" !in it }.orEmpty()) else ""
+        // 반납 문구: `반납 4일 남음`, 북커스 격자 보기 칸은 저자 없이 `9일 남음`
+        fun isDue(t: String) = "반납" in t || "만료" in t || STATUS_ONLY.matches(t)
+        val due = if (spec.due != null) items.firstOrNull(::isDue)?.let(::dueDate) ?: -1 else -1
+        val author = if (spec.authors.isNotEmpty()) authorName(items.getOrNull(1)?.takeIf { "%" !in it && !isDue(it) }.orEmpty()) else ""
         return Seen(title, author, progress, due, null, Rect())
     }
 
@@ -412,6 +438,8 @@ class ReaderWatchService : AccessibilityService() {
      */
     private fun bookOpened(spec: ReaderSpec, seen: Seen, at: Long? = null) {
         webBook.remove(spec.pkg)
+        unknownClick -= spec.pkg
+        unknownOpen -= spec.pkg
         val book = BookShelf.findByTitle(this, seen.title)?.also {
             BookShelf.moveToFront(this, it.id)
             BookShelf.updateStatus(this, it.id, seen.progress, seen.due, seen.author)
@@ -449,6 +477,7 @@ class ReaderWatchService : AccessibilityService() {
         val seen = readShelf(spec, root)
         // 책 칸을 눌러도 알림이 오지 않는 앱(알라딘): 읽는 화면에서 돌아오면 서재 아래 '최근 읽은 책'이 방금 편 책이다.
         spec.recent?.takeIf { spec.pkg in readSince }?.let { id ->
+            if (readKnown.remove(spec.pkg)) { readSince -= spec.pkg; return@let }
             val title = root.byId(spec, id).firstOrNull()?.text?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: return@let
             readSince -= spec.pkg
             bookOpened(spec, seen.firstOrNull { sameTitle(it.title, title) } ?: Seen(title, "", -1, -1, null, Rect()), readerAt[spec.pkg])
@@ -538,6 +567,16 @@ class ReaderWatchService : AccessibilityService() {
         runCatching { windows.mapNotNull { it.root }.filter { it.packageName == spec.pkg } }.getOrDefault(emptyList())
             .ifEmpty { listOfNotNull(root(spec)) }
 
+    /**
+     * [cls] 가 [pkg] 의 액티비티인가. 대화상자가 닫힐 때는 화면 바뀜 알림이 다시 오지 않아, 대화상자를 화면으로 기억하면
+     * 그 아래 읽는 화면을 읽지 않게 된다. 창이 바뀔 때만 불리고 앱이 업데이트될 수 있어 담아 두지 않는다. 앱 정보를 못 읽으면 액티비티로 본다.
+     */
+    private fun isActivity(pkg: String, cls: String): Boolean {
+        val activities = runCatching { packageManager.getPackageInfo(pkg, PackageManager.GET_ACTIVITIES).activities }.getOrNull()
+            ?: return true
+        return activities.any { it.name == cls }
+    }
+
     /** 지금 앞에 있는 그 앱의 화면(다른 앱·시스템 창이면 null) */
     private fun root(spec: ReaderSpec): AccessibilityNodeInfo? = rootInActiveWindow?.takeIf { it.packageName == spec.pkg }
 
@@ -582,6 +621,10 @@ class ReaderWatchService : AccessibilityService() {
         val viewerLoading: String? = null,
         /** 읽는 화면 메뉴의 책 제목(메뉴를 띄웠을 때만 보인다) */
         val viewerTitle: String? = null,
+        /** 메뉴의 책 제목이 `제목 - 저자` 꼴(문리더. 파일로 연 TXT 등은 파일 이름) */
+        val viewerTitleAuthor: Boolean = false,
+        /** 진행률이 없는 칸은 책이 아니다(문리더 책장의 묶음 칸은 진행률 줄을 감춘다) */
+        val cellNeedsProgress: Boolean = false,
         /** 쪽 번호가 지금 쪽·전체 쪽 두 요소로 나뉜 읽는 화면(북커스 메뉴) */
         val viewerPages: Pair<String, String>? = null,
         /** 쪽으로 셈한 진행률을 올림한다(서재에 보이는 % 와 맞추려고. 북커스는 1/368쪽을 1% 로 보인다) */
@@ -747,6 +790,19 @@ class ReaderWatchService : AccessibilityService() {
                 viewerProgress = listOf("bottom_page_no", "text_space_page"), viewerTitle = "tv_book_title",
                 openOnViewer = true, secure = true,
             ),
+            // 문리더(내 파일을 여는 리더): 서재(최근 목록·책장, 목록·격자 보기 같은 이름) 칸에 제목 `myBookName`·표지 `myBookImage`·
+            // 진행률 `progresTv`, 목록 보기에 저자 `myBookAuthor`(격자 보기는 저자순 정렬일 때만 `myAuthor`). 칸을 누르면 알림이 온다.
+            // 홈 탭의 '최근 목록' 줄은 표지만 있어(누르면 빈 알림) 읽는 화면 메뉴의 제목(`txtTitle`, `제목 - 저자`)으로 안다.
+            // 읽는 화면(본문은 직접 그리는 뷰라 글자가 드러나지 않는다) 아래 상태 줄 오른쪽 `statusRight` 에 진행률(`30.9%`, 설정에 따라
+            // `12/300`), 메뉴에 `txtTextViewPercent`(`30%`). 상태 줄 가운데(`statusMiddle`, `2장 (5/8)`)는 장 안의 쪽이라 쓰지 않는다.
+            ReaderSpec(
+                pkg = "com.flyersoft.moonreader", classPrefix = "com.flyersoft.moonreader",
+                shelves = setOf("com.flyersoft.moonreader.ActivityMain"),
+                viewers = setOf("com.flyersoft.moonreader.ActivityTxt"),
+                titles = listOf("myBookName"), thumbs = listOf("myBookImage"), authors = listOf("myBookAuthor", "myAuthor"), progress = "progresTv", due = null,
+                viewerProgress = listOf("statusRight", "txtTextViewPercent"), viewerTitle = "txtTitle", viewerTitleAuthor = true,
+                cellNeedsProgress = true, eagerCovers = true,
+            ),
         ).associateBy { it.pkg }
 
         /** 거의 한 가지 색뿐인 그림(아직 그려지지 않은 표지 칸)인가. 16×16 점의 밝기 차로 본다. */
@@ -825,8 +881,21 @@ class ReaderWatchService : AccessibilityService() {
         /** 지은이 뒤의 `지음`·`저`(뒤에 옮긴이·출판사가 이어질 수 있다) */
         private val AUTHOR_ROLE = Regex("""\s+(지음|저)(?=\s*($|/|,))""")
 
+        /** `47%` → 47, 소수(문리더 `30.9%`)는 버림. 없으면 -1 */
         private fun percent(text: CharSequence): Int =
-            Regex("""(\d{1,3})\s*%""").find(text)?.groupValues?.get(1)?.toInt()?.coerceIn(0, 100) ?: -1
+            Regex("""(\d{1,3})(?:[.,]\d+)?\s*%""").find(text)?.groupValues?.get(1)?.toInt()?.coerceIn(0, 100) ?: -1
+
+        /**
+         * 문리더 메뉴 제목 → 제목·저자. EPUB 등은 `제목 - 저자`(저자가 없으면 제목만)라 마지막 ` - ` 에서 나눈다.
+         * TXT·HTML 등은 파일 이름(`이름.txt`)이라 확장자만 뗀다(`저자 - 제목.txt` 같은 파일 이름은 나누지 않는다).
+         */
+        private fun titleAuthor(text: String): Pair<String, String> {
+            BOOK_FILE.find(text)?.let { return text.substring(0, it.range.first) to "" }
+            val i = text.lastIndexOf(" - ")
+            return if (i > 0) text.substring(0, i).trim() to text.substring(i + 3).trim() else text to ""
+        }
+
+        private val BOOK_FILE = Regex("""\.(txt|html?|xhtml|mht|mhtml|md|rtf|docx|odt|fb2(\.zip)?|chm|epub|mobi|azw3?|pdf|djvu|cbz|cbr|zip)$""", RegexOption.IGNORE_CASE)
 
         /** 읽는 화면의 진행률: `2% (4/226p)` 처럼 % 가 있으면 그것, 없으면 쪽 `6 / 368` 로 계산(알라딘·북커스). 모르면 -1 */
         private fun viewerPercent(text: CharSequence, roundUp: Boolean): Int {

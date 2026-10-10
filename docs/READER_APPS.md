@@ -13,6 +13,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 알라딘 `kr.co.aladin.ebook` | O | O (알라딘 상품번호) | O | O | `Android/data` |
 | 리디 `com.initialcoms.ridi` | O | O (리디 책 번호) | O `ridi://Library` | O | 앱 전용 저장소 |
 | 교보eBook `com.kyobo.ebook.eink` | O | 기기 안 번호라 사실상 X | O `kyoboebookeink://mylibrary` | O | `Android/data` |
+| 문리더 `com.flyersoft.moonreader`(내 파일, DRM 없음) | `ActivityTxt` | O (파일 위치를 알면 `ACTION_VIEW`) | O | X | 사용자가 둔 곳(공유 저장소) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
 - 사용 기록에는 **앱·화면 이름과 시각만** 남는다. 어떤 책인지는 알 수 없다.
@@ -157,8 +158,30 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | YES24 전자도서관 1.0.27 | `com.yes24.library.shelf.LibShelfActivity`(내 서재) | 격자·목록 보기 같은 이름: 제목 `tv_title`, 표지 `iv_cover`, 저자 `tv_author`(`<정지원,염선형 저>`, 목록은 `/ 미래의창` 이 붙음), 도서관 `tv_lib_name`, 반납 `tv_d_day`(`D-15`), 목록 보기에 `tv_end_date`(`(2026.10.20 까지)`), 진행 막대 `pb_read_percent`(글자 없음, 읽는 화면이 8% 인데 0 이라 안 씀). 개발자 모드에서도 쓸 수 있다 | 옴(`[고양시도서관센터, 제목, <저자>]`, 누른 요소는 없음) | **지원**. 읽는 화면 `com.yes24.ebook.fourth.ui.viewer.epub.EpubActivity`(본문 웹 화면, 화면 캡처 막힘): 아래 `tv_percent`(`8%`), 뷰어 설정의 하단 정보를 켜면 그 대신 아래 줄에 제목(이름 없음)·`ll_page_area`(`14`,`/`,`283`)·`tv_toc_title`(장 제목). 메뉴에 `tv_title`. 도서관 화면 책 상세(`lib.detail.LibDetailActivity`)의 `도서 읽기`로도 연다 |
 
 - 알라딘 `txt_title` 은 `분야`·`필터` 단추에도 쓰인다 → 표지 그림이 들어 있는 묶음만 책 칸으로 본다.
+- 알라딘 서재 아래 '최근 읽은 책' 줄은 읽는 화면에서 돌아온 직후에는 앞서 읽은 책을 보이다가 조금 뒤 바뀐다(격자 칸 순서는 바로 바뀐다, 2026-10-10 페블) → 읽는 화면 메뉴로 이미 안 책이면 그 줄을 보지 않는다.
+- 북커스 격자 보기 칸에는 저자가 없고, 누르면 `[제목, 9일 남음, 1%]` 가 온다(2026-10-10) → 두 번째 글자가 반납 문구면 저자가 아니라 반납일.
 - 이벤트로 받은 요소(누른 요소)는 부모로 올라갈 수 없다 → 누른 곳의 가운데가 들어 있는 칸을 서재 화면에서 찾는다.
 - 북커스 내서재는 탭마다 같은 책 칸이 화면 밖에도 있다(화면 밖 칸은 표지 크기가 0 이라 자르지 않는다).
+
+### 문리더(Moon+ Reader) `com.flyersoft.moonreader` (2026-10-10, 갤럭시 A23 안드로이드 14, 10.7 무료판, **지원**)
+
+내 파일(EPUB·PDF·TXT 등)을 여는 일반 리더라 DRM 이 없다. 시험용 EPUB(제목·저자·표지 넣어 만든 것)으로 확인했다.
+
+- **화면**: 서재 `com.flyersoft.moonreader.ActivityMain`(홈 탭·최근 목록·책장이 모두 이 화면 안), 읽는 화면 `com.flyersoft.moonreader.ActivityTxt`. 목차·설정은 대화상자(`PrefChapters` 등)라 사용 기록에 따로 남지 않는다. 무료판은 읽는 화면에서 나올 때 전면 광고 `com.google.android.gms.ads.AdActivity`(같은 패키지)가 뜬다. 읽은 시간에서는 빠진다.
+  - 목차(`PrefChapters`) 등 대화상자도 이름이 `com.flyersoft.moonreader.` 로 시작해 화면 바뀜 알림이 온다. 닫힐 때는 알림이 다시 오지 않으므로 액티비티만 화면으로 본다.
+- **읽는 화면**: 본문은 직접 그리는 뷰(`txtTextView01`)라 글자가 접근성에 드러나지 않는다. 아래 상태 줄에 `statusMiddle`(장 이름 `2장 시험 (5/8)`, 괄호 안은 장 안의 쪽)·`statusRight`(진행률)가 이름으로 늘 보인다.
+  - `statusRight` 는 기본 `30.9%`(소수). 설정에 따라 `12/300`(전체 쪽), PDF 는 `쪽/전체`, 앞에 `…`·`◐ ` 가 붙기도 한다.
+  - `30.9%` 는 30 으로 읽는다(서재 칸도 `30%`).
+  - 가운데를 눌러 메뉴를 띄우면 `txtTitle` = `페블 시험 책 : 문리더 편 - 홍길동`(제목 ` - ` 저자), `txtTextViewPercent` = `0%`(정수). 메뉴 위쪽은 메뉴를 띄울 때만 트리에 생긴다.
+- **서재**
+  - 최근 목록·목록 보기 칸: 제목 `myBookName`, 저자 `myBookAuthor`, 진행률 `progresTv`(`30%`), 표지 `myBookImage`, 읽은 시간 `description`(`0.01시간, 500단어/분`).
+  - 칸을 누르면 `TYPE_VIEW_CLICKED` 가 온다. 글자는 `[제목, 저자, 30%, 0.01시간, 500단어/분]`.
+  - 홈 탭의 '최근 목록' 줄은 표지 그림(`myBookImage`)만 있다. 누르면 빈 클릭(`Text: []`)이 오므로, 이 경우는 읽는 화면 메뉴의 제목으로 안다.
+- **특정 책 바로 열기**: 된다. `ACTION_VIEW` + 파일(`file://`·`content://`, EPUB 등 MIME)을 `ActivityMain` 으로 보내면 곧바로 `ActivityTxt` 로 연다. 다만 런처가 그 책의 파일 위치를 알아야 한다. 접근성으로는 제목만 보이고, 서재의 파일 위치는 앱 전용 DB 에 있다.
+  - 공개 방송 `com.flyersoft.moonreader.open_broadcast`(extra `bookFile`=경로)로도 열 수 있다. 문리더가 이미 떠 있을 때만 된다.
+- **저장소**: 표지 캐시가 `/sdcard/Books/.MoonReader/<파일 이름>_1.png` 에 남는다. DB·진행률은 앱 전용 저장소에 있다. `BookViewProvider` 는 공개되지 않는다.
+- 책장의 묶음 칸은 진행률 줄(`progressLay`)을 감춘다 → 진행률이 없는 칸은 책으로 보지 않는다.
+- **유료판** `com.flyersoft.moonreaderp`: 요소 이름 앞이 `com.flyersoft.moonreaderp:id/` 가 될 것 **(미확인)**.
 
 ## 런처에서 쓸 수 있는 것
 

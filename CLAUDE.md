@@ -27,6 +27,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.3.1-release.apk </dev/
 - 화면이 꺼져 있으면 `input keyevent KEYCODE_WAKEUP` 먼저. `am start -W` 는 화면이 꺼져 있으면 멈출 수 있어 `perl -e 'alarm 90; exec @ARGV' adb ...` 로 시간 제한을 둔다.
 - 기기가 잠깐 offline 이 되면 기다렸다 다시 한다.
 - 글자로 누르기: `uiautomator dump` 후 `text="..."` 의 bounds 가운데를 탭(이중 공백은 하나로 접힌다). 이미지 뷰는 dump 에 안 나온다.
+- `uiautomator dump`·`events` 를 돌리면 접근성 서비스가 새로 만들어져(메모리의 지금 화면·누른 칸이 지워진다) 읽는 책 자동 추가를 시험할 때는 쓰지 않는다. 화면 캡처와 좌표로 누르고, 결과는 DB(디버그 빌드 `run-as`)로 본다.
 - **사용자가 기기를 쓰는 중일 수 있다.** 자동 조작은 필요한 만큼만, 와이파이·블루투스 등 기기 설정은 건드리지 않는다. 다른 앱 화면에서 길게 누르기·탭이 엉뚱한 곳(다른 이북 앱, Play 스토어)을 누른 적이 있다.
 - **`am force-stop com.woody.pebbledesk` 를 하지 않는다**: 접근성 서비스(읽는 책 자동 추가)가 시스템 설정에서 꺼진다. 다시 켜는 것은 사용자가 한다(adb 로 켜지 않는다). 덮어 설치는 괜찮다.
 - 캡처: `adb exec-out screencap -p > x.png`. 시안·비교 이미지는 `design-review/`(git 제외)에 둔다.
@@ -52,7 +53,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.3.1-release.apk </dev/
 | YearBooksActivity | ⑬ 올해 읽은 책(목록·격자, 해 고르기): 읽는 중·완독한 책(표지에 띠)·뺀 책, 완독·다시 읽기·기록에서 지우기 |
 | BookRecord / BookDetail | 책 한 권의 기록(읽은 날·완독 회차, `BookRecord.all`) / 홈·올해 읽은 책이 같이 쓰는 책 상세 `showBookDetail`(머리·기록·메뉴·`책 정보 고치기`, 상태로만 갈림. 홈은 지금 읽는 것만, 올해 읽은 책은 완독한 회차 전체) |
 | Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간을 책별로 계산(편 책 `book_open`), DB `reading_day` 저장, 연속일 |
-| ReaderWatch | `ReaderWatchService`(접근성): 교보도서관·교보eBook·밀리·알라딘·북커스·리디·YES24(전자도서관·my YES) 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기. 앱별 화면 요소 이름은 `SPECS` |
+| ReaderWatch | `ReaderWatchService`(접근성): 교보도서관·교보eBook·밀리·알라딘·북커스·리디·YES24(전자도서관·my YES)·문리더 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기. 앱별 화면 요소 이름은 `SPECS` |
 | Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 10권, 홈에는 4권, YES24 표지 검색)과 나간 책(완독·뺀 책, `BookShelf.history`), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
 | AppListActivity / FavoritesActivity / SettingsActivity / DeviceInfoActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 / 기기 정보(사진으로 찍어 보내는 진단 화면: 속성·권한·누른 키·빠른 설정 시험) |

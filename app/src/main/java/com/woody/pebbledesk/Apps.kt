@@ -33,6 +33,7 @@ object AppStore {
     val EBOOK_PACKAGES = setOf(
         "com.initialcoms.ridi", "kr.co.millie.eink", "kr.co.aladin.ebook", "com.yes24.ebook.einkstore",
         "com.kyobo.ebook.eink", "com.bookers.ebook", "com.yes24.library.eink", "kr.co.kyobobook.KEL",
+        "com.flyersoft.moonreader",
     )
     private val EBOOK_WORDS = listOf("ebook", "e-book", "eink", "e ink", "도서", "서재", "리디", "book")
 
