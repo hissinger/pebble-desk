@@ -98,6 +98,11 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:screenOrientation="portrait" />
+        <activity
+            android:name=".WatchLogActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
         <!-- 읽는 책 자동 추가(설정 > 독서). 사용자가 안드로이드 접근성에서 켜야 동작한다. -->
         <service

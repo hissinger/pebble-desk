@@ -88,12 +88,21 @@ class ReaderWatchService : AccessibilityService() {
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         val spec = ReaderApps.byPackage[e.packageName?.toString()] ?: return
+        WatchLog.event(this, spec.pkg)
         // 서재는 화면이 바뀌는 동안(칸을 다시 채우는 중, 표지를 불러오는 중, 누른 칸이 반전된 순간) 읽지 않고 멈출 때까지 미룬다.
         if (settleSpec?.pkg == spec.pkg) scheduleSettle(spec)
         when (e.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 // 대화상자 같은 것은 빼고 그 앱의 화면만 기억한다(문리더 목차 `PrefChapters` 처럼 앱 안의 대화상자도 이름이 앱 것이라 액티비티인지 본다).
-                e.className?.toString()?.takeIf { it.startsWith(spec.classPrefix) && isActivity(spec.pkg, it) }?.let {
+                val cls = e.className?.toString()
+                val isScreen = cls != null && cls.startsWith(spec.classPrefix) && isActivity(spec.pkg, cls)
+                WatchLog.add(this, if (isScreen) WatchLog.Kind.SCREEN else WatchLog.Kind.OTHER_WINDOW, spec.pkg, cls.orEmpty().substringAfterLast('.'),
+                    if (!isScreen) "" else when (cls) {
+                        in spec.shelves -> WatchLog.Role.SHELF.name
+                        in spec.viewers -> WatchLog.Role.VIEWER.name
+                        else -> WatchLog.Role.OTHER.name
+                    })
+                cls?.takeIf { isScreen }?.let {
                     // 화면이 새로 열릴 때마다(홈에서 돌아온 서재 포함) 바로 자르기 횟수를 다시 센다.
                     eagerTries.clear()
                     val now = System.currentTimeMillis()
@@ -118,6 +127,7 @@ class ReaderWatchService : AccessibilityService() {
                     // 방금 읽어 둔 칸으로 맞춘 것은 그 뒤 읽는 화면에서 진행률이 바뀌었을 수 있어 목록에 이미 있는 책에는 쓰지 않는다(반납일은 그대로).
                     if (c.stale && BookShelf.findByTitle(this, c.title) != null) c.copy(progress = -1) else c
                 }
+                WatchLog.add(this, WatchLog.Kind.CLICK, spec.pkg, cell?.title.orEmpty())
                 when {
                     cell == null -> {
                         // 표지만 있는 칸일 수 있다(누르자마자 읽는 화면으로 넘어가 누른 요소도 읽을 수 없다). 메뉴에 제목이 없는 앱은 알 길이 없어 두지 않는다.
@@ -179,9 +189,10 @@ class ReaderWatchService : AccessibilityService() {
     private fun readViewer(spec: ReaderSpec) {
         viewerSpec = null
         if (screen[spec.pkg] !in spec.viewers) return
-        val windows = windowsOf(spec).takeIf { it.all.isNotEmpty() } ?: return
+        val windows = windowsOf(spec).takeIf { it.all.isNotEmpty() } ?: return logNoWindow(spec)
         val info = spec.readViewer(windows)
         val progress = info.progress
+        if (progress >= 0 || info.title != null) WatchLog.add(this, WatchLog.Kind.PROGRESS, spec.pkg, "$progress", info.title.orEmpty())
         if (progress < 0 && viewerRetries-- > 0) {
             viewerSpec = spec
             handler.postDelayed(viewerLater, VIEWER_RETRY_MS)
@@ -239,14 +250,20 @@ class ReaderWatchService : AccessibilityService() {
         webBook.remove(spec.pkg)
         unknownClick -= spec.pkg
         unknownOpen -= spec.pkg
+        var result = WatchLog.Opened.FRONT
         val book = BookShelf.findByTitle(this, seen.title)?.also {
             BookShelf.moveToFront(this, it.id)
             BookShelf.updateStatus(this, it.id, seen.progress, seen.due, seen.author)
-        } ?: if (!BookShelf.canAutoAdd(this, seen.title)) null else {
+        } ?: if (!BookShelf.canAutoAdd(this, seen.title)) {
+            result = if (BookShelf.isFull(this)) WatchLog.Opened.FULL else WatchLog.Opened.FINISHED
+            null
+        } else {
             // 다 찼으면 앱 목록(시스템 호출)도 보지 않는다. 다 찬 동안 목록에 없는 책을 읽으면 화면 이벤트마다 여기 온다.
             val app = AppStore.load(this).firstOrNull { it.pkg == spec.pkg }?.key
+            result = WatchLog.Opened.NEW
             BookShelf.addOpened(this, seen.title, seen.author, app, seen.progress, seen.due)
         }
+        WatchLog.add(this, WatchLog.Kind.OPENED, spec.pkg, seen.title, result.name)
         // 넣지 못한 책도 연 책으로 적는다(그래야 읽는 화면의 진행률이 앞서 연 다른 책에 붙지 않는다).
         setOpened(spec.pkg, book?.title ?: seen.title)
         ReadingLog.bookOpened(this, spec.pkg, book?.title ?: seen.title, at ?: System.currentTimeMillis())
@@ -272,8 +289,9 @@ class ReaderWatchService : AccessibilityService() {
     private fun settleShelf(spec: ReaderSpec) {
         settleSpec = null
         if (screen[spec.pkg] !in spec.shelves) return
-        val root = root(spec) ?: return
+        val root = root(spec) ?: return logNoWindow(spec)
         val seen = readShelf(spec, root)
+        WatchLog.add(this, WatchLog.Kind.SHELF, spec.pkg, "${seen.size}")
         // 책 칸을 눌러도 알림이 오지 않는 앱(알라딘): 읽는 화면에서 돌아오면 서재 아래 '최근 읽은 책'이 방금 편 책이다.
         if (spec.pkg in readSince) {
             if (readKnown.remove(spec.pkg)) readSince -= spec.pkg
@@ -353,16 +371,20 @@ class ReaderWatchService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         recordLife(this, connected = true)
+        WatchLog.connected(this)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
         recordLife(this, connected = false)
+        WatchLog.add(this, WatchLog.Kind.UNBOUND)
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
         handler.removeCallbacks(settleLater)
         handler.removeCallbacks(viewerLater)
+        WatchLog.add(this, WatchLog.Kind.DESTROYED)
+        WatchLog.flush()
         super.onDestroy()
     }
 
@@ -385,6 +407,11 @@ class ReaderWatchService : AccessibilityService() {
     private fun root(spec: ReaderSpec): AccessibilityNodeInfo? = rootInActiveWindow?.takeIf { it.packageName == spec.pkg }
 
     private fun windowsOf(spec: ReaderSpec) = AppWindows(root(spec), appRoots(spec))
+
+    /** 그 앱의 화면을 못 얻었을 때 기록한다. 다른 앱으로 떠난 것(맨 앞 창이 다른 앱)은 빼고, 맨 앞 창을 아예 못 얻을 때만. */
+    private fun logNoWindow(spec: ReaderSpec) {
+        if (rootInActiveWindow == null) WatchLog.add(this, WatchLog.Kind.NO_WINDOW, spec.pkg)
+    }
 
     companion object {
         private const val THROTTLE_MS = 1000L
