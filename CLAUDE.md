@@ -4,6 +4,7 @@
 화면 규격·동작의 기준은 **DESIGN.md**다. 코드를 바꾸면 DESIGN.md도 같이 맞춘다.
 이북 앱(교보도서관·밀리의서재 등)에서 알아낼 수 있는 것과 없는 것은 **docs/READER_APPS.md** 에 정리했다.
 다른 기기(메이북 등) 호환 조사와 펌웨어 받기·풀기 방법은 **docs/DEVICES.md** 에 정리했다. 새 기기를 조사하면 거기에 더한다.
+사용자 댓글로 들어온 기기 문제의 진행 상태는 **docs/ISSUES.md** 에서 따라간다(이북 앱 지원·기능 요청은 적지 않는다).
 
 ## 빌드·설치
 
@@ -55,6 +56,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.4.0-release.apk </dev/
 | BookRecord / BookDetail | 책 한 권의 기록(읽은 날·완독 회차, `BookRecord.all`) / 홈·올해 읽은 책이 같이 쓰는 책 상세 `showBookDetail`(머리·기록·메뉴·`책 정보 고치기`, 상태로만 갈림. 홈은 지금 읽는 것만, 올해 읽은 책은 완독한 회차 전체) |
 | Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간을 책별로 계산(편 책 `book_open`), DB `reading_day` 저장, 연속일 |
 | ReaderWatch | `ReaderWatchService`(접근성): 이북 앱 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기 |
+| WatchLog / WatchLogActivity | 자동 추가 서비스가 받은 알림·한 일 기록(최근 60줄 + 앱별 알림 수) / 기기 정보 › `기록 보기 ›` 화면(쪽 없이 한 화면, 사진으로 받는다) |
 | readers/ | 이북 앱마다 파일 하나(`KyoboLibrary`·`KyoboEbook`·`Millie`(e-ink)·`MillieMobile`(휴대폰)·`Aladin`·`Bookers`·`Ridi`·`Yes24Library`·`Yes24Ebook`·`MyYes`·`MoonReader`). 바탕 `ReaderSpec` 이 요소 이름으로 서재 칸·누른 칸·읽는 화면을 읽고, 다르게 읽어야 하는 앱은 그 앱 파일에서 메서드를 바꾼다(리디·휴대폰 밀리 서재, e-ink 밀리 검색 상세, 문리더 제목). 서비스는 앱 종류로 갈라지지 않는다. 공통 도구 `Nodes`, 앱 목록 `ReaderApps`(이북 앱 패키지·읽는 화면도 여기서). 앱을 더하면 `res/xml/reader_watch.xml` 의 packageNames 도 |
 | Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 10권, 홈에는 4권, YES24 표지 검색)과 나간 책(완독·뺀 책, `BookShelf.history`), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
