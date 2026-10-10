@@ -15,8 +15,6 @@
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
-    <!-- 기기 정보: 안드로이드 기본 빠른 설정 펼치기 시험 -->
-    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
     <application
         android:allowBackup="false"

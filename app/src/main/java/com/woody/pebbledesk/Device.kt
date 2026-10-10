@@ -46,25 +46,11 @@ object Device {
      * `com.haoqing.action.QUICK_SETTINGS`. 받는 쪽이 없는 방송은 아무 일도 하지 않으므로 기기를 가리지 않고 둘 다 보낸다.
      */
     fun openQuickSettings(context: Context) {
-        sendCremaQuickSettings(context)
-        sendMeebookQuickSettings(context)
-    }
-
-    /** 크레마: SystemUI 가 받아 크레마 빠른 설정 앱(`com.inno.quicksetting`)을 띄운다. */
-    fun sendCremaQuickSettings(context: Context) = context.sendBroadcast(Intent("com.epd.drop_down"))
-
-    /** 메이북: Haoqing SystemUI 가 받아 알림창(빠른 설정)을 펼친다. */
-    fun sendMeebookQuickSettings(context: Context) =
+        // 크레마: SystemUI 가 받아 크레마 빠른 설정 앱(`com.inno.quicksetting`)을 띄운다.
+        context.sendBroadcast(Intent("com.epd.drop_down"))
+        // 메이북: Haoqing SystemUI 가 받아 알림창(빠른 설정)을 펼친다.
         context.sendBroadcast(Intent("com.haoqing.action.QUICK_SETTINGS").setPackage("com.android.systemui"))
-
-    /**
-     * 안드로이드 기본 빠른 설정 펼치기(`StatusBarManager.expandSettingsPanel`, 숨은 함수라 리플렉션, `EXPAND_STATUS_BAR` 권한).
-     * 지금은 기기 정보의 시험 버튼에서만 쓴다. 부르지 못하면 false.
-     */
-    fun expandQuickSettings(context: Context): Boolean = runCatching {
-        val bar = context.getSystemService("statusbar") ?: error("no statusbar")
-        bar.javaClass.getMethod("expandSettingsPanel").invoke(bar)
-    }.isSuccess
+    }
 
     /** SystemProperties.get 은 숨은 함수라 한 번만 찾아 둔다(배터리 신호마다 불리므로). */
     private val getProperty by lazy {

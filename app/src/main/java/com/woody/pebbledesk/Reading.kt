@@ -89,8 +89,10 @@ object ReadingLog {
 
     /** 시스템의 '사용 기록 액세스' 화면 */
     fun openAccessSettings(context: Context) {
-        runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+        runCatching { context.startActivity(accessSettingsIntent()) }
     }
+
+    fun accessSettingsIntent() = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
 
     /**
      * [packages] (이북 앱) 의 날마다 책([readingKey])별 읽은 시간. 권한이 없으면 null.

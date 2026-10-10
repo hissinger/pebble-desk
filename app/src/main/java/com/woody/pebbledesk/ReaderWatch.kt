@@ -350,6 +350,16 @@ class ReaderWatchService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        recordLife(this, connected = true)
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        recordLife(this, connected = false)
+        return super.onUnbind(intent)
+    }
+
     override fun onDestroy() {
         handler.removeCallbacks(settleLater)
         handler.removeCallbacks(viewerLater)
@@ -459,6 +469,29 @@ class ReaderWatchService : AccessibilityService() {
         /** 여백으로 보는 밝기 */
         private const val WHITE = 230
 
+        /**
+         * 서비스가 연결·끊긴 때와 끊긴 횟수(기기 정보에서 본다). 켜 둔 서비스가 저절로 꺼지는 기기(Moaan MIX7S)에서
+         * 언제 끊겼는지 알려고. 이 앱 프로세스가 왜 끝났는지는 기기 정보가 안드로이드에서 따로 읽는다.
+         */
+        private fun recordLife(context: Context, connected: Boolean) {
+            val prefs = lifePrefs(context)
+            val now = System.currentTimeMillis()
+            prefs.edit().apply {
+                if (connected) putLong(LIFE_CONNECTED, now)
+                else putLong(LIFE_DISCONNECTED, now).putInt(LIFE_DISCONNECTS, prefs.getInt(LIFE_DISCONNECTS, 0) + 1)
+            }.apply()
+        }
+
+        /** 마지막 연결 때·마지막 끊김 때(없으면 0)·끊긴 횟수 */
+        fun lifeLog(context: Context): Triple<Long, Long, Int> = lifePrefs(context).let {
+            Triple(it.getLong(LIFE_CONNECTED, 0), it.getLong(LIFE_DISCONNECTED, 0), it.getInt(LIFE_DISCONNECTS, 0))
+        }
+
+        private fun lifePrefs(context: Context) = Storage.of(context).getSharedPreferences("reader_watch_life", Context.MODE_PRIVATE)
+        private const val LIFE_CONNECTED = "connected"
+        private const val LIFE_DISCONNECTED = "disconnected"
+        private const val LIFE_DISCONNECTS = "disconnects"
+
         /** 시스템 접근성 설정에서 이 서비스가 켜져 있는가 */
         fun isEnabled(context: Context): Boolean {
             val me = ComponentName(context, ReaderWatchService::class.java)
@@ -474,8 +507,10 @@ class ReaderWatchService : AccessibilityService() {
 
         /** 시스템 접근성 설정 */
         fun openSettings(context: Context) {
-            runCatching { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            runCatching { context.startActivity(settingsIntent()) }
         }
+
+        fun settingsIntent() = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
 
         /**
          * 이 앱의 앱 정보(제한된 설정 허용). 기기 설정 아이콘을 숨긴 기기(iReader)에서도 직접 열린다.
@@ -483,12 +518,10 @@ class ReaderWatchService : AccessibilityService() {
          * 없으면 -1 로 묻다가 실패해 `제한된 설정 허용` 이 빠진다(에뮬레이터 API 33 에서 확인). 그래서 uid 를 함께 넘긴다.
          */
         fun openAppInfo(context: Context) {
-            runCatching {
-                context.startActivity(
-                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
-                        .putExtra("uId", Process.myUid())
-                )
-            }
+            runCatching { context.startActivity(appInfoIntent(context)) }
         }
+
+        fun appInfoIntent(context: Context): Intent =
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")).putExtra("uId", Process.myUid())
     }
 }

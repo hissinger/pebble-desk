@@ -31,9 +31,14 @@ object Ui {
     /** 화면 짧은 변이 [DESIGN_WIDTH_DP] 가 되는 밀도(dpi). 페블 300, 메이북 E6·M6C(1072px) 300, 1404px 7.8인치면 393. */
     fun designDensityDpi(context: Context): Int {
         val dm = context.resources.displayMetrics
+        densityBasis = "${dm.widthPixels}×${dm.heightPixels}"
         val shortPx = minOf(dm.widthPixels, dm.heightPixels)
         return (shortPx * 160f / DESIGN_WIDTH_DP).roundToInt()
     }
+
+    /** 마지막으로 [designDensityDpi] 가 본 화면 크기(px). 기기 정보에서 밀도가 왜 그렇게 정해졌는지 본다(Moaan MIX7S 는 1264px 인데 300dpi 로 잡혔다). */
+    @Volatile var densityBasis: String? = null
+        private set
 
     const val BLACK = Color.BLACK
     const val GRAY = 0xFF555555.toInt()

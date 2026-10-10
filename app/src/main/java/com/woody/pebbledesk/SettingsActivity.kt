@@ -113,7 +113,7 @@ class SettingsActivity : EinkActivity() {
         val watching = ReaderWatchService.isEnabled(this)
         row(
             getString(R.string.auto_books), getString(if (watching) R.string.on else R.string.off),
-            on = watching, next = true, hint = getString(R.string.auto_books_hint),
+            on = watching, next = true,
         ) { autoBooksSheet(watching) }
         // 무엇을 어떻게 읽는지(서재 화면에 보이는 것만, 앱마다 되는 화면) 안내
         row(getString(R.string.auto_books_guide), null, next = true) {

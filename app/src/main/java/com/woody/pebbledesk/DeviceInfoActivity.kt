@@ -1,17 +1,19 @@
 package com.woody.pebbledesk
 
+import android.app.ActivityManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.DisplayMetrics
 import android.view.KeyEvent
 import android.widget.LinearLayout
-import android.widget.TableLayout
-import android.widget.TableRow
 import android.widget.TextView
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -19,11 +21,15 @@ import kotlin.math.roundToInt
 
 /**
  * 기기 정보(설정 › 기기 정보). 다른 기기를 쓰는 사람이 이 화면을 사진으로 찍어 보내면 기기마다 다른 동작을 맞출 수 있게
- * 한 화면에 모은다: 기기·시스템 속성·설정 값·권한, 누른 버튼의 키 번호, 최근에 뜬 다른 화면, 빠른 설정 여는 방법 시험. 기기별 조사는 docs/DEVICES.md.
+ * 한 화면에 모은다: 기기·시스템 속성·설정 값·권한, 자동 추가 서비스 기록, 누른 버튼의 키 번호, 최근에 뜬 다른 화면,
+ * 이 앱이 여는 시스템 화면 시험. 기기별 조사는 docs/DEVICES.md.
  */
 class DeviceInfoActivity : EinkActivity() {
     private lateinit var keyValue: TextView
     private lateinit var recentValue: TextView
+
+    /** 시스템 화면 시험에서 연 화면: 결과를 쓸 곳, 화면 이름, 연 때. 돌아오면([onResume]) 걸린 시간을 쓴다. */
+    private var opened: Triple<TextView, String, Long>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,7 +39,7 @@ class DeviceInfoActivity : EinkActivity() {
         val list = vbox().apply { setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0) }
         root.addView(list, lp(MATCH, 0, 1f))
 
-        list.addView(text(getString(R.string.device_photo_hint), 15f, color = Ui.GRAY, lines = 3),
+        list.addView(text(getString(R.string.device_photo_hint), 15f, color = Ui.GRAY),
             lp(MATCH, WRAP).apply { topMargin = dp(8) })
 
         // 화면: 기기가 선언한 밀도·dp(앱 밀도를 바꾸지 않은 applicationContext)와 앱이 그리는 밀도·dp(EinkActivity 가 맞춘 것)
@@ -41,27 +47,32 @@ class DeviceInfoActivity : EinkActivity() {
         @Suppress("DEPRECATION") windowManager.defaultDisplay.getRealMetrics(real)
         val sys = applicationContext.resources.displayMetrics
         val dm = resources.displayMetrics
+        // 앱 밀도를 정할 때(Ui.designDensityDpi) 본 크기. 실제 화면과 다르면 앱 글자가 기기에 맞지 않는다.
+        val basis = Ui.densityBasis ?: "-"
         fun dpSize(density: Float) = "${(real.widthPixels / density).roundToInt()}×${(real.heightPixels / density).roundToInt()}dp"
         val kind = getString(when (Device.kind) {
             Device.Kind.CREMA -> R.string.device_kind_crema
             Device.Kind.MEEBOOK -> R.string.device_kind_meebook
             Device.Kind.OTHER -> R.string.device_kind_other
         })
+        // 값만 봐도 무엇인지 알 수 있어 이름 없이 이어 쓴다: 모델(코드명)·제조사·브랜드·안드로이드·기기 종류·앱 버전·화면·빌드.
+        // 화면은 앱이 맞춘 밀도가 다르거나 밀도를 정할 때 본 크기가 실제와 다르면 `→ 앱 기준 …` 을 붙인다. 길면 잘리는 빌드를 맨 뒤에.
         section(list, R.string.device_section_device)
-        list.addView(table(listOf(
-            getString(R.string.device_model) to "${Build.MODEL} (${Build.DEVICE})",
-            getString(R.string.device_maker) to "${Build.MANUFACTURER} · ${Build.BRAND}",
-            getString(R.string.device_android) to "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
-            getString(R.string.device_build) to Build.DISPLAY,
-            getString(R.string.device_screen) to "${real.widthPixels}×${real.heightPixels} · ${sys.densityDpi}dpi · ${dpSize(sys.density)}" +
-                (if (dm.densityDpi != sys.densityDpi) "\n${getString(R.string.device_screen_app)} ${dm.densityDpi}dpi · ${dpSize(dm.density)}" else ""),
-            getString(R.string.device_kind) to "$kind · Pebble Desk ${appVersion()}",
-        )))
+        val size = "${real.widthPixels}×${real.heightPixels}"
+        val screen = "${getString(R.string.device_screen)} $size · ${sys.densityDpi}dpi · ${dpSize(sys.density)}" +
+            if (dm.densityDpi != sys.densityDpi || basis != size)
+                " → ${getString(R.string.device_screen_app)} ${dm.densityDpi}dpi · ${dpSize(dm.density)} · ${getString(R.string.device_screen_basis, basis)}"
+            else ""
+        list.addView(text(listOf(
+            "${Build.MODEL} (${Build.DEVICE})", Build.MANUFACTURER, Build.BRAND,
+            "${getString(R.string.device_android)} ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+            kind, "Pebble Desk ${appVersion()}", screen, Build.DISPLAY,
+        ).joinToString(" · "), 14f, lines = 4).apply { setLineSpacing(0f, 1.15f) })
 
         // 기기마다 다른 동작을 가르는 시스템 속성·설정 값: 이미 아는 키(크레마·메이북)와 이름으로 찾은 기기 고유 값 중 있는 것만.
         section(list, R.string.device_section_values)
         listOf(vendorProps(), vendorSettings()).forEach {
-            list.addView(text(it.ifEmpty { "-" }, 14f, lines = 3).apply { setLineSpacing(0f, 1.15f) })
+            list.addView(text(it.ifEmpty { "-" }, 14f, lines = 2).apply { setLineSpacing(0f, 1.15f) })
         }
 
         section(list, R.string.device_section_perms)
@@ -72,6 +83,13 @@ class DeviceInfoActivity : EinkActivity() {
             getString(R.string.reading_time) to ReadingLog.hasAccess(this),
             getString(R.string.device_perm_home) to home,
         ).joinToString("  ·  ") { (label, on) -> "$label ${onOff(on)}" }, 16f, lines = 2))
+
+        // 자동 추가(접근성 서비스)가 저절로 꺼지는 기기에서 언제·왜 끊겼는지: 서비스 연결·끊김, 이 앱이 끝난 까닭(안드로이드 11+),
+        // 백그라운드에서 앱을 끄는 설정들.
+        section(list, R.string.device_section_service)
+        serviceLog().forEachIndexed { i, line ->
+            list.addView(text(line, 14f, lines = if (i == 2) 2 else 1).apply { setLineSpacing(0f, 1.15f) })
+        }
 
         // 버튼 시험: 페이지 버튼·화면 아래 버튼이 무슨 키를 보내는지. 뒤로 키는 화면을 닫으므로 다시 열면 보인다.
         section(list, R.string.device_section_keys)
@@ -84,18 +102,17 @@ class DeviceInfoActivity : EinkActivity() {
         recentValue = text("", 14f, lines = 3).apply { setLineSpacing(0f, 1.15f) }
         list.addView(recentValue)
 
-        section(list, R.string.device_section_qs)
+        // 이 앱이 여는 시스템 화면이 열리는지(설정 앱이 멈추는 기기, Moaan MIX7S 의 사용 기록 화면). 연 화면 이름과 돌아오기까지 걸린 시간을 쓴다.
+        section(list, R.string.device_section_system)
         list.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            QUICK_SETTINGS.forEach { (label, open) ->
-                val result = text("", 13f, color = Ui.GRAY)
+            SYSTEM_SCREENS.forEach { (label, intentOf) ->
+                val result = text("", 13f, color = Ui.GRAY, lines = 2)
                 addView(vbox().apply {
-                    addView(text(getString(label) + " ›", 18f, Ui.bold))
+                    addView(text(getString(label) + " ›", 17f, Ui.bold))
                     addView(result)
-                    setPadding(0, dp(6), 0, dp(6))
-                    setOnClickListener {
-                        result.text = getString(if (open(this@DeviceInfoActivity)) R.string.device_qs_sent else R.string.device_qs_failed)
-                    }
+                    setPadding(0, dp(6), dp(4), dp(6))
+                    setOnClickListener { openSystem(intentOf(this@DeviceInfoActivity), result) }
                 }, lp(0, WRAP, 1f))
             }
         })
@@ -105,7 +122,77 @@ class DeviceInfoActivity : EinkActivity() {
     override fun onResume() {
         super.onResume()
         recentValue.text = recentScreens()
+        opened?.let { (result, name, at) ->
+            result.text = getString(R.string.device_system_back, name, ((SystemClock.elapsedRealtime() - at) / 1000).toInt())
+            opened = null
+        }
     }
+
+    /** [intent] 를 열고 연 화면 이름(`Settings$AppUsageAccessSettingsActivity` → `AppUsageAccessSettings`)을 기억한다. 받는 화면이 없거나 열지 못하면 바로 쓴다. */
+    private fun openSystem(intent: Intent, result: TextView) {
+        val name = packageManager.resolveActivity(intent, 0)?.activityInfo?.name
+            ?.substringAfterLast('.')?.substringAfterLast('$')?.removeSuffix("Activity")
+            // 좁은 칸에서 낱말 사이(대문자 앞)에서 줄이 바뀌게
+            ?.replace(WORD_START, "\u200B")
+        if (name == null) {
+            result.text = getString(R.string.device_system_none)
+            return
+        }
+        runCatching { startActivity(intent) }
+            .onSuccess { opened = Triple(result, name, SystemClock.elapsedRealtime()) }
+            .onFailure { result.text = getString(R.string.device_system_failed, name) }
+    }
+
+    /**
+     * 세 줄: 서비스 연결·끊김 때와 끊긴 횟수 / 이 앱이 최근에 끝난 때와 까닭(안드로이드 11+) /
+     * 배터리 최적화 제외·대기 그룹·백그라운드 제한과 이 앱 이름이 든 기기 설정 값(제조사의 허용 목록일 수 있다).
+     */
+    private fun serviceLog(): List<String> {
+        val time = SimpleDateFormat("MM/dd HH:mm", Locale.US)
+        fun at(ms: Long) = if (ms == 0L) "-" else time.format(ms)
+        val (connected, disconnected, count) = ReaderWatchService.lifeLog(this)
+        val life = getString(R.string.device_service_life, at(connected), at(disconnected), count)
+
+        val exits = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching {
+                // 한 줄에 들게, 앞 것과 같은 날이면 시각만
+                val day = SimpleDateFormat("MM/dd", Locale.US)
+                val clock = SimpleDateFormat("HH:mm", Locale.US)
+                var lastDay: String? = null
+                getSystemService(ActivityManager::class.java).getHistoricalProcessExitReasons(packageName, 0, EXIT_COUNT)
+                    .joinToString(" · ") {
+                        val d = day.format(it.timestamp)
+                        val stamp = (if (d == lastDay) "" else "$d ") + clock.format(it.timestamp)
+                        lastDay = d
+                        "$stamp ${exitReason(it.reason)}"
+                    }
+            }.getOrNull()
+        } else null
+        val exit = getString(R.string.device_service_exits, exits?.ifEmpty { "-" } ?: "-")
+
+        val power = getSystemService(PowerManager::class.java)
+        val bucket = getSystemService(UsageStatsManager::class.java)?.appStandbyBucket?.let { BUCKETS[it] ?: "$it" } ?: "-"
+        val restricted = getSystemService(ActivityManager::class.java).isBackgroundRestricted
+        val lists = settingsNaming(packageName)
+        val kill = listOf(
+            getString(R.string.device_service_battery) + " " + onOff(power?.isIgnoringBatteryOptimizations(packageName) == true),
+            getString(R.string.device_service_bucket) + " " + bucket,
+            getString(R.string.device_service_restricted) + " " + onOff(restricted),
+        ).joinToString(" · ") + if (lists.isEmpty()) "" else " · " + lists.joinToString(" · ")
+        return listOf(life, exit, kill)
+    }
+
+    /** `Settings.System`·`Secure`·`Global` 가운데 값에 [pkg] 가 든 기기 고유 키(접근성 켜짐 같은 안드로이드 기본 키는 뺀다). */
+    private fun settingsNaming(pkg: String): List<String> =
+        listOf(Settings.System.CONTENT_URI, Settings.Secure.CONTENT_URI, Settings.Global.CONTENT_URI).flatMap { uri ->
+            runCatching {
+                contentResolver.query(uri, arrayOf("name", "value"), null, null, null)?.use { c ->
+                    buildList { while (c.moveToNext()) if (c.getString(1)?.contains(pkg) == true) c.getString(0)?.let { add(it) } }
+                }
+            }.getOrNull().orEmpty()
+        }.filter { !AOSP_PACKAGE_SETTING.matches(it) }.distinct().map { short(it) }
+
+    private fun exitReason(reason: Int) = EXIT_REASONS[reason] ?: "$reason"
 
     /** 최근 [RECENT_MS] 안에 앞에 뜬 다른 앱 화면 [RECENT_COUNT] 개(시각 · 패키지 / 화면 클래스 이름). 한 줄에 들게 클래스는 마지막 이름만. 사용 기록 권한이 없으면 안내. */
     private fun recentScreens(): String {
@@ -176,18 +263,6 @@ class DeviceInfoActivity : EinkActivity() {
         list.addView(text(getString(title), 15f, color = Ui.LIGHT_GRAY), lp(MATCH, WRAP).apply { topMargin = dp(9); bottomMargin = dp(2) })
     }
 
-    /** 이름·값 표. 이름 칸 너비를 가장 긴 이름에 맞춰 값의 왼쪽이 줄을 맞춘다. */
-    private fun table(fields: List<Pair<String, String>>) = TableLayout(this).apply {
-        setColumnShrinkable(1, true)
-        fields.forEach { (label, value) ->
-            addView(TableRow(context).apply {
-                setPadding(0, dp(1), 0, dp(1))
-                addView(text(label, 16f, color = Ui.GRAY).apply { setPadding(0, 0, dp(14), 0) })
-                addView(text(value, 16f, lines = 2))
-            })
-        }
-    }
-
     companion object {
         /** 이 프로세스에서 마지막으로 누른 키(뒤로 키로 닫혀도 다시 열면 보이게) */
         private var lastKey: String? = null
@@ -214,12 +289,32 @@ class DeviceInfoActivity : EinkActivity() {
         private val PROP_LINE = Regex("""\[(.+?)]: \[(.*)]""")
         private const val VALUE_MAX = 32
 
-        /** 빠른 설정 여는 방법들([Device]). 어느 것을 눌렀을 때 실제로 열리는지 사용자가 보고 알려 준다. */
-        private val QUICK_SETTINGS: List<Pair<Int, (Context) -> Boolean>> = listOf(
-            R.string.device_qs_crema to { c -> runCatching { Device.sendCremaQuickSettings(c) }.isSuccess },
-            R.string.device_qs_meebook to { c -> runCatching { Device.sendMeebookQuickSettings(c) }.isSuccess },
-            R.string.device_qs_android to Device::expandQuickSettings,
+        /**
+         * 이 앱이 여는 시스템 화면들(앱이 여는 것과 같은 인텐트). 사용 기록은 앱이 여는 목록 화면과, 그게 안 열리는 기기를 위해
+         * 이 앱만 보이는 화면(같은 동작 + `package:` 주소)도.
+         */
+        private val SYSTEM_SCREENS: List<Pair<Int, (Context) -> Intent>> = listOf(
+            R.string.device_system_a11y to { _ -> ReaderWatchService.settingsIntent() },
+            R.string.device_system_usage to { _ -> ReadingLog.accessSettingsIntent() },
+            R.string.device_system_usage_app to { c -> ReadingLog.accessSettingsIntent().setData(Uri.parse("package:${c.packageName}")) },
+            R.string.device_system_app_info to ReaderWatchService::appInfoIntent,
         )
+
+        private const val EXIT_COUNT = 3
+        private val WORD_START = Regex("(?<=[a-z])(?=[A-Z])")
+
+        /** `ApplicationExitInfo` 의 까닭(세 개가 한 줄에 들게 줄인 이름). 상수는 안드로이드 11+ 에만 있어 숫자로 둔다. */
+        private val EXIT_REASONS = mapOf(
+            1 to "EXIT_SELF", 2 to "SIGNALED", 3 to "LOW_MEMORY", 4 to "CRASH", 5 to "CRASH_NATIVE", 6 to "ANR",
+            7 to "INIT_FAIL", 8 to "PERMISSION", 9 to "RESOURCE", 10 to "USER_REQ", 11 to "USER_STOP",
+            12 to "DEP_DIED", 13 to "OTHER", 14 to "FREEZER", 15 to "PKG_STATE", 16 to "PKG_UPDATED",
+        )
+
+        /** 앱 대기 그룹(`UsageStatsManager.STANDBY_BUCKET_*`) */
+        private val BUCKETS = mapOf(5 to "EXEMPTED", 10 to "ACTIVE", 20 to "WORKING_SET", 30 to "FREQUENT", 40 to "RARE", 45 to "RESTRICTED", 50 to "NEVER")
+
+        /** 값에 이 앱 이름이 드는 안드로이드 기본 설정(접근성 켜짐·바로가기) */
+        private val AOSP_PACKAGE_SETTING = Regex("enabled_accessibility_services|touch_exploration_granted_accessible_services|accessibility_.*")
 
         fun intent(context: Context) = Intent(context, DeviceInfoActivity::class.java)
     }

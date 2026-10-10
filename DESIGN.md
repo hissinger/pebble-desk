@@ -121,14 +121,17 @@
   - 숨긴 앱 `3 ›` → ⑦
   - 기본 홈 앱으로 설정 `›`: 안드로이드 홈 앱 선택 화면을 연다.
   - 기기 설정 열기 `›`: 안드로이드 설정을 연다(크레마 상단바의 설정 버튼 대신).
-  - 기기 정보 `CREMA PEBBLE ›` → **기기 정보** 화면. 다른 기기를 쓰는 사람이 사진 한 장으로 찍어 보낼 수 있게 한 화면에 모은다(스크롤 없음). 설정은 제목 80 + 줄 11개 + 바닥글 44 ≈ 708dp 라 상단 바를 뺀 세로가 714dp 인 E6(밀도 맞춤 뒤)에 여유 6dp 로 들어간다. 줄을 더 넣으려면 독서처럼 하위 화면으로 뺀다.
-    - 맨 위 안내: 문제가 있으면 이 화면을 사진으로 찍어 보내 달라, 버튼을 눌러 보면 키 번호가, 빠른 설정을 열었다가 돌아오면 그 화면 이름이 나온다.
-    - 기기: 이름·값 표로 모델(`Build.MODEL` (`Build.DEVICE`))·제조사·브랜드·안드로이드·빌드·화면(px · 기기가 선언한 dpi·dp. 앱이 맞춘 밀도가 다르면 둘째 줄에 `앱 기준 300dpi · 572×772dp`)·기기 종류(크레마 / 메이북 / 기타, `Device.kind`)와 앱 버전.
-    - 시스템 속성·설정 값(작은 글자, `이름=값` 을 이어 씀, 각 3줄까지): 있는 값만 보인다. 아는 키(크레마·메이북: `ro.haoqing.brand`, `persist.haoqing.updatemodel`, `persist.haoqing.pagekeys`, `persist.vendor.fullmode_cnt` / `screen_brightness`·`warm_light`·`isLightOn`·`light_mode`·`haoqing_warm_light`·`hq_contrast`)에 더해, 처음 보는 기기의 고유 값을 이름으로 찾는다: `getprop` 전체와 `Settings.System` 전체에서 전자잉크·조명·대비 낱말(`eink`·`epd`·`backlight`·`warm`·`contrast` 등)이나 알려진 펌웨어 회사·제조사·브랜드 이름이 든 키, 설정은 `light`·`bright`·`key`·`gesture`·`refresh` 도(안드로이드 기본 설정 `screen_brightness_mode`·`notification_light_pulse`·진동 등은 뺀다). 값은 32자까지. 하나도 없으면 `-`.
+  - 기기 정보 `CREMA PEBBLE ›` → **기기 정보** 화면. 다른 기기를 쓰는 사람이 사진 한 장으로 찍어 보낼 수 있게 한 화면에 모은다(스크롤 없음, 아래 줄 없음). 값이 가장 많아도(속성·설정 값 각 2줄, 최근 화면 3줄, 빌드 2줄) 약 700dp 라 상단 바를 뺀 세로가 714dp 인 E6(밀도 맞춤 뒤)에 들어간다. 그래서 줄 수 한도를 늘리거나 줄을 더 넣으려면 다른 것을 줄인다.
+    - 맨 위 안내 한 줄: 문제가 있으면 이 화면을 사진으로 찍어 보내 달라.
+    - 기기(작은 글자, 4줄까지. 값만 봐도 알 수 있어 이름 없이 ` · ` 로 이어 쓴다): `MoaanMIX7S (rk3566_ebook) · rockchip · rockchip · 안드로이드 14 (API 34) · 기타 · Pebble Desk 1.4.0 · 화면 1264×1680 · 254dpi · 796×1058dp → 앱 기준 300dpi · 674×896dp · 1072×1456 로 셈 · UQ1A.240205.004.B1 release-keys`
+      - 차례: 모델(`Build.MODEL` (`Build.DEVICE`))·제조사·브랜드·안드로이드·기기 종류(크레마 / 메이북 / 기타, `Device.kind`)·앱 버전·화면·빌드(`Build.DISPLAY`, 길면 잘려도 되게 맨 뒤).
+      - 화면: px · 기기가 선언한 dpi·dp. 앱이 맞춘 밀도가 다르거나 앱이 밀도를 정할 때 본 크기(`Ui.densityBasis`)가 실제 px 와 다르면 `→ 앱 기준 …dpi · …dp · … 로 셈` 을 붙인다.
+    - 시스템 속성·설정 값(작은 글자, `이름=값` 을 이어 씀, 각 2줄까지): 있는 값만 보인다. 아는 키(크레마·메이북: `ro.haoqing.brand`, `persist.haoqing.updatemodel`, `persist.haoqing.pagekeys`, `persist.vendor.fullmode_cnt` / `screen_brightness`·`warm_light`·`isLightOn`·`light_mode`·`haoqing_warm_light`·`hq_contrast`)에 더해, 처음 보는 기기의 고유 값을 이름으로 찾는다: `getprop` 전체와 `Settings.System` 전체에서 전자잉크·조명·대비 낱말(`eink`·`epd`·`backlight`·`warm`·`contrast` 등)이나 알려진 펌웨어 회사·제조사·브랜드 이름이 든 키, 설정은 `light`·`bright`·`key`·`gesture`·`refresh` 도(안드로이드 기본 설정 `screen_brightness_mode`·`notification_light_pulse`·진동 등은 뺀다). 값은 32자까지. 하나도 없으면 `-`.
     - 권한 한 줄: `자동 추가 켜짐 · 오늘 읽은 시간 켜짐 · 기본 홈 켜짐`.
-    - 마지막으로 누른 버튼: `292  KEYCODE_… · scan 604`. 이 화면에서는 버튼이 쪽을 넘기지 않고 기록만 한다. 뒤로 키는 기록하고 닫는다(다시 열면 보인다).
+    - 자동 추가 서비스 기록(작은 글자, 자동 추가가 저절로 꺼지는 기기를 위해): ① `연결 10/10 14:03 · 끊김 10/09 22:10 · 끊긴 횟수 3`(접근성 서비스 `onServiceConnected`·`onUnbind` 때를 기기 보호 저장소 `reader_watch_life` 에 적는다. 프로세스가 죽으면 끊김 없이 다시 연결만 찍힌다) ② `앱 종료 10/10 18:02 USER_REQ · 18:01 LOW_MEMORY · 10/07 00:36 CRASH`(최근 3개, `ApplicationExitInfo`, 안드로이드 11+. 한 줄에 들게 앞 것과 같은 날이면 시각만, 까닭 이름은 줄여서) ③ `배터리 최적화 제외 꺼짐 · 대기 그룹 ACTIVE · 백그라운드 제한 꺼짐` 과 `Settings.System`·`Secure`·`Global` 가운데 값에 이 앱 이름이 든 기기 고유 키(제조사의 백그라운드 허용 목록일 수 있다. 접근성 키는 뺀다).
+    - 마지막으로 누른 버튼: `292  KEYCODE_… · scan 604`. 이 화면에서는 버튼이 아무것도 하지 않고 기록만 한다. 뒤로 키는 기록하고 닫는다(다시 열면 보인다).
     - 최근에 뜬 다른 화면(새 것부터 3개, 10분 안): `00:32:26  com.inno.quicksetting / QuickSettings`. 사용 기록에서 앞에 뜬 화면(Activity)을 읽는다(사용 기록 권한이 없으면 안내). 기본 런처·상단 바에서 빠른 설정을 열었다가 돌아오면, 빠른 설정이 따로 된 화면이면 여기 남고 시스템 알림창이면 남지 않는다. 화면에 다시 돌아올 때마다 새로 읽는다.
-    - 빠른 설정 시험: `크레마 ›`(`com.epd.drop_down`) · `메이북 ›`(`com.haoqing.action.QUICK_SETTINGS`) · `안드로이드 ›`(`StatusBarManager.expandSettingsPanel`, `EXPAND_STATUS_BAR` 권한). 누르면 아래에 `보냄`/`실패`. 실제로 열렸는지는 찍어 보낸 사람이 알려 준다.
+    - 시스템 화면 시험(이 앱이 여는 것): `접근성 ›` · `사용 기록 ›`(앱이 여는 목록 화면) · `이 앱 기록 ›`(같은 동작 + `package:` 주소, 이 앱만 보이는 화면) · `앱 정보 ›`. 누르면 그 화면을 열고, 돌아오면 아래에 받은 화면 이름과 걸린 시간 `UsageAccessSettings · 3초`(설정 앱이 멈추면 짧다. 좁은 칸이라 이름은 낱말 사이에서 줄을 바꾼다). 받을 화면이 없으면 `여는 화면 없음`, 열지 못하면 `… · 열지 못함`.
 - 맨 아래 가운데에 `Pebble Desk 1.4.0`(44dp, 연회색).
 
 ## 자주 쓰는 앱
