@@ -164,7 +164,8 @@ class DeviceInfoActivity : EinkActivity() {
     }
 
     private val makerWords by lazy {
-        listOf(Build.MANUFACTURER, Build.BRAND).flatMap { it.lowercase().split(' ', '-', '_') }.filter { it.length >= 4 }.distinct()
+        listOf(Build.MANUFACTURER, Build.BRAND).flatMap { it.lowercase().split(' ', '-', '_') }
+            .filter { it.length >= 4 && it !in COMMON_WORDS }.distinct()
     }
 
     private fun short(value: String) = if (value.length > VALUE_MAX) value.take(VALUE_MAX) + "…" else value
@@ -199,7 +200,10 @@ class DeviceInfoActivity : EinkActivity() {
         private val SETTINGS = listOf("screen_brightness", "warm_light", "isLightOn", "light_mode", "haoqing_warm_light", "hq_contrast")
 
         /** 처음 보는 기기의 고유 값을 이름으로 찾는다: 전자잉크·화면 갱신·조명·버튼 낱말, 알려진 펌웨어 회사 이름. */
-        private val VENDOR_KEY = Regex("eink|epd|ebc|fullmode|pagekey|backlight|frontlight|warm|contrast|haoqing|wisky|viwoods|crema|wetao|onyx|boox|bigme")
+        private val VENDOR_KEY = Regex("eink|epd|ebc|fullmode|pagekey|backlight|frontlight|warm(?!_?(reset|boot))|contrast|haoqing|wisky|viwoods|crema|wetao|onyx|boox|bigme")
+
+        /** 제조사·브랜드 이름에 흔한 낱말. 안드로이드 기본 키에도 들어 있어 잡음만 나온다(Minimal Phone 의 `phone` → `gsm.current.phone-type`·`volume_music_headphone`). */
+        private val COMMON_WORDS = setOf("phone", "mobile", "tech", "technology", "electronics", "digital", "company", "group", "android", "device", "inc.")
 
         /** `Settings.System` 에서 더 보는 낱말(조명·버튼·제스처·화면 갱신). 시스템 속성에는 이름이 비슷한 안드로이드 기본 값이 많아 쓰지 않는다. */
         private val SETTING_KEY = Regex("light|bright|key|gesture|refresh|ghost", RegexOption.IGNORE_CASE)
