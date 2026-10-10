@@ -210,6 +210,6 @@
     <string name="onboarding_books_s1">접근성 화면을 엽니다.</string>
     <string name="onboarding_books_s2">Pebble Desk 를 눌러 사용을 켜고 돌아옵니다.</string>
     <string name="onboarding_time_s1">사용 기록 액세스 화면을 엽니다.</string>
-    <string name="onboarding_time_s2">목록에서 Pebble Desk 를 눌러 허용을 켜고 돌아옵니다.</string>
+    <string name="onboarding_time_s2">Pebble Desk 의 허용을 켜고 돌아옵니다.</string>
     <string name="year_books_count">%1$d권</string>
 </resources>

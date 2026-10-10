@@ -5,7 +5,6 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
@@ -290,13 +289,13 @@ class DeviceInfoActivity : EinkActivity() {
         private const val VALUE_MAX = 32
 
         /**
-         * 이 앱이 여는 시스템 화면들(앱이 여는 것과 같은 인텐트). 사용 기록은 앱이 여는 목록 화면과, 그게 안 열리는 기기를 위해
-         * 이 앱만 보이는 화면(같은 동작 + `package:` 주소)도.
+         * 이 앱이 여는 시스템 화면들(앱이 여는 것과 같은 인텐트). 사용 기록은 앱이 여는 이 앱만 보이는 화면과, 그 화면이 없는
+         * 기기에서 대신 여는 목록 화면을 따로 시험한다.
          */
         private val SYSTEM_SCREENS: List<Pair<Int, (Context) -> Intent>> = listOf(
             R.string.device_system_a11y to { _ -> ReaderWatchService.settingsIntent() },
             R.string.device_system_usage to { _ -> ReadingLog.accessSettingsIntent() },
-            R.string.device_system_usage_app to { c -> ReadingLog.accessSettingsIntent().setData(Uri.parse("package:${c.packageName}")) },
+            R.string.device_system_usage_app to ReadingLog::appAccessSettingsIntent,
             R.string.device_system_app_info to ReaderWatchService::appInfoIntent,
         )
 

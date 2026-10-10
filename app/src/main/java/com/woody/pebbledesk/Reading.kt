@@ -6,6 +6,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
@@ -87,12 +88,20 @@ object ReadingLog {
     fun readerPackages(context: Context): Set<String> =
         AppStore.EBOOK_PACKAGES + BookShelf.list(context).mapNotNull { it.app?.substringBefore('/') }
 
-    /** 시스템의 '사용 기록 액세스' 화면 */
+    /**
+     * 시스템의 '사용 기록 액세스' 화면. 목록에서 찾지 않게 이 앱만 보이는 화면(바로 허용)을 열고, 열지 못하면(그 화면이 없는 기기) 목록.
+     * Moaan MIX7S 는 목록 화면에서 시스템 설정 앱이 멈추고 이 앱만 보이는 화면은 열린다(사용자 확인).
+     */
     fun openAccessSettings(context: Context) {
-        runCatching { context.startActivity(accessSettingsIntent()) }
+        runCatching { context.startActivity(appAccessSettingsIntent(context)) }
+            .recoverCatching { context.startActivity(accessSettingsIntent()) }
     }
 
+    /** 사용 기록 액세스 목록 화면 */
     fun accessSettingsIntent() = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+
+    /** 이 앱만 보이는 사용 기록 액세스 화면(같은 동작 + `package:` 주소) */
+    fun appAccessSettingsIntent(context: Context): Intent = accessSettingsIntent().setData(Uri.parse("package:${context.packageName}"))
 
     /**
      * [packages] (이북 앱) 의 날마다 책([readingKey])별 읽은 시간. 권한이 없으면 null.
