@@ -17,11 +17,13 @@ import android.graphics.Bitmap
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.woody.pebbledesk.readers.ReaderApps
+import com.woody.pebbledesk.readers.ReaderSpec
 import java.time.LocalDate
 import kotlin.math.abs
 
 /**
- * 읽고 있는 책 자동 추가(접근성 서비스). 교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES)·문리더의 **서재 화면**에 보이는 제목·저자·진행률·반납일과
+ * 읽고 있는 책 자동 추가(접근성 서비스). 이북 앱([ReaderApps], 앱마다 화면 이름·요소 이름은 `readers/` 의 앱 파일)의 **서재 화면**에 보이는 제목·저자·진행률·반납일과
  * 사용자가 누른 책 칸만 읽는다. 다른 앱은 시스템이 아예 보내지 않고(`res/xml/reader_watch.xml` 의 packageNames),
  * 읽는 화면은 본문(웹 화면)을 훑지 않고 진행률 줄·메뉴 제목만 이름으로 읽는다. 읽은 내용은 책 목록에만 적고 밖으로 보내지 않는다.
  */
@@ -83,7 +85,7 @@ class ReaderWatchService : AccessibilityService() {
 
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
-        val spec = SPECS[e.packageName?.toString()] ?: return
+        val spec = ReaderApps.byPackage[e.packageName?.toString()] ?: return
         // 서재는 화면이 바뀌는 동안(칸을 다시 채우는 중, 표지를 불러오는 중, 누른 칸이 반전된 순간) 읽지 않고 멈출 때까지 미룬다.
         if (settleSpec?.pkg == spec.pkg) scheduleSettle(spec)
         when (e.eventType) {
@@ -177,7 +179,7 @@ class ReaderWatchService : AccessibilityService() {
         // 글자가 없는 묶음이면 바로 아래 글자들을 이어 붙인다(북커스 아래 줄: `8` ` / ` `371` 세 조각).
         fun textOf(n: AccessibilityNodeInfo): String? = n.text?.toString()
             ?: (0 until n.childCount).mapNotNull { n.getChild(it)?.text?.toString() }.joinToString("").ifEmpty { null }
-        fun texts(id: String) = roots.flatMap { it.byId(spec, id) }.mapNotNull { textOf(it)?.trim() }.filter { it.isNotEmpty() }
+        fun texts(id: String) = roots.flatMap { it.byId(spec, id) }.mapNotNull { textOf(it)?.let(::plain) }.filter { it.isNotEmpty() }
         // 진행률 줄이 여럿이면 앱이 보여 주는 % 를 쪽으로 셈한 것보다 먼저 쓴다(리디 아래 좌·우는 사용자가 고른 대로 쪽·% 가 놓인다).
         // 책을 막 열었을 때의 `페이지 계산중 - 40%` 는 진행률이 아니다(my YES). 책을 불러오는 동안 먼저 보이는 `0%` 도 아니다(밀리).
         val loading by lazy { spec.viewerLoading?.let { texts(it).isNotEmpty() } == true }
@@ -192,7 +194,7 @@ class ReaderWatchService : AccessibilityService() {
         }
         // 제목은 하나만 보일 때만 믿는다(같은 이름이 여럿이면 목차 같은 목록이다. 북커스는 흔한 이름 `tv_title`).
         spec.viewerTitle?.let { id -> texts(id).distinct().singleOrNull() }?.let { text ->
-            val (title, author) = if (spec.viewerTitleAuthor) titleAuthor(text) else text to ""
+            val (title, author) = spec.splitViewerTitle?.invoke(text) ?: (text to "")
             if (spec.pkg in readSince) readKnown += spec.pkg
             val current = opened(spec.pkg)?.let { BookShelf.findByTitle(this, it) }
             if (current == null || BookShelf.findByTitle(this, title)?.id != current.id) {
@@ -372,7 +374,7 @@ class ReaderWatchService : AccessibilityService() {
      * 진행률은 그 뒤 읽는 화면에서 바뀌었을 수 있어 목록에 이미 있는 책에는 쓰지 않는다(반납일은 읽는 동안 바뀌지 않는다).
      */
     private fun shelfCellByText(spec: ReaderSpec, list: List<CharSequence>): Seen? {
-        val texts = list.map { it.toString().trim() }.filter { it.isNotEmpty() }.toSet()
+        val texts = list.map(::plain).filter { it.isNotEmpty() }.toSet()
         val s = lastShelf[spec.pkg]?.firstOrNull { it.title in texts } ?: return null
         val progress = if (BookShelf.findByTitle(this, s.title) == null) s.progress else -1
         return Seen(s.title, s.author, progress, s.due, s.thumb, s.cell)
@@ -401,7 +403,7 @@ class ReaderWatchService : AccessibilityService() {
         var thumb: Rect? = null
         fun walk(n: AccessibilityNodeInfo, depth: Int) {
             val id = n.viewIdResourceName?.substringAfter(":id/")
-            val t = n.text?.toString()?.trim()
+            val t = n.text?.let(::plain)
             if (id != null && !t.isNullOrEmpty()) texts.putIfAbsent(id, t)
             if (id in spec.thumbs && thumb == null) thumb = Rect().also { n.getBoundsInScreen(it) }
             if (depth < WALK_DEPTH) for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1) }
@@ -421,14 +423,15 @@ class ReaderWatchService : AccessibilityService() {
      * 탭·단추(`다운로드`, `책장` 등)를 책으로 넣지 않도록 진행률(`%`)이 함께 있을 때만 책 칸으로 본다.
      */
     private fun fromClickText(spec: ReaderSpec, list: List<CharSequence>): Seen? {
-        val items = list.map { it.toString().trim() }.filter { it.isNotEmpty() }
+        val items = list.map(::plain).filter { it.isNotEmpty() }
         val progress = items.firstNotNullOfOrNull { percent(it).takeIf { p -> p >= 0 } } ?: return null
         val title = items.firstOrNull()?.takeIf { percent(it) < 0 && !STATUS_ONLY.matches(it) } ?: return null
         // 반납 문구: `반납 4일 남음`, 북커스 격자 보기 칸은 저자 없이 `9일 남음`
         fun isDue(t: String) = "반납" in t || "만료" in t || STATUS_ONLY.matches(t)
         val due = if (spec.due != null) items.firstOrNull(::isDue)?.let(::dueDate) ?: -1 else -1
         val author = if (spec.authors.isNotEmpty()) authorName(items.getOrNull(1)?.takeIf { "%" !in it && !isDue(it) }.orEmpty()) else ""
-        return Seen(title, author, progress, due, null, Rect())
+        // 서재 진행률을 쓰지 않는 앱(읽는 화면보다 늦게 바뀐다)은 누른 글자의 진행률도 쓰지 않는다.
+        return Seen(title, author, if (spec.progress != null) progress else -1, due, null, Rect())
     }
 
     /**
@@ -597,58 +600,6 @@ class ReaderWatchService : AccessibilityService() {
     /** 서재 칸 한 권에서 읽은 것. [cell] 은 칸의 화면 위치 */
     private class Seen(val title: String, val author: String, val progress: Int, val due: Long, val thumb: Rect?, val cell: Rect)
 
-    /** 앱마다 화면 요소 이름(앱이 업데이트돼 바뀌면 여기만 고친다) */
-    private class ReaderSpec(
-        val pkg: String,
-        val classPrefix: String,
-        /** 책 칸이 보이는 화면들(서재·탭·책장 안) */
-        val shelves: Set<String>,
-        val viewers: Set<String>,
-        /** 서재 칸의 제목(보기 방식마다 이름이 다르면 여럿) */
-        val titles: List<String>,
-        /** 서재 칸의 표지 그림(보기 방식·화면마다 이름이 다르면 여럿) */
-        val thumbs: List<String>,
-        /** 서재 칸의 저자(앞에서부터 먼저 찾은 것) */
-        val authors: List<String>,
-        val progress: String?,
-        val due: String?,
-        /** 읽는 화면의 진행률 줄(앞에서부터 먼저 찾은 것) */
-        val viewerProgress: List<String>,
-        /**
-         * 읽는 화면이 책을 불러오는 중에 보이는 요소. 이것이 보이는 동안의 `0%` 는 진행률로 보지 않는다
-         * (밀리는 불러오는 처음 2초쯤 `0%` 를 보이다가 진짜 값으로 바꾸고, 불러오기 문구는 그 뒤로도 20초쯤 남는다).
-         */
-        val viewerLoading: String? = null,
-        /** 읽는 화면 메뉴의 책 제목(메뉴를 띄웠을 때만 보인다) */
-        val viewerTitle: String? = null,
-        /** 메뉴의 책 제목이 `제목 - 저자` 꼴(문리더. 파일로 연 TXT 등은 파일 이름) */
-        val viewerTitleAuthor: Boolean = false,
-        /** 진행률이 없는 칸은 책이 아니다(문리더 책장의 묶음 칸은 진행률 줄을 감춘다) */
-        val cellNeedsProgress: Boolean = false,
-        /** 쪽 번호가 지금 쪽·전체 쪽 두 요소로 나뉜 읽는 화면(북커스 메뉴) */
-        val viewerPages: Pair<String, String>? = null,
-        /** 쪽으로 셈한 진행률을 올림한다(서재에 보이는 % 와 맞추려고. 북커스는 1/368쪽을 1% 로 보인다) */
-        val pagesRoundUp: Boolean = false,
-        /** 서재 화면의 '최근 읽은 책' 제목(책 칸을 눌러도 알림이 오지 않는 앱) */
-        val recent: String? = null,
-        /** 검색(웹 화면) 책 상세의 읽기 단추 글자 */
-        val readNow: Set<String> = emptySet(),
-        /**
-         * 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스·리디): 멈추기를 기다리지 않고 표지를 잘라 둔다.
-         * 밀리는 앱을 다시 열 때 잠깐 칸을 다른 책으로 채우므로 쓰지 않는다.
-         */
-        val eagerCovers: Boolean = false,
-        /** 칸을 눌러도 읽는 화면이 열려야 편 것으로 본다(my YES: 누르면 내려받기·기간 만료 안내가 먼저 뜬다) */
-        val openOnViewer: Boolean = false,
-        /** 앱 화면 전체가 화면 캡처를 막아(검게 찍힌다) 표지를 자르지 않는다(my YES) */
-        val secure: Boolean = false,
-        /**
-         * 요소 이름이 없는 서재(리디, React Native)의 서재 표시 요소. 이것이 있는 화면에서 칸을 설명·글자·그림으로 찾는다([unnamedCells]).
-         * 화면이 넘어가는 중(작품 화면이 밀려 들어옴)에 찍으면 어긋나므로, 찍은 뒤에도 칸이 그 자리에 있을 때만 쓴다.
-         */
-        val unnamedShelf: String? = null,
-    )
-
     companion object {
         private const val THROTTLE_MS = 1000L
         /** 읽는 화면이 이만큼 잠잠하면 진행률·제목을 읽는다 */
@@ -683,127 +634,6 @@ class ReaderWatchService : AccessibilityService() {
         private const val CLICK_OPEN_MS = 120_000L
         /** 화면이 바뀐 뒤 이만큼은 바로 자르지 않는다 */
         private const val TRANSITION_MS = 1000L
-
-        private val SPECS = listOf(
-            ReaderSpec(
-                pkg = "kr.co.kyobobook.KEL", classPrefix = "com.kyobo",
-                shelves = setOf("com.kyobo.ebook.kel.ui.main.MainActivity"),
-                // 읽는 화면은 본문이 웹 화면이라 훑지 않고, 아래 진행률 줄과 메뉴의 제목만 이름으로 읽는다.
-                viewers = setOf(
-                    "com.kyobo.ebook.kel.viewer.epub.B2BViewerEpubMainActivity",
-                    "com.kyobo.ebook.kel.viewer.pdf.B2BViewerPdfMainActivity",
-                ),
-                titles = listOf("tvTitle"), thumbs = listOf("ivThumbnail"), authors = listOf("tvAuthor"), progress = "tvReadPercentageTxt", due = "tvRemainDate",
-                viewerProgress = listOf("bookIndicator"), viewerTitle = "viewer_top_booktitle",
-            ),
-            // 교보eBook: 서재(Compose)에는 요소 이름이 없고 격자 보기에는 제목도 없어 서재는 읽지 않는다.
-            // 교보도서관과 같은 읽는 화면이라 진행률 줄과 메뉴의 제목으로 안다(서재·내 책장 어디서 열어도).
-            ReaderSpec(
-                pkg = "com.kyobo.ebook.eink", classPrefix = "com.kyobo",
-                shelves = emptySet(),
-                viewers = setOf(
-                    "com.kyobo.ebook.common.b2c.viewer.epub.ViewerEpubMainActivity",
-                    "com.kyobo.ebook.common.b2c.viewer.pdf.ViewerPdfMainActivity",
-                    "com.kyobo.ebook.common.b2c.viewer.comic.ViewerComicMainActivity",
-                ),
-                // 서재(shelves)를 읽지 않으므로 칸 요소 이름(titles·thumbs)은 쓰이지 않는다.
-                titles = emptyList(), thumbs = emptyList(), authors = emptyList(), progress = null, due = null,
-                viewerProgress = listOf("bookIndicator"), viewerTitle = "viewer_top_booktitle",
-            ),
-            ReaderSpec(
-                pkg = "kr.co.millie.eink", classPrefix = "kr.co.millie",
-                // 다운로드·전체도서 탭은 BookshelfActivity, 책장 안(읽고있는 책 등)은 BookShelfDetailActivity
-                shelves = setOf("kr.co.millie.eink.bookshelf.BookshelfActivity", "kr.co.millie.eink.bookshelf.BookShelfDetailActivity"),
-                viewers = setOf(
-                    "kr.co.millie.eink.epub.EPubViewActivity",
-                    "kr.co.millie.eink.pdf.PDFViewActivity",
-                    "kr.co.millie.eink.epub.StoryViewActivity",
-                ),
-                titles = listOf("tv_book_title"), thumbs = listOf("iv_thumbnail"), authors = emptyList(), progress = "bookshelf_cell_reading", due = null,
-                viewerProgress = listOf("tv_viewer_add_on_right"), viewerLoading = "epub_loading_message",
-                readNow = setOf("바로 읽기", "이어 읽기"),
-            ),
-            // 알라딘: 격자 보기 칸에는 제목·표지만 있고 눌러도 알림이 없다(서재 아래 '최근 읽은 책'으로 안다).
-            // 목록 보기 칸에는 제목·저자·진행률·대여 기한이 있고 누르면 알림이 온다. 읽는 화면은 메뉴의 제목으로 안다.
-            ReaderSpec(
-                pkg = "kr.co.aladin.ebook", classPrefix = "kr.co.aladin",
-                shelves = setOf("kr.co.aladin.ebook.MainActivity"),
-                viewers = setOf("kr.co.aladin.epubreader.readonbook.bookrender.ReadONBookRenderActivity"),
-                titles = listOf("txt_title", "text_title"), thumbs = listOf("img_cover"), authors = listOf("text_author"), progress = "txt_read_percent",
-                // 읽는 화면 아래 쪽 표시(`6 / 368　 저자소개`, 쪽·장 이름)로 진행률을 셈한다.
-                due = "text_rent_date", viewerProgress = listOf("bookrender_txt_page_onepage", "viewermenu_text_pageinfo"),
-                viewerTitle = "viewer_header_title",
-                recent = "reading_book_tv_book_title", eagerCovers = true,
-            ),
-            // 북커스: 내서재 칸에 제목·표지·진행률·대여 기한(다운로드 탭), 리스트 보기에는 저자. 칸을 누르면 알림이 온다.
-            // 읽는 화면(본문 웹 화면)은 하단 정보를 켰을 때만 아래 줄에 쪽이 보이고, 메뉴에는 제목과 쪽(지금 쪽 / 전체 쪽)이 나온다.
-            ReaderSpec(
-                pkg = "com.bookers.ebook", classPrefix = "com.bookers",
-                shelves = setOf("com.bookers.ebook.ui.purchase.PurchaseActivity"),
-                viewers = setOf("com.bookers.ebook.ui.viewer.epub.EpubActivity"),
-                titles = listOf("tv_title"), thumbs = listOf("iv_cover"), authors = listOf("tv_author"), progress = "tv_percent", due = "tv_end_date",
-                // 하단 정보를 켜면 아래 줄(`ll_page_area`, 쪽 또는 %)이 늘 보인다. 꺼 두면 메뉴의 쪽으로.
-                viewerProgress = listOf("ll_page_area"), viewerTitle = "tv_title", viewerPages = "tv_current_page" to "tv_total_page",
-                pagesRoundUp = true, eagerCovers = true,
-            ),
-            // 리디: 책은 교보eBook처럼 읽는 화면 메뉴의 제목(`title`)으로 안다. 서재(React Native, 내 서재 탭과 작품 화면)는 요소 이름이 없어
-            // 칸 설명·글자로 표지만 잘라 둔다(칸을 눌러도 알림이 없다). 진행률은 뷰어 설정의 '하단 좌/우 정보 표시'를 켜면 아래 좌·우
-            // (`15 / 640`, `2%`), 꺼 두면 메뉴의 쪽(`14 / 626`).
-            ReaderSpec(
-                pkg = "com.initialcoms.ridi", classPrefix = "com.ridi",
-                shelves = setOf("com.ridi.books.viewer.main.activity.MainActivity"),
-                viewers = setOf(
-                    "com.ridi.books.viewer.reader.epub.EPubReaderActivity",
-                    "com.ridi.books.viewer.reader.pagebased.pdf.PDFReaderActivity",
-                    "com.ridi.books.viewer.reader.pagebased.comic.ComicBookReaderActivity",
-                ),
-                titles = emptyList(), thumbs = emptyList(), authors = emptyList(), progress = null, due = null,
-                viewerProgress = listOf("reader_right_info", "reader_left_info", "reader_toolbar_page_text"), viewerTitle = "title",
-                unnamedShelf = "libraryGnbMenus", eagerCovers = true,
-            ),
-            // YES24 도서관: 내 서재 칸(격자·목록 보기 같은 이름)에 제목·표지·저자(`<지은이 저>`)·반납(`D-15`). 진행 막대(`pb_read_percent`)는
-            // 읽는 화면과 맞지 않아(읽는 화면 8% 인데 0) 쓰지 않는다. 읽는 화면(본문 웹 화면, 북커스와 같은 뷰어)은 아래에 진행률(`tv_percent`),
-            // 뷰어 설정에서 하단 정보를 켜면 그 자리에 쪽(`ll_page_area`, `14` `/` `283` 세 조각)이 보인다. 메뉴에 제목(`tv_title`).
-            ReaderSpec(
-                pkg = "com.yes24.library.eink", classPrefix = "com.yes24",
-                shelves = setOf("com.yes24.library.shelf.LibShelfActivity"),
-                viewers = setOf("com.yes24.ebook.fourth.ui.viewer.epub.EpubActivity"),
-                titles = listOf("tv_title"), thumbs = listOf("iv_cover"), authors = listOf("tv_author"), progress = null, due = "tv_d_day",
-                viewerProgress = listOf("tv_percent", "ll_page_area"), viewerTitle = "tv_title", pagesRoundUp = true, eagerCovers = true,
-            ),
-            // my YES(YES24 서점, 크레마 기본 앱): 첫 화면 기본책장(격자) 칸에 제목 `textView_title`·표지 `grid_book_cover`·저자 `textView_author`
-            // (`<김호연> 저`), 그 위에 뜨는 구매목록 창 칸(`ll_list_book`)에 제목 `tv_buylist_title`·작은 표지 `aiv_buylist_thumbnail`·저자.
-            // 진행률·반납일은 서재에 없다. 읽는 화면(본문 웹 화면) 아래 `bottom_page_no`(`28%`), 메뉴에 제목 `tv_book_title`·`text_space_page`(`28%`).
-            // 앱 화면 전체가 화면 캡처를 막아(검게 찍힘, 코드에 창 FLAG_SECURE) 표지는 자르지 않는다.
-            ReaderSpec(
-                pkg = "com.yes24.ebook.einkstore", classPrefix = "com.keph",
-                shelves = setOf("com.keph.crema.lunar.ui.MainActivity"),
-                viewers = setOf(
-                    "com.keph.crema.lunar.ui.viewer.epub.CremaEPUBActivity",
-                    "com.keph.crema.lunar.ui.viewer.pdf.CremaPDFActivity",
-                    "com.keph.crema.lunar.ui.viewer.cpub.CremaCPUBActivity",
-                    "com.keph.crema.lunar.ui.viewer.txt.CremaTXTActivity",
-                ),
-                titles = listOf("textView_title", "tv_buylist_title"), thumbs = listOf("grid_book_cover", "aiv_buylist_thumbnail"),
-                // 기간이 지난 대여 책은 표지 위에 `기간만료`(`tv_book_disable_message`)가 뜬다.
-                authors = listOf("textView_author", "tv_buylist_author"), progress = null, due = "tv_book_disable_message",
-                viewerProgress = listOf("bottom_page_no", "text_space_page"), viewerTitle = "tv_book_title",
-                openOnViewer = true, secure = true,
-            ),
-            // 문리더(내 파일을 여는 리더): 서재(최근 목록·책장, 목록·격자 보기 같은 이름) 칸에 제목 `myBookName`·표지 `myBookImage`·
-            // 진행률 `progresTv`, 목록 보기에 저자 `myBookAuthor`(격자 보기는 저자순 정렬일 때만 `myAuthor`). 칸을 누르면 알림이 온다.
-            // 홈 탭의 '최근 목록' 줄은 표지만 있어(누르면 빈 알림) 읽는 화면 메뉴의 제목(`txtTitle`, `제목 - 저자`)으로 안다.
-            // 읽는 화면(본문은 직접 그리는 뷰라 글자가 드러나지 않는다) 아래 상태 줄 오른쪽 `statusRight` 에 진행률(`30.9%`, 설정에 따라
-            // `12/300`), 메뉴에 `txtTextViewPercent`(`30%`). 상태 줄 가운데(`statusMiddle`, `2장 (5/8)`)는 장 안의 쪽이라 쓰지 않는다.
-            ReaderSpec(
-                pkg = "com.flyersoft.moonreader", classPrefix = "com.flyersoft.moonreader",
-                shelves = setOf("com.flyersoft.moonreader.ActivityMain"),
-                viewers = setOf("com.flyersoft.moonreader.ActivityTxt"),
-                titles = listOf("myBookName"), thumbs = listOf("myBookImage"), authors = listOf("myBookAuthor", "myAuthor"), progress = "progresTv", due = null,
-                viewerProgress = listOf("statusRight", "txtTextViewPercent"), viewerTitle = "txtTitle", viewerTitleAuthor = true,
-                cellNeedsProgress = true, eagerCovers = true,
-            ),
-        ).associateBy { it.pkg }
 
         /** 거의 한 가지 색뿐인 그림(아직 그려지지 않은 표지 칸)인가. 16×16 점의 밝기 차로 본다. */
         private fun isFlat(b: Bitmap): Boolean {
@@ -881,21 +711,12 @@ class ReaderWatchService : AccessibilityService() {
         /** 지은이 뒤의 `지음`·`저`(뒤에 옮긴이·출판사가 이어질 수 있다) */
         private val AUTHOR_ROLE = Regex("""\s+(지음|저)(?=\s*($|/|,))""")
 
+        /** 화면 글자를 보통 글자로(YES24 eBook 서재 제목은 띄어쓰기가 줄바꿈 없는 공백 U+00A0 이다) */
+        private fun plain(text: CharSequence): String = text.toString().replace('\u00A0', ' ').trim()
+
         /** `47%` → 47, 소수(문리더 `30.9%`)는 버림. 없으면 -1 */
         private fun percent(text: CharSequence): Int =
             Regex("""(\d{1,3})(?:[.,]\d+)?\s*%""").find(text)?.groupValues?.get(1)?.toInt()?.coerceIn(0, 100) ?: -1
-
-        /**
-         * 문리더 메뉴 제목 → 제목·저자. EPUB 등은 `제목 - 저자`(저자가 없으면 제목만)라 마지막 ` - ` 에서 나눈다.
-         * TXT·HTML 등은 파일 이름(`이름.txt`)이라 확장자만 뗀다(`저자 - 제목.txt` 같은 파일 이름은 나누지 않는다).
-         */
-        private fun titleAuthor(text: String): Pair<String, String> {
-            BOOK_FILE.find(text)?.let { return text.substring(0, it.range.first) to "" }
-            val i = text.lastIndexOf(" - ")
-            return if (i > 0) text.substring(0, i).trim() to text.substring(i + 3).trim() else text to ""
-        }
-
-        private val BOOK_FILE = Regex("""\.(txt|html?|xhtml|mht|mhtml|md|rtf|docx|odt|fb2(\.zip)?|chm|epub|mobi|azw3?|pdf|djvu|cbz|cbr|zip)$""", RegexOption.IGNORE_CASE)
 
         /** 읽는 화면의 진행률: `2% (4/226p)` 처럼 % 가 있으면 그것, 없으면 쪽 `6 / 368` 로 계산(알라딘·북커스). 모르면 -1 */
         private fun viewerPercent(text: CharSequence, roundUp: Boolean): Int {

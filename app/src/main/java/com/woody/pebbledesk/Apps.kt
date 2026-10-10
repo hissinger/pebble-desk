@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import android.net.Uri
 import android.provider.Settings
 import android.util.LruCache
+import com.woody.pebbledesk.readers.ReaderApps
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -30,11 +31,7 @@ object AppStore {
     val collator: Collator by lazy { Collator.getInstance(Locale.ROOT) }
 
     /** 이북 앱(읽고 있는 앱 고르기에서 먼저 보여 줄 앱) */
-    val EBOOK_PACKAGES = setOf(
-        "com.initialcoms.ridi", "kr.co.millie.eink", "kr.co.aladin.ebook", "com.yes24.ebook.einkstore",
-        "com.kyobo.ebook.eink", "com.bookers.ebook", "com.yes24.library.eink", "kr.co.kyobobook.KEL",
-        "com.flyersoft.moonreader",
-    )
+    val EBOOK_PACKAGES = ReaderApps.packages
     private val EBOOK_WORDS = listOf("ebook", "e-book", "eink", "e ink", "도서", "서재", "리디", "book")
 
     /** 설치된 앱 전체(이 런처 자신 제외)를 이름 순으로 */

@@ -13,6 +13,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 알라딘 `kr.co.aladin.ebook` | O | O (알라딘 상품번호) | O | O | `Android/data` |
 | 리디 `com.initialcoms.ridi` | O | O (리디 책 번호) | O `ridi://Library` | O | 앱 전용 저장소 |
 | 교보eBook `com.kyobo.ebook.eink` | O | 기기 안 번호라 사실상 X | O `kyoboebookeink://mylibrary` | O | `Android/data` |
+| YES24 eBook `com.yes24.ebook.fourth`(휴대폰·태블릿용) | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | 문리더 `com.flyersoft.moonreader`(내 파일, DRM 없음) | `ActivityTxt` | O (파일 위치를 알면 `ACTION_VIEW`) | O | X | 사용자가 둔 곳(공유 저장소) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
@@ -77,7 +78,10 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
   - `com.keph.crema.lunar.ui.MainActivity` 에 `GoLibrary=GoPurchaseList`(구매 목록).
   - `ActProduct` 에 `ProductNo=<YES24 상품번호>` 로 스토어 상세 화면. Pebble Desk 책 검색과 같은 번호라 "YES24에서 보기"에 쓸 수 있다.
   - 읽는 화면 `com.keph.crema.lunar.ui.viewer.{epub.CremaEPUBActivity, pdf.CremaPDFActivity, cpub.CremaCPUBActivity, txt.CremaTXTActivity}`.
-  - 책을 열 때 대기 화면이 '책 표지' 모드면 `Pictures/.bookcover/bookcover.png` 를 쓴다(`ViewerRunner`). 방송 `com.keph.crema.shine.book_cover_added`/`_removed` 를 정의한다. → 크레마 슬립 화면 표지는 원래 YES24 서점 앱이 채우는 것이다.
+  - 크레마 기기면(`Build.MODEL` 에 crema) 책을 열 때마다 그 책의 서점 표지(원본, 페블에서 260KB PNG)를 `Pictures/.bookcover/bookcover.png` 에 복사한다(`ViewerRunner.setCoverImage`). 대기 화면 설정과 상관없다(페블 `enable_standby_book=2` 에서도 씀, 2026-10-10). 직전과 같은 책이면 다시 쓰지 않고, 표지 주소가 없으면 지운다. '책 표지' 모드(`enable_standby_book=1`)면 그 파일로 대기 화면을 바꾸라고 크레마 설정에 보낸다(`com.haoqing.action.SET_WALLPAPER`). → 크레마 슬립 화면 표지는 원래 YES24 서점 앱이 채우는 것이다.
+  - 방송 `com.keph.crema.shine.book_cover_added`/`_removed` 는 이노웨이브 화면보호기(`com.inno.screensaver`)에만 지정해 보낸다 → 다른 앱은 받을 수 없다.
+  - 앱 화면 전체가 화면 캡처를 막는다: 모든 화면의 바탕 클래스(`com.keph.crema.module.ui.view.activity.b`)가 `onCreate` 에서 늘 `FLAG_SECURE`(`setFlags(8192, 8192)`), 푸는 코드 없음. 공개된 데이터 제공자·수신기·서비스도 없다.
+  - → Pebble Desk 가 MY YES 표지를 얻는 길은 위 표지 파일뿐이다. 숨김 폴더의 다른 앱 파일이라 targetSdk 30+ 앱은 '모든 파일 접근'(`MANAGE_EXTERNAL_STORAGE`) 이 있어야 읽을 수 있다(Cover Pebble 은 targetSdk 29 예전 저장소 방식). 권한이 넓어 보류(2026-10-10), 표지는 '표지 다시 찾기'.
 
 ## 핀 바로가기("홈 화면에 추가")로 얻는 것
 
@@ -182,6 +186,18 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **저장소**: 표지 캐시가 `/sdcard/Books/.MoonReader/<파일 이름>_1.png` 에 남는다. DB·진행률은 앱 전용 저장소에 있다. `BookViewProvider` 는 공개되지 않는다.
 - 책장의 묶음 칸은 진행률 줄(`progressLay`)을 감춘다 → 진행률이 없는 칸은 책으로 보지 않는다.
 - **유료판** `com.flyersoft.moonreaderp`: 요소 이름 앞이 `com.flyersoft.moonreaderp:id/` 가 될 것 **(미확인)**.
+
+### YES24 eBook `com.yes24.ebook.fourth` (2026-10-10, 갤럭시 A23 안드로이드 14, 3.4.43, **지원**)
+
+휴대폰·태블릿용 YES24 eBook. 크레마에 깔린 my YES(`com.yes24.ebook.einkstore`)와 다른 앱이고, YES24 도서관·북커스와 같은 회사 코드다(읽는 화면 `ui.viewer.epub.EpubActivity` 는 YES24 도서관이 쓰는 그 뷰어). USB 디버깅이 켜져 있어도 쓸 수 있다.
+
+- **화면**: 내서재 `ui.purchase.PurchaseActivity`(읽고 있는 책·책장·구매한 책 탭), 읽는 화면 `ui.viewer.epub.EpubActivity`·`ui.viewer.pdf.PDFActivity`·`ui.viewer.comic.ComicActivity`(듣기 `ui.viewer.audio.AudioActivity`). 처음 책을 열면 사용법 화면 `ui.tutorial.TutorialActivity` 이 먼저 뜬다.
+- **서재 칸**: 제목 `tv_title`(띄어쓰기가 줄바꿈 없는 공백 U+00A0), 저자 `tv_author`, 표지 `iv_cover`, 진행률 `tv_read_percent`·`pb_read_percent`(받은 책). 받지 않은 책은 `btn_download`(`다운로드`, 묶음은 `총 13권`).
+  - 칸을 누르면 `TYPE_VIEW_CLICKED` 글자 `[제목, 저자, 0%]`.
+  - 칸의 진행률은 읽는 화면보다 늦게 바뀐다(읽는 화면 1% 인데 서재·누른 글자 모두 0%) → 쓰지 않는다.
+- **읽는 화면**: 본문은 웹 화면(글자가 접근성에 드러난다 → 훑지 않는다). 화면 캡처가 막혀 있다.
+  - 뷰어 화면설정 › `하단 정보 표시` 기본이 `모두 표시 안함`. 고르면 아래 줄 `bottomInfoView` 안에 이름 없는 제목, `ll_page_area`(안의 이름 없는 글자 `1%`, 페이지를 고르면 쪽), 장 제목 `tv_toc_title`. 선택지: 모두 표시 안함 / 페이지만 / 독서진행률만 / 시간만 / 책 제목·페이지·목차 / 책 제목·페이지·시간 / 책 제목·독서진행률·목차 / 책 제목·독서진행률·시간.
+  - 가운데를 눌러 메뉴: 제목 `tv_title`, 쪽 `ll_menu_page_area`(`1 / 519`), 단추 `듣기`·`목차`·`독서노트`·`보기설정`·`화면설정`.
 
 ## 런처에서 쓸 수 있는 것
 

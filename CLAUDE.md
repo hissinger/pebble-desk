@@ -26,6 +26,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.3.1-release.apk </dev/
 - adb 를 부르는 스크립트는 **bash 파일**로 쓴다(zsh 는 변수를 나누지 않고 `path` 가 특수 변수다). adb 명령에는 `</dev/null` 을 붙인다(heredoc 입력을 먹는다).
 - 화면이 꺼져 있으면 `input keyevent KEYCODE_WAKEUP` 먼저. `am start -W` 는 화면이 꺼져 있으면 멈출 수 있어 `perl -e 'alarm 90; exec @ARGV' adb ...` 로 시간 제한을 둔다.
 - 기기가 잠깐 offline 이 되면 기다렸다 다시 한다.
+- my YES 는 USB 디버깅이 켜져 있으면 닫힌다. 크레마는 USB 디버깅을 끄면 무선 디버깅도 멈춰(설정에는 켜짐으로 보여도) adb 로 시험할 수 없다 → 디버그 빌드를 깔고 사용자가 디버깅을 끈 채 눌러 본 뒤, 다시 켜고 DB 로 확인한다. Mac 의 adb 서버가 `No route to host` 로 무선 기기에 못 붙으면 터미널에서 서버를 다시 띄운다(로컬 네트워크 권한).
 - 글자로 누르기: `uiautomator dump` 후 `text="..."` 의 bounds 가운데를 탭(이중 공백은 하나로 접힌다). 이미지 뷰는 dump 에 안 나온다.
 - `uiautomator dump`·`events` 를 돌리면 접근성 서비스가 새로 만들어져(메모리의 지금 화면·누른 칸이 지워진다) 읽는 책 자동 추가를 시험할 때는 쓰지 않는다. 화면 캡처와 좌표로 누르고, 결과는 DB(디버그 빌드 `run-as`)로 본다.
 - **사용자가 기기를 쓰는 중일 수 있다.** 자동 조작은 필요한 만큼만, 와이파이·블루투스 등 기기 설정은 건드리지 않는다. 다른 앱 화면에서 길게 누르기·탭이 엉뚱한 곳(다른 이북 앱, Play 스토어)을 누른 적이 있다.
@@ -53,7 +54,8 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.3.1-release.apk </dev/
 | YearBooksActivity | ⑬ 올해 읽은 책(목록·격자, 해 고르기): 읽는 중·완독한 책(표지에 띠)·뺀 책, 완독·다시 읽기·기록에서 지우기 |
 | BookRecord / BookDetail | 책 한 권의 기록(읽은 날·완독 회차, `BookRecord.all`) / 홈·올해 읽은 책이 같이 쓰는 책 상세 `showBookDetail`(머리·기록·메뉴·`책 정보 고치기`, 상태로만 갈림. 홈은 지금 읽는 것만, 올해 읽은 책은 완독한 회차 전체) |
 | Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간을 책별로 계산(편 책 `book_open`), DB `reading_day` 저장, 연속일 |
-| ReaderWatch | `ReaderWatchService`(접근성): 교보도서관·교보eBook·밀리·알라딘·북커스·리디·YES24(전자도서관·my YES)·문리더 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기. 앱별 화면 요소 이름은 `SPECS` |
+| ReaderWatch | `ReaderWatchService`(접근성): 이북 앱 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기 |
+| readers/ | 이북 앱마다 파일 하나(`Kyobo`·`Millie`·`Aladin`·`Bookers`·`Ridi`·`Yes24`(도서관·eBook·my YES)·`MoonReader`): 화면 이름·요소 이름(`ReaderSpec`)과 그 앱만의 처리. 앱 목록 `ReaderApps`(이북 앱 패키지·읽는 화면도 여기서). 앱을 더하면 `res/xml/reader_watch.xml` 의 packageNames 도 |
 | Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 10권, 홈에는 4권, YES24 표지 검색)과 나간 책(완독·뺀 책, `BookShelf.history`), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
 | AppListActivity / FavoritesActivity / SettingsActivity / DeviceInfoActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 / 기기 정보(사진으로 찍어 보내는 진단 화면: 속성·권한·누른 키·빠른 설정 시험) |

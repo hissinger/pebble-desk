@@ -180,6 +180,7 @@ class SettingsActivity : EinkActivity() {
             R.string.guide_ridi to R.string.guide_ridi_desc,
             R.string.guide_yes24lib to null,
             R.string.guide_myyes to R.string.guide_myyes_desc,
+            R.string.guide_yes24ebook to null,
             R.string.guide_moon to R.string.guide_moon_desc,
         )
         section(getString(R.string.guide_apps))

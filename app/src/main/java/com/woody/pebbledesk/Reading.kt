@@ -11,6 +11,7 @@ import android.os.Process
 import android.provider.Settings
 import com.woody.pebbledesk.Db.rows
 import com.woody.pebbledesk.Db.tx
+import com.woody.pebbledesk.readers.ReaderApps
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -49,15 +50,16 @@ object ReadingLog {
     /**
      * 읽는 화면(클래스의 마지막 이름). 서재·스토어 화면과 구분한다.
      * 밀리 EPubViewActivity · 교보 ViewerEpubMainActivity · 알라딘 ViewerActivity, ReadONBookRenderActivity ·
-     * 리디 EPubReaderActivity · YES24 CremaEPUBActivity · 북커스 EpubActivity · 문리더 ActivityTxt 등. 리디의 WebViewActivity 같은 웹 화면은 뺀다.
+     * 리디 EPubReaderActivity · YES24 CremaEPUBActivity · 북커스 EpubActivity 등. 리디의 WebViewActivity 같은 웹 화면은 뺀다.
+     * 자동 추가가 받는 앱은 앱 파일에 적은 읽는 화면([ReaderApps.isViewer], 문리더 ActivityTxt 처럼 이 규칙에 안 맞는 것도)으로 센다.
      */
     private val READER = Regex(
         "^(?!.*WebView).*(ViewActivity|ViewerActivity|ReaderActivity|RenderActivity|" +
-            "Viewer(Epub|Pdf|Comic)MainActivity|(EPUB|Epub|PDF|CPUB|TXT)Activity)$|^ActivityTxt$"
+            "Viewer(Epub|Pdf|Comic)MainActivity|(EPUB|Epub|PDF|CPUB|TXT)Activity)$"
     )
 
     /** [cls](액티비티 전체 이름)가 이북 앱의 읽는 화면인가 */
-    fun isReaderScreen(cls: String) = READER.matches(cls.substringAfterLast('.'))
+    fun isReaderScreen(cls: String) = ReaderApps.isViewer(cls) || READER.matches(cls.substringAfterLast('.'))
 
     /** 연속일로 셀 하루 최소 시간 */
     const val MIN_DAY_MS = 60_000L
