@@ -17,7 +17,7 @@ import java.time.LocalDate
  * ⑬ 올해 읽은 책(독서 기록 제목 오른쪽 `올해 읽은 책 ›`). 제목 오른쪽 `2026 ▾` 로 지난해를 고르면 `2025년 읽은 책`.
  * 그해 1분 이상 읽었거나 그해 완독한 책을 모두 보인다:
  * 읽고 있는 책·완독한 책·뺀 책·목록에 넣지 못한 책(읽은 시간에만 있는 제목). 최근에 읽은(다 읽은) 순.
- * 목록은 줄마다 표지·제목·저자(완독한 책은 오른쪽 끝에 도장, 읽는 중 표시는 없다), 격자는 한 줄에 표지 4권과 그 아래 책 이름.
+ * 목록은 줄마다 표지·제목·저자와 별점(완독한 책은 오른쪽 끝에 도장, 읽는 중 표시는 없다), 격자는 한 줄에 표지 4권과 그 아래 책 이름·별점.
  * 한 번이라도 완독한 책은 표지가 어디에 놓이든(격자·목록·상세) 오른쪽 위 모서리를 가로지르는 `완독` 띠. 완독한 날은 모두 남고
  * 상세에 회차마다 기간이 나온다. 다시 읽어도 완독 기록은 그대로다.
  * 하단 왼쪽 `목록 · 격자`, 가운데 `전체 · 완독`(그해 완독한 책만)으로 바꾸고 기억한다. 책을 누르면 홈과 같은 책 상세([showBookDetail]).
@@ -32,6 +32,11 @@ class YearBooksActivity : EinkActivity() {
     private lateinit var filterToggle: TextView
     private lateinit var empty: TextView
     private var cellW = 0
+    /** 격자 표지 크기: 칸 높이는 그대로 두고 아래 별 줄만큼 줄인다(2:3) */
+    private var gridCoverW = 0
+    private var gridCoverH = 0
+    /** 책(id)마다 별점·감상(그릴 때마다 읽는다) */
+    private var reviews: Map<String, Review> = emptyMap()
     /** 보고 있는 해(처음에는 올해). 제목 오른쪽 `2026 ▾` 로 고른다. */
     private var year = LocalDate.now().year
     private lateinit var titleText: TextView
@@ -65,6 +70,8 @@ class YearBooksActivity : EinkActivity() {
         cellW = (resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - (COLUMNS - 1) * dp(GAP_DP)) / COLUMNS
         listRows = PagedRows(this, dp(ROW_DP))
         gridRows = PagedRows(this, cellW * 3 / 2 + dp(GRID_TEXT_DP), dividers = false)
+        gridCoverH = cellW * 3 / 2 - dp(GRID_STARS_DP)
+        gridCoverW = gridCoverH * 2 / 3
         val pages = FrameLayout(this)
         pages.addView(listRows, FrameLayout.LayoutParams(MATCH, MATCH))
         pages.addView(gridRows, FrameLayout.LayoutParams(MATCH, MATCH))
@@ -115,6 +122,7 @@ class YearBooksActivity : EinkActivity() {
         val today = LocalDate.now()
         // 기록은 한 번만 읽는다(읽은 시간 계산이 사용 기록을 읽는다).
         val records = BookRecord.all(this).filter { !it.hidden }
+        reviews = BookShelf.reviews(this)
         val years = years(records, today)
         // 지난해의 마지막 책을 기록에서 지워 그해가 비면 올해로 돌아온다(빈 지난해에 `올해 읽은 책이 없습니다`가 뜨지 않게).
         if (year !in years) year = today.year
@@ -155,36 +163,63 @@ class YearBooksActivity : EinkActivity() {
         }
     }
 
-    /** 표지 [COLUMNS]권 한 줄. 표지 아래에 책 이름 한 줄(완독한 책은 표지의 띠로 안다). */
+    /**
+     * 표지 [COLUMNS]권 한 줄. 표지 아래에 책 이름 한 줄(완독한 책은 표지의 띠로 안다), 별점이 있으면 그 아래 작은 별(없으면 빈 자리).
+     * 표지를 가리지 않게 별 줄만큼 표지를 줄였다(칸 높이는 그대로).
+     */
     private fun gridRow(line: List<Row>): View = hbox().apply {
         gravity = Gravity.TOP
         setPadding(dp(Ui.MARGIN), dp(12), dp(Ui.MARGIN), 0)
         line.forEachIndexed { i, r ->
             addView(vbox().apply {
-                addView(coverImage(BookShelf.cover(context, r.book, cellW)), lp(cellW, cellW * 3 / 2))
+                addView(coverImage(BookShelf.cover(context, r.book, gridCoverW)), lp(gridCoverW, gridCoverH).apply { gravity = Gravity.CENTER_HORIZONTAL })
                 addView(text(r.book.title, 13f, Ui.medium).apply { gravity = Gravity.CENTER_HORIZONTAL }, lp(MATCH, WRAP).apply { topMargin = dp(6) })
+                stars(r, 12)?.let { addView(it, lp(WRAP, WRAP).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(5) }) }
                 setOnClickListener { showMenu(r) }
             }, lp(cellW, MATCH).apply { if (i > 0) marginStart = dp(GAP_DP) })
         }
     }
 
-    /** 한 줄: 표지·제목·저자. 완독한 적이 있으면 오른쪽 끝에 줄보다 큰 완독 도장(위아래·오른쪽이 조금 잘린다). */
+    /** 한 줄: 표지·제목·저자와 별점. 완독한 적이 있으면 오른쪽 끝에 줄보다 큰 완독 도장(위아래·오른쪽이 조금 잘린다). */
     private fun bookRow(r: Row): View = (if (r.finished) StampedRow(this, STAMP_DP, STAMP_END_DP) else hbox()).apply {
         setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
         val w = dp(COVER_DP)
         addView(coverImage(BookShelf.cover(context, r.book, w)), lp(w + dp(2), w * 3 / 2 + dp(2)))
         addView(vbox().apply {
             addView(text(r.book.title, 22f, Ui.bold, lines = 2))
-            // 목록은 짧게: 저자만(알면). 완독은 표지의 띠와 도장이, 읽는 중인지·완독 횟수·기간·읽은 시간은 누르면 나오는 상세가 말한다.
-            r.book.author.takeIf { it.isNotBlank() }?.let {
-                addView(text(it, 16f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = dp(6) })
-            }
+            // 목록은 짧게: 저자(알면)와 별점(있으면). 완독은 표지의 띠와 도장이, 읽는 중인지·완독 횟수·기간·읽은 시간은 누르면 나오는 상세가 말한다.
+            val author = r.book.author.takeIf { it.isNotBlank() }
+            val stars = stars(r, 13)
+            if (author != null || stars != null) addView(hbox().apply {
+                author?.let {
+                    // 저자가 길어도 별이 밀려나지 않게 별 자리를 뺀 만큼만 쓴다.
+                    addView(text(it, 16f, color = Ui.GRAY).apply {
+                        if (stars != null) maxWidth = r.textWidth() - stars.apply { measure(0, 0) }.measuredWidth - dp(DOT_W_DP)
+                    })
+                }
+                stars?.let {
+                    if (author != null) addView(text("·", 16f, color = Ui.GRAY), lp(WRAP, WRAP).apply { marginStart = dp(DOT_GAP_DP); marginEnd = dp(DOT_GAP_DP) })
+                    addView(it)
+                }
+            }, lp(WRAP, WRAP).apply { topMargin = dp(6) })
         }, lp(0, WRAP, 1f).apply {
             marginStart = dp(16)
             // 글자가 도장에 덮이지 않게 도장 왼쪽 끝까지 비운다.
-            if (r.finished) marginEnd = dp(STAMP_END_DP + STAMP_DP / 2 - Ui.MARGIN)
+            if (r.finished) marginEnd = stampSpace
         })
         setOnClickListener { showMenu(r) }
+    }
+
+    private val stampSpace get() = dp(STAMP_END_DP + STAMP_DP / 2 - Ui.MARGIN)
+
+    /** 목록 줄 글자 칸 폭(화면 폭 - 여백 - 표지 - 도장 자리) */
+    private fun Row.textWidth() = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - dp(COVER_DP + 2) - dp(16) - (if (finished) stampSpace else 0)
+
+    /** 별점이 있으면 작은 별 다섯(회색, 반 개), 없으면 null */
+    private fun stars(r: Row, sizeDp: Int): View? {
+        val halves = reviews[r.book.id]?.halves ?: 0
+        if (halves == 0) return null
+        return StarBar(this, sizeDp, 2, filled = Ui.GRAY).apply { this.halves = halves }
     }
 
     /** 홈과 같은 책 상세(기록 전체). 지난해 책을 완독하면 그해 마지막으로 읽은 날에 완독한 것으로(올해는 오늘). */
@@ -204,6 +239,11 @@ class YearBooksActivity : EinkActivity() {
         private const val COLUMNS = 4
         private const val GAP_DP = 14
         private const val GRID_TEXT_DP = 34
+        /** 격자 별 줄(별 12dp + 위 5dp): 표지를 이만큼 줄인다 */
+        private const val GRID_STARS_DP = 17
+        /** 목록 저자와 별 사이 `·` 양옆 틈과 `·` 자리(점 폭 넉넉히) */
+        private const val DOT_GAP_DP = 8
+        private const val DOT_W_DP = 2 * DOT_GAP_DP + 8
 
         fun intent(context: Context) = Intent(context, YearBooksActivity::class.java)
 

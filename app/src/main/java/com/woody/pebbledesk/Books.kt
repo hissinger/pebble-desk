@@ -234,6 +234,33 @@ object BookShelf {
         cachedFinishes = all + (id to ((all[id].orEmpty() + on).distinct().sorted()))
     }
 
+    @Volatile private var cachedReviews: Map<String, Review>? = null
+
+    /** 책(id)마다 별점·감상 */
+    fun reviews(context: Context): Map<String, Review> = cachedReviews ?: loadReviews(context)
+
+    @Synchronized private fun loadReviews(context: Context): Map<String, Review> {
+        cachedReviews?.let { return it }
+        return Db.get(context).rows("SELECT book_id, stars, text FROM review") { it.getString(0) to Review(it.getInt(1), it.getString(2).orEmpty()) }
+            .toMap().also { cachedReviews = it }
+    }
+
+    /** [id] 책의 별점·감상을 바꾼다. 둘 다 비면 지운다. */
+    @Synchronized fun setReview(context: Context, id: String, review: Review) {
+        val db = Db.get(context)
+        val r = review.copy(text = review.text.trim())
+        val all = reviews(context)
+        cachedReviews = if (r.isEmpty) {
+            db.delete("review", "book_id = ?", arrayOf(id))
+            all - id
+        } else {
+            db.insertWithOnConflict("review", null, Db.values(
+                "book_id" to id, "stars" to r.halves, "text" to r.text, "updated_at" to System.currentTimeMillis(),
+            ), SQLiteDatabase.CONFLICT_REPLACE)
+            all + (id to r)
+        }
+    }
+
     /** 나간 책 목록을 쓴다(지우지 않는다. 지운 책도 읽은 시간이 남아 있어 다시 보이지 않게 남긴다). 한 트랜잭션으로 통째로 바꾼다. */
     private fun writeHistory(context: Context, past: List<PastBook>) {
         Db.get(context).tx {
@@ -264,10 +291,11 @@ object BookShelf {
         leave(context, id)
     }
 
-    /** 나간 책(뺀 책) 또는 목록에 없던 책([title], 그 책을 읽은 [app])을 [on] 에 완독한 책으로 */
-    @Synchronized fun finishPast(context: Context, pastId: String?, title: String, app: String?, on: LocalDate = LocalDate.now()) {
+    /** 나간 책(뺀 책) 또는 목록에 없던 책([title], 그 책을 읽은 [app])을 [on] 에 완독한 책으로. 그 책의 id 를 돌려준다. */
+    @Synchronized fun finishPast(context: Context, pastId: String?, title: String, app: String?, on: LocalDate = LocalDate.now()): String {
         val id = pastId?.takeIf { id -> history(context).any { it.book.id == id } } ?: keep(context, title, app).id
         addFinish(context, id, on)
+        return id
     }
 
     /**
@@ -399,12 +427,17 @@ object BookShelf {
 
     /**
      * 이북 앱에서 편 책을 맨 앞에 표지 그림 없이 넣는다(읽고 있는 책 자동 추가, 빈 표지로 보인다).
+     * 전에 뺀 책(나간 책, 지운 책은 빼고)이면 새로 만들지 않고 그 책을 같은 id 로 되살린다(별점·감상·표지·고친 제목이 이어지게).
      * [MAX]권이 차 있으면 넣지 않고 null(있던 책을 빼지 않는다. 사용자가 목록에서 직접 뺀다).
      */
     @Synchronized fun addOpened(context: Context, title: String, author: String, app: String?, progress: Int, due: Long): ShelfBook? {
         if (isFull(context)) return null
-        val added = ShelfBook(newId(), title, author, app, System.currentTimeMillis(), progress, due, seenTitle = title)
+        val now = System.currentTimeMillis()
+        val past = findPast(context, title)?.takeIf { !it.hidden }?.book
+        val added = past?.copy(author = past.author.ifEmpty { author }, app = app ?: past.app, updatedAt = now, progress = progress, due = due)
+            ?: ShelfBook(newId(), title, author, app, now, progress, due, seenTitle = title)
         write(context, listOf(added) + list(context))
+        if (past != null) writeHistory(context, history(context).filter { it.book.id != past.id })
         return added
     }
 

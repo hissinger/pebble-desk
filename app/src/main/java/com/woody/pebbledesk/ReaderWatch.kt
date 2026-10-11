@@ -268,7 +268,7 @@ class ReaderWatchService : AccessibilityService() {
         if (spec.editing(root)) emptyList() else spec.shelfCells(root).also { if (it.isNotEmpty()) lastShelf[spec.pkg] = it }
 
     /**
-     * 책을 폈다: 목록에 있으면 맨 앞으로, 없으면 새로 넣는다(목록이 다 찼으면 넣지 않는다). 인터넷 검색은 하지 않고,
+     * 책을 폈다: 목록에 있으면 맨 앞으로, 없으면 새로 넣는다(전에 뺀 책이면 같은 책으로 되살린다. 목록이 다 찼으면 넣지 않는다). 인터넷 검색은 하지 않고,
      * 표지는 이북 앱 서재에 보이는 그 책의 표지 칸을 화면에서 잘라 온다(안 되면 빈 표지).
      * [at] 은 그 책을 편 때(서재로 돌아와서야 알면 읽는 화면이 열린 때). 읽은 시간을 이때부터 이 책으로 센다.
      */

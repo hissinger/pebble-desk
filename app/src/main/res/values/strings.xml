@@ -124,10 +124,13 @@
     <string name="since_date">%1$s부터</string>
     <string name="filter_all">전체</string>
     <string name="year_finished_empty">이 해에 완독한 책이 없습니다.</string>
-    <string name="finish_confirm">완독한 책으로 남길까요?</string>
     <string name="finish_summary">완독 %1$d회 · 마지막 %2$s</string>
-    <string name="remove_confirm">읽고 있는 책에서 뺄까요?</string>
     <string name="remove_book">책 빼기</string>
+    <string name="review_stars_hint">누르거나 밀어서 고릅니다 · 비워 둬도 됩니다</string>
+    <string name="review_stars_set">%1$s점 · 다시 누르면 지웁니다</string>
+    <string name="review_text_hint">감상이나 나에게 남은 한 문장을 적어 두세요</string>
+    <string name="review_add">별점·감상 남기기 ›</string>
+    <string name="review_edit">고치기 ›</string>
     <string name="books_more">%1$s 외 %2$d권</string>
     <string name="books_empty">읽고 있는 책이 없습니다</string>
     <string name="books_empty_desc">책 추가에서 표지를 찾아 넣으세요. 홈에 크게 보입니다.</string>

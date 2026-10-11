@@ -16,11 +16,12 @@ import java.time.LocalDate
  * - `book_open`: 이북 앱에서 책을 편 때([ReadingLog.bookOpened])
  * - `shelf`·`past`: 읽고 있는 책과 나간 책([BookShelf]). 표지 그림은 파일(`books/<id>.jpg`), 설정은 SharedPreferences.
  * - `finish`: 책(id)마다 완독한 날(여러 번 완독하면 여러 줄). 다시 읽어도 지우지 않는다.
+ * - `review`: 책(id)마다 별점(반 개 단위 0~10)과 감상 하나([Review]). 버전 2에서 더했다.
  * 처음 열 때 1.2.1 까지의 JSON 파일을 옮기고 `<이름>.migrated` 로 바꿔 둔다([importFiles]).
  */
 object Db {
     private const val NAME = "pebble.db"
-    private const val VERSION = 1
+    private const val VERSION = 2
 
     @Volatile private var db: SQLiteDatabase? = null
 
@@ -51,9 +52,15 @@ object Db {
                     "updated_at INTEGER, progress INTEGER, seen_title TEXT, left_at INTEGER, hidden INTEGER)"
             )
             db.execSQL("CREATE TABLE finish (book_id TEXT NOT NULL, day INTEGER NOT NULL, PRIMARY KEY (book_id, day))")
+            createReview(db)
         }
 
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            if (oldVersion < 2) createReview(db)
+        }
+
+        private fun createReview(db: SQLiteDatabase) =
+            db.execSQL("CREATE TABLE review (book_id TEXT PRIMARY KEY, stars INTEGER NOT NULL, text TEXT NOT NULL, updated_at INTEGER NOT NULL)")
     }
 
     /** [block] 을 한 트랜잭션으로(중간에 실패하면 아무것도 바뀌지 않는다) */

@@ -17,7 +17,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.4.2-release.apk </dev/
 
 - 릴리스는 R8 축소(약 235KB, HTML 라이브러리 없이 YES24 검색 결과를 직접 읽는다)이고 디버그 키로 서명한다. 덮어 설치하면 앱 데이터가 남는다.
 - 앱 데이터는 **기기 보호 저장소**(`/data/user_de/0/com.woody.pebbledesk/`)에 있다(`Storage`). 홈이 잠금 해제 전에도 뜨게(directBootAware) 하려고 옮겼다.
-  - DB `databases/pebble.db`(`Db`, 안드로이드 기본 SQLite, 버전 1): 읽은 시간 `reading_day`·`reading_meta`, 편 책 `book_open`, 읽고 있는 책 `shelf`, 나간 책 `past`, 완독한 날 `finish`(여러 번). 기록은 지우지 않는다.
+  - DB `databases/pebble.db`(`Db`, 안드로이드 기본 SQLite, 버전 2): 읽은 시간 `reading_day`·`reading_meta`, 편 책 `book_open`, 읽고 있는 책 `shelf`, 나간 책 `past`, 완독한 날 `finish`(여러 번), 별점·감상 `review`(버전 2). 기록은 지우지 않는다.
   - 파일: 설정 `shared_prefs/home.xml`, 표지 `files/books/<id>.jpg`, 앱 목록 캐시 `files/apps.json`.
   - 1.2.1 까지의 JSON(`reading.json`·`books/books.json`)은 이 실행에서 처음 DB를 열 때 옮기고 `.migrated`로 이름을 바꿔 둔다(읽지 못하면 `.bad`). DB 확인: `adb exec-out run-as … cat …/databases/pebble.db > x.db` 후 `sqlite3`(디버그 빌드).
 - 릴리스는 `run-as` 가 안 된다. 앱 데이터를 직접 고쳐야 하면 같은 키로 서명된 디버그 빌드를 잠깐 깔아 `run-as` 로 넣고 다시 릴리스를 깐다.
@@ -54,7 +54,8 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.4.2-release.apk </dev/
 | HomeActivity | 홈: 상단 · 책 자리(스켈레톤/한 권/여러 권) · 자주 쓰는 앱(고정 3줄) · 하단 줄(모든 앱 · 오늘 읽은 시간 · 설정) |
 | ReadingActivity | ⑫ 독서 기록: 연속일·오늘 링, 4주 링 달력·막대그래프(각각 뷰 하나로 그림, 같은 높이), 합계, 이번 주 읽은 책 |
 | YearBooksActivity | ⑬ 올해 읽은 책(목록·격자, 해 고르기): 읽는 중·완독한 책(표지에 띠)·뺀 책, 완독·다시 읽기·기록에서 지우기 |
-| BookRecord / BookDetail | 책 한 권의 기록(읽은 날·완독 회차, `BookRecord.all`) / 홈·올해 읽은 책이 같이 쓰는 책 상세 `showBookDetail`(머리·기록·메뉴·`책 정보 고치기`, 상태로만 갈림. 홈은 지금 읽는 것만, 올해 읽은 책은 완독한 회차 전체) |
+| BookRecord / BookDetail | 책 한 권의 기록(읽은 날·완독 회차, `BookRecord.all`) / 홈·올해 읽은 책이 같이 쓰는 책 상세 `showBookDetail`(머리·기록·메뉴·`책 정보 고치기`, 상태로만 갈림. 홈은 지금 읽는 것만, 올해 읽은 책은 완독한 회차 전체와 별점·감상 칸) |
+| Review | 별점·감상(`Review`, 저장은 `BookShelf.setReview`), 별 다섯 `StarBar`(반 개, 누르기·밀기), 별점·감상 메뉴 `reviewSheet`(완독·책 빼기의 확인을 겸함), 상세의 칸 `reviewBlock` |
 | Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간을 책별로 계산(편 책 `book_open`), DB `reading_day` 저장, 연속일 |
 | ReaderWatch | `ReaderWatchService`(접근성): 이북 앱 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기 |
 | WatchLog / WatchLogActivity | 자동 추가 서비스가 받은 알림·한 일 기록(최근 60줄 + 앱별 알림 수) / 기기 정보 › `기록 보기 ›` 화면(쪽 없이 한 화면, 사진으로 받는다) |

@@ -121,10 +121,13 @@
     <string name="since_date">Since %1$s</string>
     <string name="filter_all">All</string>
     <string name="year_finished_empty">No books finished this year.</string>
-    <string name="finish_confirm">Mark this book as finished?</string>
     <string name="finish_summary">Finished %1$d× · last %2$s</string>
-    <string name="remove_confirm">Remove from your reading list?</string>
     <string name="remove_book">Remove book</string>
+    <string name="review_stars_hint">Tap or slide to rate · optional</string>
+    <string name="review_stars_set">%1$s / 5 · tap again to clear</string>
+    <string name="review_text_hint">Your thoughts, or a line that stayed with you</string>
+    <string name="review_add">Rate and review ›</string>
+    <string name="review_edit">Edit ›</string>
     <string name="books_more">%1$s + %2$d more</string>
     <string name="books_empty">No books yet</string>
     <string name="books_empty_desc">Add a book to find its cover. It shows large on Home.</string>

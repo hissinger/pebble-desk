@@ -12,25 +12,26 @@ import java.time.format.DateTimeFormatter
  * 메뉴는 책 상태에 따라
  * - 읽고 있는 책(다시 읽는 책 포함): `완독` / `책 정보 고치기 ›` / `책 빼기`
  * - 나간 책·목록에 없던 책: `완독`(아직 완독하지 않았으면) / `다시 읽기`(읽고 있는 책에 자리가 있으면) / `책 정보 고치기 ›` / `기록에서 지우기`
- * `완독`·`책 빼기`·`기록에서 지우기`는 한 번 더 묻는다. [full] 이면 기록 전체(올해 읽은 책), 아니면 지금 읽는 것만(홈, 메뉴가 길어서).
- * [finishOn] 은 나간 책을 완독할 때의 날(지난해를 보고 있으면 그해 마지막으로 읽은 날). 무엇이든 바뀌면 [onChange].
+ * `완독`·`책 빼기`는 확인 대신 별점·감상 메뉴([reviewSheet], 비워 두고 눌러도 된다), `기록에서 지우기`는 한 번 더 묻는다.
+ * [full] 이면 기록 전체와 별점·감상 칸(올해 읽은 책), 아니면 지금 읽는 것만(홈, 메뉴가 길어서). [finishOn] 은 나간 책을 완독할 때의 날(지난해를 보고 있으면 그해 마지막으로 읽은 날). 무엇이든 바뀌면 [onChange].
  */
 fun Context.showBookDetail(r: BookRecord, full: Boolean, finishOn: LocalDate = LocalDate.now(), onChange: () -> Unit) {
     val book = r.book
-    val sheet = bookSheet(r, full)
+    val sub = bookSubtitle(book, r.state == State.READING)
+    val sheet = bookSheet(r, sub, full, onChange)
     if (r.state == State.READING) {
         sheet.item(getString(R.string.finish_book)) {
-            confirm(getString(R.string.finish_confirm), book.title, getString(R.string.finish_book)) { BookShelf.finish(this, book.id); onChange() }
+            reviewSheet(book, sub, getString(R.string.finish_book)) {
+                BookShelf.finish(this, book.id); BookShelf.setReview(this, book.id, it); onChange()
+            }
         }
         sheet.item(getString(R.string.edit_book)) { showEditMenu(r, onChange) }
-        sheet.item(getString(R.string.remove_book)) {
-            confirm(getString(R.string.remove_confirm), book.title, getString(R.string.remove_book)) { BookShelf.remove(this, book.id); onChange() }
-        }
+        sheet.item(getString(R.string.remove_book)) { removeBook(book, sub, onChange) }
     } else {
         val pastId = book.id.takeIf { r.state == State.PAST }
         if (!r.finished) sheet.item(getString(R.string.finish_book)) {
-            confirm(getString(R.string.finish_confirm), book.title, getString(R.string.finish_book)) {
-                BookShelf.finishPast(this, pastId, book.title, book.app, finishOn); onChange()
+            reviewSheet(book, sub, getString(R.string.finish_book)) {
+                BookShelf.setReview(this, BookShelf.finishPast(this, pastId, book.title, book.app, finishOn), it); onChange()
             }
         }
         // 다 찼으면 다시 읽기를 두지 않는다(읽고 있는 책에서 먼저 한 권을 빼야 한다).
@@ -43,6 +44,13 @@ fun Context.showBookDetail(r: BookRecord, full: Boolean, finishOn: LocalDate = L
         }
     }
     sheet.show()
+}
+
+/** `책 빼기`(홈 책 상세·읽고 있는 책 목록의 `빼기`): 확인 대신 별점·감상 메뉴, 맨 아래 `취소` / `책 빼기`. */
+fun Context.removeBook(book: ShelfBook, sub: CharSequence?, onChange: () -> Unit) {
+    reviewSheet(book, sub, getString(R.string.remove_book)) {
+        BookShelf.remove(this, book.id); BookShelf.setReview(this, book.id, it); onChange()
+    }
 }
 
 /**
@@ -68,17 +76,30 @@ private fun Context.showEditMenu(r: BookRecord, onChange: () -> Unit) {
     sheet.show()
 }
 
-/**
- * 책 상세의 머리: 표지(완독 띠), 제목, 저자(알면), 회색 줄 `교보도서관 · 47% 읽음 · 반납 4일 남음`(아는 것만, 진행률·반납일은
- * 읽고 있는 책만), 완독한 적이 있으면 오른쪽 위에 완독 도장, 그 아래 기록 칸([recordView], 기록이 없으면 두지 않는다).
- */
-private fun Context.bookSheet(r: BookRecord, full: Boolean): Sheet {
-    val book = r.book
+/** 책 머리의 제목 아래: 저자(알면), 회색 줄 `교보도서관 · 47% 읽음 · 반납 4일 남음`(아는 것만, 진행률·반납일은 [reading] 일 때만) */
+fun Context.bookSubtitle(book: ShelfBook, reading: Boolean): String? {
     val app = book.app?.let { key -> AppStore.load(this).find { it.key == key }?.label }
-    val status = (listOfNotNull(app) + if (r.state == State.READING) bookStatus(book) else emptyList()).joinToString("  ·  ")
-    val sub = listOfNotNull(book.author.takeIf { it.isNotBlank() }, status.ifEmpty { null }).joinToString("\n").ifEmpty { null }
+    val status = (listOfNotNull(app) + if (reading) bookStatus(book) else emptyList()).joinToString("  ·  ")
+    return listOfNotNull(book.author.takeIf { it.isNotBlank() }, status.ifEmpty { null }).joinToString("\n").ifEmpty { null }
+}
+
+/**
+ * 책 상세의 머리: 표지(완독 띠), 제목, [sub], 완독한 적이 있으면 오른쪽 위에 완독 도장, 그 아래 기록 칸([recordView], 기록이 없으면 두지 않는다).
+ * [full](올해 읽은 책)이면 그 아래 별점·감상 칸([reviewBlock], 누르면 고친다. 목록에 없던 책은 남기는 순간 나간 책으로 적어 둔다).
+ */
+private fun Context.bookSheet(r: BookRecord, sub: String?, full: Boolean, onChange: () -> Unit): Sheet {
+    val book = r.book
     val sheet = Sheet(this).header(book.title, sub, image = BookShelf.cover(this, book, dp(SHEET_COVER_DP)))
     recordView(r, full)?.let { sheet.note(it) }
+    if (full) sheet.note(reviewBlock(BookShelf.reviews(this)[book.id])) {
+        reviewSheet(book, sub, getString(R.string.save)) { review ->
+            if (r.state != State.TITLE_ONLY || !review.isEmpty) {
+                val id = if (r.state == State.TITLE_ONLY) BookShelf.keep(this, book.title, book.app).id else book.id
+                BookShelf.setReview(this, id, review)
+                onChange()
+            }
+        }
+    }
     if (r.finished) sheet.stamp()
     return sheet
 }

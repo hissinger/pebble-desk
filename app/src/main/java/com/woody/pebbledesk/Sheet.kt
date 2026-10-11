@@ -3,6 +3,7 @@ package com.woody.pebbledesk
 import android.app.Dialog
 import android.content.Context
 import android.graphics.Bitmap
+import android.text.InputFilter
 import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
@@ -11,9 +12,11 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.FrameLayout
 
 /**
  * 아래에서 올라오는 메뉴. 위쪽 굵은 선, 머리(아이콘·이름·설명), 항목들, 맨 아래 오른쪽 `닫기`.
+ * 별점·감상 칸([review])이 있으면 항목 대신 별·감상 입력과 맨 아래 `취소` / 할 일 한 줄.
  * 박스 없이 선으로만 나눈다.
  */
 class Sheet(private val context: Context) {
@@ -33,10 +36,18 @@ class Sheet(private val context: Context) {
 
     fun noClose() = apply { closeRow = false }
 
-    /** 머리와 항목 사이에 두는 칸(책 상세의 회차별 기록). 머리 아래 옅은 선 다음에 화면 폭으로(좌우 여백 안). */
-    private var note: View? = null
+    /** 머리와 항목 사이에 두는 칸(책 상세의 회차별 기록·별점 칸). 칸마다 위에 옅은 선, 화면 폭으로(좌우 여백 안). [onClick] 이 있으면 칸 전체를 누를 수 있다. */
+    private class Note(val view: View, val onClick: (() -> Unit)?)
+    private val notes = mutableListOf<Note>()
 
-    fun note(view: View) = apply { note = view }
+    fun note(view: View, onClick: (() -> Unit)? = null) = apply { notes += Note(view, onClick) }
+
+    /** 별점·감상 칸(지금 값, 아래 오른쪽 굵은 글자, 누르면 부를 일). 있으면 머리 아래에 두고 맨 아래 `취소` / 할 일 한 줄. */
+    private var review: Triple<Review, String, (Review) -> Unit>? = null
+
+    fun review(initial: Review, action: String, onDone: (Review) -> Unit) = apply {
+        review = Triple(initial, action, onDone); closeRow = false
+    }
 
     /** 머리 오른쪽 위에 완독 도장(위 끝은 메뉴 위 선에서 잘리고 아래는 기록 칸에 조금 걸친다) */
     private var stamped = false
@@ -57,6 +68,11 @@ class Sheet(private val context: Context) {
     fun show() {
         val dialog = Dialog(context, R.style.Sheet)
         val c = context
+        // 닫고 할 일. 닫히기 전에 두 번 눌려도 한 번만(같은 책을 두 번 다시 읽기·적어 두기 하지 않게).
+        fun dismissThen(action: () -> Unit) {
+            if (!dialog.isShowing) return
+            dialog.dismiss(); action()
+        }
         val root = c.vbox()
         Crema.reserveHiddenBottom(root)
         root.addView(c.hline(2, inset = false))
@@ -84,11 +100,60 @@ class Sheet(private val context: Context) {
             if (stamped) marginEnd = c.dp(STAMP_END_DP + STAMP_DP / 2 - Ui.MARGIN)
         })
         root.addView(head)
-        note?.let {
+        notes.forEach { n ->
             root.addView(c.hline(1, Ui.DIVIDER))
-            root.addView(it, lp(MATCH, WRAP).apply {
-                marginStart = c.dp(Ui.MARGIN); marginEnd = c.dp(Ui.MARGIN); topMargin = c.dp(10); bottomMargin = c.dp(14)
-            })
+            root.addView(FrameLayout(c).apply {
+                setPadding(c.dp(Ui.MARGIN), c.dp(10), c.dp(Ui.MARGIN), c.dp(14))
+                addView(n.view)
+                n.onClick?.let { action -> setOnClickListener { dismissThen(action) } }
+            }, lp(MATCH, WRAP))
+        }
+
+        review?.let { (initial, action, onDone) ->
+            root.addView(c.hline(1, Ui.DIVIDER))
+            val hint = c.text(c.reviewHint(initial.halves), 15f, color = Ui.LIGHT_GRAY).apply { gravity = Gravity.CENTER_HORIZONTAL }
+            val stars = StarBar(c, 54, 18).apply {
+                halves = initial.halves
+                editable = true
+                onChange = { hint.text = c.reviewHint(it) }
+            }
+            root.addView(stars, lp(MATCH, WRAP).apply { topMargin = c.dp(18) })
+            root.addView(hint, lp(MATCH, WRAP).apply { topMargin = c.dp(8); bottomMargin = c.dp(14) })
+            root.addView(c.hline(1, Ui.DIVIDER))
+            val field = EditText(c).apply {
+                setText(initial.text)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                setTextColor(Ui.BLACK)
+                setHint(R.string.review_text_hint)
+                setHintTextColor(Ui.LIGHT_GRAY)
+                background = null
+                gravity = Gravity.TOP or Gravity.START
+                setPadding(0, c.dp(14), 0, c.dp(14))
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                minLines = 4
+                maxLines = 4
+                filters = arrayOf(InputFilter.LengthFilter(2000))
+                // 키보드가 올라오면 메뉴가 다 들어가지 않아 머리(표지·제목)를 감춘다.
+                setOnFocusChangeListener { _, focused -> if (focused) head.visibility = View.GONE }
+            }
+            root.addView(field, lp(MATCH, WRAP).apply { marginStart = c.dp(Ui.MARGIN); marginEnd = c.dp(Ui.MARGIN) })
+            root.addView(c.hline(2))
+            root.addView(c.hbox().apply {
+                setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
+                addView(c.text(c.getString(R.string.cancel), 24f).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(0, 0, c.dp(24), 0)
+                    setOnClickListener { dialog.dismiss() }
+                }, lp(WRAP, MATCH))
+                addView(View(c), lp(0, 0, 1f))
+                addView(c.text(action, 24f, Ui.bold).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(c.dp(24), 0, 0, 0)
+                    setOnClickListener { dismissThen { onDone(Review(stars.halves, field.text.toString())) } }
+                }, lp(WRAP, MATCH))
+            }, lp(MATCH, c.dp(Ui.ROW_DP)))
+            // 처음에는 감상 칸에 초점을 주지 않는다(키보드가 바로 뜨지 않게. 별만 고르는 일이 많다).
+            root.isFocusableInTouchMode = true
         }
 
         input?.let { (initial, onDone) ->
@@ -105,7 +170,7 @@ class Sheet(private val context: Context) {
             }
             val save = {
                 val v = field.text.toString().trim()
-                if (v.isNotEmpty()) { dialog.dismiss(); onDone(v) }
+                if (v.isNotEmpty()) dismissThen { onDone(v) }
             }
             field.setOnEditorActionListener { _, action, _ -> if (action == EditorInfo.IME_ACTION_DONE) { save(); true } else false }
             root.addView(field, lp(MATCH, WRAP).apply { marginStart = c.dp(Ui.MARGIN); marginEnd = c.dp(Ui.MARGIN) })
@@ -123,10 +188,10 @@ class Sheet(private val context: Context) {
             root.addView(c.hbox().apply {
                 setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
                 addView(c.text(item.label, 24f, if (item.bold) Ui.bold else Ui.regular), lp(MATCH, WRAP))
-                setOnClickListener { dialog.dismiss(); item.action() }
+                setOnClickListener { dismissThen(item.action) }
             }, lp(MATCH, c.dp(Ui.ROW_DP)))
         }
-        root.addView(c.hline(1, Ui.DIVIDER))
+        if (review == null) root.addView(c.hline(1, Ui.DIVIDER))
         if (closeRow) root.addView(c.text(c.getString(R.string.close), 21f, Ui.bold).apply {
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
             setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
@@ -140,7 +205,10 @@ class Sheet(private val context: Context) {
             decorView.setPadding(0, 0, 0, 0)
             // 입력 줄이 있으면 키보드를 띄우고, 메뉴가 키보드 위로 올라오게 한다.
             if (input != null) setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            if (review != null) setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         }
+        // 감상을 쓰다 바깥을 잘못 눌러 글이 날아가지 않게(뒤로 가기·`취소`로 닫는다).
+        if (review != null) dialog.setCanceledOnTouchOutside(false)
         dialog.show()
     }
 }
