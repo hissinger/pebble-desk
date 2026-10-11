@@ -103,7 +103,7 @@ class BooksActivity : EinkActivity() {
             addView(text(getString(R.string.remove), 19f).apply {
                 paintFlags = paintFlags or Paint.UNDERLINE_TEXT_FLAG
                 setPadding(dp(16), dp(14), 0, dp(14))
-                setOnClickListener { removeBook(book, bookSubtitle(book, reading = true)) { render() } }
+                setOnClickListener { removeBook(BookRecord.of(this@BooksActivity, book), bookSubtitle(book, reading = true)) { render() } }
             })
             setOnClickListener {
                 startActivity(AppListActivity.intent(this@BooksActivity, AppListActivity.Mode.PICK_READER, book.id))

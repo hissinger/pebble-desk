@@ -26,7 +26,7 @@ fun Context.showBookDetail(r: BookRecord, full: Boolean, finishOn: LocalDate = L
             }
         }
         sheet.item(getString(R.string.edit_book)) { showEditMenu(r, onChange) }
-        sheet.item(getString(R.string.remove_book)) { removeBook(book, sub, onChange) }
+        sheet.item(getString(R.string.remove_book)) { removeBook(r, sub, onChange) }
     } else {
         val pastId = book.id.takeIf { r.state == State.PAST }
         if (!r.finished) sheet.item(getString(R.string.finish_book)) {
@@ -46,8 +46,16 @@ fun Context.showBookDetail(r: BookRecord, full: Boolean, finishOn: LocalDate = L
     sheet.show()
 }
 
-/** `책 빼기`(홈 책 상세·읽고 있는 책 목록의 `빼기`): 확인 대신 별점·감상 메뉴, 맨 아래 `취소` / `책 빼기`. */
-fun Context.removeBook(book: ShelfBook, sub: CharSequence?, onChange: () -> Unit) {
+/**
+ * `책 빼기`(홈 책 상세·읽고 있는 책 목록의 `빼기`): 올해 읽은 책에 남는 책([BookRecord.inYearBooks])이면 확인 대신 별점·감상 메뉴
+ * (맨 아래 `취소` / `책 빼기`), 아니면(거의 읽지 않은 책. 남긴 별점을 볼 곳이 없다) 확인만 `읽고 있는 책에서 뺄까요?`.
+ */
+fun Context.removeBook(r: BookRecord, sub: CharSequence?, onChange: () -> Unit) {
+    val book = r.book
+    if (!r.inYearBooks) {
+        confirm(getString(R.string.remove_confirm), book.title, getString(R.string.remove_book)) { BookShelf.remove(this, book.id); onChange() }
+        return
+    }
     reviewSheet(book, sub, getString(R.string.remove_book)) {
         BookShelf.remove(this, book.id); BookShelf.setReview(this, book.id, it); onChange()
     }

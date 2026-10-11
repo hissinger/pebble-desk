@@ -125,6 +125,7 @@
     <string name="filter_all">전체</string>
     <string name="year_finished_empty">이 해에 완독한 책이 없습니다.</string>
     <string name="finish_summary">완독 %1$d회 · 마지막 %2$s</string>
+    <string name="remove_confirm">읽고 있는 책에서 뺄까요?</string>
     <string name="remove_book">책 빼기</string>
     <string name="review_stars_hint">누르거나 밀어서 고릅니다 · 비워 둬도 됩니다</string>
     <string name="review_stars_set">%1$s점 · 다시 누르면 지웁니다</string>

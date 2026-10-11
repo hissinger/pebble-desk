@@ -31,6 +31,12 @@ class BookRecord(
     /** [year] 에 읽은 시간 */
     fun yearMs(year: Int) = dayMs.entries.sumOf { (d, ms) -> if (d.year == year) ms else 0L }
 
+    /** 1분 이상 읽은 해(그해 올해 읽은 책에 보인다) */
+    val readYears: List<Int> = dayMs.keys.map { it.year }.distinct().filter { yearMs(it) >= ReadingLog.MIN_DAY_MS }
+
+    /** 어느 해의 올해 읽은 책에든 보이는가: 그해 1분 이상 읽었거나 완독했다(별점·감상을 남길 만한 책) */
+    val inYearBooks get() = finished || readYears.isNotEmpty()
+
     /** [after] 다음 날부터 [upTo] 까지(null 이면 끝없이) 읽은 시간: 회차마다 읽은 시간 */
     private fun spent(after: LocalDate?, upTo: LocalDate?) =
         dayMs.entries.sumOf { (d, ms) -> if ((after == null || d > after) && (upTo == null || d <= upTo)) ms else 0L }

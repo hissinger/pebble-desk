@@ -122,6 +122,7 @@
     <string name="filter_all">All</string>
     <string name="year_finished_empty">No books finished this year.</string>
     <string name="finish_summary">Finished %1$d× · last %2$s</string>
+    <string name="remove_confirm">Remove from your reading list?</string>
     <string name="remove_book">Remove book</string>
     <string name="review_stars_hint">Tap or slide to rate · optional</string>
     <string name="review_stars_set">%1$s / 5 · tap again to clear</string>

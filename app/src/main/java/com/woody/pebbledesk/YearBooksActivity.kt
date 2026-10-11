@@ -249,8 +249,7 @@ class YearBooksActivity : EinkActivity() {
 
         /** 고를 수 있는 해: 1분 이상 읽었거나 완독한 책이 있는 해와 올해(최근 순) */
         private fun years(records: List<BookRecord>, today: LocalDate): List<Int> {
-            fun readYears(r: BookRecord) = r.dayMs.keys.map { it.year }.distinct().filter { r.yearMs(it) >= ReadingLog.MIN_DAY_MS }
-            return (records.flatMap { r -> readYears(r) + r.finishes.map { it.year } } + today.year).distinct().sortedDescending()
+            return (records.flatMap { r -> r.readYears + r.finishes.map { it.year } } + today.year).distinct().sortedDescending()
         }
 
         /**
@@ -259,7 +258,7 @@ class YearBooksActivity : EinkActivity() {
          */
         private fun yearRows(records: List<BookRecord>, year: Int): List<Row> =
             records
-                .filter { it.yearMs(year) >= ReadingLog.MIN_DAY_MS || it.finishes.any { d -> d.year == year } }
+                .filter { year in it.readYears || it.finishes.any { d -> d.year == year } }
                 .map { r ->
                     val lastRead = r.readDays.lastOrNull { it.year == year } ?: LocalDate.MIN
                     val lastDone = r.finishes.lastOrNull { it.year == year } ?: LocalDate.MIN
