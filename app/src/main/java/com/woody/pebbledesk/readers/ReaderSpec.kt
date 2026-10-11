@@ -70,7 +70,7 @@ open class ReaderSpec(
 
     /**
      * 읽는 화면: 본문(웹 화면)은 훑지 않고 이름으로 찾은 요소만 읽는다. 진행률은 아래 줄([viewerProgress])에서,
-     * 없으면 메뉴의 쪽([viewerPages])으로. 제목([viewerTitle])은 메뉴를 띄웠을 때만 보이고, 같은 이름이 여럿이면(목차 같은 목록) 믿지 않는다.
+     * 없으면 메뉴의 쪽([viewerPages])으로. 제목([viewerTitleIds])은 메뉴를 띄웠을 때만 보이고, 같은 이름이 여럿이면(목차 같은 목록) 믿지 않는다.
      * 메뉴·알림 창이 위에 떠 있어도 그 아래 읽는 화면의 진행률 줄을 읽도록 그 앱의 창을 모두 본다.
      */
     open fun readViewer(windows: AppWindows): ViewerInfo {
@@ -85,11 +85,15 @@ open class ReaderSpec(
             ?: lines.firstNotNullOfOrNull { viewerPercent(it, pagesRoundUp).takeIf { p -> p >= 0 } }
             ?: viewerPages?.let { (cur, total) -> pagePercent(texts(cur).firstOrNull(), texts(total).firstOrNull(), pagesRoundUp) }
             ?: -1
-        val title = viewerTitle?.let { id -> texts(id, titleRoots(windows)).distinct().singleOrNull() }
+        val titleRoots = titleRoots(windows)
+        val title = viewerTitleIds.firstNotNullOfOrNull { id -> texts(id, titleRoots).distinct().singleOrNull() }
             ?: return ViewerInfo(null, "", progress)
         val (name, author) = splitTitle(title)
         return ViewerInfo(name, author, progress)
     }
+
+    /** 읽는 화면 제목을 찾을 요소 이름들(앞에서부터, 글자가 있는 것). 기본: [viewerTitle] 하나 */
+    protected open val viewerTitleIds: List<String> get() = listOfNotNull(viewerTitle)
 
     /** 읽는 화면 제목을 찾을 묶음들. 기본: 그 앱의 창 전체 */
     protected open fun titleRoots(windows: AppWindows): List<AccessibilityNodeInfo> = windows.all
