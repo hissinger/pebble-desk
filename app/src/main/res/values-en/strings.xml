@@ -209,6 +209,7 @@
     <string name="save">Save</string>
     <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, of Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi, YES24 (Library, my YES, eBook) and Moon+ Reader to fill your reading list. Book text and other apps are not seen, and nothing leaves the device.</string>
     <string name="open_app_info">Open App info</string>
+    <string name="allow_hint">If you can\'t see Allow, turn on the shortcut switch below.</string>
     <string name="restricted_hint">If Pebble Desk is greyed out in Accessibility (restricted setting), tap it once and close the notice first, then open App info › ⋮ at the top right › Allow restricted settings and turn it on again.</string>
     <string name="onboarding_title">Getting started</string>
     <string name="onboarding_intro">Just open a book and your home fills itself. Turn on these two.</string>

@@ -77,7 +77,7 @@ class Sheet(private val context: Context) {
         }
         val names = c.vbox()
         names.addView(c.text(title, 29f, Ui.heavy))
-        subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = 12), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
+        subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = 16), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
         head.addView(names, lp(0, WRAP, 1f).apply {
             if (image != null) gravity = Gravity.TOP
             // 제목이 도장에 덮이지 않게 도장 왼쪽 끝까지 비운다.

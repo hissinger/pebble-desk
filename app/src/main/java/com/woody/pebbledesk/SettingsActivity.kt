@@ -203,11 +203,12 @@ class SettingsActivity : EinkActivity() {
 
     /**
      * 자동 추가 창: 무엇을 읽는지 + `접근성 설정 열기`. 안드로이드 13+ 이면 늘 `앱 정보 열기` 도 두고,
-     * 꺼져 있으면([watching] 이 false) 제한된 설정 안내를 설명에 붙인다.
+     * 꺼져 있으면([watching] 이 false) 허용이 안 보일 때 안내(BOOX Leaf2)와 13+ 의 제한된 설정 안내를 설명 아래 단락으로 붙인다.
      */
     private fun autoBooksSheet(watching: Boolean) {
         val restricted = ReaderWatchService.mayBeRestricted
-        val desc = getString(R.string.auto_books_desc) + if (restricted && !watching) "\n\n" + getString(R.string.restricted_hint) else ""
+        val hints = if (watching) emptyList() else listOfNotNull(R.string.allow_hint, R.string.restricted_hint.takeIf { restricted })
+        val desc = (listOf(R.string.auto_books_desc) + hints).joinToString("\n\n") { getString(it) }
         val sheet = Sheet(this).header(getString(R.string.auto_books), desc)
             .item(getString(R.string.open_accessibility), bold = true) { ReaderWatchService.openSettings(this) }
         if (restricted) sheet.item(getString(R.string.open_app_info)) { ReaderWatchService.openAppInfo(this) }
