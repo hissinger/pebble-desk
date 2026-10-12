@@ -1,9 +1,19 @@
 package com.woody.pebbledesk
 
+import android.app.Dialog
+import android.content.Context
 import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
@@ -13,6 +23,12 @@ import java.time.format.TextStyle
 /** ⑧ 설정. 회색 소제목으로 묶고 값은 오른쪽에 같은 굵기로 쓴다. 켜짐은 검정, 꺼짐은 진회색, `›` 는 다음 화면. */
 class SettingsActivity : EinkActivity() {
     private lateinit var list: LinearLayout
+    /** 업데이트 줄 자리(상태가 바뀌면 이 줄만 다시 그린다) */
+    private var updateSlot: LinearLayout? = null
+    /** 최신 판 줄을 눌러 다시 확인하는 중(끝나서 여전히 최신이면 알린다) */
+    private var announceLatest = false
+    /** 받는 중 창(받기가 끝나거나 실패하면 닫는다) */
+    private var progressDialog: Dialog? = null
     /** 자동 추가 안내의 쪽들(그 화면에서만) */
     private lateinit var guide: PagedBlocks
     /** 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]) */
@@ -52,8 +68,24 @@ class SettingsActivity : EinkActivity() {
         when (page) {
             PAGE_GUIDE -> renderGuide()
             PAGE_READING -> renderReading()
-            else -> render()
+            else -> {
+                render()
+                Update.onChange = { renderUpdate(); closeProgress(); showInstallFailure(); showLatest() }
+                closeProgress()
+                showInstallFailure()
+                Update.checkIfStale(this)
+            }
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (page == null) Update.onChange = null
+    }
+
+    override fun onDestroy() {
+        progressDialog?.dismiss()
+        super.onDestroy()
     }
 
     private fun render() {
@@ -113,7 +145,141 @@ class SettingsActivity : EinkActivity() {
         row(getString(R.string.device_settings), null, next = true) {
             runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
         }
-        row(getString(R.string.device_info), Build.MODEL, next = true, last = true) { startActivity(DeviceInfoActivity.intent(this)) }
+        row(getString(R.string.device_info), Build.MODEL, next = true) { startActivity(DeviceInfoActivity.intent(this)) }
+        updateSlot = vbox().also { list.addView(it) }
+        renderUpdate()
+    }
+
+    /**
+     * 업데이트 줄: 판 번호만. 최신이면 지금 판(회색), 새 판이 있으면 `1.5.1 ›`(받는 동안은 `›` 없이),
+     * 모르면 `확인 중` · `인터넷 없음`(누르면 연결 확인 안내) · `서버 응답 없음`(회색, 누르면 잠시 뒤 다시 해 보라는 창). 새 판을 누르면 바뀐 점과 `설치` 창, 그 밖에는 누르면 다시 확인한다
+     * (최신 판을 눌러 다시 확인해도 최신이면 `최신 버전이 설치되어 있습니다` 창).
+     */
+    private fun renderUpdate() {
+        val slot = updateSlot ?: return
+        slot.removeAllViews()
+        val label = getString(R.string.update)
+        when (val s = Update.state) {
+            is Update.State.Available ->
+                row(label, s.release.version, next = true, last = true, into = slot) { offerUpdate(s.release) }
+            is Update.State.Downloading -> row(label, s.release.version, last = true, into = slot) {}
+            // 설치 창을 띄운 뒤: 창을 그냥 벗어났을 수 있어 다시 누르면 그 창을 다시 띄운다.
+            is Update.State.Installing -> row(label, s.release.version, next = true, last = true, into = slot) {
+                if (!Update.resumeInstall(this, s.release.version)) offerUpdate(s.release)
+            }
+            Update.State.Latest -> row(label, appVersion(), on = false, last = true, into = slot) {
+                announceLatest = true
+                Update.check(this)
+            }
+            Update.State.Unknown, Update.State.Checking ->
+                row(label, getString(R.string.update_checking), on = false, last = true, into = slot) {}
+            // 누르면 아직 연결이 없으면 연결을 확인하라고 알리고, 연결됐으면 다시 확인한다.
+            Update.State.Offline -> row(label, getString(R.string.update_offline_short), on = false, last = true, into = slot) {
+                if (Update.online(this)) Update.check(this)
+                else Sheet(this).header(getString(R.string.update_offline), getString(R.string.update_offline_desc)).show()
+            }
+            // 누르면 잠시 뒤 다시 해 보라고 알리고, 뒤에서 다시 확인해 둔다.
+            Update.State.Failed -> row(label, getString(R.string.update_no_response), on = false, last = true, into = slot) {
+                Sheet(this).header(getString(R.string.update_server_title), getString(R.string.update_server_desc)).show()
+                Update.check(this)
+            }
+        }
+    }
+
+    /**
+     * 받는 중 창: 머리 `Pebble Desk 1.5.1` · `받는 중`, 막대. 전자잉크라 막대는 25% 씩 네 번만 바꾸고, 금방 받아도
+     * [Update.MIN_SHOW_MS](5초)에 걸쳐 채운다(받은 만큼보다 앞서 가지 않는다). 받기가 끝나면 닫히고 설치 창이 뜬다.
+     */
+    private fun showProgress(release: Update.Release) {
+        val bar = ProgressLine(this)
+        val dialog = Sheet(this).header("Pebble Desk ${release.version}", getString(R.string.update_downloading))
+            .note(bar).locked().show()
+        progressDialog = dialog
+        val step = Update.MIN_SHOW_MS / 4
+        var ticks = 0
+        val tick = object : Runnable {
+            override fun run() {
+                if (!dialog.isShowing) return
+                ticks++
+                val shown = minOf(ticks * 25, Update.downloaded / 25 * 25)
+                if (shown != bar.percent) bar.percent = shown
+                bar.postDelayed(this, step)
+            }
+        }
+        bar.postDelayed(tick, step)
+    }
+
+    /** 받기가 끝났으면(설치 창을 띄웠거나 실패) 받는 중 창을 닫는다 */
+    private fun closeProgress() {
+        if (Update.state is Update.State.Downloading) return
+        progressDialog?.dismiss()
+        progressDialog = null
+    }
+
+    /** 최신 판 줄을 눌러 다시 확인했는데 여전히 최신이면 알린다(새 판이 나왔으면 줄이 그 판으로 바뀐다) */
+    private fun showLatest() {
+        val s = Update.state
+        if (!announceLatest || s == Update.State.Checking) return
+        announceLatest = false
+        if (s == Update.State.Latest) Sheet(this).header("Pebble Desk ${appVersion()}", getString(R.string.update_is_latest)).show()
+    }
+
+    /** `설치` 뒤 받기·확인·설치에 실패했으면 알린다(이 화면을 떠나 있었으면 돌아올 때) */
+    private fun showInstallFailure() {
+        if (!Update.takeInstallFailure()) return
+        Sheet(this).header(getString(R.string.update_install_failed), getString(R.string.update_install_failed_desc)).show()
+    }
+
+    /** 새 판의 바뀐 점(릴리스 설명, 화면에서 [NOTES_LINES] 줄까지)과 `설치` */
+    private fun offerUpdate(release: Update.Release) {
+        Sheet(this).header("Pebble Desk ${release.version}", releaseNotes(release.notes), lines = NOTES_LINES)
+            .item(getString(R.string.update_install), bold = true) { installUpdate(release) }
+            .show()
+    }
+
+    /**
+     * 릴리스 설명(마크다운)을 창에 넣을 글로: 절 제목(`## 새로 생긴 것`)은 굵은 검정, 항목(`- `)은 `· ` 로 시작하는 회색,
+     * 두 번째 절부터는 위에 반 줄을 띄운다. `**`·`` ` `` 는 던다. 줄 수는 창이 [NOTES_LINES] 로 자른다(넘으면 끝에 줄임표).
+     * 릴리스 설명은 이 줄 수에 맞춰 쓴다(CLAUDE.md 릴리스 절).
+     */
+    private fun releaseNotes(markdown: String): CharSequence? {
+        val out = SpannableStringBuilder()
+        for (raw in markdown.lines()) {
+            val line = raw.replace("**", "").replace("`", "").trim()
+            if (line.isEmpty()) continue
+            val heading = line.startsWith("#")
+            val text = when {
+                heading -> line.trimStart('#', ' ')
+                line.startsWith("- ") || line.startsWith("* ") -> "· " + line.drop(2)
+                else -> line
+            }
+            if (out.isNotEmpty()) {
+                out.append("\n")
+                if (heading) out.append(" \n", RelativeSizeSpan(0.5f), 0)
+            }
+            if (heading) out.append(text, StyleSpan(Typeface.BOLD), 0).also {
+                it.setSpan(ForegroundColorSpan(Ui.BLACK), it.length - text.length, it.length, 0)
+            } else out.append(text)
+            // 어차피 [NOTES_LINES] 줄만 보이므로 아주 긴 설명은 앞부분만 다룬다.
+            if (out.length > NOTES_SCAN_CHARS) break
+        }
+        return out.takeIf { it.isNotEmpty() }
+    }
+
+    /** 이 앱에 '알 수 없는 앱 설치'가 허용돼 있으면 받아서 설치하고(이 판의 설치 창을 띄워 둔 적이 있으면 그 창을), 아니면 허용 화면 안내 */
+    private fun installUpdate(release: Update.Release) {
+        if (Update.resumeInstall(this, release.version)) return
+        if (packageManager.canRequestPackageInstalls()) {
+            Update.install(this, release)
+            showProgress(release)
+            return
+        }
+        Sheet(this).header(getString(R.string.update_allow_title), getString(R.string.update_allow_desc))
+            .item(getString(R.string.update_allow_open), bold = true) {
+                runCatching {
+                    startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                }
+            }.show()
     }
 
     /** 독서 화면: 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */
@@ -253,7 +419,7 @@ class SettingsActivity : EinkActivity() {
      */
     private fun row(
         label: String, value: String?, on: Boolean = true, next: Boolean = false, last: Boolean = false,
-        hint: String? = null, tail: String? = null, action: () -> Unit,
+        hint: String? = null, tail: String? = null, into: LinearLayout = list, action: () -> Unit,
     ) {
         val color = if (on) Ui.BLACK else Ui.GRAY
         val row = hbox().apply {
@@ -269,8 +435,8 @@ class SettingsActivity : EinkActivity() {
             if (end.isNotEmpty()) addView(text(end, 20f, Ui.medium, color))
             setOnClickListener { action() }
         }
-        list.addView(row, lp(MATCH, dp(45)))
-        if (!last) list.addView(hline(1, Ui.DIVIDER))
+        into.addView(row, lp(MATCH, dp(45)))
+        if (!last) into.addView(hline(1, Ui.DIVIDER))
     }
 
     private fun toggle(label: String, value: Boolean, hint: String? = null, set: (Boolean) -> Unit) =
@@ -294,5 +460,29 @@ class SettingsActivity : EinkActivity() {
         private const val PAGE_GUIDE = "guide"
         private const val GOAL_MIN = 1L
         private const val GOAL_MAX = 300L
+        /** 바뀐 점 창에 보이는 릴리스 설명 줄 수(크레마 페블에서 한 줄 한국어 약 28자). 릴리스 설명은 이 안에 맞춰 쓴다. */
+        const val NOTES_LINES = 18
+        private const val NOTES_SCAN_CHARS = 2_000
+    }
+}
+
+/** 받는 중 막대: 연회색 줄 위에 받은 만큼 검정(박스 없이, 높이 [HEIGHT_DP]) */
+private class ProgressLine(context: Context) : View(context) {
+    var percent = 0
+        set(v) { field = v; invalidate() }
+    private val paint = Paint()
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) =
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), context.dp(HEIGHT_DP))
+
+    override fun onDraw(canvas: Canvas) {
+        paint.color = Ui.DIVIDER
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        paint.color = Ui.BLACK
+        canvas.drawRect(0f, 0f, width * percent / 100f, height.toFloat(), paint)
+    }
+
+    companion object {
+        const val HEIGHT_DP = 8
     }
 }

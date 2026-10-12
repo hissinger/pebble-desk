@@ -27,6 +27,8 @@ class Sheet(private val context: Context) {
     private var image: Bitmap? = null
     private var title: String = ""
     private var subtitle: CharSequence? = null
+    /** 부제의 최대 줄 수(넘으면 끝에 줄임표) */
+    private var subtitleLines = 16
     private val items = mutableListOf<Item>()
     /** 글자 입력 줄(지금 값, 다 쓰면 부를 일). 있으면 머리 아래에 두고 `저장`을 맨 위 항목으로 둔다. */
     private var input: Pair<String, (String) -> Unit>? = null
@@ -35,6 +37,11 @@ class Sheet(private val context: Context) {
     private var closeRow = true
 
     fun noClose() = apply { closeRow = false }
+
+    /** 닫기 줄 없이, 뒤로 가기·바깥 누르기로도 닫히지 않는다(받는 중 창. 부르는 쪽이 [show] 가 돌려준 창을 닫는다). */
+    private var locked = false
+
+    fun locked() = apply { locked = true; closeRow = false }
 
     /** 머리와 항목 사이에 두는 칸(책 상세의 회차별 기록·별점 칸). 칸마다 위에 옅은 선, 화면 폭으로(좌우 여백 안). [onClick] 이 있으면 칸 전체를 누를 수 있다. */
     private class Note(val view: View, val onClick: (() -> Unit)?)
@@ -54,8 +61,8 @@ class Sheet(private val context: Context) {
 
     fun stamp() = apply { stamped = true }
 
-    fun header(title: String, subtitle: CharSequence? = null, app: AppEntry? = null, image: Bitmap? = null) = apply {
-        this.title = title; this.subtitle = subtitle; this.app = app; this.image = image
+    fun header(title: String, subtitle: CharSequence? = null, app: AppEntry? = null, image: Bitmap? = null, lines: Int = 16) = apply {
+        this.title = title; this.subtitle = subtitle; this.app = app; this.image = image; subtitleLines = lines
     }
 
     fun item(label: String, bold: Boolean = false, action: () -> Unit) = apply { items += Item(label, bold, action) }
@@ -65,7 +72,7 @@ class Sheet(private val context: Context) {
         input = initial to onDone; this.numeric = numeric
     }
 
-    fun show() {
+    fun show(): Dialog {
         val dialog = Dialog(context, R.style.Sheet)
         val c = context
         // 닫고 할 일. 닫히기 전에 두 번 눌려도 한 번만(같은 책을 두 번 다시 읽기·적어 두기 하지 않게).
@@ -93,7 +100,7 @@ class Sheet(private val context: Context) {
         }
         val names = c.vbox()
         names.addView(c.text(title, 29f, Ui.heavy))
-        subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = 16), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
+        subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = subtitleLines), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
         head.addView(names, lp(0, WRAP, 1f).apply {
             if (image != null) gravity = Gravity.TOP
             // 제목이 도장에 덮이지 않게 도장 왼쪽 끝까지 비운다.
@@ -209,7 +216,9 @@ class Sheet(private val context: Context) {
         }
         // 감상을 쓰다 바깥을 잘못 눌러 글이 날아가지 않게(뒤로 가기·`취소`로 닫는다).
         if (review != null) dialog.setCanceledOnTouchOutside(false)
+        if (locked) dialog.setCancelable(false)
         dialog.show()
+        return dialog
     }
 }
 

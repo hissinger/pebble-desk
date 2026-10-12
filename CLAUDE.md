@@ -16,11 +16,12 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.4.2-release.apk </dev/
 ```
 
 - 릴리스는 R8 축소(약 235KB, HTML 라이브러리 없이 YES24 검색 결과를 직접 읽는다). 덮어 설치하면 앱 데이터가 남는다.
-- 서명: 1.4.2 까지는 디버그 키. 그 뒤로는 APK 를 만드는 `packageRelease`·`packageDebug` 끝에 릴리스 키(`~/Dev/pebble-desk-keys`, 저장소 밖·백업은 iCloud `PebbleDesk-서명키`)와 교체 이력(lineage, 디버그 키 → 릴리스 키)으로 v3 서명만 다시 하고(v1·v2·v4 끔), 인증서·이력이 맞는지 `apksigner verify`·`lineage` 로 확인한다(`app/build.gradle.kts`). 그래서 1.4.2 위에 덮어 깔리고, 디버그 키로만 서명한 APK 는 그 위에 깔리지 않는다. 키 폴더가 없으면 디버그 빌드는 디버그 키 그대로, 릴리스 빌드는 실패한다(`-Ppebbledesk.debugSignedRelease=true` 면 디버그 키로). assemble·install·Android Studio 실행 모두 다시 서명된 APK 를 쓴다. 키는 저장소(공개)에 넣지 않는다.
+- 서명: 1.4.2 까지는 디버그 키. 1.5.0 부터는 APK 를 만드는 `packageRelease`·`packageDebug` 끝에 릴리스 키(`~/Dev/pebble-desk-keys`, 저장소 밖·백업은 iCloud `PebbleDesk-서명키`)와 교체 이력(lineage, 디버그 키 → 릴리스 키)으로 v3 서명만 다시 하고(v1·v2·v4 끔), 인증서·이력이 맞는지 `apksigner verify`·`lineage` 로 확인한다(`app/build.gradle.kts`). 그래서 1.4.2 위에 덮어 깔리고, 디버그 키로만 서명한 APK 는 그 위에 깔리지 않는다. 키 폴더가 없으면 디버그 빌드는 디버그 키 그대로, 릴리스 빌드는 실패한다(`-Ppebbledesk.debugSignedRelease=true` 면 디버그 키로). assemble·install·Android Studio 실행 모두 다시 서명된 APK 를 쓴다. 키는 저장소(공개)에 넣지 않는다.
 - 앱 데이터는 **기기 보호 저장소**(`/data/user_de/0/com.woody.pebbledesk/`)에 있다(`Storage`). 홈이 잠금 해제 전에도 뜨게(directBootAware) 하려고 옮겼다.
   - DB `databases/pebble.db`(`Db`, 안드로이드 기본 SQLite, 버전 2): 읽은 시간 `reading_day`·`reading_meta`, 편 책 `book_open`, 읽고 있는 책 `shelf`, 나간 책 `past`, 완독한 날 `finish`(여러 번), 별점·감상 `review`(버전 2). 기록은 지우지 않는다.
   - 파일: 설정 `shared_prefs/home.xml`, 표지 `files/books/<id>.jpg`, 앱 목록 캐시 `files/apps.json`.
   - 1.2.1 까지의 JSON(`reading.json`·`books/books.json`)은 이 실행에서 처음 DB를 열 때 옮기고 `.migrated`로 이름을 바꿔 둔다(읽지 못하면 `.bad`). DB 확인: `adb exec-out run-as … cat …/databases/pebble.db > x.db` 후 `sqlite3`(디버그 빌드).
+- **릴리스 설명**(GitHub 릴리스 본문): 앱의 설정 › 업데이트 창에 **18줄까지** 보이고 넘으면 끝이 `…` 로 잘린다(`SettingsActivity.NOTES_LINES`). 크레마 페블에서 한 줄은 한국어 약 28자, 절 제목은 한 줄, 두 번째 절부터 위에 반 줄이 더 든다. 그래서 `## 새로 생긴 것` / `## 고친 것` 두 절, 항목(`- `)은 한두 줄짜리로 모두 합쳐 18줄 안에 쓴다(자세한 설명은 README·문서로). `**`·`` ` `` 는 앱에서 지워지니 써도 된다. 태그는 `v<판>`, 자산은 `PebbleDesk-<판>-release.apk`(APK 의 versionName 과 같아야 앱이 받는다).
 - 릴리스는 `run-as` 가 안 된다. 앱 데이터를 직접 고쳐야 하면 같은 키로 서명된 디버그 빌드를 잠깐 깔아 `run-as` 로 넣고 다시 릴리스를 깐다.
 - 성능은 꼭 **릴리스 빌드**로 잰다(디버그는 몇 배 느리다).
 
@@ -68,6 +69,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.4.2-release.apk </dev/
 | PagedRows | 스크롤 없는 페이지 목록(목록·격자, fixedRows), 높이가 제각각인 묶음을 쪽으로 나누는 `PagedBlocks`(자동 추가 안내), 쪽 표시 `pageLabel`·`pagesClick`(`Paged`) |
 | EinkActivity / Sheet / Ui / TopBarView / HomePrefs | 공통 화면(밀기·페이지 버튼·언어·밀도 맞춤)·아래 메뉴·규격(`PictureView`, 완독 도장을 찍는 줄 `StampedRow`, 기준 폭 572dp 포함)·상단·설정 저장 |
 | Device / Crema | 기기 종류(크레마·메이북·기타)와 기기마다 다른 동작(빠른 설정·조명·시스템 속성·BOOX 얼린 앱 열기) / 크레마 전용 화면 보정(대비·가려지는 아래·로고) |
+| Update | 설정 › 업데이트: GitHub 최신 릴리스 확인, APK 받기·확인(크기·SHA-256·서명 이력), 설치 세션·설치 창, 설치 뒤 홈 다시 띄우기 |
 | Storage / Db | 기기 보호 저장소와 예전 저장소에서 옮기기 / 앱 데이터 DB(SQLite)와 예전 JSON 옮기기 |
 
 ## 지금까지 정한 것(요지, 자세한 건 DESIGN.md)

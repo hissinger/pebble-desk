@@ -406,6 +406,8 @@ class ReaderWatchService : AccessibilityService() {
         super.onServiceConnected()
         recordLife(this, connected = true)
         WatchLog.connected(this)
+        // 설정 › 업데이트로 새 판이 깔린 뒤 다시 붙은 것이면 홈을 띄운다(깔린 직후의 알림에서는 막힐 때가 있다).
+        Update.reopenHomeAfterUpdate(this, fromService = true)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {

@@ -6,11 +6,15 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <!-- 지금 읽는 책: YES24 에서 책 표지 검색 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 설정 › 업데이트: 인터넷에 연결돼 있는지 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- 상태 줄: 와이파이·블루투스가 켜져 있는지 -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
+    <!-- 설정 › 업데이트: GitHub 에서 받은 새 판을 설치 창으로 깐다(사용자가 '출처를 알 수 없는 앱 설치'를 허용해야 한다) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- 오늘 읽은 시간: 이북 앱의 읽는 화면이 떠 있던 시간(사용자가 '사용 기록 액세스'에서 허용해야 한다) -->
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
@@ -103,6 +107,19 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:screenOrientation="portrait" />
+
+        <!-- 설정 › 업데이트: 설치 세션 결과(사용자 확인이 필요하면 설치 창을 띄운다) -->
+        <receiver
+            android:name=".Update$StatusReceiver"
+            android:exported="false" />
+        <!-- 새 판이 깔리면 홈을 다시 띄운다(설정에서 맡긴 설치일 때) -->
+        <receiver
+            android:name=".Update$ReplacedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- 읽는 책 자동 추가(설정 > 독서). 사용자가 안드로이드 접근성에서 켜야 동작한다. -->
         <service

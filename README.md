@@ -15,7 +15,7 @@
 
 ## 설치
 
-[Releases](https://github.com/hissinger/pebble-desk/releases)에서 `PebbleDesk-<판>-release.apk` 를 받아 기기에 복사하고 파일 관리자에서 눌러 설치한다. 덮어 설치하면 책 목록·독서 기록·설정이 그대로 남는다. 설치한 뒤 설정 > 앱 관리 > `기본 홈 앱으로 설정`에서 Pebble Desk를 홈 앱으로 고른다.
+[Releases](https://github.com/hissinger/pebble-desk/releases)에서 `PebbleDesk-<판>-release.apk` 를 받아 기기에 복사하고 파일 관리자에서 눌러 설치한다. 덮어 설치하면 책 목록·독서 기록·설정이 그대로 남는다. 1.5.0 까지는 이렇게 직접 받아 설치하고, 1.5.0 을 깐 뒤로는 설정 > 앱 관리 > `업데이트`에서 다음 판을 받아 설치할 수 있다(처음 한 번 '알 수 없는 앱 설치'를 허용). 설치한 뒤 설정 > 앱 관리 > `기본 홈 앱으로 설정`에서 Pebble Desk를 홈 앱으로 고른다.
 
 화면은 크레마 페블(폭 572dp) 기준으로 만들고, 다른 안드로이드 전자잉크 기기는 폭이 같아지도록 앱이 밀도를 맞춘다. 문제가 생기면 [문제가 생기면](docs/TROUBLESHOOTING.md)을 보고, 그래도 안 되면 설정 > `기기 정보` 화면을 사진으로 찍어 보내 주면 맞춘다.
 
