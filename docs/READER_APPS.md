@@ -17,6 +17,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 밀리의서재 휴대폰 판 `kr.co.millie.millieshelf` | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | YES24 eBook `com.yes24.ebook.fourth`(휴대폰·태블릿용) | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | 문리더 `com.flyersoft.moonreader`(내 파일, DRM 없음) | `ActivityTxt` | O (파일 위치를 알면 `ACTION_VIEW`) | O | X | 사용자가 둔 곳(공유 저장소) |
+| 킨들 `com.amazon.kindle`(휴대폰 판 하나, 한국어 없음) | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
 - 사용 기록에는 **앱·화면 이름과 시각만** 남는다. 어떤 책인지는 알 수 없다.
@@ -246,3 +247,18 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
   - 처음 열면 사용 안내 겹 화면(`viewer_guide_layout`)이 뜬다. 누르면 닫힌다.
   - 가운데를 눌러 메뉴를 띄우면 `viewer_top_booktitle` = `1984(한글판+영문판)`, `viewer_bottom_pagecount` = `0% (1/1755p)`.
 - 책 칸을 누르면 받지 않은 책은 내려받기만 하고, 받은 책은 바로 읽는 화면을 연다.
+
+### 킨들 `com.amazon.kindle` (2026-10-12, 에뮬레이터 `CremaPebble_A11` 안드로이드 11, 8.158.0.100, **지원**)
+
+e-ink 판이 따로 없다(킨들 단말기는 안드로이드가 아니다). 크레마·BOOX 에서도 Play 스토어의 이 앱 하나를 쓴다(minSdk 30). 한국어가 없어 한국어 기기에서도 화면·설명이 영어다. 로그인 전에는 서재가 비어 있다(무료 고전으로 시험).
+
+- **화면**: 첫 화면 `com.amazon.kindle.UpgradePage`(별칭) → `ThirdPartyUpgradePage` → 서재 `com.amazon.kcp.oob.MainActivity`(아래 탭 Home·Library·More, Compose). 책을 열면 `com.amazon.kindle.bookopen.content.BookOpenActivity` 를 거쳐 읽는 화면 `com.amazon.kcp.reader.StandAloneBookReaderActivity`. 그 밖의 읽는 화면 `SimplifiedStandAloneBookReaderActivity`·`StandAlonePdfReaderActivity`·`StandAloneMopReaderActivity`·`MopReaderActivity`(매니페스트).
+- **서재 칸**: 설명이 `제목, 성, 이름, , 상태, 크기`. 상태는 `Book not downloaded.` 또는 `Book downloaded.Reading is 4% completed.`, 오디오북이 딸리면 앞에 `Audible companion available `.
+  - 격자 보기·홈 탭 `From Your Library` 줄: 단추 `badgeable_cover`(설명) 안에 표지 `cover_image` 뿐. 표지 위에 진행률 띠 `top_right_badge`(`4%`)·받음 ✓ `bottom_right_badge`·오디오 `top_right_corner_badge` 를 그린다.
+  - 목록 보기: 이름 없는 단추(설명) 안에 표지 `cover_image`, 제목 `lib_book_row_title`, 저자 `lib_book_row_author`(`BRONTË, EMILY`, 대문자), 크기 `lib_book_row_file_size`, 진행률(`4%`). 표시는 표지 밖 오른쪽.
+  - 홈 탭의 추천 줄은 설명이 `제목 by 저자` 로 다르다.
+  - 칸을 누르면 `TYPE_VIEW_CLICKED` 가 오는데 요소는 단추를 감싼 묶음(`FrameLayout`, 같은 자리, 글자·설명 없음)이다. 받지 않은 책은 Library 탭에서 누르면 내려받기만 하고(다시 눌러야 열린다), 홈 탭 `From Your Library` 줄에서는 받은 뒤 바로 열었다. 받은 책은 바로 연다.
+  - 아래 탭 줄 왼쪽에 마지막으로 읽은 책의 '이어 읽기' 표지(이름 없는 요소 `[89,1297][179,1432]`, 탭 줄 위로 43px 솟음)가 늘 떠 있다. 누르면 그 책을 열고, 누름 알림은 오지 않는다.
+- **읽는 화면**: 본문·위 제목(`WUTHERING HEIGHTS`)·아래 `Learning reading speed`·`0%` 가 모두 직접 그리는 뷰(`KRFView`)라 드러나지 않는다. 가운데를 눌러 메뉴를 띄우면 제목 `command_bar_title_bottom`(`Wuthering Heights`)·진행률 `nln_text_secondary`(`Location 1 of 4559  •  0%`, 쪽이 있는 책은 `Page 15 of 325  •  4%`)·진행 막대 `krx_location_control`. 화면 캡처는 막혀 있지 않다.
+- **진행률**: 서재 칸 설명의 `Reading is 4% completed.` 는 읽는 화면을 닫고 돌아오면 바로 바뀐다.
+- **특정 책 바로 열기**: 매니페스트에 `kindle://` 링크가 있다 **(미확인)**. 내 파일(PDF·EPUB)도 `ACTION_VIEW` 로 받는다.

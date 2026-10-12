@@ -6,7 +6,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 /**
  * 이북 앱 하나(읽는 책 자동 추가 [com.woody.pebbledesk.ReaderWatchService] 가 쓴다). 화면 이름·요소 이름과, 서재 칸·누른 칸·
  * 읽는 화면을 읽는 동작을 가진다. 기본 동작은 요소 이름으로 찾는 것이고, 다르게 읽어야 하는 앱은 그 앱 파일에서 메서드를 바꾼다
- * (리디·휴대폰 밀리·e-ink 밀리·문리더). 앱이 업데이트돼 이름이 바뀌면 그 앱 파일만 고친다. 앱 목록은 [ReaderApps].
+ * (리디·휴대폰 밀리·e-ink 밀리·문리더·킨들). 앱이 업데이트돼 이름이 바뀌면 그 앱 파일만 고친다. 앱 목록은 [ReaderApps].
  */
 open class ReaderSpec(
     val pkg: String,

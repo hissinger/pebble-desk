@@ -7,9 +7,18 @@ import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.LinearLayout
 import android.widget.TextView
+
+/** 쪽으로 넘기는 것(쪽 표시 [pageLabel]·[pagesClick] 가 쓴다). [next]·[prev] 는 끝에서 멈춘다. */
+interface Paged {
+    val page: Int
+    val pageCount: Int
+    fun next()
+    fun prev()
+}
 
 /**
  * 스크롤 없이 페이지 단위로 넘기는 목록. 주어진 높이에 들어가는 만큼만 줄을 그리고, 줄 사이에 가는 회색 선을 둔다.
@@ -24,7 +33,7 @@ class PagedRows(
     private val fixedRows: Int = 0,
     private val insetDividers: Boolean = true,
     private val dividers: Boolean = true,
-) : LinearLayout(context) {
+) : LinearLayout(context), Paged {
     private var rows: List<() -> View> = emptyList()
     private val dividerPx = context.dp(1)
 
@@ -47,9 +56,9 @@ class PagedRows(
 
     var perPage = 0
         private set
-    var page = 0
+    override var page = 0
         private set
-    val pageCount: Int get() = if (perPage <= 0) 1 else maxOf(1, (rows.size + perPage - 1) / perPage)
+    override val pageCount: Int get() = if (perPage <= 0) 1 else maxOf(1, (rows.size + perPage - 1) / perPage)
 
     /** 목록 위에 함께 붙는 머리(제목·선). 들어갈 줄 수를 셀 때 그 높이를 뺀다. */
     var header: List<View> = emptyList()
@@ -80,8 +89,8 @@ class PagedRows(
     }
 
     /** 다음·앞 쪽(끝에서 멈춘다. 쪽 표시의 `‹ ›` 와 맞게 처음·끝을 돌지 않는다) */
-    fun next() = showPage(page + 1)
-    fun prev() = showPage(page - 1)
+    override fun next() = showPage(page + 1)
+    override fun prev() = showPage(page - 1)
 
     /** [index] 번째 줄이 있는 페이지 */
     fun pageOf(index: Int) = if (perPage <= 0) 0 else index / perPage
@@ -121,23 +130,8 @@ class PagedRows(
         return true
     }
 
-    /**
-     * 머리 뷰 높이 합. 실제 배치와 같은 조건(정해진 높이·좌우 여백)으로 잰다. 레이아웃 중에 다른 조건으로 재면
-     * 그 값이 그대로 남아 선(높이 2dp)이 0 으로 그려진다.
-     */
-    private fun headerHeight(): Int = header.sumOf { v ->
-        val m = v.layoutParams as? MarginLayoutParams
-        val lpW = v.layoutParams?.width ?: MATCH
-        val lpH = v.layoutParams?.height ?: WRAP
-        val wSpec = getChildMeasureSpec(
-            MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
-            paddingLeft + paddingRight + (m?.leftMargin ?: 0) + (m?.rightMargin ?: 0), lpW,
-        )
-        val hSpec = if (lpH >= 0) MeasureSpec.makeMeasureSpec(lpH, MeasureSpec.EXACTLY)
-        else MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-        v.measure(wSpec, hSpec)
-        v.measuredHeight + (m?.topMargin ?: 0) + (m?.bottomMargin ?: 0)
-    }
+    /** 머리 뷰 높이 합([measuredHeightIn]) */
+    private fun headerHeight(): Int = header.sumOf { measuredHeightIn(it) }
 
     private var renderPending = false
 
@@ -145,14 +139,7 @@ class PagedRows(
     private fun renderBeforeDraw() {
         if (renderPending) return
         renderPending = true
-        viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
-            override fun onPreDraw(): Boolean {
-                viewTreeObserver.removeOnPreDrawListener(this)
-                renderPending = false
-                render()
-                return false
-            }
-        })
+        beforeNextDraw { renderPending = false; render() }
     }
 
     private fun render() {
@@ -180,10 +167,114 @@ class PagedRows(
 }
 
 /**
+ * 높이가 제각각인 묶음(단락·제목·항목)을 스크롤 없이 쪽으로 나눠 보여 준다. 묶음은 쪼개지 않고 들어가는 만큼 한 쪽에 담으며,
+ * [Block.newPage] 인 묶음은 새 쪽에서 시작한다. 높이를 알게 되면 그리기 직전에 나눈다([PagedRows] 와 같이 빈 화면을 한 번 그리지 않게).
+ */
+class PagedBlocks(context: Context) : LinearLayout(context), Paged {
+    class Block(val views: List<View>, val newPage: Boolean = false)
+
+    private var blocks: List<Block> = emptyList()
+    /** 쪽마다 담을 묶음. 높이를 모르면 비어 있다. */
+    private var pages: List<List<Block>> = emptyList()
+    private var splitPending = false
+
+    override var page = 0
+        private set
+    override val pageCount: Int get() = maxOf(1, pages.size)
+
+    /** 쪽이나 쪽 수가 바뀌면 불린다(쪽 번호 갱신용). */
+    var onPageChanged: (() -> Unit)? = null
+
+    init {
+        orientation = VERTICAL
+    }
+
+    /** 묶음을 바꾼다(보던 쪽은 남는 데까지 그대로) */
+    fun setBlocks(blocks: List<Block>) {
+        this.blocks = blocks
+        if (height > 0) split(height)
+    }
+
+    private fun showPage(p: Int) {
+        val target = p.coerceIn(0, pageCount - 1)
+        if (target == page) return
+        page = target
+        render()
+    }
+
+    override fun next() = showPage(page + 1)
+    override fun prev() = showPage(page - 1)
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        // 레이아웃 중에는 자식을 바꾸지 않고 그리기 직전에 나눈다.
+        if (h > 0 && !splitPending) {
+            splitPending = true
+            beforeNextDraw { splitPending = false; split(height) }
+        }
+    }
+
+    /** 높이 [h] 에 맞춰 쪽을 나누고 지금 쪽을 그린다 */
+    private fun split(h: Int) {
+        val out = mutableListOf<MutableList<Block>>()
+        var used = 0
+        for (b in blocks) {
+            val bh = b.views.sumOf { measuredHeightIn(it) }
+            val cur = out.lastOrNull()
+            if (cur == null || (cur.isNotEmpty() && (b.newPage || used + bh > h))) {
+                out += mutableListOf(b)
+                used = bh
+            } else {
+                cur += b
+                used += bh
+            }
+        }
+        pages = out
+        page = page.coerceIn(0, pageCount - 1)
+        render()
+    }
+
+    private fun render() {
+        removeAllViews()
+        pages.getOrNull(page)?.forEach { b -> b.views.forEach(::addView) }
+        onPageChanged?.invoke()
+    }
+}
+
+/**
+ * [v] 를 이 묶음에 넣었을 때의 높이(위아래 여백 포함). 실제 배치와 같은 조건(정해진 높이·좌우 여백)으로 잰다.
+ * 레이아웃 중에 다른 조건으로 재면 그 값이 그대로 남아 선(높이 2dp)이 0 으로 그려진다.
+ */
+private fun LinearLayout.measuredHeightIn(v: View): Int {
+    val m = v.layoutParams as? ViewGroup.MarginLayoutParams
+    val lpW = v.layoutParams?.width ?: MATCH
+    val lpH = v.layoutParams?.height ?: WRAP
+    val wSpec = ViewGroup.getChildMeasureSpec(
+        View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+        paddingLeft + paddingRight + (m?.leftMargin ?: 0) + (m?.rightMargin ?: 0), lpW,
+    )
+    val hSpec = if (lpH >= 0) View.MeasureSpec.makeMeasureSpec(lpH, View.MeasureSpec.EXACTLY)
+    else View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+    v.measure(wSpec, hSpec)
+    return v.measuredHeight + (m?.topMargin ?: 0) + (m?.bottomMargin ?: 0)
+}
+
+/** 다음 그리기를 건너뛰고 [action] 을 한 뒤 다시 레이아웃해서 그린다 */
+private fun View.beforeNextDraw(action: () -> Unit) {
+    viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+        override fun onPreDraw(): Boolean {
+            viewTreeObserver.removeOnPreDrawListener(this)
+            action()
+            return false
+        }
+    })
+}
+
+/**
  * 쪽 표시 `‹   2 / 3   ›`: 갈 수 있는 쪽 화살표는 글자색 그대로, 갈 수 없는 쪽(첫 쪽의 `‹`, 끝 쪽의 `›`)은 흐리게
  * (독서 기록 달력의 `‹ ›` 처럼). 숫자 자리는 쪽마다 그대로다. 한 쪽뿐이면 빈 글자.
  */
-fun pageLabel(rows: PagedRows): CharSequence {
+fun pageLabel(rows: Paged): CharSequence {
     if (rows.pageCount <= 1) return ""
     fun arrow(s: String, on: Boolean) = SpannableString(s).apply {
         if (!on) setSpan(ForegroundColorSpan(Ui.DIVIDER), 0, s.length, 0)
@@ -199,11 +290,11 @@ fun pageLabel(rows: PagedRows): CharSequence {
  * 손가락 위치 없이 눌리면(다른 곳을 눌러 대신 누를 때) 다음 쪽, 끝이면 앞 쪽.
  */
 @SuppressLint("ClickableViewAccessibility")
-fun TextView.pagesClick(rows: PagedRows) = pagesClick { rows }
+fun TextView.pagesClick(rows: Paged) = pagesClick { rows }
 
 /** [pagesClick] 를 누를 때마다 [current] 로 지금 보이는 목록에(목록·격자를 바꾸는 화면) */
 @SuppressLint("ClickableViewAccessibility")
-fun TextView.pagesClick(current: () -> PagedRows) {
+fun TextView.pagesClick(current: () -> Paged) {
     var downX = -1f
     // 밀기로 취소되면 위치를 지운다(남아 있으면 제목 줄로 대신 누를 때 그 위치로 방향을 정한다).
     setOnTouchListener { _, e ->

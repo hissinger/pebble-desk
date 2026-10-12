@@ -59,12 +59,12 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.4.2-release.apk </dev/
 | Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간을 책별로 계산(편 책 `book_open`), DB `reading_day` 저장, 연속일 |
 | ReaderWatch | `ReaderWatchService`(접근성): 이북 앱 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기 |
 | WatchLog / WatchLogActivity | 자동 추가 서비스가 받은 알림·한 일 기록(최근 60줄 + 앱별 알림 수) / 기기 정보 › `기록 보기 ›` 화면(쪽 없이 한 화면, 사진으로 받는다) |
-| readers/ | 이북 앱마다 파일 하나(`KyoboLibrary`·`KyoboEbook`(e-ink)·`KyoboEbookMobile`(휴대폰)·`Millie`(e-ink)·`MillieMobile`(휴대폰)·`Aladin`·`Bookers`·`Ridi`·`Yes24Library`·`Yes24Ebook`·`MyYes`·`MoonReader`). 바탕 `ReaderSpec` 이 요소 이름으로 서재 칸·누른 칸·읽는 화면을 읽고, 다르게 읽어야 하는 앱은 그 앱 파일에서 메서드를 바꾼다(리디·휴대폰 밀리 서재, e-ink 밀리 검색 상세, 문리더 제목). 서비스는 앱 종류로 갈라지지 않는다. 공통 도구 `Nodes`, 앱 목록 `ReaderApps`(이북 앱 패키지·읽는 화면도 여기서). 앱을 더하면 `res/xml/reader_watch.xml` 의 packageNames 도 |
+| readers/ | 이북 앱마다 파일 하나(`KyoboLibrary`·`KyoboEbook`(e-ink)·`KyoboEbookMobile`(휴대폰)·`Millie`(e-ink)·`MillieMobile`(휴대폰)·`Aladin`·`Bookers`·`Ridi`·`Yes24Library`·`Yes24Ebook`·`MyYes`·`MoonReader`·`Kindle`). 바탕 `ReaderSpec` 이 요소 이름으로 서재 칸·누른 칸·읽는 화면을 읽고, 다르게 읽어야 하는 앱은 그 앱 파일에서 메서드를 바꾼다(리디·휴대폰 밀리 서재, e-ink 밀리 검색 상세, 문리더 제목, 킨들 서재 칸 설명). 서비스는 앱 종류로 갈라지지 않는다. 공통 도구 `Nodes`, 앱 목록 `ReaderApps`(이북 앱 패키지·읽는 화면도 여기서). 앱을 더하면 `res/xml/reader_watch.xml` 의 packageNames 도 |
 | Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 10권, 홈에는 4권, YES24 표지 검색)과 나간 책(완독·뺀 책, `BookShelf.history`), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
 | AppListActivity / FavoritesActivity / SettingsActivity / DeviceInfoActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 / 기기 정보(사진으로 찍어 보내는 진단 화면: 속성·권한·자동 추가 서비스 기록·누른 키·시스템 화면 시험) |
 | OnboardingActivity | ⑭ 시작하기: 처음 한 번, 읽는 책 자동 추가·오늘 읽은 시간을 설명하고 켜게 한다(안드로이드 13+ 제한된 설정 안내 포함) |
-| PagedRows | 스크롤 없는 페이지 목록(목록·격자, fixedRows) |
+| PagedRows | 스크롤 없는 페이지 목록(목록·격자, fixedRows), 높이가 제각각인 묶음을 쪽으로 나누는 `PagedBlocks`(자동 추가 안내), 쪽 표시 `pageLabel`·`pagesClick`(`Paged`) |
 | EinkActivity / Sheet / Ui / TopBarView / HomePrefs | 공통 화면(밀기·페이지 버튼·언어·밀도 맞춤)·아래 메뉴·규격(`PictureView`, 완독 도장을 찍는 줄 `StampedRow`, 기준 폭 572dp 포함)·상단·설정 저장 |
 | Device / Crema | 기기 종류(크레마·메이북·기타)와 기기마다 다른 동작(빠른 설정·조명·시스템 속성·BOOX 얼린 앱 열기) / 크레마 전용 화면 보정(대비·가려지는 아래·로고) |
 | Storage / Db | 기기 보호 저장소와 예전 저장소에서 옮기기 / 앱 데이터 DB(SQLite)와 예전 JSON 옮기기 |

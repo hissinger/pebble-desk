@@ -132,7 +132,7 @@
     <string name="review_text_hint">감상이나 나에게 남은 한 문장을 적어 두세요</string>
     <string name="review_add">별점·감상 남기기 ›</string>
     <string name="review_edit">고치기 ›</string>
-    <string name="books_more">%1$s 외 %2$d권</string>
+    <string name="books_more">외 %d권</string>
     <string name="books_empty">읽고 있는 책이 없습니다</string>
     <string name="books_empty_desc">책 추가에서 표지를 찾아 넣으세요. 홈에 크게 보입니다.</string>
     <string name="add_book_link">책 추가  ›</string>
@@ -180,7 +180,7 @@
     <string name="reading_settings">독서</string>
     <string name="auto_books">읽는 책 자동 추가</string>
     <string name="auto_books_short">자동 추가</string>
-    <string name="auto_books_desc">교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES·eBook)·문리더에서 책을 펴면 그 책을 읽고 있는 책 맨 위에 넣습니다. 서재·검색 화면의 책 제목·저자·진행률·반납일과 표지, 읽는 화면의 책 제목·진행률만 읽고 본문과 다른 앱 화면은 보지 않습니다. 안드로이드 접근성에서 Pebble Desk 를 켜 주세요.</string>
+    <string name="auto_books_desc">교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES·eBook)·문리더·킨들에서 책을 펴면 그 책을 읽고 있는 책 맨 위에 넣습니다. 서재·검색 화면의 책 제목·저자·진행률·반납일과 표지, 읽는 화면의 책 제목·진행률만 읽고 본문과 다른 앱 화면은 보지 않습니다. 안드로이드 접근성에서 Pebble Desk 를 켜 주세요.</string>
     <string name="open_accessibility">접근성 설정 열기</string>
     <string name="progress_pct">%1$d%% 읽음</string>
     <string name="due_days">반납 %1$d일 남음</string>
@@ -208,13 +208,15 @@
     <string name="guide_yes24ebook">YES24 eBook</string>
     <string name="guide_moon">문리더</string>
     <string name="guide_moon_desc">홈 탭의 최근 목록 표지로 열면 읽다가 메뉴를 띄워야 책이 추가됩니다.</string>
+    <string name="guide_kindle">킨들</string>
+    <string name="guide_kindle_desc">받지 않았던 책과 읽는 중 진행률은 메뉴를 띄워야 들어옵니다.\n격자 보기 서재에서는 읽은 책의 표지를 가져오지 못해 목록 보기 서재를 한 번 열어야 합니다.</string>
     <string name="guide_progress_note">읽는 중 진행률은 이북 앱 뷰어 설정에서 화면 아래 정보(쪽·진행률) 표시를 켜 두면 들어옵니다.</string>
     <string name="guide_cover_note">표지는 서재 화면의 표지를 잘라 옵니다. 제목이 잘리거나 다르면 홈에서 책을 길게 눌러 고치세요. 저자도 같은 메뉴에서 넣거나 고칠 수 있습니다.</string>
     <string name="edit_title">제목 고치기</string>
     <string name="add_author">저자 입력</string>
     <string name="edit_author">저자 고치기</string>
     <string name="save">저장</string>
-    <string name="reader_watch_desc">교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES·eBook)·문리더 서재·검색 화면의 책 제목·저자·진행률·반납일과 표지, 읽는 화면의 책 제목·진행률만 읽어 읽고 있는 책 목록에 넣습니다. 본문과 다른 앱 화면은 받지 않고, 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
+    <string name="reader_watch_desc">교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES·eBook)·문리더·킨들 서재·검색 화면의 책 제목·저자·진행률·반납일과 표지, 읽는 화면의 책 제목·진행률만 읽어 읽고 있는 책 목록에 넣습니다. 본문과 다른 앱 화면은 받지 않고, 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
     <string name="open_app_info">앱 정보 열기</string>
     <string name="allow_hint">허용(allow)이 보이지 않으면 아래 단축키·바로가기(shortcut) 스위치를 켜세요.</string>
     <string name="restricted_hint">접근성에서 Pebble Desk 가 흐리게 막혀 있으면(제한된 설정) 먼저 그것을 한 번 눌러 안내 창을 닫은 뒤, 앱 정보 › 오른쪽 위 ⋮ › 제한된 설정 허용을 하고 다시 켜 주세요.</string>

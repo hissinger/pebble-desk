@@ -13,6 +13,8 @@ import java.time.format.TextStyle
 /** ⑧ 설정. 회색 소제목으로 묶고 값은 오른쪽에 같은 굵기로 쓴다. 켜짐은 검정, 꺼짐은 진회색, `›` 는 다음 화면. */
 class SettingsActivity : EinkActivity() {
     private lateinit var list: LinearLayout
+    /** 자동 추가 안내의 쪽들(그 화면에서만) */
+    private lateinit var guide: PagedBlocks
     /** 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]) */
     private val page by lazy { intent.getStringExtra(EXTRA_PAGE) }
 
@@ -24,10 +26,21 @@ class SettingsActivity : EinkActivity() {
             PAGE_READING -> R.string.reading_settings
             else -> R.string.settings
         }
-        root.addView(titleRow(getString(title)) { finish() })
+        val titleRow = titleRow(getString(title)) { finish() }
+        root.addView(titleRow)
         root.addView(hline(2))
-        list = vbox()
-        root.addView(list, lp(MATCH, 0, 1f))
+        if (page == PAGE_GUIDE) {
+            // 한 화면에 다 들어가지 않아 쪽으로 나눈다. 쪽 표시 `‹ 1 / 2 ›` 는 제목 줄 오른쪽 끝(아래 줄이 없는 화면).
+            guide = PagedBlocks(this)
+            val guidePage = text("", 21f).apply { setPadding(dp(24), dp(12), 0, dp(12)); pagesClick(guide) }
+            titleRow.addView(View(this), lp(0, 1, 1f))
+            titleRow.addView(guidePage)
+            guide.onPageChanged = { guidePage.text = pageLabel(guide) }
+            root.addView(guide, lp(MATCH, 0, 1f))
+        } else {
+            list = vbox()
+            root.addView(list, lp(MATCH, 0, 1f))
+        }
         if (page == null) root.addView(text("Pebble Desk ${appVersion()}", 15f, color = Ui.LIGHT_GRAY).apply {
             gravity = Gravity.CENTER
         }, lp(MATCH, dp(44)))
@@ -50,12 +63,10 @@ class SettingsActivity : EinkActivity() {
         // 읽고 있는 앱은 책을 정할 때 함께 고른다(책 없이 바꾸려면 앱을 길게 눌러 '읽고 있는 앱으로 설정').
         section(getString(R.string.section_home))
         val books = BookShelf.list(this)
-        val booksText = when (books.size) {
-            0 -> getString(R.string.none)
-            1 -> books[0].title
-            else -> getString(R.string.books_more, books[0].title, books.size - 1)
-        }
-        row(getString(R.string.now_reading), booksText, on = books.isNotEmpty(), next = true) {
+        // 맨 앞 책 제목이 길면 줄임표로 자르고 `외 3권` 은 늘 보인다.
+        val booksText = books.firstOrNull()?.title ?: getString(R.string.none)
+        val booksTail = if (books.size > 1) getString(R.string.books_more, books.size - 1) else null
+        row(getString(R.string.now_reading), booksText, on = books.isNotEmpty(), next = true, tail = booksTail) {
             startActivity(BooksActivity.intent(this))
         }
         row(getString(R.string.favorites), prefs.favoriteList.size.toString(), next = true) {
@@ -159,18 +170,15 @@ class SettingsActivity : EinkActivity() {
             }.show()
     }
 
-    /** 자동 추가 안내: 공통 안내 한 단락, 앱마다 이름과 한 줄 설명, 표지·제목 안내 */
+    /**
+     * 자동 추가 안내(두 쪽): 1쪽은 앱마다 공통인 안내(읽는 방식, 진행률, 표지·제목)와 지원하는 앱 이름,
+     * 2쪽은 안 되는 게 있는 앱만 이름과 설명. 2쪽에 다 들어가지 않으면 다음 쪽으로 이어진다.
+     */
     private fun renderGuide() {
-        list.removeAllViews()
-        fun para(res: Int, top: Int, bottom: Int) = list.addView(text(getString(res), 17f, color = Ui.BLACK, lines = 6).apply {
+        fun para(res: Int, top: Int, bottom: Int) = text(getString(res), 17f, color = Ui.BLACK, lines = 6).apply {
             setLineSpacing(0f, 1.2f)
             setPadding(dp(Ui.MARGIN), dp(top), dp(Ui.MARGIN), dp(bottom))
-        })
-        // 앱마다 공통인 것(읽는 방식, 진행률, 표지·제목)을 먼저
-        para(R.string.guide_intro, 12, 4)
-        para(R.string.guide_progress_note, 4, 4)
-        para(R.string.guide_cover_note, 4, 12)
-        // 지원하는 앱 이름을 한 단락으로, 그 아래 안 되는 게 있는 앱만 설명
+        }
         val apps = listOf(
             R.string.guide_kel to R.string.guide_kel_desc,
             R.string.guide_kyobo to R.string.guide_kyobo_desc,
@@ -183,22 +191,40 @@ class SettingsActivity : EinkActivity() {
             R.string.guide_myyes to R.string.guide_myyes_desc,
             R.string.guide_yes24ebook to null,
             R.string.guide_moon to R.string.guide_moon_desc,
+            R.string.guide_kindle to R.string.guide_kindle_desc,
         )
-        section(getString(R.string.guide_apps))
-        list.addView(text(apps.joinToString("  ·  ") { getString(it.first) }, 18f, Ui.bold, lines = 3).apply {
-            setLineSpacing(0f, 1.2f)
-            setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(10))
-        })
-        section(getString(R.string.guide_limits))
-        for ((name, desc) in apps) {
-            if (desc == null) continue
-            list.addView(hline(1, Ui.DIVIDER))
-            list.addView(text(getString(name), 19f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), 0) })
-            list.addView(text(getString(desc), 17f, color = Ui.GRAY, lines = 3).apply {
+        val blocks = mutableListOf(
+            PagedBlocks.Block(listOf(para(R.string.guide_intro, 12, 4))),
+            PagedBlocks.Block(listOf(para(R.string.guide_progress_note, 4, 4))),
+            PagedBlocks.Block(listOf(para(R.string.guide_cover_note, 4, 12))),
+            PagedBlocks.Block(listOf(
+                sectionView(getString(R.string.guide_apps)),
+                text(apps.joinToString("  ·  ") { getString(it.first) }, 18f, Ui.bold, lines = 3).apply {
+                    setLineSpacing(0f, 1.2f)
+                    setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(10))
+                },
+            )),
+        )
+        // 안 되는 게 있는 앱: 앱 하나가 한 묶음(위 선·이름·설명). 소제목은 첫 앱과 함께 새 쪽에서, 마지막 앱 아래에 선.
+        val limited = apps.mapNotNull { (name, desc) -> desc?.let { name to it } }
+        limited.forEachIndexed { i, (name, desc) ->
+            val views = mutableListOf<View>()
+            if (i == 0) views += sectionView(getString(R.string.guide_limits))
+            views += hline(1, Ui.DIVIDER)
+            views += text(getString(name), 19f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), 0) }
+            views += text(getString(desc), 17f, color = Ui.GRAY, lines = 3).apply {
                 setPadding(dp(Ui.MARGIN), dp(2), dp(Ui.MARGIN), dp(8))
-            })
+            }
+            if (i == limited.lastIndex) views += hline(1, Ui.DIVIDER)
+            blocks += PagedBlocks.Block(views, newPage = i == 0)
         }
-        list.addView(hline(1, Ui.DIVIDER))
+        guide.setBlocks(blocks)
+    }
+
+    override fun onSwipe(toLeft: Boolean): Boolean {
+        if (page != PAGE_GUIDE || guide.pageCount <= 1) return false
+        if (toLeft) guide.next() else guide.prev()
+        return true
     }
 
     /**
@@ -215,24 +241,32 @@ class SettingsActivity : EinkActivity() {
         sheet.show()
     }
 
-    private fun section(title: String) {
-        list.addView(text(title, 16f, color = Ui.LIGHT_GRAY).apply {
-            setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), dp(2))
-        })
+    private fun section(title: String) = list.addView(sectionView(title))
+
+    private fun sectionView(title: String) = text(title, 16f, color = Ui.LIGHT_GRAY).apply {
+        setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), dp(2))
     }
 
-    /** 설정 한 줄. [hint] 는 이름 뒤에 작은 회색 글자로 붙는 보조 설명. 값은 같은 굵기로, 꺼짐은 진회색. */
+    /**
+     * 설정 한 줄. [hint] 는 이름 뒤에 작은 회색 글자로 붙는 보조 설명. 값은 같은 굵기로, 꺼짐은 진회색.
+     * 값은 이름 뒤 남는 폭만큼 오른쪽에 붙여 보이고 넘치면 줄임표로 자른다. [tail](`외 3권`)과 `›` 는 자르지 않는다.
+     */
     private fun row(
         label: String, value: String?, on: Boolean = true, next: Boolean = false, last: Boolean = false,
-        hint: String? = null, action: () -> Unit,
+        hint: String? = null, tail: String? = null, action: () -> Unit,
     ) {
+        val color = if (on) Ui.BLACK else Ui.GRAY
         val row = hbox().apply {
             setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
             addView(text(label, 22f))
             if (hint != null) addView(text(hint, 15f, color = Ui.LIGHT_GRAY), lp(WRAP, WRAP).apply { marginStart = dp(10) })
-            addView(View(context), lp(0, 1, 1f))
-            val shown = listOfNotNull(value, if (next) "›" else null).joinToString("  ")
-            if (shown.isNotEmpty()) addView(text(shown, 20f, Ui.medium, if (on) Ui.BLACK else Ui.GRAY))
+            addView(text(value.orEmpty(), 20f, Ui.medium, color).apply { gravity = Gravity.END }, lp(0, WRAP, 1f).apply { marginStart = dp(16) })
+            // 값과의 사이는 전과 같은 글자 간격(`외 3권` 앞 한 칸, `›` 앞 두 칸)
+            val end = buildString {
+                tail?.let { append(if (value.isNullOrEmpty()) it else " $it") }
+                if (next) append(if (isEmpty() && value.isNullOrEmpty()) "›" else "  ›")
+            }
+            if (end.isNotEmpty()) addView(text(end, 20f, Ui.medium, color))
             setOnClickListener { action() }
         }
         list.addView(row, lp(MATCH, dp(45)))
