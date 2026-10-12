@@ -8,3 +8,9 @@ local.properties
 *.apk
 design-*.svg
 design-review/
+
+# 서명 키(공개 저장소라 올리지 않는다)
+*.jks
+*.keystore
+*.lineage
+keystore.properties

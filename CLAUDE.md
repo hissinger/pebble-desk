@@ -15,7 +15,8 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 adb install -r app/build/outputs/apk/release/PebbleDesk-1.4.2-release.apk </dev/null
 ```
 
-- 릴리스는 R8 축소(약 235KB, HTML 라이브러리 없이 YES24 검색 결과를 직접 읽는다)이고 디버그 키로 서명한다. 덮어 설치하면 앱 데이터가 남는다.
+- 릴리스는 R8 축소(약 235KB, HTML 라이브러리 없이 YES24 검색 결과를 직접 읽는다). 덮어 설치하면 앱 데이터가 남는다.
+- 서명: 1.4.2 까지는 디버그 키. 그 뒤로는 APK 를 만드는 `packageRelease`·`packageDebug` 끝에 릴리스 키(`~/Dev/pebble-desk-keys`, 저장소 밖·백업은 iCloud `PebbleDesk-서명키`)와 교체 이력(lineage, 디버그 키 → 릴리스 키)으로 v3 서명만 다시 하고(v1·v2·v4 끔), 인증서·이력이 맞는지 `apksigner verify`·`lineage` 로 확인한다(`app/build.gradle.kts`). 그래서 1.4.2 위에 덮어 깔리고, 디버그 키로만 서명한 APK 는 그 위에 깔리지 않는다. 키 폴더가 없으면 디버그 빌드는 디버그 키 그대로, 릴리스 빌드는 실패한다(`-Ppebbledesk.debugSignedRelease=true` 면 디버그 키로). assemble·install·Android Studio 실행 모두 다시 서명된 APK 를 쓴다. 키는 저장소(공개)에 넣지 않는다.
 - 앱 데이터는 **기기 보호 저장소**(`/data/user_de/0/com.woody.pebbledesk/`)에 있다(`Storage`). 홈이 잠금 해제 전에도 뜨게(directBootAware) 하려고 옮겼다.
   - DB `databases/pebble.db`(`Db`, 안드로이드 기본 SQLite, 버전 2): 읽은 시간 `reading_day`·`reading_meta`, 편 책 `book_open`, 읽고 있는 책 `shelf`, 나간 책 `past`, 완독한 날 `finish`(여러 번), 별점·감상 `review`(버전 2). 기록은 지우지 않는다.
   - 파일: 설정 `shared_prefs/home.xml`, 표지 `files/books/<id>.jpg`, 앱 목록 캐시 `files/apps.json`.
