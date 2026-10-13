@@ -52,6 +52,16 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("clock_24h", true)
         set(v) = sp.edit().putBoolean("clock_24h", v).apply()
 
+    /** 글자 크기(%): [TEXT_SCALES] 중 하나. 앱 전체 글자에 곱한다([Ui.textScale]). */
+    var textScalePercent: Int
+        get() = percent(sp, KEY_TEXT_SCALE, TEXT_SCALES)
+        set(v) = sp.edit().putInt(KEY_TEXT_SCALE, v).apply()
+
+    /** 줄 간격(%): [ROW_SCALES] 중 하나. 목록·메뉴 줄 높이에 곱한다([Ui.rowScale]). */
+    var rowScalePercent: Int
+        get() = percent(sp, KEY_ROW_SCALE, ROW_SCALES)
+        set(v) = sp.edit().putInt(KEY_ROW_SCALE, v).apply()
+
     /** 앱 전체(시계·날짜 포함)를 영어로. false 면 한국어 */
     var english: Boolean
         get() = sp.getBoolean(KEY_ENGLISH, false)
@@ -145,6 +155,21 @@ class HomePrefs(context: Context) {
     companion object {
         const val FILE = "home"
         private const val KEY_ENGLISH = "english"
+        private const val KEY_TEXT_SCALE = "text_scale"
+        private const val KEY_ROW_SCALE = "row_scale"
+
+        /** 설정 › 글자 · 간격의 단계(%): 글자 크기는 70~150(기기 글꼴 크기에 곱한다), 줄 간격은 80~150, 10% 씩 */
+        val TEXT_SCALES = (70..150 step 10).toList()
+        val ROW_SCALES = (80..150 step 10).toList()
+
+        private fun percent(sp: android.content.SharedPreferences, key: String, steps: List<Int>) =
+            sp.getInt(key, 100).takeIf { it in steps } ?: 100
+
+        private fun prefs(context: Context) = Storage.of(context).getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+        /** 화면을 만들기 전에(attachBaseContext) 글자 크기·줄 간격을 정하려고 쓴다. */
+        fun textScalePercent(context: Context) = percent(prefs(context), KEY_TEXT_SCALE, TEXT_SCALES)
+        fun rowScalePercent(context: Context) = percent(prefs(context), KEY_ROW_SCALE, ROW_SCALES)
 
         /** 화면을 만들기 전에(attachBaseContext) 언어를 정하려고 쓴다. */
         fun isEnglish(context: Context) =

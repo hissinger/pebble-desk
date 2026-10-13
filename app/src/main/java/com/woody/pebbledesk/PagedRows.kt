@@ -259,11 +259,18 @@ private fun LinearLayout.measuredHeightIn(v: View): Int {
     return v.measuredHeight + (m?.topMargin ?: 0) + (m?.bottomMargin ?: 0)
 }
 
-/** 다음 그리기를 건너뛰고 [action] 을 한 뒤 다시 레이아웃해서 그린다 */
+/**
+ * 다음 그리기를 건너뛰고 [action] 을 한 뒤 다시 레이아웃해서 그린다.
+ * 그 사이 이 목록이 화면에서 떨어졌으면(화면을 새로 만들었으면) 할 일 없이 그리게 둔다. 떨어진 뷰의 viewTreeObserver 는
+ * 화면 것이 아니어서 거기서 지우면 리스너가 남아 그리기를 계속 건너뛴다(독서 기록이 검게 멈췄다). 그래서 건 관찰자에서 지운다.
+ */
 private fun View.beforeNextDraw(action: () -> Unit) {
-    viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+    val observer = viewTreeObserver
+    observer.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
         override fun onPreDraw(): Boolean {
-            viewTreeObserver.removeOnPreDrawListener(this)
+            if (observer.isAlive) observer.removeOnPreDrawListener(this)
+            if (viewTreeObserver.isAlive) viewTreeObserver.removeOnPreDrawListener(this)
+            if (!isAttachedToWindow) return true
             action()
             return false
         }

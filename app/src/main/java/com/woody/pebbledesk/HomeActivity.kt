@@ -170,7 +170,7 @@ class HomeActivity : EinkActivity() {
             addView(favPage, lp(WRAP, WRAP))
         }
         favLine = hline(1)
-        favRows = PagedRows(this, dp(Ui.ROW_DP), fixedRows = FAV_ROWS).apply { header = listOf(favHeader, favLine) }
+        favRows = PagedRows(this, rowDp(Ui.ROW_DP), fixedRows = FAV_ROWS).apply { header = listOf(favHeader, favLine) }
         favPage.pagesClick(favRows)
         root.addView(favRows, lp(MATCH, WRAP))
 
@@ -249,7 +249,8 @@ class HomeActivity : EinkActivity() {
         // 함께 읽는 책 줄과 같은 칸(좌우 여백 + 칸 사이 간격)으로 나누고, 칸마다 아이콘과 이름을 가운데에 맞춘다.
         gravity = Gravity.TOP
         setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), 0)
-        val icon = (favRows.rowHeightPx - dp(GRID_LABEL_DP)).coerceIn(dp(32), dp(GRID_ICON_MAX_DP))
+        // 이름 칸은 글자를 키운 만큼 높이고(두 줄 이름이 잘리지 않게) 그만큼 아이콘을 줄인다.
+        val icon = (favRows.rowHeightPx - dp(GRID_LABEL_DP * Ui.textGrow)).coerceIn(dp(32), dp(GRID_ICON_MAX_DP))
         line.forEachIndexed { i, app ->
             addView(vbox().apply {
                 gravity = Gravity.CENTER_HORIZONTAL
@@ -390,7 +391,9 @@ class HomeActivity : EinkActivity() {
         val coverH = coverW * 3 / 2
         addView(coverView(book, coverW), lp(coverW + dp(2), coverH + dp(2)))
         val info = vbox()
-        info.addView(text(book.title, 34f, Ui.heavy, lines = 2), lp(MATCH, WRAP).apply { topMargin = dp(10) })
+        // 글자를 키웠을 때 긴 제목이 두 줄에서 잘리지 않게 줄인다(옆 칸 폭: 화면 − 좌우 여백 − 표지 − 사이).
+        val infoW = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - (coverW + dp(2)) - dp(24)
+        info.addView(text(book.title, 34f, Ui.heavy, lines = 2).apply { fitLines(34f, infoW) }, lp(MATCH, WRAP).apply { topMargin = dp(10) })
         if (book.author.isNotBlank()) {
             info.addView(text(book.author, 16f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(10) })
         }
@@ -411,10 +414,13 @@ class HomeActivity : EinkActivity() {
         setOnLongClickListener { showBookMenu(book); true }
     }
 
-    /** 함께 읽는 책: 작은 표지 옆에 제목과 그 책의 앱. 누르면 맨 앞으로 올리고 그 앱을 연다. */
-    private fun smallBook(book: ShelfBook): View = hbox().apply {
-        gravity = Gravity.TOP
-        val w = dp(SMALL_COVER_DP)
+    /**
+     * 함께 읽는 책: 작은 표지 옆에 제목과 그 책의 앱. 누르면 맨 앞으로 올리고 그 앱을 연다.
+     * 바형 화면([Ui.tallScreen])은 세로가 남아 표지를 두 배로 키우고, 옆에 자리가 없어 글자는 표지 아래에 둔다(표지·글자 모두 칸 가운데, 올해 읽은 책 격자처럼).
+     */
+    private fun smallBook(book: ShelfBook): View = (if (Ui.tallScreen) vbox() else hbox()).apply {
+        gravity = if (Ui.tallScreen) Gravity.CENTER_HORIZONTAL else Gravity.TOP
+        val w = dp(if (Ui.tallScreen) SMALL_COVER_DP * 2 else SMALL_COVER_DP)
         addView(coverView(book, w), lp(w + dp(2), w * 3 / 2 + dp(2)))
         val info = vbox()
         info.addView(text(book.title, 16f, Ui.bold, lines = 2))
@@ -422,7 +428,11 @@ class HomeActivity : EinkActivity() {
             info.addView(text(it.label, 13f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = dp(4) })
         }
         bookStatus(book).forEach { info.addView(text(it, 12f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = dp(2) }) }
-        addView(info, lp(0, WRAP, 1f).apply { marginStart = dp(10) })
+        if (Ui.tallScreen) addView(info.apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            for (i in 0 until childCount) (getChildAt(i) as? TextView)?.gravity = Gravity.CENTER_HORIZONTAL
+        }, lp(MATCH, WRAP).apply { topMargin = dp(10) })
+        else addView(info, lp(0, WRAP, 1f).apply { marginStart = dp(10) })
         setOnClickListener {
             BookShelf.moveToFront(this@HomeActivity, book.id)
             openBook(book)

@@ -68,8 +68,9 @@ class YearBooksActivity : EinkActivity() {
         }
         root.addView(empty)
         cellW = (resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - (COLUMNS - 1) * dp(GAP_DP)) / COLUMNS
-        listRows = PagedRows(this, dp(ROW_DP))
-        gridRows = PagedRows(this, cellW * 3 / 2 + dp(GRID_TEXT_DP), dividers = false)
+        // 글자를 키우면 줄·격자 글자 칸도 그만큼 높인다(줄이면 고정 크기 표지가 잘리므로 100% 아래로는 그대로).
+        listRows = PagedRows(this, rowDp(ROW_DP * Ui.textGrow))
+        gridRows = PagedRows(this, cellW * 3 / 2 + dp(GRID_TEXT_DP * Ui.textGrow), dividers = false)
         gridCoverH = cellW * 3 / 2 - dp(GRID_STARS_DP)
         gridCoverW = gridCoverH * 2 / 3
         val pages = FrameLayout(this)

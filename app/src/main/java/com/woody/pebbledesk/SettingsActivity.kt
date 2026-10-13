@@ -19,6 +19,7 @@ import android.view.View
 import android.widget.LinearLayout
 import java.time.DayOfWeek
 import java.time.format.TextStyle
+import kotlin.math.roundToInt
 
 /** ⑧ 설정. 회색 소제목으로 묶고 값은 오른쪽에 같은 굵기로 쓴다. 켜짐은 검정, 꺼짐은 진회색, `›` 는 다음 화면. */
 class SettingsActivity : EinkActivity() {
@@ -31,7 +32,7 @@ class SettingsActivity : EinkActivity() {
     private var progressDialog: Dialog? = null
     /** 자동 추가 안내의 쪽들(그 화면에서만) */
     private lateinit var guide: PagedBlocks
-    /** 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]) */
+    /** 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]), 글자 · 간격([PAGE_TEXT]) */
     private val page by lazy { intent.getStringExtra(EXTRA_PAGE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,6 +41,7 @@ class SettingsActivity : EinkActivity() {
         val title = when (page) {
             PAGE_GUIDE -> R.string.auto_books_guide
             PAGE_READING -> R.string.reading_settings
+            PAGE_TEXT -> R.string.text_spacing
             else -> R.string.settings
         }
         val titleRow = titleRow(getString(title)) { finish() }
@@ -57,9 +59,6 @@ class SettingsActivity : EinkActivity() {
             list = vbox()
             root.addView(list, lp(MATCH, 0, 1f))
         }
-        if (page == null) root.addView(text("Pebble Desk ${appVersion()}", 15f, color = Ui.LIGHT_GRAY).apply {
-            gravity = Gravity.CENTER
-        }, lp(MATCH, dp(44)))
         setContentView(root)
     }
 
@@ -68,6 +67,7 @@ class SettingsActivity : EinkActivity() {
         when (page) {
             PAGE_GUIDE -> renderGuide()
             PAGE_READING -> renderReading()
+            PAGE_TEXT -> renderText()
             else -> {
                 render()
                 Update.onChange = { renderUpdate(); closeProgress(); showInstallFailure(); showLatest() }
@@ -92,34 +92,18 @@ class SettingsActivity : EinkActivity() {
         list.removeAllViews()
         AppStore.loadAndPrune(this, prefs)
 
-        // 읽고 있는 앱은 책을 정할 때 함께 고른다(책 없이 바꾸려면 앱을 길게 눌러 '읽고 있는 앱으로 설정').
-        section(getString(R.string.section_home))
-        val books = BookShelf.list(this)
-        // 맨 앞 책 제목이 길면 줄임표로 자르고 `외 3권` 은 늘 보인다.
-        val booksText = books.firstOrNull()?.title ?: getString(R.string.none)
-        val booksTail = if (books.size > 1) getString(R.string.books_more, books.size - 1) else null
-        row(getString(R.string.now_reading), booksText, on = books.isNotEmpty(), next = true, tail = booksTail) {
-            startActivity(BooksActivity.intent(this))
-        }
-        row(getString(R.string.favorites), prefs.favoriteList.size.toString(), next = true) {
-            startActivity(FavoritesActivity.intent(this))
-        }
-        val views = listOf(getString(R.string.fav_view_list), getString(R.string.fav_view_grid))
-        row(getString(R.string.fav_view), views[if (prefs.favGrid) 1 else 0], next = true) {
-            choose(getString(R.string.fav_view), views, if (prefs.favGrid) 1 else 0) {
-                prefs.favGrid = it == 1; render()
-            }
-        }
-        toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint)) { prefs.showIcons = it }
-        // 독서(읽는 책 자동 추가·오늘 읽은 시간·하루 목표·한 주 시작)는 줄이 많아 따로 한 화면에 둔다.
-        val reading = listOfNotNull(
-            getString(R.string.auto_books_short).takeIf { ReaderWatchService.isEnabled(this) },
-            getString(R.string.reading_time).takeIf { ReadingLog.hasAccess(this) },
-        )
-        row(getString(R.string.reading_settings), reading.joinToString(" · ").ifEmpty { getString(R.string.off) },
-            on = reading.isNotEmpty(), next = true) {
+        // 맨 위 소제목 없이 독서(읽고 있는 책·자동 추가·오늘 읽은 시간·하루 목표·한 주 시작·독서 기록). 줄이 많아 한 화면에 모은다.
+        row(getString(R.string.reading_settings), null, next = true) {
             startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, PAGE_READING))
         }
+
+        // 화면: 앱 전체에 걸리는 보기 설정
+        section(getString(R.string.section_display))
+        // 글자 크기·줄 간격은 한 화면에서 슬라이더로 보며 고른다.
+        row(getString(R.string.text_spacing), "${prefs.textScalePercent}% · ${prefs.rowScalePercent}%", next = true) {
+            startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, PAGE_TEXT))
+        }
+        toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint)) { prefs.showIcons = it }
         val clocks = listOf(getString(R.string.clock24), getString(R.string.clock12))
         row(getString(R.string.clock), clocks[if (prefs.clock24h) 0 else 1], next = true) {
             choose(getString(R.string.clock), clocks, if (prefs.clock24h) 0 else 1) {
@@ -138,6 +122,9 @@ class SettingsActivity : EinkActivity() {
         }
 
         section(getString(R.string.section_apps))
+        row(getString(R.string.favorites), prefs.favoriteList.size.toString(), next = true) {
+            startActivity(FavoritesActivity.intent(this))
+        }
         row(getString(R.string.hidden_apps), prefs.hidden.size.toString(), next = true) {
             startActivity(AppListActivity.intent(this, AppListActivity.Mode.HIDDEN))
         }
@@ -145,6 +132,9 @@ class SettingsActivity : EinkActivity() {
         row(getString(R.string.device_settings), null, next = true) {
             runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
         }
+
+        // 정보: 판 번호는 업데이트 줄에만 보인다(아래 꼬리글은 두지 않는다).
+        section(getString(R.string.section_info))
         row(getString(R.string.device_info), Build.MODEL, next = true) { startActivity(DeviceInfoActivity.intent(this)) }
         updateSlot = vbox().also { list.addView(it) }
         renderUpdate()
@@ -282,9 +272,17 @@ class SettingsActivity : EinkActivity() {
             }.show()
     }
 
-    /** 독서 화면: 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */
+    /** 독서 화면: 읽고 있는 책, 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */
     private fun renderReading() {
         list.removeAllViews()
+        // 읽고 있는 앱은 책을 정할 때 함께 고른다(책 없이 바꾸려면 앱을 길게 눌러 '읽고 있는 앱으로 설정').
+        // 맨 앞 책 제목이 길면 줄임표로 자르고 `외 3권` 은 늘 보인다.
+        val books = BookShelf.list(this)
+        val booksText = books.firstOrNull()?.title ?: getString(R.string.none)
+        val booksTail = if (books.size > 1) getString(R.string.books_more, books.size - 1) else null
+        row(getString(R.string.now_reading), booksText, on = books.isNotEmpty(), next = true, tail = booksTail) {
+            startActivity(BooksActivity.intent(this))
+        }
         // 읽는 책 자동 추가 = 안드로이드 접근성에서 이 앱이 켜져 있음(앱이 대신 켜고 끌 수 없다).
         // 켜져 있든 꺼져 있든 무엇을 읽는지 안내 창(켜고 끄기는 그 창의 `접근성 설정 열기`).
         val watching = ReaderWatchService.isEnabled(this)
@@ -325,6 +323,49 @@ class SettingsActivity : EinkActivity() {
             }
         }
         row(getString(R.string.reading_stats), null, next = true, last = true) { startActivity(ReadingActivity.intent(this)) }
+    }
+
+    /**
+     * 글자 · 간격 화면: 글자 크기(70~150%, 기기 글꼴 크기에 곱한다)와 줄 간격(80~150%)을 10% 단위 슬라이더로 고르고, 아래 미리 보기(자주 쓰는 앱 목록 몇 줄)가
+     * 손을 뗄 때 바로 바뀐다. 다른 화면은 돌아갈 때 새 값으로 다시 만든다(EinkActivity). 이 화면의 제목·슬라이더는 다시 들어올 때 바뀐다.
+     */
+    private fun renderText() {
+        list.removeAllViews()
+        val preview = vbox()
+        fun showPreview() {
+            preview.removeAllViews()
+            val apps = AppStore.load(this).let { all ->
+                prefs.favoriteList.mapNotNull { k -> all.firstOrNull { it.key == k } }.ifEmpty { all }
+            }.take(PREVIEW_ROWS)
+            apps.forEachIndexed { i, app ->
+                if (i > 0) preview.addView(hline(1, Ui.DIVIDER))
+                preview.addView(appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = prefs.showIcons), lp(MATCH, rowDp(Ui.ROW_DP)))
+            }
+        }
+        fun slider(label: Int, steps: List<Int>, value: Int, apply: (Int) -> Unit) {
+            val valueText = text("$value%", 20f, Ui.medium)
+            list.addView(hbox().apply {
+                setPadding(dp(Ui.MARGIN), dp(18), dp(Ui.MARGIN), 0)
+                addView(text(getString(label), ROW_LABEL_SP), lp(0, WRAP, 1f))
+                addView(valueText)
+            })
+            list.addView(StepSlider(this, steps, value, onStep = { valueText.text = "$it%" }) { apply(it); showPreview() })
+        }
+        slider(R.string.text_size, HomePrefs.TEXT_SCALES, prefs.textScalePercent) {
+            prefs.textScalePercent = it; Ui.textScale = it / 100f
+        }
+        // 기기 글꼴 크기를 바꿔 두었으면 그 위에 곱한다는 것을 알린다.
+        val deviceFont = (resources.configuration.fontScale * 100).roundToInt()
+        if (deviceFont != 100) list.addView(text(getString(R.string.text_size_device, deviceFont), 15f, color = Ui.GRAY).apply {
+            setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
+        })
+        slider(R.string.line_spacing, HomePrefs.ROW_SCALES, prefs.rowScalePercent) {
+            prefs.rowScalePercent = it; Ui.rowScale = it / 100f
+        }
+        section(getString(R.string.preview))
+        list.addView(hline(1))
+        list.addView(preview)
+        showPreview()
     }
 
     /** 하루 목표 직접 입력(분). 범위 밖이면 가장 가까운 값으로 */
@@ -424,7 +465,7 @@ class SettingsActivity : EinkActivity() {
         val color = if (on) Ui.BLACK else Ui.GRAY
         val row = hbox().apply {
             setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
-            addView(text(label, 22f))
+            addView(text(label, ROW_LABEL_SP))
             if (hint != null) addView(text(hint, 15f, color = Ui.LIGHT_GRAY), lp(WRAP, WRAP).apply { marginStart = dp(10) })
             addView(text(value.orEmpty(), 20f, Ui.medium, color).apply { gravity = Gravity.END }, lp(0, WRAP, 1f).apply { marginStart = dp(16) })
             // 값과의 사이는 전과 같은 글자 간격(`외 3권` 앞 한 칸, `›` 앞 두 칸)
@@ -435,7 +476,7 @@ class SettingsActivity : EinkActivity() {
             if (end.isNotEmpty()) addView(text(end, 20f, Ui.medium, color))
             setOnClickListener { action() }
         }
-        into.addView(row, lp(MATCH, dp(45)))
+        into.addView(row, lp(MATCH, rowDp(Ui.SETTING_ROW_DP)))
         if (!last) into.addView(hline(1, Ui.DIVIDER))
     }
 
@@ -456,6 +497,9 @@ class SettingsActivity : EinkActivity() {
 
     companion object {
         private const val EXTRA_PAGE = "page"
+        private const val PAGE_TEXT = "text"
+        /** 설정 줄 이름 글자(sp) */
+        private const val ROW_LABEL_SP = 22f
         private const val PAGE_READING = "reading"
         private const val PAGE_GUIDE = "guide"
         private const val GOAL_MIN = 1L
@@ -463,6 +507,72 @@ class SettingsActivity : EinkActivity() {
         /** 바뀐 점 창에 보이는 릴리스 설명 줄 수(크레마 페블에서 한 줄 한국어 약 28자). 릴리스 설명은 이 안에 맞춰 쓴다. */
         const val NOTES_LINES = 18
         private const val NOTES_SCAN_CHARS = 2_000
+        /** 글자 · 간격 미리 보기 줄 수 */
+        private const val PREVIEW_ROWS = 4
+    }
+}
+
+/**
+ * 단계 슬라이더(글자 · 간격): 가로 선 위 단계마다 점, 고른 값까지 검정, 동그란 손잡이, 아래에 단계 값.
+ * 누르거나 밀면 가장 가까운 단계로 옮기고([onStep]), 손을 떼면 [onCommit]. 단계가 바뀔 때만 다시 그린다(전자잉크).
+ */
+private class StepSlider(
+    context: Context,
+    private val steps: List<Int>,
+    value: Int,
+    private val onStep: (Int) -> Unit,
+    private val onCommit: (Int) -> Unit,
+) : View(context) {
+    private var index = steps.indexOf(value).coerceAtLeast(0)
+    private var committed = index
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = context.dpf(14); textAlign = Paint.Align.CENTER; typeface = Ui.regular
+    }
+    private val pad = context.dpf(Ui.MARGIN + 6)
+
+    private fun x(i: Int) = pad + (width - 2 * pad) * i / (steps.size - 1)
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) =
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), context.dp(HEIGHT_DP))
+
+    override fun onDraw(canvas: Canvas) {
+        val y = context.dpf(TRACK_Y_DP)
+        paint.strokeWidth = context.dpf(2)
+        paint.color = Ui.DIVIDER
+        canvas.drawLine(x(0), y, x(steps.size - 1), y, paint)
+        paint.color = Ui.BLACK
+        paint.strokeWidth = context.dpf(3)
+        canvas.drawLine(x(0), y, x(index), y, paint)
+        steps.forEachIndexed { i, v ->
+            paint.color = if (i <= index) Ui.BLACK else Ui.LIGHT_GRAY
+            canvas.drawCircle(x(i), y, context.dpf(4), paint)
+            labelPaint.color = if (i == index) Ui.BLACK else Ui.LIGHT_GRAY
+            labelPaint.typeface = if (i == index) Ui.bold else Ui.regular
+            canvas.drawText(v.toString(), x(i), y + context.dpf(38), labelPaint)
+        }
+        paint.color = Ui.BLACK
+        canvas.drawCircle(x(index), y, context.dpf(12), paint)
+    }
+
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        when (event.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_MOVE -> {
+                parent.requestDisallowInterceptTouchEvent(true)
+                val i = ((event.x - pad) / ((width - 2 * pad) / (steps.size - 1))).let { Math.round(it) }.coerceIn(0, steps.size - 1)
+                if (i != index) { index = i; invalidate(); onStep(steps[i]) }
+            }
+            // 손을 떼거나 터치가 취소되면 보이는 값으로 확정한다(손잡이와 저장 값이 어긋나지 않게).
+            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL ->
+                if (index != committed) { committed = index; onCommit(steps[index]) }
+        }
+        return true
+    }
+
+    companion object {
+        const val HEIGHT_DP = 72
+        const val TRACK_Y_DP = 26
     }
 }
 

@@ -81,7 +81,7 @@ class AppListActivity : EinkActivity() {
         }
 
         val body = LinearLayout(this)
-        rows = PagedRows(this, dp(Ui.ROW_DP))
+        rows = PagedRows(this, rowDp(Ui.ROW_DP))
         body.addView(rows, lp(0, MATCH, 1f))
         if (mode == Mode.ALL) {
             indexCol = vbox().apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL }

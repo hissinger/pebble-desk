@@ -65,13 +65,13 @@ class TopBarView(context: Context) : View(context) {
     private val logo: Drawable? = Crema.logo(context)
     private val clockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Ui.regular
-        textSize = context.dpf(37)
+        textSize = context.spf(37f)
         color = Ui.BLACK
         letterSpacing = -0.02f
     }
     private val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Ui.regular
-        textSize = context.dpf(15.5f)
+        textSize = context.spf(15.5f)
         color = Ui.BLACK
     }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Ui.BLACK }
@@ -82,7 +82,7 @@ class TopBarView(context: Context) : View(context) {
     }
     private val ringTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Ui.bold
-        textSize = context.dpf(11f)
+        textSize = context.spf(11f)
         color = Ui.BLACK
         textAlign = Paint.Align.CENTER
     }
@@ -119,7 +119,8 @@ class TopBarView(context: Context) : View(context) {
     private val padBottom = context.dp(14)
     private val lineGap = context.dp(16)
     private val logoHeight = context.dp(32)
-    private val iconSize = context.dp(19)
+    /** 상태 줄 아이콘·원문자는 상태 글자처럼 글자 배율을 따른다 */
+    private val iconSize = context.dp(19 * Ui.textScale)
     private val sepGap = context.dpf(5)
     private val clockCap = capHeight(clockPaint)
     private val statusCap = capHeight(statusPaint)
@@ -211,7 +212,7 @@ class TopBarView(context: Context) : View(context) {
 
     /** 원문자(⑮): 크레마 상단바처럼 원 안에 숫자 */
     private fun drawRing(canvas: Canvas, n: Int, right: Float, mid: Float): Float {
-        val r = context.dpf(9.5f)
+        val r = context.dpf(9.5f * Ui.textScale)
         val cx = right - r - ringPaint.strokeWidth / 2
         canvas.drawCircle(cx, mid, r, ringPaint)
         val b = Rect().also { ringTextPaint.getTextBounds("0", 0, 1, it) }

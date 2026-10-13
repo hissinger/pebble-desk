@@ -11,7 +11,6 @@ import android.graphics.RectF
 import android.os.Bundle
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -21,7 +20,9 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
@@ -48,6 +49,7 @@ class ReadingActivity : EinkActivity() {
         root.addView(hline(2))
         body = vbox()
         root.addView(body, lp(MATCH, 0, 1f))
+        checkRoom()
         setContentView(root)
     }
 
@@ -56,9 +58,15 @@ class ReadingActivity : EinkActivity() {
         render()
     }
 
+    /** 달력과 그래프를 함께 보일 높이가 있는가(처음 그리기 전에 한 번 잰다, [checkRoom]). 모르면 null */
+    private var both: Boolean? = null
+    /** 지금 화면에 달력이 있는가(사용 기록 권한이 없으면 안내 글뿐이라 높이를 재지 않는다) */
+    private var hasCalendar = false
+
     private fun render() {
         body.removeAllViews()
         val days = ReadingLog.days(this, ReadingLog.readerPackages(this))
+        hasCalendar = days != null
         if (days == null) {
             body.addView(text(getString(R.string.reading_no_access), 18f, color = Ui.GRAY, lines = 3).apply {
                 setPadding(dp(Ui.MARGIN), dp(40), dp(Ui.MARGIN), 0)
@@ -78,15 +86,30 @@ class ReadingActivity : EinkActivity() {
 
         val since = ReadingLog.since(this) ?: today
         body.addView(hero(days, today, goalMs, frac(today), monthGoal(days, today, since, goalMs, ::frac)))
-        body.addView(calendar(days, today, since, goalMs, ::frac))
+        // 연속일 줄과 달력 사이는 조금 띄운다(달력 제목 줄이 오늘 링 바로 밑에 붙지 않게).
+        body.addView(calendar(days, today, since, goalMs, ::frac), lp(MATCH, WRAP).apply { topMargin = dp(HERO_GAP_DP) })
         // 아래: 왼쪽 합계 · 오른쪽 이번 주 읽은 책. 칸마다 달력처럼 제목과 그 아래 선(두 칸 모두 위에 맞춘다).
         body.addView(hbox().apply {
             gravity = Gravity.TOP
             setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), 0)
-            addView(section(getString(R.string.read_time), totals(days, today)), lp(dp(TOTALS_W), WRAP))
+            addView(section(getString(R.string.read_time), totals(days, today)), lp(dp(TOTALS_W * Ui.textGrow), WRAP))
             val page = text("", 13f, Ui.bold, Ui.GRAY)
             addView(section(getString(R.string.books_this_week), byBook(days, today, page), page), lp(0, WRAP, 1f).apply { marginStart = dp(BOOKS_GAP) })
         })
+    }
+
+    /**
+     * 처음 그리기 전에 아래 남는 높이를 재서, 그래프 하나(+ 사이)가 더 들어가면 달력과 그래프를 함께 보이게 다시 만든다
+     * (세로가 긴 바형 화면. 넘친 화면을 한 번 그리지 않게 이번 그리기는 건너뛴다). 페블·글자를 키운 화면은 지금처럼 하나씩.
+     */
+    private fun checkRoom() {
+        body.viewTreeObserver.addOnPreDrawListener {
+            if (both != null || !hasCalendar) return@addOnPreDrawListener true
+            // 쓴 높이: 마지막 칸의 아래 끝(칸 사이 여백까지 든다)
+            val used = if (body.childCount == 0) 0 else body.getChildAt(body.childCount - 1).bottom
+            both = body.height - used >= ringCalendarHeight(this, WEEKS) + dp(GRAPH_GAP_DP)
+            if (both == true) { render(); false } else true
+        }
     }
 
     /** 제목(오른쪽 끝에 [page]: 쪽 표시) · 그 아래 선 · [content] */
@@ -130,12 +153,13 @@ class ReadingActivity : EinkActivity() {
         fun TextView.lineH() = paint.fontMetrics.let { it.descent - it.ascent }
         val r = dpf(RING / 2f - RING_STROKE)
         var sp = 17f
-        while (sp > 12f) {
+        // 링 크기는 고정이라 글자 배율과 상관없이 실제 12sp 까지 줄인다.
+        while (sp > 12f / Ui.textScale) {
             val half = (time.lineH() + (goal?.lineH() ?: 0f)) / 2
             val room = 2 * sqrt(r * r - half * half) - dpf(6)
             if (time.paint.measureText(time.text.toString()) <= room) break
             sp -= 0.5f
-            time.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
+            time.setSp(sp)
         }
     }
 
@@ -144,6 +168,7 @@ class ReadingActivity : EinkActivity() {
 
     /**
      * 4주 링 달력 또는 막대그래프(처음에는 이번 주까지 최근 4주). 제목 줄 왼쪽 `달력 · 그래프`로 바꾸고 기억한다(같은 높이, 이 칸만 다시 그린다).
+     * 둘 다 들어갈 높이가 있으면([both]) 달력 아래에 그래프를 함께 두고 `달력 · 그래프` 는 뺀다.
      * 달력: 날짜는 링 위에 작게, 오늘은 검은 동그라미 안에. 기록 전([since] 전)·앞날은 흐린 빈 링.
      * 제목 줄 오른쪽 `9월 14일 – 10월 11일  ‹ ›` 로 두 보기를 함께 4주씩 넘긴다. 기록 시작 전으로·이번 주 뒤로는 가지 않는다(흐리게).
      */
@@ -168,8 +193,11 @@ class ReadingActivity : EinkActivity() {
             cal.visibility = if (graphOn) View.INVISIBLE else View.VISIBLE
             graph.visibility = if (graphOn) View.VISIBLE else View.GONE
         }
-        toggle.setOnClickListener { prefs.readingGraph = !prefs.readingGraph; showView() }
-        showView()
+        val together = both == true
+        if (!together) {
+            toggle.setOnClickListener { prefs.readingGraph = !prefs.readingGraph; showView() }
+            showView()
+        }
         val range = text("", 12f, Ui.medium, Ui.LIGHT_GRAY)
         fun arrow(symbol: String) = text(symbol, 20f, Ui.bold).apply { gravity = Gravity.CENTER; minWidth = dp(40) }
         val prev = arrow("‹")
@@ -198,7 +226,10 @@ class ReadingActivity : EinkActivity() {
             addView(next, lp(WRAP, WRAP))
         })
         addView(hline(1))
-        addView(FrameLayout(context).apply {
+        if (together) {
+            addView(cal, lp(MATCH, WRAP))
+            addView(graph, lp(MATCH, WRAP).apply { topMargin = dp(GRAPH_GAP_DP) })
+        } else addView(FrameLayout(context).apply {
             addView(cal, FrameLayout.LayoutParams(MATCH, WRAP))
             addView(graph, FrameLayout.LayoutParams(MATCH, MATCH))
         }, lp(MATCH, WRAP))
@@ -251,7 +282,7 @@ class ReadingActivity : EinkActivity() {
             }
         }
         // 자주 쓰는 앱처럼 [BOOKS]줄씩, 넘치면 제목 오른쪽 `‹ 1 / 2 ›`(누르거나 밀면 다음 쪽). 덜 찬 쪽도 높이는 같다.
-        val rows = PagedRows(this, dp(BOOK_ROW), fixedRows = BOOKS, insetDividers = false)
+        val rows = PagedRows(this, rowDp(BOOK_ROW * Ui.textGrow), fixedRows = BOOKS, insetDividers = false)
         rows.onPageChanged = { page.text = pageLabel(rows) }
         page.pagesClick(rows)
         rows.setRows(books.map { (label, ms) -> {
@@ -272,6 +303,10 @@ class ReadingActivity : EinkActivity() {
 
     companion object {
         private const val WEEKS = 4
+        /** 달력과 그래프를 함께 둘 때 사이(그래프 위 시간 글자가 달력에 붙지 않게) */
+        private const val GRAPH_GAP_DP = 28
+        /** 연속일 줄과 달력 사이 */
+        private const val HERO_GAP_DP = 16
         /** 아래 왼쪽 합계 칸 폭(dp) */
         private const val TOTALS_W = 150
         /** 왼쪽 합계 칸과 오른쪽 책 칸 사이(dp) */
@@ -342,10 +377,10 @@ private class RingCalendar(
     private val weekdays = (0L..6L).map { start.dayOfWeek.plus(it).getDisplayName(TextStyle.NARROW, context.resources.configuration.locales[0]) }
     private val margin = context.dpf(Ui.MARGIN)
     private val weekdayTop = context.dpf(8)
-    private val weekdayH = context.dpf(CAL_WEEKDAY_DP)
+    private val weekdayH = context.dpf(CAL_WEEKDAY_DP * Ui.textGrow)
     private val rowGap = context.dpf(CAL_ROW_GAP_DP)
-    private val labelH = context.dpf(CAL_LABEL_DP)
-    private val pillHalf = context.dpf(10)
+    private val labelH = context.dpf(CAL_LABEL_DP * Ui.textGrow)
+    private val pillHalf = context.dpf(10 * Ui.textGrow)
     private val ringGap = context.dpf(CAL_RING_GAP_DP)
     private val ring = context.dpf(CAL_RING_DP)
     private val rowH = rowGap + labelH + ringGap + ring
@@ -395,14 +430,16 @@ private const val CAL_RING_GAP_DP = 2
 private const val CAL_RING_DP = 28
 
 /** 링 달력 높이. 같은 자리의 그래프도 이 높이를 쓴다. */
-private fun ringCalendarHeight(context: Context, weeks: Int): Int =
-    context.dpf(CAL_WEEKDAY_DP + weeks * (CAL_ROW_GAP_DP + CAL_LABEL_DP + CAL_RING_GAP_DP + CAL_RING_DP)).toInt()
+private fun ringCalendarHeight(context: Context, weeks: Int): Int {
+    val s = Ui.textGrow
+    return context.dpf(CAL_WEEKDAY_DP * s + weeks * (CAL_ROW_GAP_DP + CAL_LABEL_DP * s + CAL_RING_GAP_DP + CAL_RING_DP)).toInt()
+}
 
 /** 달력·그래프 글자 붓 */
 private fun Context.calPaint(sp: Float, face: android.graphics.Typeface, color: Int, align: Paint.Align = Paint.Align.CENTER) =
     Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = align
-        textSize = sp * resources.displayMetrics.scaledDensity
+        textSize = spf(sp)
         typeface = face
         this.color = color
     }
@@ -427,8 +464,8 @@ private class ReadingGraph(
         set(v) { field = v; invalidate() }
     private val margin = context.dpf(Ui.MARGIN)
     /** 위(막대 위 시간)·아래(날짜) 글자 자리 */
-    private val topRoom = context.dpf(34)
-    private val bottomRoom = context.dpf(28)
+    private val topRoom = context.dpf(34 * Ui.textGrow)
+    private val bottomRoom = context.dpf(28 * Ui.textGrow)
     private val valuePaint = context.calPaint(12f, Ui.bold, Ui.BLACK)
     private val datePaint = context.calPaint(11f, Ui.medium, Ui.GRAY)
     private val todayPaint = context.calPaint(11f, Ui.bold, Color.WHITE)
@@ -440,8 +477,8 @@ private class ReadingGraph(
         pathEffect = DashPathEffect(floatArrayOf(context.dpf(4), context.dpf(4)), 0f)
     }
     private val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Ui.BLACK }
-    private val pillHalf = context.dpf(10)
-    private val pillH = context.dpf(17)
+    private val pillHalf = context.dpf(10 * Ui.textGrow)
+    private val pillH = context.dpf(17 * Ui.textGrow)
     private val minBar = context.dpf(2)
     private val goalLine = Path()
     /** `목표 30분` 뒤의 흰 바탕 */
@@ -451,6 +488,12 @@ private class ReadingGraph(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), ringCalendarHeight(context, weeks))
+    }
+
+    /** 주 첫날 날짜 글자(`10/12`)가 바로 옆 오늘 표시에 겹치면 날짜를 뺀다(오늘이 주 둘째 날·앞 주 마지막 날일 때). */
+    private fun nearToday(day: LocalDate, slot: Float): Boolean {
+        val gap = abs(ChronoUnit.DAYS.between(day, today)) * slot
+        return gap > 0 && gap < datePaint.measureText("${day.monthValue}/${day.dayOfMonth}") / 2 + pillHalf + context.dpf(2)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -483,7 +526,7 @@ private class ReadingGraph(
             if (day == today) {
                 canvas.drawOval(cx - pillHalf, labelY - pillH / 2, cx + pillHalf, labelY + pillH / 2, pillPaint)
                 canvas.centerText(day.dayOfMonth.toString(), cx, labelY, todayPaint)
-            } else if (i % 7 == 0) {
+            } else if (i % 7 == 0 && !nearToday(day, slot)) {
                 datePaint.color = if (day < since || day > today) Ui.DIVIDER else Ui.GRAY
                 canvas.centerText("${day.monthValue}/${day.dayOfMonth}", cx, labelY, datePaint)
             }

@@ -6,7 +6,6 @@ import android.graphics.Bitmap
 import android.os.Bundle
 import android.text.InputType
 import android.util.LruCache
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -50,7 +49,7 @@ class BookSearchActivity : EinkActivity() {
         // 제목 입력 줄: 박스 없이 아래 굵은 선만
         input = EditText(this).apply {
             hint = getString(R.string.book_query_hint)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+            setSp(24f)
             setTextColor(Ui.BLACK)
             setHintTextColor(Ui.LIGHT_GRAY)
             background = null

@@ -24,6 +24,8 @@ import kotlin.math.roundToInt
  * 이 앱이 여는 시스템 화면 시험. 기기별 조사는 docs/DEVICES.md.
  */
 class DeviceInfoActivity : EinkActivity() {
+    /** 사진으로 찍어 보내는 진단 화면이라 글자 · 간격 설정과 기기 글꼴 크기를 따르지 않는다. */
+    override val fixedTextSize get() = true
     private lateinit var keyValue: TextView
     private lateinit var recentValue: TextView
 

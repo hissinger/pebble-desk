@@ -10,7 +10,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 
 /**
- * 자주 쓰는 앱 관리(설정 > 자주 쓰는 앱). 줄마다 앱 이름과 `↑ ↓`·`빼기`, 하단 `앱 추가 ›`.
+ * 자주 쓰는 앱 관리(설정 > 앱 관리 > 자주 쓰는 앱). 맨 위 홈 `보기 목록 ›`(목록 / 격자), 줄마다 앱 이름과 `↑ ↓`·`빼기`, 하단 `앱 추가 ›`.
  * 홈에 이 순서대로 보인다.
  */
 class FavoritesActivity : EinkActivity() {
@@ -19,6 +19,7 @@ class FavoritesActivity : EinkActivity() {
     private lateinit var empty: View
     private lateinit var rows: PagedRows
     private lateinit var pageText: TextView
+    private lateinit var viewValue: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,6 +29,19 @@ class FavoritesActivity : EinkActivity() {
             addView(titleCount, lp(WRAP, WRAP).apply { marginStart = dp(14); topMargin = dp(6) })
         })
         root.addView(hline(2))
+        // 홈에서 보는 꼴(목록 / 격자). 설정 줄과 같은 모양.
+        viewValue = text("", 20f, Ui.medium)
+        root.addView(hbox().apply {
+            setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
+            addView(text(getString(R.string.fav_view), 22f), lp(0, WRAP, 1f))
+            addView(viewValue)
+            setOnClickListener {
+                val views = listOf(getString(R.string.fav_view_list), getString(R.string.fav_view_grid))
+                choose(getString(R.string.fav_view), views, if (prefs.favGrid) 1 else 0) { prefs.favGrid = it == 1; showView() }
+            }
+        }, lp(MATCH, rowDp(Ui.SETTING_ROW_DP)))
+        root.addView(hline(1, Ui.DIVIDER))
+        showView()
         hint = text(getString(R.string.favorites_order_hint), 15f, color = Ui.GRAY, lines = 2).apply {
             setPadding(dp(Ui.MARGIN), dp(12), dp(Ui.MARGIN), dp(4))
         }
@@ -36,7 +50,7 @@ class FavoritesActivity : EinkActivity() {
             setPadding(dp(Ui.MARGIN), dp(56), dp(Ui.MARGIN), 0)
         }
         root.addView(empty)
-        rows = PagedRows(this, dp(Ui.ROW_DP))
+        rows = PagedRows(this, rowDp(Ui.ROW_DP))
         root.addView(rows, lp(MATCH, 0, 1f))
 
         root.addView(hline(1, inset = false))
@@ -57,6 +71,10 @@ class FavoritesActivity : EinkActivity() {
             pageText.text = pageLabel(rows)
         }
         setContentView(root)
+    }
+
+    private fun showView() {
+        viewValue.text = getString(if (prefs.favGrid) R.string.fav_view_grid else R.string.fav_view_list) + "  ›"
     }
 
     override fun onResume() {

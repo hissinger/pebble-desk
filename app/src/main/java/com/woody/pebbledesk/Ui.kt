@@ -14,6 +14,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.text.StaticLayout
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
@@ -33,8 +34,32 @@ object Ui {
         val dm = context.resources.displayMetrics
         densityBasis = "${dm.widthPixels}×${dm.heightPixels}"
         val shortPx = minOf(dm.widthPixels, dm.heightPixels)
+        tallScreen = maxOf(dm.widthPixels, dm.heightPixels) >= shortPx * TALL_RATIO
         return (shortPx * 160f / DESIGN_WIDTH_DP).roundToInt()
     }
+
+    /**
+     * 글자 배율(설정 › 글자 · 간격, [HomePrefs.textScalePercent]). 모든 글자는 [setSp]·[spf] 로 이 배율을 곱해 그린다.
+     * 기기의 글꼴 크기는 그대로 따르고 그 위에 곱한다(sp 로 넘겨 안드로이드 14+ 의 큰 글자 덜 키우기도 같이 걸린다). 화면을 만들 때(EinkActivity) 정한다.
+     */
+    @Volatile var textScale = 1f
+
+    /**
+     * 글자가 드는 고정 자리(목록 줄·격자 글자 칸·달력 날짜 칸 등)에 곱하는 배율: 글자를 키운 만큼 넓히고, 줄일 때는 그대로 둔다
+     * (고정 크기 표지·링이 잘리지 않게).
+     */
+    val textGrow: Float get() = maxOf(1f, textScale)
+
+    /** 줄 간격 배율(설정 › 글자 · 간격, [HomePrefs.rowScalePercent]). 목록·메뉴 줄 높이를 [rowDp] 로 이 배율만큼 늘리고 줄인다. */
+    @Volatile var rowScale = 1f
+
+    /**
+     * 바형(휴대폰 모양) 화면인가: 긴 변 ÷ 짧은 변이 [TALL_RATIO] 이상. 리더는 1.33~1.36, 바형은 1.67(Mudita Kompakt)~2.0(Tango·Palma 등).
+     * 세로가 남아 홈 책 자리를 크게 쓴다. [designDensityDpi] 가 정한다.
+     */
+    @Volatile var tallScreen = false
+        private set
+    private const val TALL_RATIO = 1.5f
 
     /** 마지막으로 [designDensityDpi] 가 본 화면 크기(px). 기기 정보에서 밀도가 왜 그렇게 정해졌는지 본다(Moaan MIX7S 는 1264px 인데 300dpi 로 잡혔다). */
     @Volatile var densityBasis: String? = null
@@ -50,6 +75,9 @@ object Ui {
 
     /** 화면 맨 아래 줄(모든 앱 · 설정 · 페이지 점 등) 높이. 누르는 자리라 48dp 아래로 줄이지 않는다. */
     const val FOOTER_DP = 56
+
+    /** 설정 줄 높이(dp, 줄 간격을 곱한다). 자주 쓰는 앱 화면의 `보기` 줄도 같은 모양이다. */
+    const val SETTING_ROW_DP = 45
 
     /** 목록 한 줄 규격(홈·모든 앱·고르기·숨긴 앱 공통): 줄 높이 dp, 아이콘 dp, 글자 sp */
     const val ROW_DP = 62
@@ -79,6 +107,29 @@ fun Context.dpf(v: Number): Float = TypedValue.applyDimension(
     TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics
 )
 
+/** 목록·메뉴 줄 높이: [v]dp × 줄 간격([Ui.rowScale]) */
+fun Context.rowDp(v: Number): Int = dp(v.toFloat() * Ui.rowScale)
+
+/** 글자 크기 [sp](페블 기준 값) × [Ui.textScale] 를 기기 글꼴 크기대로 바꾼 크기(px). 직접 그리는 글자에 쓴다. */
+fun Context.spf(sp: Float): Float =
+    TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp * Ui.textScale, resources.displayMetrics)
+
+/** 글자 크기를 [sp](페블 기준 값) × [Ui.textScale] 로(기기 글꼴 크기는 안드로이드가 곱한다). */
+fun TextView.setSp(sp: Float) = setTextSize(TypedValue.COMPLEX_UNIT_SP, sp * Ui.textScale)
+
+/**
+ * 키운 글자([Ui.textScale])가 폭 [widthPx] 에서 [TextView.getMaxLines] 줄을 넘으면 1dp 씩 줄인다. 배율 100% 크기 아래로는 줄이지 않는다
+ * (그래도 넘치면 줄임표). 홈 큰 제목처럼 줄 수를 늘릴 자리가 없는 글자에 쓴다.
+ */
+fun TextView.fitLines(sp: Float, widthPx: Int) {
+    if (widthPx <= 0) return
+    fun lineCount() = StaticLayout.Builder.obtain(text, 0, text.length, paint, widthPx)
+        .setBreakStrategy(breakStrategy).setHyphenationFrequency(hyphenationFrequency).setIncludePad(includeFontPadding)
+        .build().lineCount
+    val min = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, context.resources.displayMetrics)
+    while (textSize > min && lineCount() > maxLines) setTextSize(TypedValue.COMPLEX_UNIT_PX, maxOf(min, textSize - context.dpf(1)))
+}
+
 fun Context.text(
     value: CharSequence,
     sp: Float,
@@ -87,7 +138,7 @@ fun Context.text(
     lines: Int = 1,
 ): TextView = TextView(this).apply {
     text = value
-    setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
+    setSp(sp)
     typeface = face
     setTextColor(color)
     includeFontPadding = false

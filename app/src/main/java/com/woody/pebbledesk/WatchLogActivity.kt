@@ -16,6 +16,8 @@ import java.util.Locale
  * 앱별 받은 알림 수), 아래에 들어가는 만큼 최근 기록. 지우고 한 번 해 본 뒤 찍으면 그 시도가 한 화면에 든다. 기록은 [WatchLog].
  */
 class WatchLogActivity : EinkActivity() {
+    /** 사진으로 찍어 보내는 진단 화면이라 글자 · 간격 설정과 기기 글꼴 크기를 따르지 않는다. */
+    override val fixedTextSize get() = true
     private lateinit var summary: TextView
     private lateinit var rows: PagedRows
 

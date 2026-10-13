@@ -21,6 +21,18 @@ abstract class EinkActivity : Activity() {
     private var downY = 0f
     /** 이 화면을 만들 때 쓴 언어. 설정에서 바뀌었으면 돌아올 때 다시 만든다. */
     private var createdEnglish = false
+    /** 이 화면을 만들 때 쓴 글자 크기·줄 간격(%). 설정에서 바뀌었으면 돌아올 때 다시 만든다. */
+    private var createdTextScale = 100
+    private var createdRowScale = 100
+    /** 이 화면이 쓰는 배율([Ui.textScale]·[Ui.rowScale]). 앱 전체 값이라 이 화면으로 돌아올 때마다 다시 맞춘다. */
+    private var textScale = 1f
+    private var rowScale = 1f
+
+    /**
+     * true 면 글자 · 간격 설정과 기기 글꼴 크기를 따르지 않고 늘 기본(100%) 크기로 그린다.
+     * 사진으로 찍어 보내는 진단 화면(기기 정보·자동 추가 기록)이 한 화면에 다 들어가게.
+     */
+    protected open val fixedTextSize: Boolean get() = false
 
     /**
      * 설정의 언어(한국어/영어)로 화면 글자와 날짜 형식을 정하고, 화면 폭이 [Ui.DESIGN_WIDTH_DP] 가 되도록 밀도를 다시 정한다.
@@ -29,8 +41,15 @@ abstract class EinkActivity : Activity() {
      */
     override fun attachBaseContext(newBase: Context) {
         createdEnglish = HomePrefs.isEnglish(newBase)
+        createdTextScale = HomePrefs.textScalePercent(newBase)
+        createdRowScale = HomePrefs.rowScalePercent(newBase)
+        textScale = if (fixedTextSize) 1f else createdTextScale / 100f
+        rowScale = if (fixedTextSize) 1f else createdRowScale / 100f
+        Ui.textScale = textScale
+        Ui.rowScale = rowScale
         val config = Configuration(newBase.resources.configuration)
         config.setLocale(if (createdEnglish) Locale.ENGLISH else Locale.KOREAN)
+        if (fixedTextSize) config.fontScale = 1f
         config.densityDpi = Ui.designDensityDpi(newBase)
         super.attachBaseContext(newBase.createConfigurationContext(config))
     }
@@ -42,7 +61,11 @@ abstract class EinkActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (prefs.english != createdEnglish) recreate()
+        // 기본 크기로 그리는 화면(기기 정보)에서 돌아왔으면 이 화면의 배율로 되돌린다(새로 그리는 줄·메뉴가 이 값을 쓴다).
+        Ui.textScale = textScale
+        Ui.rowScale = rowScale
+        if (prefs.english != createdEnglish || prefs.textScalePercent != createdTextScale ||
+            prefs.rowScalePercent != createdRowScale) recreate()
     }
 
     override fun setContentView(view: View) {

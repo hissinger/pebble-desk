@@ -37,7 +37,8 @@ class BooksActivity : EinkActivity() {
                 lp(WRAP, WRAP).apply { topMargin = dp(12) })
         }
         root.addView(empty)
-        rows = PagedRows(this, dp(ROW_DP))
+        // 글자를 키우면 줄도 그만큼 높인다(두 줄 제목 아래 진행률이 잘리지 않게. 100% 아래로는 표지 때문에 그대로).
+        rows = PagedRows(this, rowDp(ROW_DP * Ui.textGrow))
         root.addView(rows, lp(MATCH, 0, 1f))
 
         root.addView(hline(1, inset = false))

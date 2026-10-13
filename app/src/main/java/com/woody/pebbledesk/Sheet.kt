@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.text.InputFilter
 import android.text.InputType
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -129,7 +128,7 @@ class Sheet(private val context: Context) {
             root.addView(c.hline(1, Ui.DIVIDER))
             val field = EditText(c).apply {
                 setText(initial.text)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                setSp(22f)
                 setTextColor(Ui.BLACK)
                 setHint(R.string.review_text_hint)
                 setHintTextColor(Ui.LIGHT_GRAY)
@@ -158,7 +157,7 @@ class Sheet(private val context: Context) {
                     setPadding(c.dp(24), 0, 0, 0)
                     setOnClickListener { dismissThen { onDone(Review(stars.halves, field.text.toString())) } }
                 }, lp(WRAP, MATCH))
-            }, lp(MATCH, c.dp(Ui.ROW_DP)))
+            }, lp(MATCH, c.rowDp(Ui.ROW_DP)))
             // 처음에는 감상 칸에 초점을 주지 않는다(키보드가 바로 뜨지 않게. 별만 고르는 일이 많다).
             root.isFocusableInTouchMode = true
         }
@@ -167,7 +166,7 @@ class Sheet(private val context: Context) {
             val field = EditText(c).apply {
                 setText(initial)
                 setSelection(text.length)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+                setSp(24f)
                 setTextColor(Ui.BLACK)
                 background = null
                 setPadding(0, c.dp(8), 0, c.dp(8))
@@ -186,7 +185,7 @@ class Sheet(private val context: Context) {
                 setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
                 addView(c.text(c.getString(R.string.save), 24f, Ui.bold), lp(MATCH, WRAP))
                 setOnClickListener { save() }
-            }, lp(MATCH, c.dp(Ui.ROW_DP)))
+            }, lp(MATCH, c.rowDp(Ui.ROW_DP)))
             field.requestFocus()
         }
 
@@ -196,7 +195,7 @@ class Sheet(private val context: Context) {
                 setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
                 addView(c.text(item.label, 24f, if (item.bold) Ui.bold else Ui.regular), lp(MATCH, WRAP))
                 setOnClickListener { dismissThen(item.action) }
-            }, lp(MATCH, c.dp(Ui.ROW_DP)))
+            }, lp(MATCH, c.rowDp(Ui.ROW_DP)))
         }
         if (review == null) root.addView(c.hline(1, Ui.DIVIDER))
         if (closeRow) root.addView(c.text(c.getString(R.string.close), 21f, Ui.bold).apply {
