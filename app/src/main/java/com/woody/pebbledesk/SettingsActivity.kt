@@ -334,9 +334,7 @@ class SettingsActivity : EinkActivity() {
         val preview = vbox()
         fun showPreview() {
             preview.removeAllViews()
-            val apps = AppStore.load(this).let { all ->
-                prefs.favoriteList.mapNotNull { k -> all.firstOrNull { it.key == k } }.ifEmpty { all }
-            }.take(PREVIEW_ROWS)
+            val apps = AppStore.load(this).let { all -> favoriteApps(all, prefs).ifEmpty { all } }.take(PREVIEW_ROWS)
             apps.forEachIndexed { i, app ->
                 if (i > 0) preview.addView(hline(1, Ui.DIVIDER))
                 preview.addView(appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = prefs.showIcons), lp(MATCH, rowDp(Ui.ROW_DP)))

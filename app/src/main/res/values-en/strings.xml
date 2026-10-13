@@ -9,6 +9,8 @@
     <string name="fav_add">Add to Favorites</string>
     <string name="hide">Hide</string>
     <string name="app_info">App info</string>
+    <string name="rename">Rename</string>
+    <string name="rename_reset">Reset to %1$s</string>
     <string name="cancel">Cancel</string>
     <string name="close">Close</string>
     <string name="hidden_apps">Hidden apps</string>
@@ -160,7 +162,7 @@
     <string name="favorites_none">No favorites yet</string>
     <string name="add_app_link">Add app  ›</string>
     <string name="add_app">Add app</string>
-    <string name="favorites_order_hint">Shown on Home in this order. Use ↑ ↓ to reorder.</string>
+    <string name="favorites_order_hint">Shown on Home in this order. Use ↑ ↓ to reorder, tap a name to rename it.</string>
     <string name="fav_view">View</string>
     <string name="fav_view_list">List</string>
     <string name="fav_view_grid">Grid</string>

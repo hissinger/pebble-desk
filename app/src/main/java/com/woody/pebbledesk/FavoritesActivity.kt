@@ -10,7 +10,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 
 /**
- * 자주 쓰는 앱 관리(설정 > 앱 관리 > 자주 쓰는 앱). 맨 위 홈 `보기 목록 ›`(목록 / 격자), 줄마다 앱 이름과 `↑ ↓`·`빼기`, 하단 `앱 추가 ›`.
+ * 자주 쓰는 앱 관리(설정 > 앱 관리 > 자주 쓰는 앱). 맨 위 홈 `보기 목록 ›`(목록 / 격자), 줄마다 앱 이름(누르면 이름 바꾸기)과 `↑ ↓`·`빼기`, 하단 `앱 추가 ›`.
  * 홈에 이 순서대로 보인다.
  */
 class FavoritesActivity : EinkActivity() {
@@ -93,7 +93,7 @@ class FavoritesActivity : EinkActivity() {
         val favs = favoriteApps(apps, prefs)
         titleCount.text = favs.size.toString()
         empty.visibility = if (favs.isEmpty()) View.VISIBLE else View.GONE
-        hint.visibility = if (favs.size > 1) View.VISIBLE else View.GONE
+        hint.visibility = if (favs.isNotEmpty()) View.VISIBLE else View.GONE
         val icons = prefs.showIcons
         rows.setRows(favs.mapIndexed { i, app ->
             {
@@ -106,7 +106,9 @@ class FavoritesActivity : EinkActivity() {
                         setOnClickListener { prefs.favorites = prefs.favorites - app.key; render() }
                     })
                 }
-                appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = icons, right = controls)
+                appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = icons, right = controls).apply {
+                    setOnClickListener { renameFavorite(app) { render() } }
+                }
             }
         })
     }

@@ -227,11 +227,13 @@ object AppStore {
     }
 }
 
-/** 자주 쓰는 앱을 직접 정한 순서대로(숨긴 앱·지워진 앱 제외). */
+/** 자주 쓰는 앱을 직접 정한 순서대로(숨긴 앱·지워진 앱 제외). 이름을 바꾼 앱은 [AppEntry.label] 이 바꾼 이름이다. */
 fun favoriteApps(apps: List<AppEntry>, prefs: HomePrefs): List<AppEntry> {
     val hidden = prefs.hidden
+    val names = prefs.favoriteNames
     val byKey = apps.associateBy { it.key }
     return prefs.favoriteList.mapNotNull { byKey[it] }.filter { it.key !in hidden }
+        .map { app -> names[app.key]?.let { app.copy(label = it) } ?: app }
 }
 
 /** 흑백으로 바꾼 앱 아이콘 캐시 */

@@ -12,6 +12,8 @@
     <string name="fav_add">자주 쓰는 앱에 넣기</string>
     <string name="hide">숨기기</string>
     <string name="app_info">앱 정보</string>
+    <string name="rename">이름 바꾸기</string>
+    <string name="rename_reset">원래 이름으로 · %1$s</string>
     <string name="cancel">취소</string>
     <string name="close">닫기</string>
     <string name="hidden_apps">숨긴 앱</string>
@@ -163,7 +165,7 @@
     <string name="favorites_none">자주 쓰는 앱이 없습니다</string>
     <string name="add_app_link">앱 추가  ›</string>
     <string name="add_app">앱 추가</string>
-    <string name="favorites_order_hint">홈에 이 순서대로 보입니다. ↑ ↓ 로 순서를 바꿉니다.</string>
+    <string name="favorites_order_hint">홈에 이 순서대로 보입니다. ↑ ↓ 로 순서를 바꾸고, 이름을 누르면 이름을 바꿉니다.</string>
     <string name="fav_view">보기</string>
     <string name="fav_view_list">목록</string>
     <string name="fav_view_grid">격자</string>

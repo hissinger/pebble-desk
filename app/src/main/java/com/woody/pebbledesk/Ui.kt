@@ -172,6 +172,8 @@ fun Context.orderArrow(symbol: String, enabled: Boolean, onClick: () -> Unit): T
         minWidth = dp(48)
         setPadding(dp(4), dp(10), dp(4), dp(10))
         if (enabled) setOnClickListener { onClick() }
+        // 흐린 버튼도 누름을 받아 둔다(줄 누르기 — 앱 열기·이름 바꾸기 — 로 새지 않게).
+        else isClickable = true
     }
 
 /**

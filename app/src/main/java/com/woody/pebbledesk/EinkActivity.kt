@@ -117,15 +117,26 @@ abstract class EinkActivity : Activity() {
         @Suppress("DEPRECATION") overridePendingTransition(0, 0)
     }
 
-    /** 앱 길게 누르기 메뉴(④). 무엇이 바뀌면 [changed] 를 부른다. */
-    protected fun showAppMenu(app: AppEntry, changed: () -> Unit) {
+    /** 앱 길게 누르기 메뉴(④). 무엇이 바뀌면 [changed] 를 부른다. [rename] 이면(홈 자주 쓰는 앱) 맨 위에 `이름 바꾸기`. */
+    protected fun showAppMenu(app: AppEntry, rename: Boolean = false, changed: () -> Unit) {
         // 읽고 있는 앱은 책에 딸린 설정이라 책 메뉴·책 목록에서만 바꾼다.
         val fav = app.key in prefs.favorites
-        Sheet(this).header(app.label, app = app)
-            .item(getString(if (fav) R.string.fav_remove else R.string.fav_add)) { prefs.toggleFavorite(app.key); changed() }
+        val sheet = Sheet(this).header(app.label, app = app)
+        if (rename && fav) sheet.item(getString(R.string.rename)) { renameFavorite(app, changed) }
+        sheet.item(getString(if (fav) R.string.fav_remove else R.string.fav_add)) { prefs.toggleFavorite(app.key); changed() }
             .item(getString(R.string.hide)) { prefs.hide(app.key); changed() }
             .item(getString(R.string.app_info)) { AppStore.openAppInfo(this, app) }
             .show()
+    }
+
+    /** 자주 쓰는 앱 이름 바꾸기. 원래 이름과 같게 쓰거나 `원래 이름으로` 를 누르면 붙인 이름을 지운다. */
+    protected fun renameFavorite(app: AppEntry, changed: () -> Unit) {
+        val original = AppStore.load(this).firstOrNull { it.key == app.key }?.label ?: app.label
+        val custom = prefs.favoriteNames[app.key]
+        val sheet = Sheet(this).header(getString(R.string.rename), app = app)
+            .input(custom ?: original) { prefs.setFavoriteName(app.key, it.takeIf { name -> name != original }); changed() }
+        if (custom != null) sheet.item(getString(R.string.rename_reset, original)) { prefs.setFavoriteName(app.key, null); changed() }
+        sheet.show()
     }
 
     private companion object {

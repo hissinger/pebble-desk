@@ -234,7 +234,7 @@ class HomeActivity : EinkActivity() {
                 {
                     appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = icons).apply {
                         setOnClickListener { AppStore.launch(this@HomeActivity, app) }
-                        setOnLongClickListener { showAppMenu(app) { refresh() }; true }
+                        setOnLongClickListener { showAppMenu(app, rename = true) { refresh() }; true }
                     }
                 }
             }
@@ -257,7 +257,7 @@ class HomeActivity : EinkActivity() {
                 addView(picture(AppIcons.gray(context, app, icon)), lp(icon, icon))
                 addView(text(app.label, 13f, lines = 2).apply { gravity = Gravity.CENTER }, lp(MATCH, WRAP).apply { topMargin = dp(6) })
                 setOnClickListener { AppStore.launch(this@HomeActivity, app) }
-                setOnLongClickListener { showAppMenu(app) { refresh() }; true }
+                setOnLongClickListener { showAppMenu(app, rename = true) { refresh() }; true }
             }, lp(0, WRAP, 1f).apply { if (i > 0) marginStart = dp(GAP_DP) })
         }
         // 덜 찬 줄도 칸 폭이 같도록 빈 칸을 채운다.
@@ -331,7 +331,7 @@ class HomeActivity : EinkActivity() {
                     val room = heroHeight - dp(HERO_PAD_TOP_DP) - dp(HERO_PAD_BOTTOM_DP) - textPart - dp(4)
                     val mainW = minOf(dp(COVER_MAX_DP), (room / (1.5f * (1 + SMALL_COVER_RATIO))).toInt())
                     val cellW = (hero.width - 2 * dp(Ui.MARGIN) - (BookShelf.HOME - 2) * dp(GAP_DP)) / (BookShelf.HOME - 1) - dp(2)
-                    alsoRow((mainW * SMALL_COVER_RATIO).toInt().coerceIn(dp(SMALL_COVER_DP * 2), cellW))
+                    alsoRow(minOf(maxOf((mainW * SMALL_COVER_RATIO).toInt(), dp(SMALL_COVER_DP * 2)), cellW))
                 } else alsoRow(dp(SMALL_COVER_DP))
                 val alsoH = also.measuredIn()
                 vbox().apply {

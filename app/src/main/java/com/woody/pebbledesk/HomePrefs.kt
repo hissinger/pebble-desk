@@ -2,6 +2,7 @@ package com.woody.pebbledesk
 
 import android.content.Context
 import org.json.JSONArray
+import org.json.JSONObject
 import java.time.DayOfWeek
 import java.time.LocalDate
 
@@ -23,7 +24,25 @@ class HomePrefs(context: Context) {
             }
             return sp.getStringSet("favorites", emptySet())!!.sorted()
         }
-        set(v) = sp.edit().putString("favorite_list", JSONArray(v.distinct()).toString()).remove("favorites").apply()
+        set(v) {
+            val list = v.distinct()
+            // 빠진 앱에 붙인 이름도 함께 지운다(다시 넣으면 원래 이름).
+            sp.edit().putString("favorite_list", JSONArray(list).toString()).remove("favorites")
+                .putString(KEY_FAV_NAMES, JSONObject(favoriteNames.filterKeys { it in list }).toString()).apply()
+        }
+
+    /** 자주 쓰는 앱에 사용자가 붙인 이름(앱 키 → 이름). 홈·자주 쓰는 앱 관리에서만 쓰고, 모든 앱에는 원래 이름이 보인다. */
+    var favoriteNames: Map<String, String>
+        get() = runCatching {
+            val o = JSONObject(sp.getString(KEY_FAV_NAMES, null) ?: "{}")
+            o.keys().asSequence().associateWith { o.getString(it) }
+        }.getOrDefault(emptyMap())
+        set(v) = sp.edit().putString(KEY_FAV_NAMES, JSONObject(v).toString()).apply()
+
+    /** [key] 에 이름 [name] 을 붙인다. null 이면 원래 이름으로. */
+    fun setFavoriteName(key: String, name: String?) {
+        favoriteNames = if (name == null) favoriteNames - key else favoriteNames + (key to name)
+    }
 
     /** 들어 있는지 볼 때와 넣고 뺄 때. 새로 넣는 앱은 목록 맨 뒤에 붙는다. */
     var favorites: Set<String>
@@ -148,6 +167,8 @@ class HomePrefs(context: Context) {
 
     /** 지워졌거나 실행 화면 이름이 바뀐 앱을 정리한다([fix] 는 AppStore.keyFixer). */
     fun prune(fix: (String) -> String?) {
+        // 이름을 먼저 옮긴다(목록을 저장할 때 목록에 없는 이름은 지운다).
+        favoriteNames.let { names -> names.mapNotNull { (k, v) -> fix(k)?.let { it to v } }.toMap().let { if (it != names) favoriteNames = it } }
         favoriteList.let { list -> list.mapNotNull(fix).distinct().let { if (it != list) favoriteList = it } }
         hidden.let { set -> set.mapNotNull(fix).toSet().let { if (it != set) hidden = it } }
     }
@@ -155,6 +176,7 @@ class HomePrefs(context: Context) {
     companion object {
         const val FILE = "home"
         private const val KEY_ENGLISH = "english"
+        private const val KEY_FAV_NAMES = "favorite_names"
         private const val KEY_TEXT_SCALE = "text_scale"
         private const val KEY_ROW_SCALE = "row_scale"
 
