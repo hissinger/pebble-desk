@@ -167,6 +167,8 @@
     <string name="fav_view_list">List</string>
     <string name="fav_view_grid">Grid</string>
     <string name="app_icons_hint">in list view</string>
+    <string name="status_bar">System status bar</string>
+    <string name="status_bar_hint">on home too</string>
     <string name="reading_time">Reading time</string>
     <string name="reading_time_hint">shown at the bottom</string>
     <string name="reading_today">Today %1$s</string>

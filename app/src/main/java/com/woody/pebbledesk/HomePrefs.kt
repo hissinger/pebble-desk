@@ -157,6 +157,11 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("show_icons", true)
         set(v) = sp.edit().putBoolean("show_icons", v).apply()
 
+    /** 홈에서도 기기 상단 바를 보인다. 처음은 꺼짐(홈은 상단 바를 숨기고 자체 상단을 그린다). */
+    var showStatusBar: Boolean
+        get() = sp.getBoolean("show_status_bar", false)
+        set(v) = sp.edit().putBoolean("show_status_bar", v).apply()
+
     fun toggleFavorite(key: String) {
         favorites = if (key in favorites) favorites - key else favorites + key
     }

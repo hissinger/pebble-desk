@@ -63,7 +63,7 @@ class HomeActivity : EinkActivity() {
 
     override fun onResume() {
         super.onResume()
-        hideStatusBar()
+        applyStatusBar()
         refresh()
         // 읽은 시간은 다른 앱에서 돌아올 때만 바뀐다(레이아웃 때의 refresh 에서는 다시 세지 않는다).
         updateReading()
@@ -101,7 +101,7 @@ class HomeActivity : EinkActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideStatusBar()
+        if (hasFocus) applyStatusBar()
     }
 
     /** 홈 버튼을 다시 누르면 첫 페이지로 */
@@ -120,16 +120,25 @@ class HomeActivity : EinkActivity() {
         return true
     }
 
-    /** 홈에서는 안드로이드 상단바를 숨긴다. 위에서 아래로 쓸면 잠깐 나온다. */
-    private fun hideStatusBar() {
+    /**
+     * 홈에서는 안드로이드 상단바를 숨긴다. 위에서 아래로 쓸면 잠깐 나온다.
+     * 설정 `기기 상단 바 · 홈에서도 보이기`를 켜면 보인다(교보 sam 7 처럼 빠른 설정이 상단 바 버튼뿐인 기기).
+     * 그때는 시각·배터리 등이 겹치지 않게 홈 상단(로고·시계·상태 줄)을 빼고, 그 자리에 빈 띠를 두어 상단 바와 띄운다
+     * (컬러면 색면 위에. 색면 안 표지 위아래 여백은 그대로 같다).
+     */
+    private fun applyStatusBar() {
+        val show = prefs.showStatusBar
+        topBar.visibility = if (show) View.GONE else View.VISIBLE
+        (topBar.parent as View).setPadding(0, if (show) dp(STATUS_BAR_GAP_DP) else 0, 0, 0)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.let {
-                it.hide(WindowInsets.Type.statusBars())
+                if (show) it.show(WindowInsets.Type.statusBars()) else it.hide(WindowInsets.Type.statusBars())
                 it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         } else {
             @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            window.decorView.systemUiVisibility =
+                if (show) 0 else View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         }
     }
 
@@ -495,6 +504,8 @@ class HomeActivity : EinkActivity() {
         private const val HERO_PAD_TOP_DP = 8
         private const val HERO_PAD_TALL_DP = 14
         private const val HERO_PAD_BOTTOM_DP = 22
+        /** 기기 상단 바를 보일 때(홈 상단을 뺄 때) 상단 바 아래 빈 띠 */
+        private const val STATUS_BAR_GAP_DP = 16
         /** 함께 읽는 책 표지 폭 */
         private const val SMALL_COVER_DP = 50
         /** 바형 화면에서 함께 읽는 책 표지 폭 ÷ 맨 앞 책 표지 폭 */

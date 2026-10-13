@@ -263,7 +263,7 @@ class SettingsActivity : EinkActivity() {
 
     private fun open(page: String) = startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, page))
 
-    /** 화면: 글자 · 간격, 색, 앱 아이콘, 시계 */
+    /** 화면: 글자 · 간격, 색, 앱 아이콘, 시계, 기기 상단 바 */
     private fun renderDisplay() {
         list.removeAllViews()
         // 글자 크기·줄 간격은 한 화면에서 슬라이더로 보며 고른다.
@@ -284,6 +284,7 @@ class SettingsActivity : EinkActivity() {
                 prefs.clock24h = it == 0; renderDisplay()
             }
         }
+        toggle(getString(R.string.status_bar), prefs.showStatusBar, hint = getString(R.string.status_bar_hint), redraw = ::renderDisplay) { prefs.showStatusBar = it }
     }
 
     /** 독서 화면: 읽고 있는 책, 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */

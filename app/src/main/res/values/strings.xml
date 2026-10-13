@@ -170,6 +170,8 @@
     <string name="fav_view_list">목록</string>
     <string name="fav_view_grid">격자</string>
     <string name="app_icons_hint">목록 보기에서</string>
+    <string name="status_bar">기기 상단 바</string>
+    <string name="status_bar_hint">홈에서도 보이기</string>
     <string name="reading_time">오늘 읽은 시간</string>
     <string name="reading_time_hint">하단에 표시</string>
     <string name="reading_today">오늘 %1$s</string>
