@@ -46,7 +46,7 @@ object Crema {
 
     /**
      * 직접 그리는 그림(PictureView, 크레마가 밝혀 주지 않음)을 미리 밝기^s 로 밝혀, 화면 대비로 어두워진 뒤
-     * 원래 밝기로 보이게 한다. 흑백 그림([bmp] 의 파랑 값을 밝기로 본다)을 그 자리에서 바꾼다.
+     * 원래 밝기로 보이게 한다. [bmp] 를 그 자리에서 바꾼다(빨강·초록·파랑 따로, 흑백 그림이면 밝기를 밝히는 것과 같다).
      */
     fun undoContrast(bmp: Bitmap, tone: Float) {
         if (tone >= 1f) return
@@ -56,8 +56,8 @@ object Crema {
         val px = IntArray(w * h)
         bmp.getPixels(px, 0, w, 0, 0, w, h)
         for (i in px.indices) {
-            val l = lut[px[i] and 0xFF]
-            px[i] = (px[i] and 0xFF000000.toInt()) or (l shl 16) or (l shl 8) or l
+            val p = px[i]
+            px[i] = (p and 0xFF000000.toInt()) or (lut[p shr 16 and 0xFF] shl 16) or (lut[p shr 8 and 0xFF] shl 8) or lut[p and 0xFF]
         }
         bmp.setPixels(px, 0, w, 0, 0, w, h)
     }

@@ -17,6 +17,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
@@ -229,7 +230,10 @@ class HomeActivity : EinkActivity() {
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
                 }
-            } else if (grid) favs.chunked(GRID_COLUMNS).map { line -> { gridRow(line) } }
+            } else if (grid) favs.chunked(GRID_COLUMNS).let { lines ->
+                // 한 쪽의 몇째 줄인지와, 그 쪽이 한 줄뿐인지(위 줄 모양으로 둔다)
+                lines.mapIndexed { i, line -> { gridRow(line, i % GRID_ROWS, lastAlone = i == lines.lastIndex && i % GRID_ROWS == 0) } }
+            }
             else favs.map { app ->
                 {
                     appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = icons).apply {
@@ -242,20 +246,26 @@ class HomeActivity : EinkActivity() {
     }
 
     /**
-     * 격자 한 줄: 흑백 아이콘 아래 이름 한 줄. 줄 높이(목록 높이를 두 줄로 나눈 값)에 맞춰 아이콘 크기를 정한다.
+     * 격자 한 줄([pos]: 그 쪽의 몇째 줄): 아이콘(흑백, 컬러 [Palette] 면 원래 색) 아래 이름 한 줄.
+     * 두 줄이 한 묶음으로 보이게 바깥(위 선 → 첫 줄, 둘째 줄 → 하단 선)은 [GRID_OUTER_DP], 줄 사이는 [GRID_INNER_DP] 로 좁게 둔다.
+     * 줄 높이(목록 높이를 두 줄로 나눈 값)에서 여백·이름 한 줄을 뺀 만큼 아이콘을 키우고(최대 [GRID_ICON_MAX_DP]), 그래도 남는 높이는 바깥으로 보낸다
+     * (첫 줄은 아래에, 둘째 줄은 위에 붙인다). 한 줄뿐인 쪽([lastAlone])은 첫 줄 모양으로 위에 붙인다.
      * 격자에서는 '앱 아이콘' 설정과 상관없이 아이콘을 그린다.
      */
-    private fun gridRow(line: List<AppEntry>): View = hbox().apply {
+    private fun gridRow(line: List<AppEntry>, pos: Int, lastAlone: Boolean): View = hbox().apply {
         // 함께 읽는 책 줄과 같은 칸(좌우 여백 + 칸 사이 간격)으로 나누고, 칸마다 아이콘과 이름을 가운데에 맞춘다.
-        gravity = Gravity.TOP
-        setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), 0)
-        // 이름 칸은 글자를 키운 만큼 높이고(두 줄 이름이 잘리지 않게) 그만큼 아이콘을 줄인다.
-        val icon = (favRows.rowHeightPx - dp(GRID_LABEL_DP * Ui.textGrow)).coerceIn(dp(32), dp(GRID_ICON_MAX_DP))
+        val first = pos == 0
+        gravity = if (first && !lastAlone) Gravity.BOTTOM else Gravity.TOP
+        val inner = GRID_INNER_DP / 2
+        setPadding(dp(Ui.MARGIN), dp(if (first) GRID_OUTER_DP else inner), dp(Ui.MARGIN), dp(if (first) inner else GRID_OUTER_DP))
+        // 이름은 한 줄(길면 `…`)이라 글자를 키워도 이름 칸은 한 줄만큼만 커진다. 남는 높이를 아이콘에 준다.
+        val labelH = text("가", 13f).run { measure(0, 0); measuredHeight }
+        val icon = (favRows.rowHeightPx - dp(GRID_OUTER_DP + inner + GRID_LABEL_GAP_DP) - labelH).coerceIn(dp(32), dp(GRID_ICON_MAX_DP))
         line.forEachIndexed { i, app ->
             addView(vbox().apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                addView(picture(AppIcons.gray(context, app, icon)), lp(icon, icon))
-                addView(text(app.label, 13f, lines = 2).apply { gravity = Gravity.CENTER }, lp(MATCH, WRAP).apply { topMargin = dp(6) })
+                addView(picture(AppIcons.icon(context, app, icon)), lp(icon, icon))
+                addView(text(app.label, 13f).apply { gravity = Gravity.CENTER; ellipsize = TextUtils.TruncateAt.END }, lp(MATCH, WRAP).apply { topMargin = dp(GRID_LABEL_GAP_DP) })
                 setOnClickListener { AppStore.launch(this@HomeActivity, app) }
                 setOnLongClickListener { showAppMenu(app, rename = true) { refresh() }; true }
             }, lp(0, WRAP, 1f).apply { if (i > 0) marginStart = dp(GAP_DP) })
@@ -304,7 +314,8 @@ class HomeActivity : EinkActivity() {
             else -> {
                 /** [measureOnly] 면 표지 그림 대신 같은 크기의 빈 칸(높이만 잴 때. 표지는 폭마다 줄인 파일을 남긴다) */
                 fun alsoRow(coverW: Int, measureOnly: Boolean = false) = vbox().apply {
-                    addView(sectionTitle(getString(R.string.also_reading), topDp = 28))
+                    // 컬러면 맨 앞 책 색면이 그만큼 아래로 내려와 있어 위 여백을 줄인다(줄 높이는 같게).
+                    addView(sectionTitle(getString(R.string.also_reading), topDp = 28 - fieldBottom))
                     addView(hline(1))
                     addView(hbox().apply {
                         gravity = Gravity.TOP
@@ -328,7 +339,7 @@ class HomeActivity : EinkActivity() {
                     // 바형은 세로가 남아 함께 읽는 책 표지를 키우되, 큰 표지와 크기 차이가 나게 그 [SMALL_COVER_RATIO] 배로 둔다
                     // (100dp ~ 칸 폭). 표지 말고 줄 높이(제목·앱·진행률)는 표지 크기와 상관없으니, 남는 높이를 두 표지에 그 비율로 나눈다.
                     val textPart = alsoRow(dp(SMALL_COVER_DP * 2), measureOnly = true).measuredIn() - (dp(SMALL_COVER_DP * 2) * 3 / 2 + dp(2))
-                    val room = heroHeight - dp(HERO_PAD_TOP_DP) - dp(HERO_PAD_BOTTOM_DP) - textPart - dp(4)
+                    val room = heroHeight - dp(heroPad) - dp(HERO_PAD_BOTTOM_DP) - textPart - dp(4)
                     val mainW = minOf(dp(COVER_MAX_DP), (room / (1.5f * (1 + SMALL_COVER_RATIO))).toInt())
                     val cellW = (hero.width - 2 * dp(Ui.MARGIN) - (BookShelf.HOME - 2) * dp(GAP_DP)) / (BookShelf.HOME - 1) - dp(2)
                     alsoRow(minOf(maxOf((mainW * SMALL_COVER_RATIO).toInt(), dp(SMALL_COVER_DP * 2)), cellW))
@@ -348,14 +359,29 @@ class HomeActivity : EinkActivity() {
      * 너무 작거나 커지지 않게 [min]dp ~ COVER_MAX_DP.
      */
     private fun coverWidth(reserved: Int = 0, min: Int = COVER_DP): Int {
-        val coverH = heroHeight - dp(HERO_PAD_TOP_DP) - dp(HERO_PAD_BOTTOM_DP) - reserved
+        val coverH = heroHeight - dp(heroPad) - dp(HERO_PAD_BOTTOM_DP) - reserved
         return (coverH * 2 / 3).coerceIn(dp(min), dp(COVER_MAX_DP))
+    }
+
+    /**
+     * 맨 앞 책 표지 위 여백(dp, 컬러면 홈 색면 안에서 표지 위아래 여백). 상단 줄 바로 아래라 좁게 두고,
+     * 세로가 남는 바형 화면([Ui.tallScreen])은 조금 더 띄운다.
+     */
+    private val heroPad get() = if (Ui.tallScreen) HERO_PAD_TALL_DP else HERO_PAD_TOP_DP
+
+    /** 컬러면 맨 앞 책 자리를 칠하는 색면의 아래 여백(dp). 흑백이면 0. */
+    private val fieldBottom get() = if (Palette.current.color) heroPad else 0
+
+    /** 맨 앞 책 자리(표지·제목): 컬러면 홈 색면([Palette.Area.HOME])을 칠하고 아래로 [fieldBottom] 만큼 넓힌다. */
+    private fun View.heroField() {
+        setPadding(dp(Ui.MARGIN), dp(heroPad), dp(Ui.MARGIN), dp(fieldBottom))
+        Palette.current.field(Palette.Area.HOME)?.let { setBackgroundColor(it) }
     }
 
     /** 책이 없을 때: 표지 자리에 `+` 상자, 제목·저자·앱 자리에 회색 막대. 누르면 책 추가. */
     private fun skeleton(coverW: Int): View = hbox().apply {
         gravity = Gravity.TOP
-        setPadding(dp(Ui.MARGIN), dp(HERO_PAD_TOP_DP), dp(Ui.MARGIN), 0)
+        heroField()
         val coverH = coverW * 3 / 2
         addView(DashedBox(context), lp(coverW + dp(2), coverH + dp(2)))
         val info = vbox()
@@ -401,13 +427,13 @@ class HomeActivity : EinkActivity() {
     /** 맨 앞 책: 왼쪽 표지, 오른쪽 제목·저자와 읽고 있는 앱 */
     private fun mainBook(book: ShelfBook, reading: AppEntry?, coverW: Int): View = hbox().apply {
         gravity = Gravity.TOP
-        setPadding(dp(Ui.MARGIN), dp(HERO_PAD_TOP_DP), dp(Ui.MARGIN), 0)
+        heroField()
         val coverH = coverW * 3 / 2
         addView(coverView(book, coverW), lp(coverW + dp(2), coverH + dp(2)))
         val info = vbox()
         // 글자를 키웠을 때 긴 제목이 두 줄에서 잘리지 않게 줄인다(옆 칸 폭: 화면 − 좌우 여백 − 표지 − 사이).
         val infoW = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - (coverW + dp(2)) - dp(24)
-        info.addView(text(book.title, 34f, Ui.heavy, lines = 2).apply { fitLines(34f, infoW) }, lp(MATCH, WRAP).apply { topMargin = dp(10) })
+        info.addView(text(book.title, 34f, Ui.heavy, Palette.current.title(Palette.Area.HOME), lines = 2).apply { fitLines(34f, infoW) }, lp(MATCH, WRAP).apply { topMargin = dp(10) })
         if (book.author.isNotBlank()) {
             info.addView(text(book.author, 16f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(10) })
         }
@@ -417,7 +443,7 @@ class HomeActivity : EinkActivity() {
         }
         info.addView(
             if (reading != null) hbox().apply {
-                if (prefs.showIcons) addView(picture(AppIcons.gray(context, reading, dp(26))), lp(dp(26), dp(26)).apply { marginEnd = dp(10) })
+                if (prefs.showIcons) addView(picture(AppIcons.icon(context, reading, dp(26))), lp(dp(26), dp(26)).apply { marginEnd = dp(10) })
                 addView(text("${reading.label}  ›", 20f, Ui.bold))
             } else text(getString(R.string.pick_reader_link), 20f, Ui.bold, Ui.LIGHT_GRAY),
             // 제목·저자 바로 아래에 붙여 한 덩어리로 읽히게 한다.
@@ -465,20 +491,25 @@ class HomeActivity : EinkActivity() {
         private const val COVER_DP = 160
         private const val COVER_MAX_DP = 230
         private const val COVER_SMALLER_DP = 136
-        private const val HERO_PAD_TOP_DP = 26
+        /** 맨 앞 책 표지 위 여백(바형은 [HERO_PAD_TALL_DP]). 컬러면 홈 색면 안에서 표지 아래 여백도 같다. */
+        private const val HERO_PAD_TOP_DP = 8
+        private const val HERO_PAD_TALL_DP = 14
         private const val HERO_PAD_BOTTOM_DP = 22
         /** 함께 읽는 책 표지 폭 */
         private const val SMALL_COVER_DP = 50
         /** 바형 화면에서 함께 읽는 책 표지 폭 ÷ 맨 앞 책 표지 폭 */
         private const val SMALL_COVER_RATIO = 0.5f
 
-        /** 자주 쓰는 앱 격자: 4칸 × 2줄(목록과 같은 높이 안에), 아이콘 최대 크기, 아이콘 밖에 필요한 높이(이름·여백) */
+        /** 자주 쓰는 앱 격자: 4칸 × 2줄(목록과 같은 높이 안에), 아이콘 최대 크기 */
         private const val GRID_COLUMNS = 4
         /** 함께 읽는 책·격자 칸 사이 간격(두 줄의 칸을 맞춘다) */
         private const val GAP_DP = 12
         private const val GRID_ROWS = 2
         private const val GRID_ICON_MAX_DP = 56
-        private const val GRID_LABEL_DP = 46
+        /** 격자: 바깥(위 선 → 첫 줄 아이콘, 둘째 줄 이름 → 하단 선), 줄 사이(첫 줄 이름 → 둘째 줄 아이콘), 아이콘과 이름 사이 */
+        private const val GRID_OUTER_DP = 11
+        private const val GRID_INNER_DP = 12
+        private const val GRID_LABEL_GAP_DP = 6
 
     }
 }

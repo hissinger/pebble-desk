@@ -24,7 +24,7 @@ fun starsLabel(halves: Int): String = if (halves % 2 == 0) "${halves / 2}" else 
  * 칸이 별보다 넓으면 가운데에 그린다. 빈 별은 [empty] 테두리, 채운 별은 [filled], 반 개는 빈 별 위에 왼쪽 반만 칠한다.
  */
 class StarBar(
-    context: Context, sizeDp: Int, gapDp: Int, private val filled: Int = Ui.BLACK, private val empty: Int = Ui.LIGHT_GRAY,
+    context: Context, sizeDp: Int, gapDp: Int, private val filled: Int = Palette.current.star, private val empty: Int = Ui.LIGHT_GRAY,
 ) : View(context) {
     var halves = 0
         set(v) {

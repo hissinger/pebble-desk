@@ -53,7 +53,7 @@ class YearBooksActivity : EinkActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = vbox()
-        root.addView(titleRow("") { finish() }.apply {
+        root.addView(titleRow("", Palette.Area.LIBRARY) { finish() }.apply {
             // 제목 줄: `‹` · 제목 · 권수 · (빈 자리) · `2026 ▾`(고를 해가 둘 이상일 때)
             titleText = getChildAt(1) as TextView
             titleCount = text("", 21f, color = Ui.GRAY)
@@ -181,11 +181,13 @@ class YearBooksActivity : EinkActivity() {
         }
     }
 
-    /** 한 줄: 표지·제목·저자와 별점. 완독한 적이 있으면 오른쪽 끝에 줄보다 큰 완독 도장(위아래·오른쪽이 조금 잘린다). */
+    /**
+     * 한 줄: 표지·제목·저자와 별점. 완독한 적이 있으면 오른쪽 끝에 줄보다 큰 완독 도장(위아래·오른쪽이 조금 잘린다).
+     * 표지는 줄 높이를 거의 다 채운다(위아래 [COVER_GAP_DP] 만 남기고, 폭은 2:3).
+     */
     private fun bookRow(r: Row): View = (if (r.finished) StampedRow(this, STAMP_DP, STAMP_END_DP) else hbox()).apply {
         setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
-        val w = dp(COVER_DP)
-        addView(coverImage(BookShelf.cover(context, r.book, w)), lp(w + dp(2), w * 3 / 2 + dp(2)))
+        addView(coverImage(BookShelf.cover(context, r.book, coverW)), lp(coverW + dp(2), coverW * 3 / 2 + dp(2)))
         addView(vbox().apply {
             addView(text(r.book.title, 22f, Ui.bold, lines = 2))
             // 목록은 짧게: 저자(알면)와 별점(있으면). 완독은 표지의 띠와 도장이, 읽는 중인지·완독 횟수·기간·읽은 시간은 누르면 나오는 상세가 말한다.
@@ -213,8 +215,11 @@ class YearBooksActivity : EinkActivity() {
 
     private val stampSpace get() = dp(STAMP_END_DP + STAMP_DP / 2 - Ui.MARGIN)
 
+    /** 목록 줄 표지 그림 폭(테두리 빼고): 줄 높이에서 위아래 [COVER_GAP_DP] 와 테두리를 뺀 높이의 2/3 */
+    private val coverW get() = (rowDp(ROW_DP * Ui.textGrow) - dp(2 * COVER_GAP_DP + 2)) * 2 / 3
+
     /** 목록 줄 글자 칸 폭(화면 폭 - 여백 - 표지 - 도장 자리) */
-    private fun Row.textWidth() = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - dp(COVER_DP + 2) - dp(16) - (if (finished) stampSpace else 0)
+    private fun Row.textWidth() = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - coverW - dp(2) - dp(16) - (if (finished) stampSpace else 0)
 
     /** 별점이 있으면 작은 별 다섯(회색, 반 개), 없으면 null */
     private fun stars(r: Row, sizeDp: Int): View? {
@@ -230,7 +235,8 @@ class YearBooksActivity : EinkActivity() {
     }
 
     companion object {
-        private const val COVER_DP = 48
+        /** 목록 줄 표지 위아래 여백(dp). 표지는 나머지 높이를 채운다. */
+        private const val COVER_GAP_DP = 6
         /** 읽고 있는 책 목록과 같은 줄 높이 */
         private const val ROW_DP = 98
         /** 목록 줄의 완독 도장: 지름(줄보다 커서 위아래가 잘린다), 가운데가 줄 오른쪽 끝에서 안쪽으로 */

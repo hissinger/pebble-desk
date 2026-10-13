@@ -156,12 +156,17 @@ fun Context.hline(heightDp: Number, color: Int = Ui.BLACK, inset: Boolean = true
     }
 }
 
-/** 하위 화면 제목 줄 `‹ 제목`. 누르면 [onBack]. 제목 뒤에 덧붙일 것(개수 등)은 돌려받은 줄에 더한다. */
-fun Context.titleRow(title: String, onBack: () -> Unit): LinearLayout = hbox().apply {
+/**
+ * 하위 화면 제목 줄 `‹ 제목`. 누르면 [onBack]. 제목 뒤에 덧붙일 것(개수 등)은 돌려받은 줄에 더한다.
+ * 컬러면 화면 묶음 [area] 의 제목 색으로 쓰고, 제목 줄을 칠하는 묶음([Palette.Area.titleBand], 책장·설정)은 그 색면으로 칠한다.
+ */
+fun Context.titleRow(title: String, area: Palette.Area = Palette.Area.SETTINGS, onBack: () -> Unit): LinearLayout = hbox().apply {
     layoutParams = lp(MATCH, dp(80))
     setPadding(dp(Ui.MARGIN - 8), 0, dp(Ui.MARGIN), 0)
-    addView(text("‹", 34f), lp(WRAP, WRAP).apply { marginEnd = dp(10) })
-    addView(text(title, 33f, Ui.heavy))
+    if (area.titleBand) Palette.current.field(area)?.let { setBackgroundColor(it) }
+    val color = Palette.current.title(area)
+    addView(text("‹", 34f, color = color), lp(WRAP, WRAP).apply { marginEnd = dp(10) })
+    addView(text(title, 33f, Ui.heavy, color))
     setOnClickListener { onBack() }
 }
 
@@ -227,13 +232,13 @@ class PictureView(context: Context, private val crop: Boolean = false) : View(co
 }
 
 /**
- * 오른쪽에 완독 도장(`drawable-nodpi/stamp_completed.png`, 회색 [Ui.LIGHT_GRAY] 로 칠한다)을 찍은 가로 줄. 도장은 글자보다
+ * 오른쪽에 완독 도장(`drawable-nodpi/stamp_completed.png`, 회색 [Ui.LIGHT_GRAY], 컬러면 완독 색 [Palette.stamp] 으로 칠한다)을 찍은 가로 줄. 도장은 글자보다
  * 먼저(아래에) 그리고 줄 밖으로 나간 부분은 잘린다(종이 끝에 걸쳐 찍은 것처럼. 부모가 clipChildren=false 면 넘쳐 그린다). 지름 [sizeDp], 가운데는 오른쪽 끝에서 [endDp] 안쪽,
  * 위에서 [topDp] 아래(null 이면 줄 가운데). 글자가 도장에 덮이지 않게 부르는 쪽이 글자 칸 오른쪽을 비운다.
  */
 class StampedRow(context: Context, private val sizeDp: Int, private val endDp: Int, private val topDp: Int? = null) : LinearLayout(context) {
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG).apply {
-        colorFilter = PorterDuffColorFilter(Ui.LIGHT_GRAY, PorterDuff.Mode.SRC_IN)
+        colorFilter = PorterDuffColorFilter(Palette.current.stamp, PorterDuff.Mode.SRC_IN)
     }
     private val dst = RectF()
 
@@ -299,7 +304,7 @@ fun Context.appRow(
 ): LinearLayout = hbox().apply {
     setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
     if (showIcon && app != null) {
-        addView(picture(AppIcons.gray(context, app, dp(iconDp))), lp(dp(iconDp), dp(iconDp)).apply { marginEnd = dp(16) })
+        addView(picture(AppIcons.icon(context, app, dp(iconDp))), lp(dp(iconDp), dp(iconDp)).apply { marginEnd = dp(16) })
     }
     addView(text(label, textSp, face, color), lp(0, WRAP, 1f))
     if (right != null) addView(right, lp(WRAP, WRAP).apply { marginStart = dp(12) })

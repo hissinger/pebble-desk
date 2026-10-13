@@ -96,8 +96,8 @@ object BookSearch {
         }
     }
 
-    /** 폭 [widthPx] 에 맞춰 줄이고 흑백으로 바꾼다. 디코딩하지 못하면 null. */
-    fun grayCover(bytes: ByteArray, widthPx: Int): Bitmap? {
+    /** 폭 [widthPx] 에 맞춰 줄이고 [gray] 면 흑백으로 바꾼다. 디코딩하지 못하면 null. */
+    fun scaledCover(bytes: ByteArray, widthPx: Int, gray: Boolean): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth <= 0) return null
@@ -107,7 +107,7 @@ object BookSearch {
             ?: return null
         val h = (src.height.toLong() * widthPx / src.width).toInt().coerceAtLeast(1)
         val out = Bitmap.createBitmap(widthPx, h, Bitmap.Config.ARGB_8888)
-        Canvas(out).drawBitmap(src, null, Rect(0, 0, widthPx, h), Ui.grayPaint())
+        Canvas(out).drawBitmap(src, null, Rect(0, 0, widthPx, h), if (gray) Ui.grayPaint() else Paint(Paint.FILTER_BITMAP_FLAG))
         src.recycle()
         return out
     }
@@ -356,38 +356,39 @@ object BookShelf {
                 c.getLong(4), c.getInt(5), c.getLong(6), c.getString(7).orEmpty())
         }
 
-    /** 흑백으로 줄인 표지. 표지 그림이 없거나 읽지 못하면 제목·저자·앱 이름으로 그린 빈 표지([BlankCover]). */
+    /** 줄인 표지(흑백, 컬러 [Palette] 면 원래 색). 표지 그림이 없거나 읽지 못하면 제목·저자·앱 이름으로 그린 빈 표지([BlankCover]). */
     fun cover(context: Context, book: ShelfBook, widthPx: Int): Bitmap {
         // 빈 표지에는 앱 이름이 들어가므로 앱이 바뀌어도, 표지는 화면 대비에 맞춰 밝히므로 대비가 바뀌어도 다시 그린다.
         // 한 번이라도 완독한 책은 어디에 놓이든(홈·목록·메뉴·올해 읽은 책) `완독` 띠를 그려 넣는다.
         val tone = Crema.contrastTone(context)
         // 띠 글자는 앱 언어를 따르므로 키에 글자를 넣는다(빈 글자 = 띠 없음).
         val ribbon = if (finishes(context)[book.id].orEmpty().isEmpty()) "" else context.getString(R.string.finish_book)
-        val key = "${book.id}@$widthPx@${book.updatedAt}@${book.app}@$tone@$ribbon"
+        val palette = Palette.current
+        val key = "${book.id}@$widthPx@${book.updatedAt}@${book.app}@$tone@$ribbon@${palette.key}"
         covers.get(key)?.let { return it }
-        // 원본(큰 JPEG)을 매번 줄이지 않도록, 화면 폭으로 줄인 흑백 표지를 파일로 둔다. 원본이 바뀌면 다시 만든다.
+        // 원본(큰 JPEG)을 매번 줄이지 않도록, 화면 폭으로 줄인 표지를 파일로 둔다. 원본이 바뀌면 다시 만든다.
         val original = coverFile(context, book.id)
-        // 화면 대비만큼 미리 밝힌 그림이라 대비 값을 이름에 넣는다.
-        val thumb = File(dir(context), "${book.id}_${widthPx}t${(tone * 100).toInt()}.png")
+        // 화면 대비만큼 미리 밝힌 그림이라 대비 값을, 컬러로 줄인 것은 `c` 를 이름에 넣는다.
+        val thumb = File(dir(context), "${book.id}_${widthPx}t${(tone * 100).toInt()}${if (palette.color) "c" else ""}.png")
         val bmp = thumb.takeIf { it.lastModified() >= original.lastModified() }?.let { BitmapFactory.decodeFile(it.path) }
-            ?: runCatching { BookSearch.grayCover(original.readBytes(), widthPx)?.also { Crema.undoContrast(it, tone) } }.getOrNull()?.also { made ->
-                // 같은 폭의 예전 줄인 표지(대비가 다르거나 예전 이름)는 지운다.
-                val stale = Regex("""${Regex.escape("${book.id}_$widthPx")}(g|t\d+)?\.png""")
+            ?: runCatching { BookSearch.scaledCover(original.readBytes(), widthPx, gray = !palette.color)?.also { Crema.undoContrast(it, tone) } }.getOrNull()?.also { made ->
+                // 같은 폭의 예전 줄인 표지(대비·색이 다르거나 예전 이름)는 지운다.
+                val stale = Regex("""${Regex.escape("${book.id}_$widthPx")}(g|t\d+c?)?\.png""")
                 dir(context).listFiles { f -> f != thumb && stale.matches(f.name) }?.forEach { it.delete() }
                 runCatching { thumb.outputStream().use { made.compress(Bitmap.CompressFormat.PNG, 100, it) } }
             }
             ?: BlankCover.draw(book.title, book.author, book.app?.let { app -> AppStore.load(context).find { it.key == app }?.label }, widthPx)
-        val out = if (ribbon.isEmpty()) bmp else withRibbon(bmp, ribbon)
+        val out = if (ribbon.isEmpty()) bmp else withRibbon(bmp, ribbon, palette.ribbon)
         covers.put(key, out)
         return out
     }
 
     /**
-     * 표지 오른쪽 위 모서리를 45도로 가로지르는 진한 회색([Ui.GRAY]) [text] 띠를 그린 사본. 띠 굵기·글자는 표지 폭에 비례해(굵기 21%, 글자는 띠의 58%)
+     * 표지 오른쪽 위 모서리를 45도로 가로지르는 [band](진한 회색, 컬러면 완독 색 [Palette.ribbon]) [text] 띠를 그린 사본. 띠 굵기·글자는 표지 폭에 비례해(굵기 21%, 글자는 띠의 58%)
      * 큰 표지와 작은 표지가 같은 모양이다. 띠 가운데는 모서리에서 폭의 1/4 안쪽, 위아래 흰 줄로 어두운 표지에서도 띠가 보인다.
      * 표지 칸은 모두 2:3 이고 그림은 가운데를 잘라 보이므로, 먼저 2:3 으로 잘라 두고 그린다(아니면 띠가 잘려 한쪽으로 쏠린다).
      */
-    private fun withRibbon(cover: Bitmap, text: String): Bitmap {
+    private fun withRibbon(cover: Bitmap, text: String, band: Int): Bitmap {
         val vw = minOf(cover.width, cover.height * 2 / 3)
         val vh = minOf(cover.height, cover.width * 3 / 2)
         val out = Bitmap.createBitmap(vw, vh, Bitmap.Config.ARGB_8888)
@@ -400,7 +401,7 @@ object BookShelf {
         Canvas(out).apply {
             translate(w - k, k)
             rotate(45f)
-            drawRect(-half, -bandH / 2, half, bandH / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Ui.GRAY })
+            drawRect(-half, -bandH / 2, half, bandH / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = band })
             val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; strokeWidth = maxOf(1f, bandH * 0.045f) }
             drawLine(-half, -bandH / 2 + inset, half, -bandH / 2 + inset, edge)
             drawLine(-half, bandH / 2 - inset, half, bandH / 2 - inset, edge)

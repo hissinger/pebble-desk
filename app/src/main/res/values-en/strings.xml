@@ -185,6 +185,9 @@
     <string name="month_read">Days read in %1$s</string>
     <string name="days_of">%1$d / %2$d days</string>
     <string name="this_year">This year</string>
+    <string name="color">Color</string>
+    <string name="palette_mono">Black &amp; white</string>
+    <string name="palette_color">Color</string>
     <string name="books_this_week">Books this week</string>
     <string name="books_unknown">Turn on auto-add to see time by book</string>
     <string name="reading_empty">No reading this week yet</string>

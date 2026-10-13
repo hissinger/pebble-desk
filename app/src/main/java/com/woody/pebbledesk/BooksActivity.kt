@@ -24,7 +24,7 @@ class BooksActivity : EinkActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = vbox()
-        root.addView(titleRow(getString(R.string.now_reading)) { finish() }.apply {
+        root.addView(titleRow(getString(R.string.now_reading), Palette.Area.LIBRARY) { finish() }.apply {
             titleCount = text("", 21f, color = Ui.GRAY)
             addView(titleCount, lp(WRAP, WRAP).apply { marginStart = dp(14); topMargin = dp(6) })
         })

@@ -148,6 +148,11 @@ class HomePrefs(context: Context) {
         get() = if (sp.getBoolean("week_starts_sunday", false)) DayOfWeek.SUNDAY else DayOfWeek.MONDAY
         set(v) = sp.edit().putBoolean("week_starts_sunday", v == DayOfWeek.SUNDAY).apply()
 
+    /** 색(설정 › 화면 › 색, [Palette]). 처음은 흑백. */
+    var palette: Palette
+        get() = Palette.of(sp.getString(KEY_PALETTE, null))
+        set(v) = sp.edit().putString(KEY_PALETTE, v.key).apply()
+
     var showIcons: Boolean
         get() = sp.getBoolean("show_icons", true)
         set(v) = sp.edit().putBoolean("show_icons", v).apply()
@@ -179,6 +184,7 @@ class HomePrefs(context: Context) {
         private const val KEY_FAV_NAMES = "favorite_names"
         private const val KEY_TEXT_SCALE = "text_scale"
         private const val KEY_ROW_SCALE = "row_scale"
+        private const val KEY_PALETTE = "palette"
 
         /** 설정 › 글자 · 간격의 단계(%): 글자 크기는 70~150(기기 글꼴 크기에 곱한다), 줄 간격은 80~150, 10% 씩 */
         val TEXT_SCALES = (70..150 step 10).toList()
@@ -192,6 +198,9 @@ class HomePrefs(context: Context) {
         /** 화면을 만들기 전에(attachBaseContext) 글자 크기·줄 간격을 정하려고 쓴다. */
         fun textScalePercent(context: Context) = percent(prefs(context), KEY_TEXT_SCALE, TEXT_SCALES)
         fun rowScalePercent(context: Context) = percent(prefs(context), KEY_ROW_SCALE, ROW_SCALES)
+
+        /** 화면을 만들기 전에(attachBaseContext) 색을 정하려고 쓴다. */
+        fun palette(context: Context) = Palette.of(prefs(context).getString(KEY_PALETTE, null))
 
         /** 화면을 만들기 전에(attachBaseContext) 언어를 정하려고 쓴다. */
         fun isEnglish(context: Context) =

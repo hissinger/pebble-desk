@@ -236,14 +236,15 @@ fun favoriteApps(apps: List<AppEntry>, prefs: HomePrefs): List<AppEntry> {
         .map { app -> names[app.key]?.let { app.copy(label = it) } ?: app }
 }
 
-/** 흑백으로 바꾼 앱 아이콘 캐시 */
+/** 앱 아이콘 캐시. 흑백으로 바꿔 그리고, 컬러 [Palette] 면 원래 색 그대로. */
 object AppIcons {
     private val cache = LruCache<String, Bitmap>(200)
     private val grayPaint = Ui.grayPaint()
     private var packageSequence = 0
 
-    fun gray(context: Context, app: AppEntry, px: Int): Bitmap {
-        val key = "${app.key}@$px"
+    fun icon(context: Context, app: AppEntry, px: Int): Bitmap {
+        val gray = !Palette.current.color
+        val key = "${app.key}@$px@$gray"
         cache.get(key)?.let { return it }
         val pm = context.packageManager
         // 못 찾으면 기본 아이콘을 쓰되 기억하지 않는다(다음에 다시 찾는다).
@@ -253,11 +254,12 @@ object AppIcons {
         val drawable = found ?: pm.defaultActivityIcon
         val color = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         Canvas(color).let { drawable.setBounds(0, 0, px, px); drawable.draw(it) }
-        val gray = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        Canvas(gray).drawBitmap(color, 0f, 0f, grayPaint)
-        color.recycle()
-        if (found != null) cache.put(key, gray)
-        return gray
+        val out = if (!gray) color else Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888).also {
+            Canvas(it).drawBitmap(color, 0f, 0f, grayPaint)
+            color.recycle()
+        }
+        if (found != null) cache.put(key, out)
+        return out
     }
 
     /** 앱이 설치·업데이트·삭제됐을 때만 캐시를 비운다(아이콘이 바뀌었을 수 있으므로). 비웠으면 true. */

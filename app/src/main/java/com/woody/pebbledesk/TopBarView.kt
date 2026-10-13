@@ -116,7 +116,8 @@ class TopBarView(context: Context) : View(context) {
     private var now = Date()
 
     private val padTop = context.dp(20)
-    private val padBottom = context.dp(14)
+    /** 아래 여백: 바로 아래 맨 앞 책과 가깝게. 세로가 남는 바형 화면은 조금 더 띄운다. */
+    private val padBottom = context.dp(if (Ui.tallScreen) 6 else 2)
     private val lineGap = context.dp(16)
     private val logoHeight = context.dp(32)
     /** 상태 줄 아이콘·원문자는 상태 글자처럼 글자 배율을 따른다 */

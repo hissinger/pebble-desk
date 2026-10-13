@@ -60,6 +60,11 @@ class Sheet(private val context: Context) {
 
     fun stamp() = apply { stamped = true }
 
+    /** 머리와 칸들(책 상세의 정보)을 책 상세 색면([Palette.Area.DETAIL]) 바탕에 둬 아래 메뉴(흰색)와 나눈다. 컬러에서만. */
+    private var paper: Int? = null
+
+    fun paper() = apply { paper = Palette.current.field(Palette.Area.DETAIL) }
+
     fun header(title: String, subtitle: CharSequence? = null, app: AppEntry? = null, image: Bitmap? = null, lines: Int = 16) = apply {
         this.title = title; this.subtitle = subtitle; this.app = app; this.image = image; subtitleLines = lines
     }
@@ -82,13 +87,17 @@ class Sheet(private val context: Context) {
         val root = c.vbox()
         Crema.reserveHiddenBottom(root)
         root.addView(c.hline(2, inset = false))
+        // 머리와 칸들을 한 묶음에 넣는다(정보 바탕을 칠할 때 도장이 넘친 자리까지 같은 바탕이게).
+        val info = c.vbox()
+        paper?.let { info.setBackgroundColor(it) }
+        root.addView(info, lp(MATCH, WRAP))
         // 도장은 머리 아래로 조금 넘쳐 기록 칸 위에 걸친다(뒤에 그리는 선·글자가 위에 온다).
-        if (stamped) root.clipChildren = false
+        if (stamped) { root.clipChildren = false; info.clipChildren = false }
 
         val head = (if (stamped) StampedRow(c, STAMP_DP, STAMP_END_DP, STAMP_TOP_DP) else c.hbox())
             .apply { setPadding(c.dp(Ui.MARGIN), c.dp(22), c.dp(Ui.MARGIN), c.dp(20)) }
         app?.let {
-            head.addView(c.picture(AppIcons.gray(c, it, c.dp(45))),
+            head.addView(c.picture(AppIcons.icon(c, it, c.dp(45))),
                 lp(c.dp(45), c.dp(45)).apply { marginEnd = c.dp(16) })
         }
         image?.let {
@@ -105,10 +114,10 @@ class Sheet(private val context: Context) {
             // 제목이 도장에 덮이지 않게 도장 왼쪽 끝까지 비운다.
             if (stamped) marginEnd = c.dp(STAMP_END_DP + STAMP_DP / 2 - Ui.MARGIN)
         })
-        root.addView(head)
+        info.addView(head)
         notes.forEach { n ->
-            root.addView(c.hline(1, Ui.DIVIDER))
-            root.addView(FrameLayout(c).apply {
+            info.addView(c.hline(1, Ui.DIVIDER))
+            info.addView(FrameLayout(c).apply {
                 setPadding(c.dp(Ui.MARGIN), c.dp(10), c.dp(Ui.MARGIN), c.dp(14))
                 addView(n.view)
                 n.onClick?.let { action -> setOnClickListener { dismissThen(action) } }

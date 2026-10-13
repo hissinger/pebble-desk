@@ -32,7 +32,7 @@ class SettingsActivity : EinkActivity() {
     private var progressDialog: Dialog? = null
     /** 자동 추가 안내의 쪽들(그 화면에서만) */
     private lateinit var guide: PagedBlocks
-    /** 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]), 글자 · 간격([PAGE_TEXT]) */
+    /** 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]), 화면([PAGE_DISPLAY]), 글자 · 간격([PAGE_TEXT]) */
     private val page by lazy { intent.getStringExtra(EXTRA_PAGE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,6 +41,7 @@ class SettingsActivity : EinkActivity() {
         val title = when (page) {
             PAGE_GUIDE -> R.string.auto_books_guide
             PAGE_READING -> R.string.reading_settings
+            PAGE_DISPLAY -> R.string.section_display
             PAGE_TEXT -> R.string.text_spacing
             else -> R.string.settings
         }
@@ -67,6 +68,7 @@ class SettingsActivity : EinkActivity() {
         when (page) {
             PAGE_GUIDE -> renderGuide()
             PAGE_READING -> renderReading()
+            PAGE_DISPLAY -> renderDisplay()
             PAGE_TEXT -> renderText()
             else -> {
                 render()
@@ -93,24 +95,11 @@ class SettingsActivity : EinkActivity() {
         AppStore.loadAndPrune(this, prefs)
 
         // 맨 위 소제목 없이 독서(읽고 있는 책·자동 추가·오늘 읽은 시간·하루 목표·한 주 시작·독서 기록). 줄이 많아 한 화면에 모은다.
-        row(getString(R.string.reading_settings), null, next = true) {
-            startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, PAGE_READING))
-        }
+        row(getString(R.string.reading_settings), null, next = true) { open(PAGE_READING) }
 
-        // 화면: 앱 전체에 걸리는 보기 설정
-        section(getString(R.string.section_display))
-        // 글자 크기·줄 간격은 한 화면에서 슬라이더로 보며 고른다.
-        row(getString(R.string.text_spacing), "${prefs.textScalePercent}% · ${prefs.rowScalePercent}%", next = true) {
-            startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, PAGE_TEXT))
-        }
-        toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint)) { prefs.showIcons = it }
-        val clocks = listOf(getString(R.string.clock24), getString(R.string.clock12))
-        row(getString(R.string.clock), clocks[if (prefs.clock24h) 0 else 1], next = true) {
-            choose(getString(R.string.clock), clocks, if (prefs.clock24h) 0 else 1) {
-                prefs.clock24h = it == 0; render()
-            }
-        }
-        // 언어 이름은 바꾸지 않는다(어느 언어에서도 알아볼 수 있게). 바꾸면 이 화면부터 다시 만든다.
+        // 화면(글자 · 간격 · 색 · 앱 아이콘 · 시계)은 하위 화면에 모아 첫 화면을 짧게 둔다(줄 간격을 키워도 잘리지 않게).
+        row(getString(R.string.section_display), null, next = true) { open(PAGE_DISPLAY) }
+        // 언어는 첫 화면에 둔다(다른 언어 화면에서도 바로 찾게). 언어 이름은 바꾸지 않는다(어느 언어에서도 알아볼 수 있게). 바꾸면 이 화면부터 다시 만든다.
         val languages = listOf("한국어", "English")
         row(getString(R.string.language), languages[if (prefs.english) 1 else 0], next = true) {
             choose(getString(R.string.language), languages, if (prefs.english) 1 else 0) {
@@ -270,6 +259,31 @@ class SettingsActivity : EinkActivity() {
                     startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
                 }
             }.show()
+    }
+
+    private fun open(page: String) = startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, page))
+
+    /** 화면: 글자 · 간격, 색, 앱 아이콘, 시계 */
+    private fun renderDisplay() {
+        list.removeAllViews()
+        // 글자 크기·줄 간격은 한 화면에서 슬라이더로 보며 고른다.
+        row(getString(R.string.text_spacing), "${prefs.textScalePercent}% · ${prefs.rowScalePercent}%", next = true) { open(PAGE_TEXT) }
+        // 색: 흑백 / 컬러. 바꾸면 이 화면부터 다시 만든다(색은 화면을 만들 때 정해진다).
+        val palettes = listOf(Palette.MONO to R.string.palette_mono, Palette.COLOR to R.string.palette_color)
+        val names = palettes.map { getString(it.second) }
+        val now = palettes.indexOfFirst { it.first == prefs.palette }
+        row(getString(R.string.color), names[now], next = true) {
+            choose(getString(R.string.color), names, now) {
+                if (palettes[it].first != prefs.palette) { prefs.palette = palettes[it].first; recreate() }
+            }
+        }
+        toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint), redraw = ::renderDisplay) { prefs.showIcons = it }
+        val clocks = listOf(getString(R.string.clock24), getString(R.string.clock12))
+        row(getString(R.string.clock), clocks[if (prefs.clock24h) 0 else 1], next = true) {
+            choose(getString(R.string.clock), clocks, if (prefs.clock24h) 0 else 1) {
+                prefs.clock24h = it == 0; renderDisplay()
+            }
+        }
     }
 
     /** 독서 화면: 읽고 있는 책, 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */
@@ -478,8 +492,9 @@ class SettingsActivity : EinkActivity() {
         if (!last) into.addView(hline(1, Ui.DIVIDER))
     }
 
-    private fun toggle(label: String, value: Boolean, hint: String? = null, set: (Boolean) -> Unit) =
-        row(label, getString(if (value) R.string.on else R.string.off), on = value, hint = hint) { set(!value); render() }
+    /** 켜짐/꺼짐 줄. 누르면 바꾸고 [redraw] 로 그 화면을 다시 그린다. */
+    private fun toggle(label: String, value: Boolean, hint: String? = null, redraw: () -> Unit, set: (Boolean) -> Unit) =
+        row(label, getString(if (value) R.string.on else R.string.off), on = value, hint = hint) { set(!value); redraw() }
 
     /** 안드로이드 홈 앱 선택 화면. 기기마다 있는 화면이 달라 차례로 시도한다. */
     private fun openHomeSettings() {
@@ -496,6 +511,7 @@ class SettingsActivity : EinkActivity() {
     companion object {
         private const val EXTRA_PAGE = "page"
         private const val PAGE_TEXT = "text"
+        private const val PAGE_DISPLAY = "display"
         /** 설정 줄 이름 글자(sp) */
         private const val ROW_LABEL_SP = 22f
         private const val PAGE_READING = "reading"

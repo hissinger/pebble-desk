@@ -43,7 +43,7 @@ class BookSearchActivity : EinkActivity() {
         coverH = cellW * 3 / 2
 
         val root = vbox()
-        root.addView(titleRow(getString(if (replaceId != null) R.string.find_cover else R.string.book_search_title)) { finish() })
+        root.addView(titleRow(getString(if (replaceId != null) R.string.find_cover else R.string.book_search_title), Palette.Area.LIBRARY) { finish() })
         root.addView(hline(2))
 
         // 제목 입력 줄: 박스 없이 아래 굵은 선만
@@ -148,11 +148,14 @@ class BookSearchActivity : EinkActivity() {
 
     private fun loadThumb(view: ImageView, url: String) {
         view.tag = url
-        thumbs.get(url)?.let { view.setImageBitmap(it); view.background = null; return }
+        // 흑백·컬러를 따로 둔다(설정에서 색을 바꾸고 다시 찾을 때).
+        val gray = !Palette.current.color
+        val key = if (gray) url else "$url@c"
+        thumbs.get(key)?.let { view.setImageBitmap(it); view.background = null; return }
         val width = cellW
-        Bg.run({ BookSearch.grayCover(BookSearch.download(url), width) }) { result ->
+        Bg.run({ BookSearch.scaledCover(BookSearch.download(url), width, gray) }) { result ->
             val bmp = result.getOrNull() ?: return@run
-            thumbs.put(url, bmp)
+            thumbs.put(key, bmp)
             if (view.tag == url) {
                 view.setImageBitmap(bmp)
                 view.background = null
@@ -211,7 +214,7 @@ class BookSearchActivity : EinkActivity() {
     companion object {
         private const val COLUMNS = 4
         private const val GAP_DP = 14
-        /** 검색 결과 표지(흑백으로 줄인 것) */
+        /** 검색 결과 표지(줄인 것, 흑백 또는 컬러) */
         private val thumbs = object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
             override fun sizeOf(key: String, value: Bitmap) = value.byteCount
         }

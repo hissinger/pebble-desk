@@ -24,6 +24,8 @@ abstract class EinkActivity : Activity() {
     /** 이 화면을 만들 때 쓴 글자 크기·줄 간격(%). 설정에서 바뀌었으면 돌아올 때 다시 만든다. */
     private var createdTextScale = 100
     private var createdRowScale = 100
+    /** 이 화면을 만들 때 쓴 색. 설정에서 바뀌었으면 돌아올 때 다시 만든다. */
+    private var createdPalette = Palette.MONO
     /** 이 화면이 쓰는 배율([Ui.textScale]·[Ui.rowScale]). 앱 전체 값이라 이 화면으로 돌아올 때마다 다시 맞춘다. */
     private var textScale = 1f
     private var rowScale = 1f
@@ -43,6 +45,8 @@ abstract class EinkActivity : Activity() {
         createdEnglish = HomePrefs.isEnglish(newBase)
         createdTextScale = HomePrefs.textScalePercent(newBase)
         createdRowScale = HomePrefs.rowScalePercent(newBase)
+        createdPalette = HomePrefs.palette(newBase)
+        Palette.current = createdPalette
         textScale = if (fixedTextSize) 1f else createdTextScale / 100f
         rowScale = if (fixedTextSize) 1f else createdRowScale / 100f
         Ui.textScale = textScale
@@ -64,8 +68,9 @@ abstract class EinkActivity : Activity() {
         // 기본 크기로 그리는 화면(기기 정보)에서 돌아왔으면 이 화면의 배율로 되돌린다(새로 그리는 줄·메뉴가 이 값을 쓴다).
         Ui.textScale = textScale
         Ui.rowScale = rowScale
+        Palette.current = createdPalette
         if (prefs.english != createdEnglish || prefs.textScalePercent != createdTextScale ||
-            prefs.rowScalePercent != createdRowScale) recreate()
+            prefs.rowScalePercent != createdRowScale || prefs.palette != createdPalette) recreate()
     }
 
     override fun setContentView(view: View) {

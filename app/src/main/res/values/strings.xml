@@ -188,6 +188,9 @@
     <string name="month_read">%1$s 읽은 날</string>
     <string name="days_of">%1$d / %2$d일</string>
     <string name="this_year">올해</string>
+    <string name="color">색</string>
+    <string name="palette_mono">흑백</string>
+    <string name="palette_color">컬러</string>
     <string name="books_this_week">이번 주 읽은 책</string>
     <string name="books_unknown">읽는 책 자동 추가를 켜면 책별로 보입니다</string>
     <string name="reading_empty">이번 주에 읽은 기록이 아직 없습니다</string>

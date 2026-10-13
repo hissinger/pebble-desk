@@ -93,11 +93,12 @@ fun Context.bookSubtitle(book: ShelfBook, reading: Boolean): String? {
 
 /**
  * 책 상세의 머리: 표지(완독 띠), 제목, [sub], 완독한 적이 있으면 오른쪽 위에 완독 도장, 그 아래 기록 칸([recordView], 기록이 없으면 두지 않는다).
+ * 컬러면 머리와 칸들을 책 상세 색면([Sheet.paper])에 둬 아래 메뉴와 나눈다.
  * [full](올해 읽은 책)이면 그 아래 별점·감상 칸([reviewBlock], 누르면 고친다. 목록에 없던 책은 남기는 순간 나간 책으로 적어 둔다).
  */
 private fun Context.bookSheet(r: BookRecord, sub: String?, full: Boolean, onChange: () -> Unit): Sheet {
     val book = r.book
-    val sheet = Sheet(this).header(book.title, sub, image = BookShelf.cover(this, book, dp(SHEET_COVER_DP)))
+    val sheet = Sheet(this).header(book.title, sub, image = BookShelf.cover(this, book, dp(SHEET_COVER_DP))).paper()
     recordView(r, full)?.let { sheet.note(it) }
     if (full) sheet.note(reviewBlock(BookShelf.reviews(this)[book.id])) {
         reviewSheet(book, sub, getString(R.string.save)) { review ->

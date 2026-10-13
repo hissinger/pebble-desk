@@ -38,7 +38,7 @@ class ReadingActivity : EinkActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = vbox()
-        root.addView(titleRow(getString(R.string.reading_stats)) { finish() }.apply {
+        root.addView(titleRow(getString(R.string.reading_stats), Palette.Area.READING) { finish() }.apply {
             addView(View(context), lp(0, 0, 1f))
             // 올해 읽은 책
             addView(text(getString(R.string.year_books_link), 17f, Ui.bold).apply {
@@ -87,7 +87,9 @@ class ReadingActivity : EinkActivity() {
         val since = ReadingLog.since(this) ?: today
         body.addView(hero(days, today, goalMs, frac(today), monthGoal(days, today, since, goalMs, ::frac)))
         // 연속일 줄과 달력 사이는 조금 띄운다(달력 제목 줄이 오늘 링 바로 밑에 붙지 않게).
-        body.addView(calendar(days, today, since, goalMs, ::frac), lp(MATCH, WRAP).apply { topMargin = dp(HERO_GAP_DP) })
+        body.addView(calendar(days, today, since, goalMs, ::frac), lp(MATCH, WRAP).apply {
+            topMargin = dp(HERO_GAP_DP - if (Palette.current.color) FIELD_BOTTOM_DP else 0)
+        })
         // 아래: 왼쪽 합계 · 오른쪽 이번 주 읽은 책. 칸마다 달력처럼 제목과 그 아래 선(두 칸 모두 위에 맞춘다).
         body.addView(hbox().apply {
             gravity = Gravity.TOP
@@ -125,8 +127,11 @@ class ReadingActivity : EinkActivity() {
 
     /** 왼쪽 큰 연속일과 이번 달 목표 달성([month]: 제목 to 값), 오른쪽 오늘 링(가운데 오늘 읽은 시간) */
     private fun hero(days: ReadingDays, today: LocalDate, goalMs: Long, todayFrac: Float, month: Pair<String, String>) = hbox().apply {
-        setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), 0)
-        addView(text(ReadingLog.streak(days, today).toString(), 80f, Ui.heavy))
+        // 컬러면 독서 기록 색면(파랑)을 깔고 아래를 조금 넓힌다(달력과의 사이에서 뺀다).
+        val field = Palette.current.field(Palette.Area.READING)
+        field?.let { setBackgroundColor(it) }
+        setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), if (field != null) dp(FIELD_BOTTOM_DP) else 0)
+        addView(text(ReadingLog.streak(days, today).toString(), 80f, Ui.heavy, Palette.current.goal))
         addView(vbox().apply {
             addView(text(getString(R.string.streak_sub, ReadingLog.longestStreak(days)), 15f, Ui.medium, Ui.GRAY))
             addView(text(getString(R.string.streak_days), 28f, Ui.bold), lp(WRAP, WRAP).apply { topMargin = dp(4) })
@@ -307,6 +312,8 @@ class ReadingActivity : EinkActivity() {
         private const val GRAPH_GAP_DP = 28
         /** 연속일 줄과 달력 사이 */
         private const val HERO_GAP_DP = 16
+        /** 컬러: 연속일 칸 색면이 아래로 더 내려오는 높이(HERO_GAP_DP 안) */
+        private const val FIELD_BOTTOM_DP = 12
         /** 아래 왼쪽 합계 칸 폭(dp) */
         private const val TOTALS_W = 150
         /** 왼쪽 합계 칸과 오른쪽 책 칸 사이(dp) */
@@ -322,11 +329,11 @@ class ReadingActivity : EinkActivity() {
     }
 }
 
-/** 둥근 끝 진행 링(애플 활동 링처럼) 그리기. 바탕 링 위에 12시부터 시계 방향으로 [frac](0~1)만큼. */
+/** 둥근 끝 진행 링(애플 활동 링처럼) 그리기. 바탕 링 위에 12시부터 시계 방향으로 [frac](0~1)만큼(검정, 컬러면 [Palette.goal]). */
 private class RingPainter(stroke: Float) {
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = stroke }
     private val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = stroke; color = Ui.BLACK; strokeCap = Paint.Cap.ROUND
+        style = Paint.Style.STROKE; strokeWidth = stroke; color = Palette.current.goal; strokeCap = Paint.Cap.ROUND
     }
     /** 선 굵기의 절반: 링이 칸 안에 들어오게 이만큼 안쪽에 그린다. */
     val inset = stroke / 2
@@ -446,7 +453,7 @@ private fun Context.calPaint(sp: Float, face: android.graphics.Typeface, color: 
 
 /**
  * [weeks]주를 날마다 막대 하나로(독서 기록의 `그래프`). 높이는 같은 자리의 링 달력과 같다.
- * 하루 목표([goalMs])에 점선과 `목표 30분`, 목표를 채운 날([met])은 검정·못 채운 날은 회색 막대.
+ * 하루 목표([goalMs])에 점선과 `목표 30분`, 목표를 채운 날([met])은 검정(컬러면 [Palette.goal])·못 채운 날은 회색 막대.
  * 가장 많이 읽은 날과 오늘은 막대 위에 시간, 아래에는 주마다 첫날 `10/5`, 오늘은 검은 동그라미 안 날짜. 기록 전 날짜는 흐리게.
  */
 private class ReadingGraph(
@@ -471,6 +478,7 @@ private class ReadingGraph(
     private val todayPaint = context.calPaint(11f, Ui.bold, Color.WHITE)
     private val goalLabelPaint = context.calPaint(11f, Ui.medium, Ui.GRAY, Paint.Align.LEFT)
     private val barPaint = Paint()
+    private val metColor = Palette.current.goal
     private val basePaint = Paint().apply { color = Ui.DIVIDER; strokeWidth = context.dpf(1) }
     private val goalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Ui.GRAY; strokeWidth = context.dpf(1); style = Paint.Style.STROKE
@@ -519,7 +527,7 @@ private class ReadingGraph(
             val cx = margin + slot * (i + 0.5f)
             val v = values[i]
             if (v > 0) {
-                barPaint.color = if (met(day)) Ui.BLACK else UNMET_BAR
+                barPaint.color = if (met(day)) metColor else UNMET_BAR
                 canvas.drawRect(cx - barW / 2, minOf(y(v), bottom - minBar), cx + barW / 2, bottom, barPaint)
             }
             val labelY = bottom + context.dpf(4) + pillH / 2
