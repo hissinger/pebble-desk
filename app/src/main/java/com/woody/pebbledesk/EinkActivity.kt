@@ -10,6 +10,7 @@ import android.view.MotionEvent
 import android.view.View
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * 전자잉크용 화면 공통: 화면 전환 애니메이션을 끄고, 좌우로 밀거나 페이지 버튼을 누르면 [onSwipe] 를 부른다.
@@ -54,7 +55,17 @@ abstract class EinkActivity : Activity() {
         val config = Configuration(newBase.resources.configuration)
         config.setLocale(if (createdEnglish) Locale.ENGLISH else Locale.KOREAN)
         if (fixedTextSize) config.fontScale = 1f
-        config.densityDpi = Ui.designDensityDpi(newBase)
+        val dpi = Ui.designDensityDpi(newBase)
+        // 화면 크기(dp)도 같은 비율로 바꾼다. 밀도만 바꾸면 안드로이드 10 은 dp 크기에서 픽셀을 거꾸로 셈해 화면을 실제보다 넓게 안다
+        // (1264px 300dpi → 354dpi 면 1491px). 아래 메뉴가 그 폭으로 높이를 재서 글이 실제로는 한 줄 더 늘어 `닫기` 가 잘렸다(BOOX Leaf).
+        val from = config.densityDpi
+        if (from > 0 && from != dpi) {
+            fun scale(dp: Int) = if (dp <= 0) dp else (dp * from / dpi.toFloat()).roundToInt() // 0 은 모름
+            config.screenWidthDp = scale(config.screenWidthDp)
+            config.screenHeightDp = scale(config.screenHeightDp)
+            config.smallestScreenWidthDp = scale(config.smallestScreenWidthDp)
+        }
+        config.densityDpi = dpi
         super.attachBaseContext(newBase.createConfigurationContext(config))
     }
 

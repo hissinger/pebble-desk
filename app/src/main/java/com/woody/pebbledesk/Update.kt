@@ -282,7 +282,9 @@ object Update {
      */
     private fun verify(context: Context, release: Release, apk: File) {
         val pm = context.packageManager
-        val archive = pm.getPackageArchiveInfo(apk.path, PackageManager.GET_SIGNING_CERTIFICATES)
+        // 안드로이드 9·10 은 받은 APK 의 서명을 GET_SIGNATURES 가 있을 때만 읽는다(없으면 signingInfo 가 null 이라 늘 실패했다).
+        @Suppress("DEPRECATION")
+        val archive = pm.getPackageArchiveInfo(apk.path, PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES)
         val installed = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
         val ok = archive != null && archive.packageName == context.packageName &&
             archive.versionName == release.version && archive.longVersionCode > installed.longVersionCode &&
