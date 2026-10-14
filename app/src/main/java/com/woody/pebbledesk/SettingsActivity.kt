@@ -60,6 +60,10 @@ class SettingsActivity : EinkActivity() {
             list = vbox()
             root.addView(list, lp(MATCH, 0, 1f))
         }
+        // 맨 아래 지금 판, 늘 보인다(업데이트 줄은 새 판이 있으면 새 판 번호를 보여 지금 판이 안 보인다)
+        if (page == null) root.addView(text("Pebble Desk ${appVersion()}", 15f, color = Ui.LIGHT_GRAY).apply {
+            gravity = Gravity.CENTER
+        }, lp(MATCH, dp(44)))
         setContentView(root)
     }
 
@@ -122,7 +126,7 @@ class SettingsActivity : EinkActivity() {
             runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
         }
 
-        // 정보: 판 번호는 업데이트 줄에만 보인다(아래 꼬리글은 두지 않는다).
+        // 정보
         section(getString(R.string.section_info))
         row(getString(R.string.device_info), Build.MODEL, next = true) { startActivity(DeviceInfoActivity.intent(this)) }
         updateSlot = vbox().also { list.addView(it) }
