@@ -259,7 +259,7 @@ Pebble Desk(1.2.x)를 기본 홈으로 쓰는 홈 화면. 책 1권(밀리의서�
 - **자동 추가 서비스 기록**: `연결 10/14 08:17 · 끊김 - · 끊긴 횟수 0`, `앱 종료 10/14 08:17 PKG_UPDATED · 08:17 OTHER`. 덮어 설치(1.5.2)로 앱이 끝난 뒤 서비스가 바로 다시 붙었다. `배터리 최적화 제외 꺼짐 · 대기 그룹 EXEMPTED · 백그라운드 제한 꺼짐`.
 - **시스템 속성**(1.3.0 사진과 다른 값): `persist.sys.eink.color.filter` 0 → **10**, `persist.sys.eink.contrast` 30 → **6**. `persist.eink.dither256.disable=0`·`persist.sys.eink.gesture.width=2.0` 은 같다. 사용자가 무엇을 바꿨는지는 **(미확인)**(`contrast` 는 화면 대비, `color.filter` 는 색 거르기 정도로 보인다 **(추정)**). Tango 도 `color.filter=10`·`contrast=6` 이라 이 값이 SmartOS 기본일 수 있다 **(추정)**.
 - **설정 값**: `screen_brightness` 255 → **1**, `EinkLightStep=0`, `down_key_long_function` 4 → **2**(아래 버튼 길게 누르기 동작으로 보인다 **(추정)**), `eink_wallpaper_name=系统默认`(전에는 `시스템 캘린더`. 고를 때의 언어로 저장되는 듯 **(추정)**), 새 키 `ireader_systemui_shutdown_pending=0`·`key_b…`(잘림).
-- **최근 화면**: `com.flyersoft.moonreader / ActivityTxt`, `com.flyersoft.moonreaderp / ActivityTxt`(문리더 유료판도 읽는 화면 이름이 같다), `com.android.settings / SpaActivity`(안드로이드 14 설정의 새 앱 정보·권한 화면).
+- **최근 화면**: `com.flyersoft.moonreader / ActivityTxt`, `com.flyersoft.moonreaderp / ActivityTxt`(기기 정보는 클래스의 마지막 이름만 보인다. 실제 클래스는 `com.flyersoft.moonreaderp.ActivityTxt` 로, 무료판과 패키지 부분이 다르다), `com.android.settings / SpaActivity`(안드로이드 14 설정의 새 앱 정보·권한 화면).
 - **화면 위**: 하위 화면 위에 SmartOS 상단 바 대신 안드로이드식 상태 줄(시각 `8:55`, BT · Wi-Fi · `91%`)이 보이고, 제목 왼쪽 `‹` 가 없다. 1.5.2 의 설정 › 화면 › 기기 상단 바를 켰는지, 펌웨어가 바뀐 것인지 **(미확인)**.
 
 ### 다음에 받을 것

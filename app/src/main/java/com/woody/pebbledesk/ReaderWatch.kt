@@ -61,8 +61,8 @@ class ReaderWatchService : AccessibilityService() {
     private val unknownOpen = mutableMapOf<String, Long>()
     private var lastWebRead = 0L
     /**
-     * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 알라딘 서재가 잠깐 보일 때
-     * 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
+     * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 알라딘·리디처럼 서재를 잠깐만 보는
+     * 앱의 서재가 보일 때(보이는 대로, 그리고 멈췄을 때) 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
      */
     private val pendingCovers = object : LinkedHashMap<String, ByteArray>() {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?) = size > PENDING_MAX
@@ -180,7 +180,7 @@ class ReaderWatchService : AccessibilityService() {
                             val thumb = s.thumb?.takeIf(::usableThumb) ?: return@mapNotNull null
                             val book = BookShelf.findByTitle(this, s.title)
                             // 목록에 없는 책은 들어올 때 붙일 표지를 미리 찍어 둔다(목록이 다 찼으면 들어올 수 없어 찍지 않는다).
-                            val need = if (book == null) BookShelf.canAutoAdd(this, s.title) && pendingFor(s.title) == null else !BookShelf.hasCover(this, book.id)
+                            val need = if (book == null) wantsPendingCover(s.title) else !BookShelf.hasCover(this, book.id)
                             if (need && tryCover(s.title)) s.title to thumb else null
                         }, retry = false)
                     }
@@ -248,6 +248,9 @@ class ReaderWatchService : AccessibilityService() {
         return true
     }
 
+    /** 목록에 없는 [title] 의 표지를 잘라 둘까: 들어올 수 있고(목록이 다 찼거나 완독해 나간 책이면 들어오지 않는다) 아직 잘라 두지 않았으면 */
+    private fun wantsPendingCover(title: String) = BookShelf.canAutoAdd(this, title) && pendingFor(title) == null
+
     /** 잘라 둔 표지 가운데 [title] 의 것(부제·공백 무시)의 열쇠 */
     private fun pendingFor(title: String): String? {
         val n = normTitle(title)
@@ -309,7 +312,8 @@ class ReaderWatchService : AccessibilityService() {
     }
 
     /**
-     * 서재 화면이 [SETTLE_MS] 동안 그대로면: 보이는 책들의 진행률·반납일을 적고, 표지 없는 책은 표지 칸을 찍어 잘라 온다.
+     * 서재 화면이 [SETTLE_MS] 동안 그대로면: 보이는 책들의 진행률·반납일을 적고, 표지 없는 책은 표지 칸을 찍어 잘라 온다
+     * ([ReaderSpec.eagerCovers] 앱은 목록에 없는 책도 잘라 둔다).
      * (밀리는 앱을 다시 열 때 잠깐 모든 칸을 한 책·0% 로 채웠다가 고친다. 그 사이 값을 적지 않도록 멈춘 뒤에 읽는다.)
      */
     private fun settleShelf(spec: ReaderSpec) {
@@ -342,7 +346,14 @@ class ReaderWatchService : AccessibilityService() {
             if (book != null && web.thumb != null && !BookShelf.hasCover(this, book.id)) targets += web.title to web.thumb
         }
         for (s in seen) {
-            val book = BookShelf.findByTitle(this, s.title) ?: continue
+            val book = BookShelf.findByTitle(this, s.title)
+            if (book == null) {
+                // 서재를 잠깐만 보고 책으로 넘어가는 앱은 목록에 없는 책도 멈춘 지금 잘라 둔다. 리디 서재는 다 그려진 뒤 알림이 없어
+                // 바로 자르기([readScreen])는 칸을 누른 순간에야 찍고, 그때는 화면이 넘어가는 중이라 버려진다.
+                val thumb = s.thumb?.takeIf(::usableThumb)
+                if (spec.eagerCovers && thumb != null && wantsPendingCover(s.title)) targets += s.title to thumb
+                continue
+            }
             BookShelf.updateStatus(this, book.id, s.progress, s.due, s.author)
             if (s.thumb != null && !BookShelf.hasCover(this, book.id)) targets += s.title to s.thumb
         }
@@ -461,8 +472,8 @@ class ReaderWatchService : AccessibilityService() {
         private const val SETTLE_MS = 1500L
         /** 바로 자르기를 서재 방문마다 책 한 권에 해 보는 최대 횟수 */
         private const val EAGER_TRIES = 3
-        /** 목록에 없는 책의 표지를 잘라 둘 최대 권수 */
-        private const val PENDING_MAX = 6
+        /** 목록에 없는 책의 표지를 잘라 둘 최대 권수(서재가 멈추면 보이는 칸을 한꺼번에 잘라 둔다. 휴대폰 격자 보기는 9~12칸) */
+        private const val PENDING_MAX = 12
         /** 칸을 누른 뒤 이 안에 읽는 화면이 열리면 그 책을 편 것으로 본다(내려받기를 기다리는 시간) */
         private const val CLICK_OPEN_MS = 120_000L
         /** 화면이 바뀐 뒤 이만큼은 바로 자르지 않는다 */

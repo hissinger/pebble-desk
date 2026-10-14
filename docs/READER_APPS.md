@@ -189,7 +189,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
   - 공개 방송 `com.flyersoft.moonreader.open_broadcast`(extra `bookFile`=경로)로도 열 수 있다. 문리더가 이미 떠 있을 때만 된다.
 - **저장소**: 표지 캐시가 `/sdcard/Books/.MoonReader/<파일 이름>_1.png` 에 남는다. DB·진행률은 앱 전용 저장소에 있다. `BookViewProvider` 는 공개되지 않는다.
 - 책장의 묶음 칸은 진행률 줄(`progressLay`)을 감춘다 → 진행률이 없는 칸은 책으로 보지 않는다.
-- **유료판** `com.flyersoft.moonreaderp`(Moon+ Reader Pro, Play ₩19,000·Play Pass, 10.7): **지원(코드만, 미확인)**. 무료판 코드가 패키지 이름으로 판을 가르므로(`com.flyersoft.moonreaderpj` 와 비교, AGP 8.10.1) 같은 코드로 만든 앱이라 보고 무료판 읽기를 그대로 쓴다(`MoonReaderSpec`). 화면 이름은 같은 `com.flyersoft.moonreader.ActivityMain`·`ActivityTxt`(2026-10-14 Ocean 5 Pro 기기 정보의 최근 화면 `com.flyersoft.moonreaderp / ActivityTxt`), 요소 이름 앞은 AGP 가 앱 패키지를 붙여 `com.flyersoft.moonreaderp:id/` 가 될 것 **(추정)**. 유료판은 광고 화면이 없다.
+- **유료판** `com.flyersoft.moonreaderp`(Moon+ Reader Pro, Play ₩19,000·Play Pass, 10.7): **지원(에뮬레이터 확인, 2026-10-14)**. 요소 이름은 무료판과 같고 앞만 `com.flyersoft.moonreaderp:id/` 다. **화면 클래스도 그 패키지 아래**(`com.flyersoft.moonreaderp.ActivityMain`·`ActivityTxt`, 매니페스트로 확인)라 1.5.3 은 무료판 이름으로 찾아 서재·읽는 화면을 알아보지 못했다(자동 추가도 오늘 읽은 시간도 안 됨, Ocean 5 Pro 사용자 제보). `MoonReaderSpec` 이 화면 이름을 패키지로 만든다. Ocean5Pro_A14 에뮬레이터에서 읽는 화면 메뉴 제목·서재 칸 누르기로 들어오고 표지도 잘린다. 유료판은 광고 화면이 없다.
 
 ### 밀리의서재 휴대폰 판 `kr.co.millie.millieshelf` (2026-10-10, 갤럭시 A23 안드로이드 14, 5.47.0.0, **지원**)
 
