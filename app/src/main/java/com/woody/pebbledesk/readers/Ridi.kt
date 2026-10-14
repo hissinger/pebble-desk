@@ -7,9 +7,10 @@ import android.view.accessibility.AccessibilityNodeInfo
  * 리디: 책은 교보eBook처럼 읽는 화면 메뉴의 제목(26.10 부터 `reader_title_bar`, 그 전은 `title`)으로 안다. 서재(React Native, 내 서재 탭과 작품 화면)는 요소 이름이 없어
  * 칸 설명·글자로 표지만 잘라 둔다(칸을 눌러도 알림이 없다). 진행률은 뷰어 설정의 '하단 좌/우 정보 표시'를 켜면 아래 좌·우
  * (`15 / 640`, `2%`), 꺼 두면 메뉴의 쪽(`14 / 626`).
+ * 원스토어판(`com.ridi.books.onestore`, '리디 완전판')은 패키지만 다르고 코드는 같다고 본다 **(미확인)**.
  */
-object Ridi : ReaderSpec(
-    pkg = "com.initialcoms.ridi", classPrefix = "com.ridi",
+open class RidiSpec(pkg: String) : ReaderSpec(
+    pkg = pkg, classPrefix = "com.ridi",
     shelves = setOf("com.ridi.books.viewer.main.activity.MainActivity"),
     viewers = setOf(
         "com.ridi.books.viewer.reader.epub.EPubReaderActivity",
@@ -24,12 +25,6 @@ object Ridi : ReaderSpec(
 
     /** 26.10 부터 제목은 머리 아래 줄(`reader_title_bar`)에 있고 머리의 `title` 은 비어 있다(EPub·만화 모두). 그 전 판은 `title`. */
     override val viewerTitleIds get() = listOfNotNull(viewerTitle, "title")
-
-    /** 서재 표시 요소(내 서재 머리). 이름에 `패키지:id/` 가 없어 이름으로 찾기가 안 되어 훑으면서 본다. */
-    private const val SHELF_MARKER = "libraryGnbMenus"
-
-    /** 표지로 쓸 그림의 최소 폭(목록 보기 표지 86px 는 받고 아래 '최근 본' 줄의 66px 는 뺀다) */
-    private const val MIN_COVER_PX = 80
 
     /**
      * 요소 이름이 없는 서재: 설명이 그 안의 글자(제목)로 시작하고 표지 모양 그림이 든 묶음이 책 칸이다.
@@ -85,3 +80,15 @@ object Ridi : ReaderSpec(
         return Cell(t, "", percent(desc.removePrefix(t)), -1, thumb ?: return null, cell.bounds())
     }
 }
+
+/** 서재 표시 요소(내 서재 머리). 이름에 `패키지:id/` 가 없어 이름으로 찾기가 안 되어 훑으면서 본다. */
+private const val SHELF_MARKER = "libraryGnbMenus"
+
+/** 표지로 쓸 그림의 최소 폭(목록 보기 표지 86px 는 받고 아래 '최근 본' 줄의 66px 는 뺀다) */
+private const val MIN_COVER_PX = 80
+
+/** Play 스토어판 */
+object Ridi : RidiSpec("com.initialcoms.ridi")
+
+/** 원스토어판('리디 완전판') */
+object RidiOneStore : RidiSpec("com.ridi.books.onestore")

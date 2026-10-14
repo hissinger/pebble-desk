@@ -11,12 +11,12 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 교보도서관 `kr.co.kyobobook.KEL` | O | X | 그냥 열면 서재 | X | `Android/data` (런처 접근 불가) |
 | 밀리의서재 `kr.co.millie.eink` | O | ? (코드 암호화) | `BookshelfActivity` 직접 실행 (미확인) | X | 앱 전용 저장소 |
 | 알라딘 `kr.co.aladin.ebook` | O | O (알라딘 상품번호) | O | O | `Android/data` |
-| 리디 `com.initialcoms.ridi` | O | O (리디 책 번호) | O `ridi://Library` | O | 앱 전용 저장소 |
+| 리디 `com.initialcoms.ridi`(원스토어판 `com.ridi.books.onestore`) | O | O (리디 책 번호) | O `ridi://Library` | O | 앱 전용 저장소 |
 | 교보eBook `com.kyobo.ebook.eink` | O | 기기 안 번호라 사실상 X | O `kyoboebookeink://mylibrary` | O | `Android/data` |
 | 교보eBook 휴대폰 판 `com.kyobo.ebook.common.b2c` | O(크레마 판과 같은 화면 이름) | ? | ? | ? | ? |
 | 밀리의서재 휴대폰 판 `kr.co.millie.millieshelf` | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | YES24 eBook `com.yes24.ebook.fourth`(휴대폰·태블릿용) | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
-| 문리더 `com.flyersoft.moonreader`(내 파일, DRM 없음) | `ActivityTxt` | O (파일 위치를 알면 `ACTION_VIEW`) | O | X | 사용자가 둔 곳(공유 저장소) |
+| 문리더 `com.flyersoft.moonreader`(유료판 `com.flyersoft.moonreaderp`. 내 파일, DRM 없음) | `ActivityTxt` | O (파일 위치를 알면 `ACTION_VIEW`) | O | X | 사용자가 둔 곳(공유 저장소) |
 | 킨들 `com.amazon.kindle`(휴대폰 판 하나, 한국어 없음) | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
@@ -169,6 +169,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - 북커스 격자 보기 칸에는 저자가 없고, 누르면 `[제목, 9일 남음, 1%]` 가 온다(2026-10-10) → 두 번째 글자가 반납 문구면 저자가 아니라 반납일.
 - 이벤트로 받은 요소(누른 요소)는 부모로 올라갈 수 없다 → 누른 곳의 가운데가 들어 있는 칸을 서재 화면에서 찾는다.
 - 북커스 내서재는 탭마다 같은 책 칸이 화면 밖에도 있다(화면 밖 칸은 표지 크기가 0 이라 자르지 않는다).
+- 리디 원스토어판 `com.ridi.books.onestore`(원스토어 표시 이름 `리디 완전판`, 2026-10 기준 버전 코드 `2026100663`(AAB 배포). 원스토어 앱 페이지의 `packageNm`): **지원(코드만, 미확인)**. Ocean 5 Pro 사용자가 원스토어판으로는 자동 추가·기록이 안 되고 Aura 스토어판(Play 와 같은 `com.initialcoms.ridi`)으로 바꿔 됐다고 했다(2026-10-14 댓글) → 패키지만 달라 받지 못한 것. 화면·요소 이름은 Play 판과 같은 코드라 보고 같은 읽기를 쓴다(`RidiSpec`). 요소 이름 앞은 `com.ridi.books.onestore:id/` 가 될 것 **(추정)**.
 
 ### 문리더(Moon+ Reader) `com.flyersoft.moonreader` (2026-10-10, 갤럭시 A23 안드로이드 14, 10.7 무료판, **지원**)
 
@@ -188,7 +189,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
   - 공개 방송 `com.flyersoft.moonreader.open_broadcast`(extra `bookFile`=경로)로도 열 수 있다. 문리더가 이미 떠 있을 때만 된다.
 - **저장소**: 표지 캐시가 `/sdcard/Books/.MoonReader/<파일 이름>_1.png` 에 남는다. DB·진행률은 앱 전용 저장소에 있다. `BookViewProvider` 는 공개되지 않는다.
 - 책장의 묶음 칸은 진행률 줄(`progressLay`)을 감춘다 → 진행률이 없는 칸은 책으로 보지 않는다.
-- **유료판** `com.flyersoft.moonreaderp`: 읽는 화면은 무료판과 같은 `ActivityTxt`(2026-10-14 iReader Ocean 5 Pro 기기 정보의 최근 화면. 기기 정보는 클래스 이름의 끝만 보여 전체 이름이 `com.flyersoft.moonreader.ActivityTxt` 인지 **(미확인)**. 그렇다면 오늘 읽은 시간은 `ReaderApps.isViewer` 로 세지고, 아니면 세지지 않는다). 자동 추가는 `reader_watch.xml` 에 이 패키지가 없어 되지 않는다. 요소 이름 앞이 `com.flyersoft.moonreaderp:id/` 가 될 것 **(미확인)**.
+- **유료판** `com.flyersoft.moonreaderp`(Moon+ Reader Pro, Play ₩19,000·Play Pass, 10.7): **지원(코드만, 미확인)**. 무료판 코드가 패키지 이름으로 판을 가르므로(`com.flyersoft.moonreaderpj` 와 비교, AGP 8.10.1) 같은 코드로 만든 앱이라 보고 무료판 읽기를 그대로 쓴다(`MoonReaderSpec`). 화면 이름은 같은 `com.flyersoft.moonreader.ActivityMain`·`ActivityTxt`(2026-10-14 Ocean 5 Pro 기기 정보의 최근 화면 `com.flyersoft.moonreaderp / ActivityTxt`), 요소 이름 앞은 AGP 가 앱 패키지를 붙여 `com.flyersoft.moonreaderp:id/` 가 될 것 **(추정)**. 유료판은 광고 화면이 없다.
 
 ### 밀리의서재 휴대폰 판 `kr.co.millie.millieshelf` (2026-10-10, 갤럭시 A23 안드로이드 14, 5.47.0.0, **지원**)
 
