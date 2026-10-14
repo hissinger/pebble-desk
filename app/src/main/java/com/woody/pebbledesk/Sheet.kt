@@ -6,12 +6,14 @@ import android.graphics.Bitmap
 import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 
 /**
  * 아래에서 올라오는 메뉴. 위쪽 굵은 선, 머리(아이콘·이름·설명), 항목들, 맨 아래 오른쪽 `닫기`.
@@ -76,24 +78,9 @@ class Sheet(private val context: Context) {
         input = initial to onDone; this.numeric = numeric
     }
 
-    fun show(): Dialog {
-        val dialog = Dialog(context, R.style.Sheet)
+    /** 머리: 앱 아이콘 또는 표지, 제목·설명, 도장이 있으면 그 자리를 비운다. */
+    private fun head(): LinearLayout {
         val c = context
-        // 닫고 할 일. 닫히기 전에 두 번 눌려도 한 번만(같은 책을 두 번 다시 읽기·적어 두기 하지 않게).
-        fun dismissThen(action: () -> Unit) {
-            if (!dialog.isShowing) return
-            dialog.dismiss(); action()
-        }
-        val root = c.vbox()
-        Crema.reserveHiddenBottom(root)
-        root.addView(c.hline(2, inset = false))
-        // 머리와 칸들을 한 묶음에 넣는다(정보 바탕을 칠할 때 도장이 넘친 자리까지 같은 바탕이게).
-        val info = c.vbox()
-        paper?.let { info.setBackgroundColor(it) }
-        root.addView(info, lp(MATCH, WRAP))
-        // 도장은 머리 아래로 조금 넘쳐 기록 칸 위에 걸친다(뒤에 그리는 선·글자가 위에 온다).
-        if (stamped) { root.clipChildren = false; info.clipChildren = false }
-
         val head = (if (stamped) StampedRow(c, STAMP_DP, STAMP_END_DP, STAMP_TOP_DP) else c.hbox())
             .apply { setPadding(c.dp(Ui.MARGIN), c.dp(22), c.dp(Ui.MARGIN), c.dp(20)) }
         app?.let {
@@ -114,11 +101,46 @@ class Sheet(private val context: Context) {
             // 제목이 도장에 덮이지 않게 도장 왼쪽 끝까지 비운다.
             if (stamped) marginEnd = c.dp(STAMP_END_DP + STAMP_DP / 2 - Ui.MARGIN)
         })
+        return head
+    }
+
+    /** 머리 높이(화면 폭에서). 머리 아래에 둘 칸을 화면에 들어가는 만큼만 담을 때 쓴다. */
+    fun headHeight(): Int = head().heightAt(context.resources.displayMetrics.widthPixels)
+
+    /** 칸 안에 쪽으로 나뉜 것이 있으면 페이지 버튼([pageKey])으로 넘긴다(메뉴가 떠 있으면 키가 화면 대신 메뉴로 온다). */
+    private var paged: Paged? = null
+
+    fun paged(p: Paged) = apply { paged = p }
+
+    /** 닫히면(닫기·뒤로 가기·바깥 누르기, 항목을 눌러 닫힐 때도) 부를 일 */
+    private var onDismiss: (() -> Unit)? = null
+
+    fun onDismiss(action: () -> Unit) = apply { onDismiss = action }
+
+    fun show(): Dialog {
+        val dialog = Dialog(context, R.style.Sheet)
+        val c = context
+        // 닫고 할 일. 닫히기 전에 두 번 눌려도 한 번만(같은 책을 두 번 다시 읽기·적어 두기 하지 않게).
+        fun dismissThen(action: () -> Unit) {
+            if (!dialog.isShowing) return
+            dialog.dismiss(); action()
+        }
+        val root = c.vbox()
+        Crema.reserveHiddenBottom(root)
+        root.addView(c.hline(2, inset = false))
+        // 머리와 칸들을 한 묶음에 넣는다(정보 바탕을 칠할 때 도장이 넘친 자리까지 같은 바탕이게).
+        val info = c.vbox()
+        paper?.let { info.setBackgroundColor(it) }
+        root.addView(info, lp(MATCH, WRAP))
+        // 도장은 머리 아래로 조금 넘쳐 기록 칸 위에 걸친다(뒤에 그리는 선·글자가 위에 온다).
+        if (stamped) { root.clipChildren = false; info.clipChildren = false }
+
+        val head = head()
         info.addView(head)
         notes.forEach { n ->
             info.addView(c.hline(1, Ui.DIVIDER))
             info.addView(FrameLayout(c).apply {
-                setPadding(c.dp(Ui.MARGIN), c.dp(10), c.dp(Ui.MARGIN), c.dp(14))
+                setPadding(c.dp(Ui.MARGIN), c.dp(NOTE_PAD_TOP_DP), c.dp(Ui.MARGIN), c.dp(NOTE_PAD_BOTTOM_DP))
                 addView(n.view)
                 n.onClick?.let { action -> setOnClickListener { dismissThen(action) } }
             }, lp(MATCH, WRAP))
@@ -211,8 +233,20 @@ class Sheet(private val context: Context) {
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
             setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
             setOnClickListener { dialog.dismiss() }
-        }, lp(MATCH, c.dp(62)))
+        }, lp(MATCH, c.dp(CLOSE_ROW_DP)))
 
+        onDismiss?.let { action -> dialog.setOnDismissListener { action() } }
+        // 입력이 없는 메뉴는 초점을 받지 않는다. 받을 수 있으면 터치 모드에서 처음 누른 페이지 키가 터치 모드를 벗어나는 데 쓰이고
+        // 버려지며(쪽이 넘어가지 않는다) 누를 수 있는 글자에 회색 초점 표시가 남는다.
+        if (input == null && review == null) root.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        paged?.let { p ->
+            dialog.setOnKeyListener { _, keyCode, event ->
+                val next = pageKey(keyCode) ?: return@setOnKeyListener false
+                // 누르고 있을 때 오는 반복은 넘기지 않는다(한 번 누르면 한 쪽).
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) { if (next) p.next() else p.prev() }
+                true
+            }
+        }
         dialog.setContentView(root)
         dialog.window?.apply {
             setGravity(Gravity.BOTTOM)
@@ -232,6 +266,11 @@ class Sheet(private val context: Context) {
 
 /** 머리의 표지 폭(책 상세. 띠 글자가 읽히게 크게) */
 const val SHEET_COVER_DP = 76
+
+/** 칸([Sheet.note])의 위·아래 여백, 맨 아래 `닫기` 줄 높이(칸 안을 화면 높이에 맞춰 나눌 때도 쓴다) */
+const val NOTE_PAD_TOP_DP = 10
+const val NOTE_PAD_BOTTOM_DP = 14
+const val CLOSE_ROW_DP = 62
 
 /** 머리의 완독 도장: 지름, 가운데가 오른쪽 끝에서 안쪽으로, 위에서 아래로(지름의 절반보다 작아 위가 잘리고, 아래는 머리 밖으로 조금 넘친다) */
 private const val STAMP_DP = 220

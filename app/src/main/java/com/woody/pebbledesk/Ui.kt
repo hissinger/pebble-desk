@@ -283,6 +283,12 @@ fun Context.hbox(): LinearLayout = LinearLayout(this).apply {
     gravity = Gravity.CENTER_VERTICAL
 }
 
+/** 폭 [widthPx] 에서 잰 높이(높이 제한 없이) */
+fun View.heightAt(widthPx: Int): Int {
+    measure(View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+    return measuredHeight
+}
+
 fun lp(w: Int, h: Int, weight: Float = 0f) = LinearLayout.LayoutParams(w, h, weight)
 
 const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT

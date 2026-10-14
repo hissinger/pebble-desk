@@ -97,11 +97,7 @@ abstract class EinkActivity : Activity() {
      * 누르고 있을 때 오는 반복은 넘기지 않는다(한 번 누르면 한 쪽).
      */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        val next = when (keyCode) {
-            MEEBOOK_PAGE_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> true
-            MEEBOOK_PAGE_UP, KeyEvent.KEYCODE_PAGE_UP -> false
-            else -> return super.onKeyDown(keyCode, event)
-        }
+        val next = pageKey(keyCode) ?: return super.onKeyDown(keyCode, event)
         if (event.repeatCount > 0) return true
         return onSwipe(next) || super.onKeyDown(keyCode, event)
     }
@@ -154,10 +150,15 @@ abstract class EinkActivity : Activity() {
         if (custom != null) sheet.item(getString(R.string.rename_reset, original)) { prefs.setFavoriteName(app.key, null); changed() }
         sheet.show()
     }
+}
 
-    private companion object {
-        /** 메이북(Haoqing) 펌웨어의 KeyEvent.KEYCODE_HAOQING_PAGE_UP·DOWN */
-        const val MEEBOOK_PAGE_UP = 291
-        const val MEEBOOK_PAGE_DOWN = 292
-    }
+/** 메이북(Haoqing) 펌웨어의 KeyEvent.KEYCODE_HAOQING_PAGE_UP·DOWN */
+private const val MEEBOOK_PAGE_UP = 291
+private const val MEEBOOK_PAGE_DOWN = 292
+
+/** 페이지 버튼이면 다음 쪽(아래) true · 앞 쪽(위) false, 아니면 null */
+fun pageKey(keyCode: Int): Boolean? = when (keyCode) {
+    MEEBOOK_PAGE_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> true
+    MEEBOOK_PAGE_UP, KeyEvent.KEYCODE_PAGE_UP -> false
+    else -> null
 }
