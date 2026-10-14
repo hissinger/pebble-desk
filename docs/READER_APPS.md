@@ -188,7 +188,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
   - 공개 방송 `com.flyersoft.moonreader.open_broadcast`(extra `bookFile`=경로)로도 열 수 있다. 문리더가 이미 떠 있을 때만 된다.
 - **저장소**: 표지 캐시가 `/sdcard/Books/.MoonReader/<파일 이름>_1.png` 에 남는다. DB·진행률은 앱 전용 저장소에 있다. `BookViewProvider` 는 공개되지 않는다.
 - 책장의 묶음 칸은 진행률 줄(`progressLay`)을 감춘다 → 진행률이 없는 칸은 책으로 보지 않는다.
-- **유료판** `com.flyersoft.moonreaderp`: 요소 이름 앞이 `com.flyersoft.moonreaderp:id/` 가 될 것 **(미확인)**.
+- **유료판** `com.flyersoft.moonreaderp`: 읽는 화면은 무료판과 같은 `ActivityTxt`(2026-10-14 iReader Ocean 5 Pro 기기 정보의 최근 화면. 기기 정보는 클래스 이름의 끝만 보여 전체 이름이 `com.flyersoft.moonreader.ActivityTxt` 인지 **(미확인)**. 그렇다면 오늘 읽은 시간은 `ReaderApps.isViewer` 로 세지고, 아니면 세지지 않는다). 자동 추가는 `reader_watch.xml` 에 이 패키지가 없어 되지 않는다. 요소 이름 앞이 `com.flyersoft.moonreaderp:id/` 가 될 것 **(미확인)**.
 
 ### 밀리의서재 휴대폰 판 `kr.co.millie.millieshelf` (2026-10-10, 갤럭시 A23 안드로이드 14, 5.47.0.0, **지원**)
 
