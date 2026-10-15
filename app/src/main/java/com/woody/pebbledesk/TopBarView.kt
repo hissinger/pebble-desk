@@ -65,13 +65,13 @@ class TopBarView(context: Context) : View(context) {
     private val logo: Drawable? = Crema.logo(context)
     private val clockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Ui.regular
-        textSize = context.spf(37f)
+        textSize = context.spf(CLOCK_SP)
         color = Ui.BLACK
         letterSpacing = -0.02f
     }
     private val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Ui.regular
-        textSize = context.spf(15.5f)
+        textSize = context.spf(STATUS_SP)
         color = Ui.BLACK
     }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Ui.BLACK }
@@ -126,6 +126,35 @@ class TopBarView(context: Context) : View(context) {
     private val clockCap = capHeight(clockPaint)
     private val statusCap = capHeight(statusPaint)
 
+    /**
+     * 높이는 글자 100%·기기 글꼴 100% 일 때로 고정한다(홈 틀이 글자 설정에 따라 움직이지 않게).
+     * 키운 글자는 위 여백·줄 사이·아래 여백을 [MIN_PAD_DP] 까지 줄여 받고, 그래도 들지 않으면 상태 줄을 그리지 않는다(반쯤 잘린 줄을 보이지 않게).
+     */
+    private val fixedHeight: Int
+    private var drawPadTop = padTop
+    private var drawLineGap = lineGap
+    private var showStatus = true
+
+    init {
+        val baseStatus = Paint(statusPaint).apply { textSize = context.dpf(STATUS_SP) }
+        val textOf = { clock: Int, paint: Paint -> clock + capHeight(paint) + paint.fontMetricsInt.descent }
+        fixedHeight = padTop + lineGap + padBottom +
+            textOf(capHeight(Paint(clockPaint).apply { textSize = context.dpf(CLOCK_SP) }), baseStatus)
+        val room = fixedHeight - textOf(clockCap, statusPaint)
+        val full = padTop + lineGap + padBottom
+        val min = context.dp(MIN_PAD_DP)
+        if (room < full) {
+            if (room >= 3 * min) {
+                val f = (room - 3 * min).toFloat() / (full - 3 * min)
+                drawPadTop = min + ((padTop - min) * f).toInt()
+                drawLineGap = min + ((lineGap - min) * f).toInt()
+            } else {
+                showStatus = false
+                drawPadTop = maxOf(0, (fixedHeight - clockCap) / 2)
+            }
+        }
+    }
+
     /** 시계·상태가 실제로 바뀌었을 때만 다시 그린다(전자잉크 부분 갱신을 줄이기 위해). */
     fun update(status: DeviceStatus) {
         val now = Date()
@@ -137,14 +166,13 @@ class TopBarView(context: Context) : View(context) {
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val h = padTop + clockCap + lineGap + statusCap + statusPaint.fontMetricsInt.descent + padBottom
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), h)
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), fixedHeight)
     }
 
     override fun onDraw(canvas: Canvas) {
         val left = context.dp(Ui.MARGIN).toFloat()
         val right = width - context.dp(Ui.MARGIN).toFloat()
-        val clockBase = (padTop + clockCap).toFloat()
+        val clockBase = (drawPadTop + clockCap).toFloat()
 
         // 로고: 아랫선을 시계 글자 아랫선에 맞춘다.
         logo?.let {
@@ -170,8 +198,8 @@ class TopBarView(context: Context) : View(context) {
         }
 
         // 상태 줄: 오른쪽부터 왼쪽으로 쌓는다.
-        val s = status ?: return
-        val base = clockBase + lineGap + statusCap
+        val s = status?.takeIf { showStatus } ?: return
+        val base = clockBase + drawLineGap + statusCap
         val mid = base - statusCap / 2f
         val items = buildList<(Float) -> Float> {
             add { x -> drawText(canvas, dateFormat.format(now), x, base) }
@@ -222,4 +250,12 @@ class TopBarView(context: Context) : View(context) {
     }
 
     private fun capHeight(p: Paint): Int = Rect().also { p.getTextBounds("0", 0, 1, it) }.height()
+
+    private companion object {
+        /** 시계·상태 줄 글자 크기(sp, 글자 배율을 곱한다) */
+        const val CLOCK_SP = 37f
+        const val STATUS_SP = 15.5f
+        /** 키운 글자를 받을 때 위 여백·줄 사이·아래 여백의 최소 */
+        const val MIN_PAD_DP = 8
+    }
 }

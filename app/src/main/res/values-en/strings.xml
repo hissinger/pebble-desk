@@ -206,7 +206,7 @@
     <string name="reading_settings">Reading</string>
     <string name="auto_books">Auto-add books</string>
     <string name="auto_books_short">Auto-add</string>
-    <string name="auto_books_desc">When you open a book in Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi, YES24 (Library, my YES, eBook), Moon+ Reader or Kindle, it goes to the top of your reading list. Only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, are read; book text and other apps are never seen. Turn on Pebble Desk in Accessibility.</string>
+    <string name="auto_books_desc">When you open a book in an e-book app, it goes to the top of your reading list. Only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, are read; book text and other apps are never seen. Turn on Pebble Desk in Accessibility.</string>
     <string name="open_accessibility">Open Accessibility</string>
     <string name="progress_pct">%1$d%% read</string>
     <string name="due_days">Due in %1$d days</string>
