@@ -417,6 +417,7 @@ class SettingsActivity : EinkActivity() {
             R.string.guide_moon to R.string.guide_moon_desc,
             R.string.guide_kindle to R.string.guide_kindle_desc,
             R.string.guide_libby to R.string.guide_libby_desc,
+            R.string.guide_neo to R.string.guide_neo_desc,
         )
         val blocks = mutableListOf(
             PagedBlocks.Block(listOf(para(R.string.guide_intro, 12, 4))),

@@ -6,7 +6,7 @@ package com.woody.pebbledesk.readers
  */
 object ReaderApps {
     val ALL = listOf(
-        KyoboLibrary, KyoboEbook, KyoboEbookMobile, Millie, MillieMobile, Aladin, Bookers, Ridi, RidiOneStore, Yes24Library, Yes24Ebook, MyYes, MoonReader, MoonReaderPro, Kindle, Libby,
+        KyoboLibrary, KyoboEbook, KyoboEbookMobile, Millie, MillieMobile, Aladin, Bookers, Ridi, RidiOneStore, Yes24Library, Yes24Ebook, MyYes, MoonReader, MoonReaderPro, Kindle, Libby, NeoReader,
     )
 
     val byPackage = ALL.associateBy { it.pkg }

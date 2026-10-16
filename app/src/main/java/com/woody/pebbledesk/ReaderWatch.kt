@@ -43,6 +43,11 @@ class ReaderWatchService : AccessibilityService() {
     private fun setOpened(pkg: String, title: String?) {
         if (opened(pkg) != title) openedPrefs.edit().putString("opened_$pkg", title).apply()
     }
+    /** 탭마다 책이 다른 앱([ReaderSpec.viewerTabs])에서 읽는 화면 [cls](탭)로 마지막으로 편 책의 제목(서비스가 다시 시작돼도 남긴다) */
+    private fun tabBook(cls: String) = openedPrefs.getString("tab_$cls", null)
+    private fun setTabBook(cls: String, title: String) {
+        if (tabBook(cls) != title) openedPrefs.edit().putString("tab_$cls", title).apply()
+    }
     /** 읽으러 가기 전에 본 서재의 '최근 읽은 책'([ReaderSpec.recent]) */
     private fun recentBefore(pkg: String) = openedPrefs.getString("recent_$pkg", null)
     /** [title] 이 null 이면 지운다(모른다) */
@@ -60,6 +65,8 @@ class ReaderWatchService : AccessibilityService() {
      * (진행률을 적지 않는다. 서비스가 다시 시작돼도), 읽는 화면 메뉴의 제목으로 알면 열린 때부터 그 책으로 센다.
      */
     private val unknownOpen = mutableMapOf<String, Long>()
+    /** 탭마다 책이 다른 앱([ReaderSpec.viewerTabs])에서 [unknownOpen] 을 적은 탭(같은 모르는 탭에 다시 와도 처음 열린 때를 둔다) */
+    private val unknownTab = mutableMapOf<String, String>()
     private var lastWebRead = 0L
     /**
      * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 알라딘·리디처럼 서재를 잠깐만 보는
@@ -170,7 +177,25 @@ class ReaderWatchService : AccessibilityService() {
             }
             webBook.remove(spec.pkg)?.let { book -> bookOpened(spec, book) }
             clicked.remove(spec.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.let { bookOpened(spec, it.first) }
+            if (spec.viewerTabs && name in spec.viewers) enterTab(spec, name, now)
         }
+    }
+
+    /**
+     * 탭마다 책이 다른 앱([ReaderSpec.viewerTabs])에서 읽는 화면 탭 [cls] 가 앞에 왔다. 그 탭으로 메뉴에서 마지막으로 안 책이 지금 편 책과
+     * 다르면 그 책을 편 것으로 본다(탭을 오가며 읽으면 진행률·읽은 시간이 앞 탭의 책에 붙지 않게). 모르는 탭이면 앞서 편 책과 다를 수 있어
+     * 진행률을 적지 않고, 메뉴로 알면 탭이 열린 때부터 그 책으로 센다. 같은 탭에 다른 책을 열면 메뉴를 띄울 때까지는 알 수 없다.
+     */
+    private fun enterTab(spec: ReaderSpec, cls: String, now: Long) {
+        val title = tabBook(cls)
+        if (title == null) {
+            // 같은 모르는 탭에 다시 오면(네오리더 설정 화면에 갔다 옴 등) 처음 열린 때를 둔다.
+            if (unknownTab[spec.pkg] != cls || spec.pkg !in unknownOpen) {
+                unknownOpen[spec.pkg] = now
+                unknownTab[spec.pkg] = cls
+            }
+            setOpened(spec.pkg, null)
+        } else if (title != opened(spec.pkg)) bookOpened(spec, Cell(title, "", -1, -1, null, Rect()), now)
     }
 
     /**
@@ -352,13 +377,14 @@ class ReaderWatchService : AccessibilityService() {
             null
         } else {
             // 다 찼으면 앱 목록(시스템 호출)도 보지 않는다. 다 찬 동안 목록에 없는 책을 읽으면 화면 이벤트마다 여기 온다.
-            val app = AppStore.load(this).firstOrNull { it.pkg == spec.pkg }?.key
+            val app = AppStore.load(this).firstOrNull { it.pkg == spec.appPkg }?.key
             result = WatchLog.Opened.NEW
             BookShelf.addOpened(this, seen.title, seen.author, app, seen.progress, seen.due)
         }
         WatchLog.add(this, WatchLog.Kind.OPENED, spec.pkg, seen.title, result.name)
         // 넣지 못한 책도 연 책으로 적는다(그래야 읽는 화면의 진행률이 앞서 연 다른 책에 붙지 않는다).
         setOpened(spec.pkg, book?.title ?: seen.title)
+        if (spec.viewerTabs) screen[spec.pkg]?.takeIf { it in spec.viewers }?.let { setTabBook(it, book?.title ?: seen.title) }
         ReadingLog.bookOpened(this, spec.pkg, book?.title ?: seen.title, at ?: System.currentTimeMillis())
         if (book == null) return
         // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 알라딘 서재)
