@@ -50,6 +50,11 @@ open class ReaderSpec(
     val secure: Boolean = false,
     /** 서재 편집(지우기·옮기기) 중에만 보이는 요소. 그동안은 칸을 눌러도 책을 고르는 것이라 서재를 읽지 않는다(알라딘) */
     val shelfEditing: String? = null,
+    /**
+     * 읽는 화면이 따로 액티비티가 아니라 서재 액티비티 안에 뜨는 앱(Libby): 그 묶음의 요소 이름. 이것이 보이는 동안을
+     * 읽는 화면 `<서재 액티비티>#<이름>`([viewers] 에 적는다)으로 보고, 읽은 시간도 그 동안만 센다([com.woody.pebbledesk.ReadingLog.viewerShown]).
+     */
+    val viewerHolder: String? = null,
 ) {
     /** 서재에 보이는 책 칸들. 기본: 제목 요소마다 그것이 든 칸을 찾아 읽는다. */
     open fun shelfCells(root: AccessibilityNodeInfo): List<Cell> =
@@ -66,7 +71,7 @@ open class ReaderSpec(
     open val cellsByPosition: Boolean get() = false
 
     /** 메뉴를 띄웠을 때 읽는 화면에 제목이 보이는가(보이면 표지만 눌러 연 책도 알 수 있다) */
-    val tellsTitle: Boolean get() = viewerTitle != null
+    open val tellsTitle: Boolean get() = viewerTitle != null
 
     /**
      * 읽는 화면: 본문(웹 화면)은 훑지 않고 이름으로 찾은 요소만 읽는다. 진행률은 아래 줄([viewerProgress])에서,

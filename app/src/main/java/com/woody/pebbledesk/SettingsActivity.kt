@@ -416,6 +416,7 @@ class SettingsActivity : EinkActivity() {
             R.string.guide_yes24ebook to null,
             R.string.guide_moon to R.string.guide_moon_desc,
             R.string.guide_kindle to R.string.guide_kindle_desc,
+            R.string.guide_libby to R.string.guide_libby_desc,
         )
         val blocks = mutableListOf(
             PagedBlocks.Block(listOf(para(R.string.guide_intro, 12, 4))),
@@ -423,7 +424,7 @@ class SettingsActivity : EinkActivity() {
             PagedBlocks.Block(listOf(para(R.string.guide_cover_note, 4, 12))),
             PagedBlocks.Block(listOf(
                 sectionView(getString(R.string.guide_apps)),
-                text(apps.joinToString("  ·  ") { getString(it.first) }, 18f, Ui.bold, lines = 3).apply {
+                text(apps.joinToString("  ·  ") { getString(it.first) }, 18f, Ui.bold, lines = 6).apply {
                     setLineSpacing(0f, 1.2f)
                     setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(10))
                 },
@@ -436,7 +437,7 @@ class SettingsActivity : EinkActivity() {
             if (i == 0) views += sectionView(getString(R.string.guide_limits))
             views += hline(1, Ui.DIVIDER)
             views += text(getString(name), 19f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), 0) }
-            views += text(getString(desc), 17f, color = Ui.GRAY, lines = 3).apply {
+            views += text(getString(desc), 17f, color = Ui.GRAY, lines = 5).apply {
                 setPadding(dp(Ui.MARGIN), dp(2), dp(Ui.MARGIN), dp(8))
             }
             if (i == limited.lastIndex) views += hline(1, Ui.DIVIDER)

@@ -45,6 +45,8 @@ fun Context.duration(ms: Long): String {
  * 오늘 읽은 시간·연속 독서일. 안드로이드 사용 기록(사용 기록 액세스 권한)에서 이북 앱의 '읽는 화면'이
  * 앞에 떠 있던 시간을 더한다. 어떤 책인지는 접근성 서비스가 그 앱에서 마지막으로 편 책([bookOpened])으로 나누고,
  * 그 앱에서 편 책을 한 번도 몰랐으면 앱으로만 센다(서비스를 끈 동안 읽은 시간도 마지막으로 편 책으로 들어간다).
+ * 읽는 화면이 따로 액티비티가 아닌 앱(Libby)은 그 액티비티가 앞에 있던 시간 가운데 접근성 서비스가 읽는 화면을 본 동안([viewerShown])만 센다
+ * (서비스를 끈 동안은 세지 않는다).
  * 사용 기록은 며칠만 남으므로 끝난 날의 합계는 DB([Db]) `reading_day` 에 남겨 둔다(지우지 않는다. 지난해 읽은 책을 보려고).
  */
 object ReadingLog {
@@ -118,7 +120,7 @@ object ReadingLog {
         val c = counter?.takeIf { it.from == from && it.packages == packages && it.zone == zone }
             ?: Counter(from, packages, zone).also { counter = it }
         c.feed(context)
-        val counted = c.totals(opens(context))
+        val counted = c.totals(opens(context), marks(context))
         // 기록이 시작된 날(그 전은 '안 읽음'이 아니라 '기록 없음')
         val since = saved.since ?: (saved.days.keys + from).min()
         val days = saved.days + counted
@@ -153,11 +155,7 @@ object ReadingLog {
     fun bookOpened(context: Context, pkg: String, title: String, at: Long = System.currentTimeMillis()) {
         val list = opens(context)
         if (list.filter { it.pkg == pkg }.maxByOrNull { it.at }?.title == title) return
-        val old = at - (BACKFILL_DAYS + 3) * 24 * 60 * 60 * 1000L
-        val kept = (list + Open(at, pkg, title)).groupBy { it.pkg }.values.flatMap { mine ->
-            val last = mine.maxBy { it.at }
-            mine.filter { it.at >= old || it === last }
-        }.sortedBy { it.at }
+        val kept = keepRecent(list + Open(at, pkg, title), at, { it.pkg }, { it.at })
         opens = kept
         runCatching {
             Db.get(context).tx {
@@ -165,6 +163,60 @@ object ReadingLog {
                 kept.forEach { insertOrThrow("book_open", null, Db.values("at" to it.at, "pkg" to it.pkg, "title" to it.title)) }
             }
         }
+    }
+
+    /** 접근성 서비스가 본 '[at] 에 [pkg] 의 서재 안에 읽는 화면이 떴다([shown])·닫혔다' */
+    private class Mark(val at: Long, val pkg: String, val shown: Boolean)
+
+    @Volatile private var marks: List<Mark>? = null
+
+    /** DB `viewer_mark`(때 순) */
+    @Synchronized
+    private fun marks(context: Context): List<Mark> = marks ?: Db.get(context).rows("SELECT at, pkg, shown FROM viewer_mark ORDER BY at") {
+        Mark(it.getLong(0), it.getString(1), it.getInt(2) != 0)
+    }.also { marks = it }
+
+    /**
+     * 읽는 화면이 서재 액티비티 안에 뜨는 앱(Libby, [ReaderApps.hostsViewer])에서 그 화면이 [at] 에 떴다([shown])·닫혔다.
+     * 그 액티비티가 앞에 있던 시간 가운데 떠 있던 동안만 읽은 시간으로 센다. 앞서 적은 것과 같으면 적지 않는다.
+     * [bookOpened] 처럼 다시 셀 수 있는 날 남짓만 남기고, 앱마다 마지막 것은 남긴다.
+     */
+    @Synchronized
+    fun viewerShown(context: Context, pkg: String, shown: Boolean, at: Long = System.currentTimeMillis()) {
+        val list = marks(context)
+        if ((list.lastOrNull { it.pkg == pkg }?.shown ?: false) == shown) return
+        val kept = keepRecent(list + Mark(at, pkg, shown), at, { it.pkg }, { it.at })
+        marks = kept
+        runCatching {
+            Db.get(context).tx {
+                delete("viewer_mark", null, null)
+                kept.forEach { insertOrThrow("viewer_mark", null, Db.values("at" to it.at, "pkg" to it.pkg, "shown" to it.shown)) }
+            }
+        }
+    }
+
+    /** [now] 기준 다시 셀 수 있는 날([BACKFILL_DAYS]) 남짓 것만 남기되 앱마다 마지막 것은 남긴다(때 순) */
+    private fun <T> keepRecent(list: List<T>, now: Long, pkg: (T) -> String, at: (T) -> Long): List<T> {
+        val old = now - (BACKFILL_DAYS + 3) * 24 * 60 * 60 * 1000L
+        return list.groupBy(pkg).values.flatMap { mine ->
+            val last = mine.maxBy(at)
+            mine.filter { at(it) >= old || it === last }
+        }.sortedBy(at)
+    }
+
+    /** [pkg] 의 [a]~[b] 가운데 읽는 화면이 떠 있던 구간들([viewerShown]) */
+    private fun List<Mark>.shownWithin(pkg: String, a: Long, b: Long): List<Pair<Long, Long>> {
+        val mine = filter { it.pkg == pkg }
+        var on = mine.lastOrNull { it.at <= a }?.shown ?: false
+        var from = a
+        val out = mutableListOf<Pair<Long, Long>>()
+        for (m in mine) {
+            if (m.at <= a || m.at >= b || m.shown == on) continue
+            if (on) out += from to m.at else from = m.at
+            on = m.shown
+        }
+        if (on) out += from to b
+        return out
     }
 
     /** [pkg] 에서 [t] 까지 마지막으로 편 책(모르면 null) */
@@ -206,29 +258,30 @@ object ReadingLog {
      */
     private class Counter(val from: LocalDate, val packages: Set<String>, val zone: ZoneId) {
         private val start = from.atStartOfDay(zone).toInstant().toEpochMilli()
-        /** [pkg] 의 읽는 화면이 [a]~[b] 에 앞에 있었다. */
-        private class Span(val pkg: String, val a: Long, val b: Long)
+        /** [pkg] 의 읽는 화면이 [a]~[b] 에 앞에 있었다. [hosted] 면 읽는 화면이 안에 뜨는 서재 액티비티라 떠 있던 동안만 센다. */
+        private class Span(val pkg: String, val a: Long, val b: Long, val hosted: Boolean)
         private val spans = mutableListOf<Span>()
         /** 여기까지 읽었다. 처음에는 자정 직전에 펼친 책도 세도록 조금 앞에서부터. */
         private var until = start - LOOKBACK_MS
         private var openAt = -1L
         private var openPkg = ""
         private var openClass: String? = null
+        private var openHosted = false
 
         private fun add(pkg: String, a: Long, b: Long) {
-            if (b > start) spans += Span(pkg, maxOf(a, start), b)
+            if (b > start) spans += Span(pkg, maxOf(a, start), b, openHosted)
         }
 
         /** 날마다 책([readingKey])별 시간. 구간마다 닫힐 때까지 그 앱에서 마지막으로 편 책([opens])으로 센다. */
         @Synchronized
-        fun totals(opens: List<Open>): ReadingDays {
+        fun totals(opens: List<Open>, marks: List<Mark>): ReadingDays {
             val totals = mutableMapOf<LocalDate, MutableMap<String, Long>>()
-            for (s in spans) {
-                val key = readingKey(s.pkg, opens.bookAt(s.pkg, s.b))
-                var t = s.a
-                while (t < s.b) {
+            for (s in spans) for ((a, b) in if (s.hosted) marks.shownWithin(s.pkg, s.a, s.b) else listOf(s.a to s.b)) {
+                val key = readingKey(s.pkg, opens.bookAt(s.pkg, b))
+                var t = a
+                while (t < b) {
                     val day = Instant.ofEpochMilli(t).atZone(zone).toLocalDate()
-                    val end = minOf(s.b, day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
+                    val end = minOf(b, day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
                     val keys = totals.getOrPut(day) { mutableMapOf() }
                     keys[key] = (keys[key] ?: 0) + (end - t)
                     t = end
@@ -248,10 +301,12 @@ object ReadingLog {
                     UsageEvents.Event.MOVE_TO_FOREGROUND -> {
                         if (openAt >= 0) add(openPkg, openAt, e.timeStamp)
                         val cls = e.className
-                        val reading = e.packageName in packages && cls != null && isReaderScreen(cls)
+                        val hosted = cls != null && !isReaderScreen(cls) && ReaderApps.hostsViewer(cls)
+                        val reading = e.packageName in packages && cls != null && (isReaderScreen(cls) || hosted)
                         openAt = if (reading) e.timeStamp else -1
                         openPkg = e.packageName
                         openClass = if (reading) cls else null
+                        openHosted = reading && hosted
                     }
                     UsageEvents.Event.MOVE_TO_BACKGROUND -> if (openAt >= 0 && e.className == openClass) {
                         add(openPkg, openAt, e.timeStamp); openAt = -1
