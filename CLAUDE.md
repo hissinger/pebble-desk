@@ -18,7 +18,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.3-release.apk </dev/
 - 릴리스는 R8 축소(약 235KB, HTML 라이브러리 없이 YES24 검색 결과를 직접 읽는다). 덮어 설치하면 앱 데이터가 남는다.
 - 서명: 1.4.2 까지는 디버그 키. 1.5.0 부터는 APK 를 만드는 `packageRelease`·`packageDebug` 끝에 릴리스 키(`~/Dev/pebble-desk-keys`, 저장소 밖·백업은 iCloud `PebbleDesk-서명키`)와 교체 이력(lineage, 디버그 키 → 릴리스 키)으로 v3 서명만 다시 하고(v1·v2·v4 끔), 인증서·이력이 맞는지 `apksigner verify`·`lineage` 로 확인한다(`app/build.gradle.kts`). 그래서 1.4.2 위에 덮어 깔리고, 디버그 키로만 서명한 APK 는 그 위에 깔리지 않는다. 키 폴더가 없으면 디버그 빌드는 디버그 키 그대로, 릴리스 빌드는 실패한다(`-Ppebbledesk.debugSignedRelease=true` 면 디버그 키로). assemble·install·Android Studio 실행 모두 다시 서명된 APK 를 쓴다. 키는 저장소(공개)에 넣지 않는다.
 - 앱 데이터는 **기기 보호 저장소**(`/data/user_de/0/com.woody.pebbledesk/`)에 있다(`Storage`). 홈이 잠금 해제 전에도 뜨게(directBootAware) 하려고 옮겼다.
-  - DB `databases/pebble.db`(`Db`, 안드로이드 기본 SQLite, 버전 2): 읽은 시간 `reading_day`·`reading_meta`, 편 책 `book_open`, 읽고 있는 책 `shelf`, 나간 책 `past`, 완독한 날 `finish`(여러 번), 별점·감상 `review`(버전 2). 기록은 지우지 않는다.
+  - DB `databases/pebble.db`(`Db`, 안드로이드 기본 SQLite, 버전 3): 읽은 시간 `reading_day`(날·앱 `pkg`·편 책 제목 `title`·붙은 책 `book_id`(모르면 "", 저장할 때 `bookFor` 로 한 번 정하고 다시 정하지 않는다)·ms. 버전 3 에서 `패키지/제목` 한 칸을 나누고 책 id 를 더함)·`reading_meta`, 편 책 `book_open`(그 책 id 도), 읽고 있는 책 `shelf`, 나간 책 `past`, 완독 `finish`(한 번에 한 줄·줄 id 와 기기를 옮겨도 그대로인 `uid`, 같은 날 두 번도(순서는 누른 때 `at`). 회차 번호는 저장하지 않고 순서로 센다. 그 회차를 다시 읽기한 날 `started`·별점·감상 `stars`·`text`. 버전 3), 진행 중인 마지막 회차의 별점·감상 `review`(버전 2), 다시 읽기한 날 `round_start`(버전 3). 기록은 지우지 않는다. 릴리스된 DB 는 1.3.0~1.4.2 가 버전 1, 1.5.0~1.5.3 이 버전 2(그 전은 JSON). 버전을 올리면 이 모든 판에서 올라오는 경로(`onUpgrade`)와 새 설치(`onCreate`)를 단위 테스트(`./gradlew testDebugUnitTest`, `app/src/test`: 회차 계산·마이그레이션·JSON 옮기기·저장과 캐시, Robolectric)와 에뮬에서 시험한다. 낮은 버전으로 되돌리기는 지원하지 않는다(판 낮춘 시험 빌드는 깨끗한 에뮬에서).
   - 파일: 설정 `shared_prefs/home.xml`, 표지 `files/books/<id>.jpg`, 앱 목록 캐시 `files/apps.json`.
   - 1.2.1 까지의 JSON(`reading.json`·`books/books.json`)은 이 실행에서 처음 DB를 열 때 옮기고 `.migrated`로 이름을 바꿔 둔다(읽지 못하면 `.bad`). DB 확인: `adb exec-out run-as … cat …/databases/pebble.db > x.db` 후 `sqlite3`(디버그 빌드).
 - **릴리스 설명**(GitHub 릴리스 본문): 앱의 설정 › 업데이트 창에 **18줄까지** 보이고 넘으면 끝이 `…` 로 잘린다(`SettingsActivity.NOTES_LINES`). 크레마 페블에서 한 줄은 한국어 약 28자, 절 제목은 한 줄, 두 번째 절부터 위에 반 줄이 더 든다. 그래서 `## 새로 생긴 것` / `## 고친 것` 두 절, 항목(`- `)은 한두 줄짜리로 모두 합쳐 18줄 안에 쓴다(자세한 설명은 README·문서로). `**`·`` ` `` 는 앱에서 지워지니 써도 된다. 태그는 `v<판>`, 자산은 `PebbleDesk-<판>-release.apk`(APK 의 versionName 과 같아야 앱이 받는다).
@@ -56,18 +56,18 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.3-release.apk </dev/
 | HomeActivity | 홈: 상단 · 책 자리(스켈레톤/한 권/여러 권) · 자주 쓰는 앱(고정 3줄) · 하단 줄(모든 앱 · 오늘 읽은 시간 · 설정) |
 | ReadingActivity | ⑫ 독서 기록: 연속일·오늘 링, 4주 링 달력·막대그래프(각각 뷰 하나로 그림, 같은 높이), 합계, 이번 주 읽은 책 |
 | YearBooksActivity | ⑬ 올해 읽은 책(목록·격자, 해 고르기): 읽는 중·완독한 책(표지에 띠)·뺀 책, 완독·다시 읽기·기록에서 지우기 |
-| BookRecord / BookDetail | 책 한 권의 기록(읽은 날·완독 회차, `BookRecord.all`) / 홈·올해 읽은 책이 같이 쓰는 책 상세 `showBookDetail`(머리·기록·메뉴·`책 정보 고치기`, 상태로만 갈림. 홈은 지금 읽는 것만, 올해 읽은 책은 완독한 회차와 별점·감상 칸. 완독 2회 이상이면 마지막 회차만 두고 누르면 완독 기록 `showHistory`(세로 타임라인, 닫으면 상세로)) |
-| Review | 별점·감상(`Review`, 저장은 `BookShelf.setReview`), 별 다섯 `StarBar`(반 개, 누르기·밀기), 별점·감상 메뉴 `reviewSheet`(완독·책 빼기의 확인을 겸함), 상세의 칸 `reviewBlock` |
-| Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간을 책별로 계산(편 책 `book_open`), DB `reading_day` 저장, 연속일 |
+| BookRecord / BookDetail | 책 한 권의 기록(읽은 날·회차 `rounds`(읽기 시작해 완독까지, 회차마다 별점·감상), `BookRecord.all`) / 홈·올해 읽은 책이 같은 책 상세 `showBookDetail`(머리·마지막 회차 기록·마지막 회차 별점·감상·메뉴·`책 정보 고치기`, 메뉴만 상태로 갈림. 회차가 둘 이상이면 기록 칸을 누르면 전체 기록 `showHistory`(세로 타임라인, 줄을 누르면 회차 메뉴 `editRound`: 완독한 날·별점·감상, 닫으면 상세로). 완독은 늘 오늘, 완독한 날은 회차 메뉴에서만 고친다) |
+| Review | 회차마다 별점·감상(`Review`, 완독하지 않은 회차는 `BookShelf.setReview`, 완독한 회차는 완독한 날과 함께 `setFinish`, 완독할 때 `BookShelf.finish` 가 옮김), 별 다섯 `StarBar`(반 개, 누르기·밀기), 별점·감상 메뉴 `reviewSheet`(완독·책 빼기의 확인을 겸함), 상세의 칸 `reviewBlock` |
+| Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간을 책별로 계산(편 책 `book_open`), DB `reading_day` 저장(칸 `ReadKey`, 책을 모르는 칸은 `bookFor` 로 정하고 목록에 없던 책이 책이 되면 `adopt`), 연속일 |
 | ReaderWatch | `ReaderWatchService`(접근성): 이북 앱 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기 |
 | WatchLog / WatchLogActivity | 자동 추가 서비스가 받은 알림·한 일 기록(최근 60줄 + 앱별 알림 수) / 기기 정보 › `기록 보기 ›` 화면(쪽 없이 한 화면, 사진으로 받는다) |
 | readers/ | 이북 앱마다 파일 하나(`KyoboLibrary`·`KyoboEbook`(e-ink)·`KyoboEbookMobile`(휴대폰)·`Millie`(e-ink)·`MillieMobile`(휴대폰)·`Aladin`·`Bookers`·`Ridi`·`Yes24Library`·`Yes24Ebook`·`MyYes`·`MoonReader`·`Kindle`. 패키지만 다른 판은 같은 클래스에 패키지만 줘서 객체 하나 더: 리디 원스토어판 `RidiOneStore`, 문리더 유료판 `MoonReaderPro`). 바탕 `ReaderSpec` 이 요소 이름으로 서재 칸·누른 칸·읽는 화면을 읽고, 다르게 읽어야 하는 앱은 그 앱 파일에서 메서드를 바꾼다(리디·휴대폰 밀리 서재, e-ink 밀리 검색 상세, 문리더 제목, 킨들 서재 칸 설명). 서비스는 앱 종류로 갈라지지 않는다. 공통 도구 `Nodes`, 앱 목록 `ReaderApps`(이북 앱 패키지·읽는 화면도 여기서). 앱을 더하면 `res/xml/reader_watch.xml` 의 packageNames 도 |
-| Books / BooksActivity / BookSearchActivity | 읽고 있는 책(최대 10권, 홈에는 4권, YES24 표지 검색)과 나간 책(완독·뺀 책, `BookShelf.history`), 책 목록 관리 |
+| Books / BooksActivity / BookSearchActivity | 읽고 있는 책(권수 제한 없음, 홈에는 4권, YES24 표지 검색. `책 추가`는 지원하지 않는 이북 앱용: 늘 새 책(id `m-`)이고 제목으로 다른 책·읽은 시간과 잇지 않는다)과 나간 책(완독·뺀 책, `BookShelf.history`), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
 | AppListActivity / FavoritesActivity / SettingsActivity / DeviceInfoActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 / 기기 정보(사진으로 찍어 보내는 진단 화면: 속성·권한·자동 추가 서비스 기록·누른 키·시스템 화면 시험) |
 | OnboardingActivity | ⑭ 시작하기: 처음 한 번, 읽는 책 자동 추가·오늘 읽은 시간을 설명하고 켜게 한다(안드로이드 13+ 제한된 설정 안내 포함) |
 | PagedRows | 스크롤 없는 페이지 목록(목록·격자, fixedRows), 높이가 제각각인 묶음을 쪽으로 나누는 `PagedBlocks`(자동 추가 안내), 쪽 표시 `pageLabel`·`pagesClick`(`Paged`) |
-| EinkActivity / Sheet / Ui / TopBarView / HomePrefs | 공통 화면(밀기·페이지 버튼·언어·밀도 맞춤)·아래 메뉴·규격(`PictureView`, 완독 도장을 찍는 줄 `StampedRow`, 기준 폭 572dp 포함)·상단·설정 저장 |
+| EinkActivity / Sheet / Ui / TopBarView / HomePrefs | 공통 화면(밀기·페이지 버튼·언어·밀도 맞춤)·아래 메뉴(돌아왔을 때 그사이 DB 가 바뀌었으면 떠 있던 메뉴를 닫는 `Sheet.dismissStale`)·규격(`PictureView`, 완독 도장을 찍는 줄 `StampedRow`, 기준 폭 572dp 포함)·상단·설정 저장 |
 | Palette | 색(설정 › 화면 › 색): 흑백·컬러('색면의 서가'). 표지·아이콘 컬러 여부, 화면 묶음(`Area`)마다 색면·큰 제목 색, 완독(띠·도장)·큰 별 색. `Palette.current` 는 EinkActivity 가 정한다 |
 | Device / Crema | 기기 종류(크레마·메이북·기타)와 기기마다 다른 동작(빠른 설정·조명·시스템 속성·BOOX 얼린 앱 열기) / 크레마 전용 화면 보정(대비·가려지는 아래·로고) |
 | Update | 설정 › 업데이트: GitHub 최신 릴리스 확인, APK 받기·확인(크기·SHA-256·서명 이력), 설치 세션·설치 창, 설치 뒤 홈 다시 띄우기 |
@@ -77,12 +77,12 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.3-release.apk </dev/
 
 - 전자잉크 원칙: 애니메이션 없음, 스크롤 대신 페이지, 바뀐 것만 다시 그림, 그리기 전에 채워 빈 화면 한 번 그리지 않기.
 - 색: 처음은 흑백. 컬러('색면의 서가')는 사용자가 고른다(기기로 판단하지 않음). 화면마다 머리에 옅은 색면 하나와 큰 제목 색, 완독은 어디서나 주홍. 본문 글자·선·작은 별은 무채색, 그래프는 책별로 나누지 않는다(DESIGN.md `색`).
-- 책: 최대 10권, 홈에는 앞 4권. 빼는 건 사용자만(다 차면 새 책을 넣지 않고 밀어내지 않는다). 맨 앞 책이 크게(표지가 남는 높이만큼), 다음 3권은 `함께 읽는 책` 3칸. 책이 없으면 스켈레톤(회색 표지 + `+`, 회색 막대).
+- 책: 권수 제한 없음(1.5.3 까지 10권), 홈에는 앞 4권. 빼는 건 사용자만(자동으로 밀어내지 않는다). 맨 앞 책이 크게(표지가 남는 높이만큼), 다음 3권은 `함께 읽는 책` 3칸. 책이 없으면 스켈레톤(회색 표지 + `+`, 회색 막대).
 - 자주 쓰는 앱: 직접 정한 순서, 높이는 목록 3줄로 고정(격자 4×2, 칸 가운데 정렬). 여러 쪽이면 제목 오른쪽 끝 `‹ 1 / 2 ›`. 이름을 따로 붙일 수 있다(`favorite_names`, 모든 앱에는 원래 이름. 빼면 지운다).
 - 글자 크기·줄 간격(설정 › 화면 › 글자 · 간격, 슬라이더 10% 씩): 글자 70~150%(기기 글꼴 크기에 곱한다, `Ui.textScale`·`setSp`·`spf`), 줄 간격 80~150%(목록·메뉴·설정 줄 높이, `Ui.rowScale`·`rowDp`). 둘 다 100% 면 1.5.0 과 같은 화면. 화면에 맞춰 자동으로 줄이지 않는다(사용자가 미리 보기를 보며 고른다).
 - 바형 화면(긴 변 ÷ 짧은 변 1.5 이상, `Ui.tallScreen`. Tango·Palma 등 2.0): 홈 함께 읽는 책 표지 두 배(글자는 아래, 가운데), 독서 기록은 남는 높이가 있으면 달력과 그래프를 함께. 시험은 `Tango_A14` 에뮬레이터(824×1648, 400dpi, API 34).
 - 하단 줄 56dp(모든 화면). 홈 가운데에 `오늘 42분 · 5일째`, 누르면 독서 기록.
-- 읽는 책 자동 추가·오늘 읽은 시간은 앱에 켜짐 값을 두지 않고 시스템 값(접근성 켜짐 / **사용 기록 액세스**(`PACKAGE_USAGE_STATS`) 허용)이 곧 켜짐이다(어긋나지 않게). 어떤 책인지는 접근성 서비스가 그 앱에서 마지막으로 편 책으로 나누고(그 앱에서 편 책을 한 번도 몰랐으면 앱별. 서비스를 끈 동안 읽은 시간도 마지막으로 편 책으로 들어간다). 읽는 화면은 클래스 이름 규칙(`READER` 정규식)으로 가린다. 연속일 = 1분 이상 읽은 날. 하루 목표 기본 30분(설정, 없음 / 15분~1시간 / 직접 입력 1~300분). 바꿔도 지난날은 그날의 목표로 센다.
+- 읽는 책 자동 추가·오늘 읽은 시간은 앱에 켜짐 값을 두지 않고 시스템 값(접근성 켜짐 / **사용 기록 액세스**(`PACKAGE_USAGE_STATS`) 허용)이 곧 켜짐이다(어긋나지 않게). 어떤 책인지는 접근성 서비스가 그 앱에서 마지막으로 편 책으로 나누고(그 앱에서 편 책을 한 번도 몰랐으면 앱별. 서비스가 꺼진 동안 읽은 시간은 책 없이 하루 합계·연속일에만 들어간다). 읽는 화면은 클래스 이름 규칙(`READER` 정규식)으로 가린다. 연속일 = 5분 이상 읽은 날. 하루 목표 기본 30분(설정, 없음 / 15분~1시간 / 직접 입력 1~300분). 바꿔도 지난날은 그날의 목표로 센다.
 - 기록은 처음 켤 때 7일 전까지 채우고 그날을 기록 시작일로 둔다(그 전은 '기록 없음').
 
 ## 일하는 방식(사용자 선호)

@@ -76,11 +76,7 @@ class BooksActivity : EinkActivity() {
     private fun render() {
         val apps = AppStore.loadAndPrune(this, prefs)
         val books = BookShelf.list(this)
-        titleCount.text = getString(R.string.books_count, books.size, BookShelf.MAX)
-        // 다 차면 추가를 막는다(먼저 한 권을 빼게 한다).
-        val full = BookShelf.isFull(this)
-        addLink.isEnabled = !full
-        addLink.setTextColor(if (full) Ui.LIGHT_GRAY else Ui.BLACK)
+        titleCount.text = getString(R.string.books_count, books.size)
         empty.visibility = if (books.isEmpty()) View.VISIBLE else View.GONE
 
         rows.setRows(books.mapIndexed { i, book -> { bookRow(book, i, books.size, apps) } })

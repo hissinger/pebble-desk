@@ -40,7 +40,7 @@ object WatchLog {
     }
 
     enum class Role { SHELF, VIEWER, OTHER }
-    /** 새로 넣음 · 이미 있어 맨 앞으로 · 목록이 다 차 못 넣음 · 완독해 나간 책이라 다시 넣지 않음 */
+    /** 새로 넣음 · 이미 있어 맨 앞으로 · 목록이 다 차 못 넣음 · 완독해 나간 책이라 다시 넣지 않음(뒤의 둘은 1.5.3 까지. 남은 기록을 읽으려고 둔다) */
     enum class Opened { NEW, FRONT, FULL, FINISHED }
 
     class Entry(var at: Long, val kind: Kind, val pkg: String, var arg: String, val detail: String, var repeat: Int = 1)
@@ -93,6 +93,16 @@ object WatchLog {
         counts.clear(); lastAt.clear()
         since = System.currentTimeMillis()
         firstAt = 0L; firstPkg = ""; noWindow = 0
+    }
+
+    /**
+     * 서비스가 이북 앱 알림을 마지막으로 받은 때(어느 앱이든, 없으면 0). 그때는 서비스가 살아 있었다([ReaderWatchService.stoppedAt]).
+     * 저장은 몇 초 늦게 하므로 프로세스가 죽었으면 그보다 조금 이를 수 있다(이른 쪽이라 '책 모름'이 넓어질 뿐 다른 책에 붙지는 않는다).
+     */
+    @Synchronized
+    fun lastEventAt(context: Context): Long {
+        load(context)
+        return lastAt.values.maxOrNull() ?: 0L
     }
 
     /** 알림을 하나 받았다(글 내용 바뀜 포함). 연결 뒤 첫 알림이면 줄로도 남긴다. */

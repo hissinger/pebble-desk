@@ -3,6 +3,7 @@ package com.woody.pebbledesk
 import android.app.Dialog
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.drawable.GradientDrawable
 import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
@@ -11,6 +12,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -21,6 +23,30 @@ import android.widget.LinearLayout
  * 박스 없이 선으로만 나눈다.
  */
 class Sheet(private val context: Context) {
+    companion object {
+        /** 떠 있는 메뉴와 띄운 화면·그때의 기록 판 번호([Db.changes]) */
+        private class Shown(val dialog: Dialog, val owner: Context, val changes: Long)
+
+        private val open = mutableListOf<Shown>()
+
+        /** 닫힌 메뉴와 끝난 화면의 메뉴를 버린다(화면이 끝나면 메뉴는 닫힘 알림 없이 사라지고 isShowing 도 그대로라, 끝난 화면을 붙들지 않게) */
+        private fun prune() = open.removeAll { !it.dialog.isShowing || (it.owner as? android.app.Activity)?.isDestroyed == true }
+
+        /**
+         * 화면([owner])에 돌아왔을 때(onPostResume, 날이 바뀌어 저장한 뒤): 그 화면에 떠 있던 메뉴 중 띄운 뒤 DB 가 바뀐 것(다른 화면에서 고침·이북 앱에서 편 책 자동 추가 등)을 닫는다
+         * (오래된 기록으로 저장하지 않게). 닫힘 동작이 있는 메뉴(전체 기록·회차 메뉴)는 지금 기록으로 다시 뜨고, 별점·감상·입력 메뉴는 닫히기만 한다.
+         * 바뀐 것이 없으면(화면만 껐다 켬) 그대로 둔다.
+         * 같은 화면 안에서는 기록이 바뀌는 것이 그 메뉴들의 동작뿐이라(자동 추가는 이북 앱이 앞에 있을 때) 돌아올 때만 보면 된다.
+         */
+        fun dismissStale(owner: Context) {
+            prune()
+            val mine = open.filter { it.owner === owner }
+            if (mine.isEmpty()) return
+            val now = Db.changes()
+            mine.filter { it.changes != now && it.dialog.isShowing }.forEach { it.dialog.dismiss() }
+        }
+    }
+
     private class Item(val label: String, val bold: Boolean, val action: () -> Unit)
 
     private var app: AppEntry? = null
@@ -34,6 +60,12 @@ class Sheet(private val context: Context) {
     /** 글자 입력 줄(지금 값, 다 쓰면 부를 일). 있으면 머리 아래에 두고 `저장`을 맨 위 항목으로 둔다. */
     private var input: Pair<String, (String) -> Unit>? = null
     private var numeric = false
+    /** 입력이 날짜인가(날짜 자판) */
+    private var date = false
+    /** 입력 줄 아래 회색 안내(없으면 두지 않는다) */
+    private var inputHint: String? = null
+    /** 저장 전에 확인한다: 틀렸으면 알릴 글(안내 자리에 굵게, 저장하지 않고 메뉴를 둔다), 맞으면 null */
+    private var check: ((String) -> String?)? = null
     /** 아래 `닫기` 줄을 두는가. 확인 창은 `취소`를 항목으로 두고 닫기를 뺀다. */
     private var closeRow = true
 
@@ -41,8 +73,17 @@ class Sheet(private val context: Context) {
 
     /** 닫기 줄 없이, 뒤로 가기·바깥 누르기로도 닫히지 않는다(받는 중 창. 부르는 쪽이 [show] 가 돌려준 창을 닫는다). */
     private var locked = false
+    /** 기록이 바뀌어도 닫지 않는다([dismissStale]. 기록을 저장하지 않는 안내 창) */
+    private var keep = false
+
+    fun keepOnChange() = apply { keep = true }
 
     fun locked() = apply { locked = true; closeRow = false }
+
+    /** 아래에 붙이지 않고 화면 가운데에 띄운다(테두리를 두르고 좌우를 띄운다). 놓치면 안 되는 안내(자동 추가가 꺼짐). */
+    private var centered = false
+
+    fun centered() = apply { centered = true }
 
     /** 머리와 항목 사이에 두는 칸(책 상세의 회차별 기록·별점 칸). 칸마다 위에 옅은 선, 화면 폭으로(좌우 여백 안). [onClick] 이 있으면 칸 전체를 누를 수 있다. */
     private class Note(val view: View, val onClick: (() -> Unit)?)
@@ -78,6 +119,11 @@ class Sheet(private val context: Context) {
         input = initial to onDone; this.numeric = numeric
     }
 
+    /** 날짜 한 줄 입력(날짜 자판): 아래에 [hint], 저장 전에 [check](틀렸으면 그 글을 굵게 알리고 저장하지 않는다). */
+    fun dateInput(initial: String, hint: String, check: (String) -> String?, onDone: (String) -> Unit) = apply {
+        input = initial to onDone; date = true; inputHint = hint; this.check = check
+    }
+
     /** 머리: 앱 아이콘 또는 표지, 제목·설명, 도장이 있으면 그 자리를 비운다. */
     private fun head(): LinearLayout {
         val c = context
@@ -94,7 +140,8 @@ class Sheet(private val context: Context) {
             })
         }
         val names = c.vbox()
-        names.addView(c.text(title, 29f, Ui.heavy))
+        // 가운데 안내 창은 제목이 곧 알림이라 두 줄까지(글자를 키워도 '…꺼져 있습니다'가 잘리지 않게). 아래 메뉴는 한 줄.
+        names.addView(c.text(title, 29f, Ui.heavy, lines = if (centered) 2 else 1))
         subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = subtitleLines), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
         head.addView(names, lp(0, WRAP, 1f).apply {
             if (image != null) gravity = Gravity.TOP
@@ -104,8 +151,16 @@ class Sheet(private val context: Context) {
         return head
     }
 
-    /** 머리 높이(화면 폭에서). 머리 아래에 둘 칸을 화면에 들어가는 만큼만 담을 때 쓴다. */
-    fun headHeight(): Int = head().heightAt(context.resources.displayMetrics.widthPixels)
+    /**
+     * 띄웠을 때의 높이(화면 폭에서 실제로 만들어 잰다). 칸을 화면에 들어가는 만큼만 담을 때 쓴다(상세의 감상 줄 수, 전체 기록의 쪽 나누기).
+     * 잰 뒤에는 칸의 뷰를 떼어 둔다(띄울 때 다시 붙인다).
+     */
+    fun height(): Int {
+        val screen = context.resources.displayMetrics.widthPixels
+        val h = layout(Dialog(context, R.style.Sheet)).heightAt(if (centered) screen - context.dp(Ui.MARGIN) * 2 else screen)
+        notes.forEach { (it.view.parent as? ViewGroup)?.removeView(it.view) }
+        return h
+    }
 
     /** 칸 안에 쪽으로 나뉜 것이 있으면 페이지 버튼([pageKey])으로 넘긴다(메뉴가 떠 있으면 키가 화면 대신 메뉴로 온다). */
     private var paged: Paged? = null
@@ -119,6 +174,39 @@ class Sheet(private val context: Context) {
 
     fun show(): Dialog {
         val dialog = Dialog(context, R.style.Sheet)
+        val root = layout(dialog)
+        val shown = Shown(dialog, context, Db.changes())
+        prune()
+        // 닫지 못하게 한 메뉴(받는 중 진행 막대)와 기록을 저장하지 않는 안내 창은 기록이 바뀌어도 닫지 않는다
+        if (!locked && !keep) open += shown
+        dialog.setOnDismissListener { open -= shown; onDismiss?.invoke() }
+        paged?.let { p ->
+            dialog.setOnKeyListener { _, keyCode, event ->
+                val next = pageKey(keyCode) ?: return@setOnKeyListener false
+                // 누르고 있을 때 오는 반복은 넘기지 않는다(한 번 누르면 한 쪽).
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) { if (next) p.next() else p.prev() }
+                true
+            }
+        }
+        dialog.setContentView(root)
+        dialog.window?.apply {
+            setGravity(if (centered) Gravity.CENTER else Gravity.BOTTOM)
+            val width = if (centered) context.resources.displayMetrics.widthPixels - context.dp(Ui.MARGIN) * 2 else ViewGroup.LayoutParams.MATCH_PARENT
+            setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+            decorView.setPadding(0, 0, 0, 0)
+            // 입력 줄이 있으면 키보드를 띄우고, 메뉴가 키보드 위로 올라오게 한다.
+            if (input != null) setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            if (review != null) setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
+        // 감상을 쓰다 바깥을 잘못 눌러 글이 날아가지 않게(뒤로 가기·`취소`로 닫는다).
+        if (review != null) dialog.setCanceledOnTouchOutside(false)
+        if (locked) dialog.setCancelable(false)
+        dialog.show()
+        return dialog
+    }
+
+    /** 메뉴의 내용(머리·칸·별점 감상·입력·항목·닫기). 누르면 [dialog] 를 닫는다. */
+    private fun layout(dialog: Dialog): LinearLayout {
         val c = context
         // 닫고 할 일. 닫히기 전에 두 번 눌려도 한 번만(같은 책을 두 번 다시 읽기·적어 두기 하지 않게).
         fun dismissThen(action: () -> Unit) {
@@ -126,8 +214,13 @@ class Sheet(private val context: Context) {
             dialog.dismiss(); action()
         }
         val root = c.vbox()
-        Crema.reserveHiddenBottom(root)
-        root.addView(c.hline(2, inset = false))
+        if (centered) {
+            // 가운데에 뜨면 아래가 가려지지 않는다. 위에 굵은 선 대신 둘레에 테두리.
+            root.background = GradientDrawable().apply { setColor(android.graphics.Color.WHITE); setStroke(c.dp(2), Ui.BLACK) }
+        } else {
+            Crema.reserveHiddenBottom(root)
+            root.addView(c.hline(2, inset = false))
+        }
         // 머리와 칸들을 한 묶음에 넣는다(정보 바탕을 칠할 때 도장이 넘친 자리까지 같은 바탕이게).
         val info = c.vbox()
         paper?.let { info.setBackgroundColor(it) }
@@ -202,16 +295,28 @@ class Sheet(private val context: Context) {
                 background = null
                 setPadding(0, c.dp(8), 0, c.dp(8))
                 isSingleLine = true
-                inputType = if (numeric) InputType.TYPE_CLASS_NUMBER else InputType.TYPE_CLASS_TEXT
+                inputType = when {
+                    date -> InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_DATE
+                    numeric -> InputType.TYPE_CLASS_NUMBER
+                    else -> InputType.TYPE_CLASS_TEXT
+                }
                 imeOptions = EditorInfo.IME_ACTION_DONE
             }
+            val hint = inputHint?.let { c.text(it, 15f, color = Ui.LIGHT_GRAY, lines = 2) }
             val save = {
                 val v = field.text.toString().trim()
-                if (v.isNotEmpty()) dismissThen { onDone(v) }
+                val error = check?.invoke(v)
+                if (error != null) hint?.apply { text = error; typeface = Ui.bold; setTextColor(Ui.BLACK) }
+                else if (v.isNotEmpty()) {
+                    // 키보드를 내리고 닫는다(아래 메뉴 위에 떠서 열었을 때 키보드가 남아 그 메뉴의 아래 줄을 가리지 않게).
+                    c.getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(field.windowToken, 0)
+                    dismissThen { onDone(v) }
+                }
             }
             field.setOnEditorActionListener { _, action, _ -> if (action == EditorInfo.IME_ACTION_DONE) { save(); true } else false }
             root.addView(field, lp(MATCH, WRAP).apply { marginStart = c.dp(Ui.MARGIN); marginEnd = c.dp(Ui.MARGIN) })
             root.addView(c.hline(2))
+            hint?.let { root.addView(it, lp(MATCH, WRAP).apply { marginStart = c.dp(Ui.MARGIN); marginEnd = c.dp(Ui.MARGIN); topMargin = c.dp(8); bottomMargin = c.dp(10) }) }
             root.addView(c.hbox().apply {
                 setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
                 addView(c.text(c.getString(R.string.save), 24f, Ui.bold), lp(MATCH, WRAP))
@@ -235,42 +340,20 @@ class Sheet(private val context: Context) {
             setOnClickListener { dialog.dismiss() }
         }, lp(MATCH, c.dp(CLOSE_ROW_DP)))
 
-        onDismiss?.let { action -> dialog.setOnDismissListener { action() } }
         // 입력이 없는 메뉴는 초점을 받지 않는다. 받을 수 있으면 터치 모드에서 처음 누른 페이지 키가 터치 모드를 벗어나는 데 쓰이고
         // 버려지며(쪽이 넘어가지 않는다) 누를 수 있는 글자에 회색 초점 표시가 남는다.
         if (input == null && review == null) root.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-        paged?.let { p ->
-            dialog.setOnKeyListener { _, keyCode, event ->
-                val next = pageKey(keyCode) ?: return@setOnKeyListener false
-                // 누르고 있을 때 오는 반복은 넘기지 않는다(한 번 누르면 한 쪽).
-                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) { if (next) p.next() else p.prev() }
-                true
-            }
-        }
-        dialog.setContentView(root)
-        dialog.window?.apply {
-            setGravity(Gravity.BOTTOM)
-            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            decorView.setPadding(0, 0, 0, 0)
-            // 입력 줄이 있으면 키보드를 띄우고, 메뉴가 키보드 위로 올라오게 한다.
-            if (input != null) setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            if (review != null) setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        }
-        // 감상을 쓰다 바깥을 잘못 눌러 글이 날아가지 않게(뒤로 가기·`취소`로 닫는다).
-        if (review != null) dialog.setCanceledOnTouchOutside(false)
-        if (locked) dialog.setCancelable(false)
-        dialog.show()
-        return dialog
+        return root
     }
 }
 
 /** 머리의 표지 폭(책 상세. 띠 글자가 읽히게 크게) */
 const val SHEET_COVER_DP = 76
 
-/** 칸([Sheet.note])의 위·아래 여백, 맨 아래 `닫기` 줄 높이(칸 안을 화면 높이에 맞춰 나눌 때도 쓴다) */
-const val NOTE_PAD_TOP_DP = 10
-const val NOTE_PAD_BOTTOM_DP = 14
-const val CLOSE_ROW_DP = 62
+/** 칸([Sheet.note])의 위·아래 여백, 맨 아래 `닫기` 줄 높이 */
+private const val NOTE_PAD_TOP_DP = 10
+private const val NOTE_PAD_BOTTOM_DP = 14
+private const val CLOSE_ROW_DP = 62
 
 /** 머리의 완독 도장: 지름, 가운데가 오른쪽 끝에서 안쪽으로, 위에서 아래로(지름의 절반보다 작아 위가 잘리고, 아래는 머리 밖으로 조금 넘친다) */
 private const val STAMP_DP = 220

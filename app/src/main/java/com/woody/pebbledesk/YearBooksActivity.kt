@@ -15,7 +15,7 @@ import java.time.LocalDate
 
 /**
  * ⑬ 올해 읽은 책(독서 기록 제목 오른쪽 `올해 읽은 책 ›`). 제목 오른쪽 `2026 ▾` 로 지난해를 고르면 `2025년 읽은 책`.
- * 그해 1분 이상 읽었거나 그해 완독한 책을 모두 보인다:
+ * 그해 합쳐 5분 이상 읽었거나 그해 완독한 책을 모두 보인다(직접 넣은 책은 시간이 붙지 않아 회차가 걸친 해, [BookRecord.readYears]):
  * 읽고 있는 책·완독한 책·뺀 책·목록에 넣지 못한 책(읽은 시간에만 있는 제목). 최근에 읽은(다 읽은) 순.
  * 목록은 줄마다 표지·제목·저자와 별점(완독한 책은 오른쪽 끝에 도장, 읽는 중 표시는 없다), 격자는 한 줄에 표지 4권과 그 아래 책 이름·별점.
  * 한 번이라도 완독한 책은 표지가 어디에 놓이든(격자·목록·상세) 오른쪽 위 모서리를 가로지르는 `완독` 띠. 완독한 날은 모두 남고
@@ -35,8 +35,6 @@ class YearBooksActivity : EinkActivity() {
     /** 격자 표지 크기: 칸 높이는 그대로 두고 아래 별 줄만큼 줄인다(2:3) */
     private var gridCoverW = 0
     private var gridCoverH = 0
-    /** 책(id)마다 별점·감상(그릴 때마다 읽는다) */
-    private var reviews: Map<String, Review> = emptyMap()
     /** 보고 있는 해(처음에는 올해). 제목 오른쪽 `2026 ▾` 로 고른다. */
     private var year = LocalDate.now().year
     private lateinit var titleText: TextView
@@ -45,7 +43,7 @@ class YearBooksActivity : EinkActivity() {
     private lateinit var yearPick: TextView
 
     /** 한 줄: 책의 기록, 그해 마지막으로 읽은 날과 완독한 날 중 늦은 날(목록 순서), 그해 완독했는가(`완독` 거르기) */
-    private class Row(val record: BookRecord, val sortDay: LocalDate, val doneInYear: Boolean) {
+    internal class Row(val record: BookRecord, val sortDay: LocalDate, val doneInYear: Boolean) {
         val book get() = record.book
         val finished get() = record.finished
     }
@@ -123,7 +121,6 @@ class YearBooksActivity : EinkActivity() {
         val today = LocalDate.now()
         // 기록은 한 번만 읽는다(읽은 시간 계산이 사용 기록을 읽는다).
         val records = BookRecord.all(this).filter { !it.hidden }
-        reviews = BookShelf.reviews(this)
         val years = years(records, today)
         // 지난해의 마지막 책을 기록에서 지워 그해가 비면 올해로 돌아온다(빈 지난해에 `올해 읽은 책이 없습니다`가 뜨지 않게).
         if (year !in years) year = today.year
@@ -221,18 +218,15 @@ class YearBooksActivity : EinkActivity() {
     /** 목록 줄 글자 칸 폭(화면 폭 - 여백 - 표지 - 도장 자리) */
     private fun Row.textWidth() = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - coverW - dp(2) - dp(16) - (if (finished) stampSpace else 0)
 
-    /** 별점이 있으면 작은 별 다섯(회색, 반 개), 없으면 null */
+    /** 마지막 회차에 별점이 있으면 작은 별 다섯(회색, 반 개), 없으면 null */
     private fun stars(r: Row, sizeDp: Int): View? {
-        val halves = reviews[r.book.id]?.halves ?: 0
+        val halves = r.record.lastRound.review?.halves ?: 0
         if (halves == 0) return null
         return StarBar(this, sizeDp, 2, filled = Ui.GRAY).apply { this.halves = halves }
     }
 
-    /** 홈과 같은 책 상세(기록 전체). 지난해 책을 완독하면 그해 마지막으로 읽은 날에 완독한 것으로(올해는 오늘). */
-    private fun showMenu(r: Row) {
-        val finishOn = if (year == LocalDate.now().year) LocalDate.now() else r.sortDay.takeIf { it != LocalDate.MIN } ?: LocalDate.of(year, 12, 31)
-        showBookDetail(r.record, full = true, finishOn = finishOn) { render() }
-    }
+    /** 홈과 같은 책 상세(완독은 늘 오늘, 완독한 날은 전체 기록에서 고친다) */
+    private fun showMenu(r: Row) = showBookDetail(r.record) { render() }
 
     companion object {
         /** 목록 줄 표지 위아래 여백(dp). 표지는 나머지 높이를 채운다. */
@@ -254,23 +248,27 @@ class YearBooksActivity : EinkActivity() {
 
         fun intent(context: Context) = Intent(context, YearBooksActivity::class.java)
 
-        /** 고를 수 있는 해: 1분 이상 읽었거나 완독한 책이 있는 해와 올해(최근 순) */
-        private fun years(records: List<BookRecord>, today: LocalDate): List<Int> {
+        /** 고를 수 있는 해: 책이 보이는 해([BookRecord.readYears])나 완독한 해와 올해(최근 순) */
+        internal fun years(records: List<BookRecord>, today: LocalDate): List<Int> {
             return (records.flatMap { r -> r.readYears + r.finishes.map { it.year } } + today.year).distinct().sortedDescending()
         }
 
         /**
-         * [year] 에 1분 이상 읽었거나 그해 완독한 책. 그해 마지막으로 읽은(완독한) 날 순, 같으면 오래 읽은 순.
+         * [year] 에 합쳐 5분 이상 읽었거나 그해 완독한 책(직접 넣은 책은 회차가 걸친 해, [BookRecord.readYears]). 그해 마지막으로 읽은(완독한) 날 순
+         * (직접 넣은 책은 읽은 날 대신 그해 회차를 시작한 날), 같으면 그해 오래 읽은 순.
          * 기간·읽은 시간은 남은 기록 전체로 센다(해를 넘긴 책도 맞게).
          */
-        private fun yearRows(records: List<BookRecord>, year: Int): List<Row> =
+        internal fun yearRows(records: List<BookRecord>, year: Int): List<Row> =
             records
                 .filter { year in it.readYears || it.finishes.any { d -> d.year == year } }
                 .map { r ->
-                    val lastRead = r.readDays.lastOrNull { it.year == year } ?: LocalDate.MIN
+                    // 그해 조금이라도 읽은 마지막 날(목록에는 그해 합쳐 5분이면 들어오니, 하루 5분이 안 된 날도 정렬에 센다)
+                    val lastRead = r.dayMs.filter { (d, ms) -> d.year == year && ms > 0 }.keys.maxOrNull()
+                        // 직접 넣은 책은 읽은 시간이 없어 그해 회차를 시작한 날로
+                        ?: r.rounds.takeIf { r.book.manual }?.mapNotNull { it.from }?.filter { it.year == year }?.maxOrNull() ?: LocalDate.MIN
                     val lastDone = r.finishes.lastOrNull { it.year == year } ?: LocalDate.MIN
                     Row(r, maxOf(lastRead, lastDone), doneInYear = lastDone != LocalDate.MIN)
                 }
-                .sortedWith(compareByDescending<Row> { it.sortDay }.thenByDescending { it.record.ms })
+                .sortedWith(compareByDescending<Row> { it.sortDay }.thenByDescending { it.record.yearMs(year) })
     }
 }

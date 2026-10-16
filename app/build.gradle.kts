@@ -50,6 +50,17 @@ android {
     lint {
         disable += "QueryAllPackagesPermission"
     }
+
+    // 단위 테스트(app/src/test): 회차 계산은 JVM 에서, DB 마이그레이션은 Robolectric(안드로이드 SQLite)으로 기기 없이 돌린다.
+    // ./gradlew testDebugUnitTest
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+}
+
+dependencies {
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 }
 
 // 릴리스 키로 다시 서명: 1.4.2 까지는 디버그 키(~/.android/debug.keystore)로 서명했다.

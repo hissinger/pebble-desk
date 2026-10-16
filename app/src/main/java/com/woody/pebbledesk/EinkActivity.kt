@@ -74,6 +74,12 @@ abstract class EinkActivity : Activity() {
         prefs = HomePrefs(this)
     }
 
+    override fun onPostResume() {
+        super.onPostResume()
+        // 떠나 있는 사이(그리고 돌아오며 화면마다 onResume 에서 한 저장까지) 기록이 바뀌었으면 떠 있던 메뉴를 닫는다
+        Sheet.dismissStale(this)
+    }
+
     override fun onResume() {
         super.onResume()
         // 기본 크기로 그리는 화면(기기 정보)에서 돌아왔으면 이 화면의 배율로 되돌린다(새로 그리는 줄·메뉴가 이 값을 쓴다).

@@ -7,7 +7,8 @@ import kotlin.math.abs
 /**
  * 밀리의서재(크레마 e-ink 판 `kr.co.millie.eink`, 휴대폰 판 [MillieMobile] 과 다른 앱): 다운로드·전체도서 탭은 `BookshelfActivity`,
  * 책장 안(읽고있는 책 등)은 `BookShelfDetailActivity`. 칸에 제목·표지·진행률. 검색 탭(웹 화면) 책 상세의 `바로 읽기`·`이어 읽기` 로도 연다.
- * 읽는 화면은 아래 오른쪽 진행률(불러오는 동안의 `0%` 는 뺀다).
+ * 읽는 화면은 아래 오른쪽 진행률(불러오는 동안의 `0%` 는 뺀다). 가운데를 누르면 뜨는 위 막대 `epub_navibar` 가운데에 제목(`팩트풀니스`)이
+ * 이름 없는 글자로 있다(2026-10-16 페블에서 확인. 몇 초 뒤 저절로 닫힌다).
  */
 object Millie : ReaderSpec(
     pkg = "kr.co.millie.eink", classPrefix = "kr.co.millie",
@@ -20,6 +21,23 @@ object Millie : ReaderSpec(
     titles = listOf("tv_book_title"), thumbs = listOf("iv_thumbnail"), authors = emptyList(), progress = "bookshelf_cell_reading", due = null,
     viewerProgress = listOf("tv_viewer_add_on_right"), viewerLoading = "epub_loading_message",
 ) {
+    /** 읽는 화면 메뉴(위 막대)에 제목이 보인다(이름 없는 글자라 [viewerTitle] 대신 [readViewer] 에서 읽는다) */
+    override val tellsTitle: Boolean get() = true
+
+    /** 읽는 화면: 기본 읽기(진행률)에 더해, 메뉴가 떠 있으면 위 막대 안의 글자 하나를 제목으로(뒤로·책갈피 단추는 글자가 없다) */
+    override fun readViewer(windows: AppWindows): ViewerInfo {
+        val info = super.readViewer(windows)
+        val title = windows.all.flatMap { it.byId(pkg, NAVI_BAR) }.flatMap { barTexts(it, 0) }.distinct().singleOrNull() ?: return info
+        return ViewerInfo(title, "", info.progress)
+    }
+
+    /** 위 막대 안의 글자들(몇 단계만) */
+    private fun barTexts(n: AccessibilityNodeInfo, depth: Int): List<String> =
+        listOfNotNull(n.text?.let(::plain)?.takeIf { it.isNotEmpty() }) +
+            if (depth < 3) (0 until n.childCount).flatMap { i -> n.getChild(i)?.let { barTexts(it, depth + 1) }.orEmpty() } else emptyList()
+
+    private const val NAVI_BAR = "epub_navibar"
+
     /** 검색 책 상세의 읽기 단추 글자 */
     private val READ_NOW = setOf("바로 읽기", "이어 읽기")
     /** 웹 화면(검색 책 상세)을 훑는 깊이, 같은 줄·같은 왼쪽으로 보는 차이(px) */

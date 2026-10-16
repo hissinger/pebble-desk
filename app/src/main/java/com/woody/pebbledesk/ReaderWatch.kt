@@ -33,15 +33,10 @@ class ReaderWatchService : AccessibilityService() {
     /** 앱마다 지금 앞에 있는 화면(액티비티 이름) */
     private val screen = mutableMapOf<String, String>()
     /**
-     * 앱마다 마지막으로 편 책의 제목(읽는 화면의 진행률을 붙일 곳). 표지 다시 찾기로 id 가 바뀌어도 찾도록 제목으로 둔다.
-     * 서비스가 다시 시작돼도(앱 업데이트·재부팅) 읽는 화면으로 바로 돌아간 책의 진행률을 적도록 저장해 둔다.
+     * 서재의 '최근 읽은 책' 줄을 둔다. 예전에는 앱마다 마지막으로 편 책 제목(`opened_<앱>`)도 두어 진행률을 붙였는데, 지금은 편 책 기록(DB `book_open`,
+     * [ReadingLog.openBook])이 그 일을 하고 옛 값은 그 기록이 비어 있을 때만 읽는다([ReadingLog]).
      */
     private val openedPrefs by lazy { Storage.of(this).getSharedPreferences("reader_watch", MODE_PRIVATE) }
-    private fun opened(pkg: String) = openedPrefs.getString("opened_$pkg", null)
-    /** [title] 이 null 이면 지운다(어떤 책을 폈는지 모른다) */
-    private fun setOpened(pkg: String, title: String?) {
-        if (opened(pkg) != title) openedPrefs.edit().putString("opened_$pkg", title).apply()
-    }
     /** 읽으러 가기 전에 본 서재의 '최근 읽은 책'([ReaderSpec.recent]) */
     private fun recentBefore(pkg: String) = openedPrefs.getString("recent_$pkg", null)
     /** [title] 이 null 이면 지운다(모른다) */
@@ -56,7 +51,8 @@ class ReaderWatchService : AccessibilityService() {
     private val unknownClick = mutableMapOf<String, Long>()
     /**
      * 그렇게 누른 뒤 읽는 화면이 열려 어떤 책인지 모르는 앱과 열린 때. 앞서 편 책과 다른 책일 수 있어 마지막으로 편 책을 지워 두고
-     * (진행률을 적지 않는다. 서비스가 다시 시작돼도), 읽는 화면 메뉴의 제목으로 알면 열린 때부터 그 책으로 센다.
+     * (진행률을 적지 않는다. 서비스가 다시 시작돼도), 읽는 화면 메뉴의 제목으로 알면 열린 때부터 그 책으로 센다. 메뉴 없이 그 읽는 화면을 떠났다
+     * 다시 들어오면 지운다(다른 책일 수 있어 그 사이 시간은 책 모름 그대로).
      */
     private val unknownOpen = mutableMapOf<String, Long>()
     private var lastWebRead = 0L
@@ -115,14 +111,22 @@ class ReaderWatchService : AccessibilityService() {
                     eagerTries.clear()
                     val now = System.currentTimeMillis()
                     lastTransition = now
+                    // 같은 화면의 알림이 한 번 더 온 것(새로 들어온 것이 아니다)
+                    val again = screen[spec.pkg] == it
                     screen[spec.pkg] = it
                     if (ReadingLog.isReaderScreen(it)) {
                         // 서재를 떠나 처음 연 읽는 화면의 때만 적는다(읽는 중 목차 같은 다른 화면에 갔다 와도 처음부터 그 책으로 세게).
                         // 줄이 바뀌기를 기다리다 서재에서 다시 읽으러 갔으면 이번 책의 때로 다시 적는다.
                         if (spec.recent != null && (readSince.add(spec.pkg) || recentWait.remove(spec.pkg))) readerAt[spec.pkg] = now
-                        unknownClick.remove(spec.pkg)?.takeIf { now - it < CLICK_OPEN_MS }?.let {
+                        val unknown = unknownClick.remove(spec.pkg)?.takeIf { now - it < CLICK_OPEN_MS }
+                        if (unknown != null) {
                             unknownOpen[spec.pkg] = now
-                            setOpened(spec.pkg, null)
+                            // 제목을 못 읽은 칸을 눌러 들어왔다: 여기부터는 책 모름(앞서 편 책에 붙이지 않게. 메뉴의 제목을 읽으면 그 책으로)
+                            ReadingLog.bookOpened(this, spec.pkg, "", "", now)
+                        } else if (!again) {
+                            // 그렇게 연 읽는 화면을 메뉴 없이 떠났다 다시 들어왔으면(다른 책일 수 있다) 그때 연 때를 쓰지 않는다(그 사이 시간은 책 모름 그대로).
+                            // 같은 읽는 화면의 알림이 한 번 더 온 것이면 그대로 둔다.
+                            unknownOpen -= spec.pkg
                         }
                         webBook.remove(spec.pkg)?.let { book -> bookOpened(spec, book) }
                         clicked.remove(spec.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.let { bookOpened(spec, it.first) }
@@ -179,8 +183,8 @@ class ReaderWatchService : AccessibilityService() {
                         captureCovers(spec, readShelf(spec, root).distinctBy { it.title }.mapNotNull { s ->
                             val thumb = s.thumb?.takeIf(::usableThumb) ?: return@mapNotNull null
                             val book = BookShelf.findByTitle(this, s.title)
-                            // 목록에 없는 책은 들어올 때 붙일 표지를 미리 찍어 둔다(목록이 다 찼으면 들어올 수 없어 찍지 않는다).
-                            val need = if (book == null) BookShelf.canAutoAdd(this, s.title) && pendingFor(s.title) == null else !BookShelf.hasCover(this, book.id)
+                            // 목록에 없는 책은 들어올 때 붙일 표지를 미리 찍어 둔다.
+                            val need = if (book == null) pendingFor(s.title) == null else !BookShelf.hasCover(this, book.id)
                             if (need && tryCover(s.title)) s.title to thumb else null
                         }, retry = false)
                     }
@@ -216,16 +220,22 @@ class ReaderWatchService : AccessibilityService() {
             // '최근 읽은 책' 줄로 아는 앱은 서재를 떠난 뒤 메뉴로 처음 안 책은 앞서 편 책과 같아도 편 것으로 본다(맨 앞으로).
             // 같은 책을 다시 읽으면 그 줄이 그대로라 서재로 돌아와서는 알 수 없다.
             val first = spec.pkg in readSince && readKnown.add(spec.pkg)
-            val current = opened(spec.pkg)?.let { BookShelf.findByTitle(this, it) }
-            if (first || current == null || BookShelf.findByTitle(this, title)?.id != current.id) {
+            // 편 책 기록의 책이 이 제목의 읽고 있는 책이면 그 책을 읽는 중이다(같은 제목의 책이 여럿이어도 목록 순서로 다른 책으로 바꾸지 않는다).
+            // 아니면(서비스가 꺼졌다 켜져 '책 모름'·다른 책·책 id 없는 옛 줄·그 책이 목록에 없음) 이 제목의 책을 편 것으로 다시 적는다(그래야 그 뒤 시간이 이 책에)
+            if (first || recordedBook(spec)?.hasTitle(title) != true) {
                 bookOpened(spec, Cell(title, info.author, progress, -1, null, Rect()), unknownOpen[spec.pkg])
                 return
             }
         }
         if (progress < 0) return
-        val book = opened(spec.pkg)?.let { BookShelf.findByTitle(this, it) } ?: return
+        // 진행률은 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다)
+        val book = recordedBook(spec) ?: return
         BookShelf.updateStatus(this, book.id, progress, -1)
     }
+
+    /** 편 책 기록([ReadingLog.openBook])이 가리키는 읽고 있는 책(책 모름·목록에 없으면 null) */
+    private fun recordedBook(spec: ReaderSpec): ShelfBook? =
+        ReadingLog.openBook(this, spec.pkg)?.let { id -> BookShelf.list(this).firstOrNull { it.id == id } }
 
     /**
      * 책 칸이 아닌 것을 눌렀다: 검색 화면의 `바로 읽기`일 수 있으니 지금 보이는 책 상세를 기억하고 표지를 찍어 둔다
@@ -268,7 +278,7 @@ class ReaderWatchService : AccessibilityService() {
         if (spec.editing(root)) emptyList() else spec.shelfCells(root).also { if (it.isNotEmpty()) lastShelf[spec.pkg] = it }
 
     /**
-     * 책을 폈다: 목록에 있으면 맨 앞으로, 없으면 새로 넣는다(전에 뺀 책이면 같은 책으로 되살린다. 목록이 다 찼으면 넣지 않는다). 인터넷 검색은 하지 않고,
+     * 책을 폈다: 목록에 있으면 맨 앞으로, 없으면 새로 넣는다(전에 뺀 책이면 같은 책으로 되살린다. 권수 제한은 없다). 인터넷 검색은 하지 않고,
      * 표지는 이북 앱 서재에 보이는 그 책의 표지 칸을 화면에서 잘라 온다(안 되면 빈 표지).
      * [at] 은 그 책을 편 때(서재로 돌아와서야 알면 읽는 화면이 열린 때). 읽은 시간을 이때부터 이 책으로 센다.
      */
@@ -276,24 +286,21 @@ class ReaderWatchService : AccessibilityService() {
         webBook.remove(spec.pkg)
         unknownClick -= spec.pkg
         unknownOpen -= spec.pkg
+        // 편 때는 한 번만 정해 회차 시작일과 편 책 기록에 같이 쓴다(자정에 걸쳐도 같은 날)
+        val openedAt = at ?: System.currentTimeMillis()
         var result = WatchLog.Opened.FRONT
         val book = BookShelf.findByTitle(this, seen.title)?.also {
             BookShelf.moveToFront(this, it.id)
             BookShelf.updateStatus(this, it.id, seen.progress, seen.due, seen.author)
-        } ?: if (!BookShelf.canAutoAdd(this, seen.title)) {
-            result = if (BookShelf.isFull(this)) WatchLog.Opened.FULL else WatchLog.Opened.FINISHED
-            null
-        } else {
-            // 다 찼으면 앱 목록(시스템 호출)도 보지 않는다. 다 찬 동안 목록에 없는 책을 읽으면 화면 이벤트마다 여기 온다.
+        } ?: run {
+            // 완독한 책도 펴면 들어온다(새 회차가 그날 시작, [BookShelf.addOpened]. 1.5.3 까지는 완독한 책은 넣지 않았고, 10권이 차면 넣지 않았다).
             val app = AppStore.load(this).firstOrNull { it.pkg == spec.pkg }?.key
             result = WatchLog.Opened.NEW
-            BookShelf.addOpened(this, seen.title, seen.author, app, seen.progress, seen.due)
+            BookShelf.addOpened(this, seen.title, seen.author, app, seen.progress, seen.due, openedAt)
         }
         WatchLog.add(this, WatchLog.Kind.OPENED, spec.pkg, seen.title, result.name)
-        // 넣지 못한 책도 연 책으로 적는다(그래야 읽는 화면의 진행률이 앞서 연 다른 책에 붙지 않는다).
-        setOpened(spec.pkg, book?.title ?: seen.title)
-        ReadingLog.bookOpened(this, spec.pkg, book?.title ?: seen.title, at ?: System.currentTimeMillis())
-        if (book == null) return
+        // 편 책 기록에는 앱이 보여 준 제목을 적는다(제목을 고친 책이어도. 지운 뒤 그 시간을 다시 정할 때 같은 제목의 새 책을 찾게)
+        ReadingLog.bookOpened(this, spec.pkg, seen.title, book.id, openedAt)
         // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 알라딘 서재)
         pendingFor(book.title)?.let { key ->
             val bytes = pendingCovers.remove(key) ?: return@let
@@ -404,19 +411,29 @@ class ReaderWatchService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        // 지난번 서비스가 내려가 있던 동안(끊긴 때부터, 끊김 알림 없이 끝났으면 살아 있던 마지막 때부터 — 강제 종료·메모리 부족·업데이트·재부팅)
+        // 편 책을 모른다. 그 사이 읽은 시간이 그 전에 편 책에 붙지 않게 '책 모름'을 그때로 적는다(어느 책인지 모르면 버린다).
+        downSince(this)?.let { ReadingLog.watchStopped(this, it) }
         recordLife(this, connected = true)
+        bound = true
         WatchLog.connected(this)
         // 설정 › 업데이트로 새 판이 깔린 뒤 다시 붙은 것이면 홈을 띄운다(깔린 직후의 알림에서는 막힐 때가 있다).
         Update.reopenHomeAfterUpdate(this, fromService = true)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        bound = false
         recordLife(this, connected = false)
+        // 사용자가 접근성에서 끈 것이면(설정에서도 꺼짐) 그 뒤 읽은 시간은 어느 책인지 모른다(꺼지기 전에 마지막으로 편 책에 붙이지 않게).
+        // 업데이트·재부팅처럼 설정은 켜진 채 잠깐 떨어진 것이면 다시 붙을 때 끊긴 때로 적는다([downSince]).
+        // 끊긴 때(방금 적은 것)와 같은 때로 적어, 셀 때·다시 붙을 때 다시 적지 않게 한다.
+        if (!isEnabled(this)) ReadingLog.watchStopped(this, lifeLog(this).second)
         WatchLog.add(this, WatchLog.Kind.UNBOUND)
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
+        bound = false
         handler.removeCallbacks(settleLater)
         handler.removeCallbacks(viewerLater)
         WatchLog.add(this, WatchLog.Kind.DESTROYED)
@@ -544,6 +561,33 @@ class ReaderWatchService : AccessibilityService() {
                 else putLong(LIFE_DISCONNECTED, now).putInt(LIFE_DISCONNECTS, prefs.getInt(LIFE_DISCONNECTS, 0) + 1)
             }.apply()
         }
+
+        /**
+         * (지금 붙어 있지 않은) 서비스가 내려가 그 뒤로 편 책을 모르게 된 때: 정상적으로 끊겼으면 끊긴 때, 끊김 알림(onUnbind) 없이 끝났으면
+         * 살아 있던 것이 확실한 마지막 때(연결된 때·이북 앱 알림을 마지막으로 받은 때·편 책을 마지막으로 적은 때 중 늦은 것). 연결된 적이 없으면 null.
+         * 다시 붙을 때([onServiceConnected])와 꺼져 있는 채 셀 때([stoppedAt]) '책 모름'을 이때로 적는다.
+         */
+        internal fun downSince(context: Context): Long? {
+            val (connected, disconnected, _) = lifeLog(context)
+            val at = when {
+                connected == 0L && disconnected == 0L -> return null
+                disconnected >= connected -> disconnected
+                // 편 책 기록도 살아 있던 서비스가 적은 것(알림 수는 몇 초 늦게 저장되고, 같은 알림을 처리하며 편 책을 적는 것이 그 뒤라 그보다 앞이면
+                // '책 모름'이 편 책 줄 앞에 놓여 쓰이지 않는다)
+                else -> maxOf(connected, WatchLog.lastEventAt(context), ReadingLog.lastOpenAt(context))
+            }
+            return minOf(at, System.currentTimeMillis())
+        }
+
+        /**
+         * 이 프로세스에서 서비스가 붙어 있다(홈과 같은 프로세스). 설정에서 켜져 있어도 붙어 있지 않으면(시스템이 떼어 놓음·저절로 꺼지는 기기·
+         * 프로세스가 막 떠 아직 안 붙음) 편 책을 모른다([ReadingLog.days]).
+         */
+        @Volatile var bound = false
+            private set
+
+        /** 꺼져 있는 서비스가 편 책을 모르게 된 때([downSince], 기록이 없으면 지금). 그 뒤 시간이 꺼지기 전에 편 책에 붙지 않게([ReadingLog.days]). */
+        fun stoppedAt(context: Context): Long = downSince(context) ?: System.currentTimeMillis()
 
         /** 마지막 연결 때·마지막 끊김 때(없으면 0)·끊긴 횟수 */
         fun lifeLog(context: Context): Triple<Long, Long, Int> = lifePrefs(context).let {

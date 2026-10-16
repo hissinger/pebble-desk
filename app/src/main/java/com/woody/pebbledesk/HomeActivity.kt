@@ -48,7 +48,13 @@ class HomeActivity : EinkActivity() {
         override fun onReceive(context: Context, intent: Intent) {
             updateStatus()
             // 날이 바뀌면 오늘 읽은 시간을 0 부터. 부팅 직후 잠금이 풀리면 그때부터 읽은 시간을 셀 수 있다.
-            if (intent.action == Intent.ACTION_DATE_CHANGED || intent.action == Intent.ACTION_USER_UNLOCKED) updateReading()
+            if (intent.action == Intent.ACTION_DATE_CHANGED || intent.action == Intent.ACTION_USER_UNLOCKED) {
+                updateReading()
+                // 반납일 글자(`반납 1일 남음` → `오늘 반납`)는 날에 따라 바뀐다(바뀐 책 자리만 다시 그린다)
+                refresh()
+                // 끝난 날을 저장했으면 떠 있던 메뉴는 옛 기록이다
+                Sheet.dismissStale(this@HomeActivity)
+            }
             // BOOX 런처는 잠금이 풀려야 띄울 수 있고, 화면이 꺼진 동안 죽었을 수 있다.
             if (intent.action == Intent.ACTION_USER_UNLOCKED || intent.action == Intent.ACTION_SCREEN_ON) Device.keepBooxLauncher(context)
         }
@@ -67,8 +73,68 @@ class HomeActivity : EinkActivity() {
         refresh()
         // 읽은 시간은 다른 앱에서 돌아올 때만 바뀐다(레이아웃 때의 refresh 에서는 다시 세지 않는다).
         updateReading()
-        OnboardingActivity.showOnce(this, prefs)
+        // 시작하기를 띄웠으면 그것이 자동 추가를 설명한다
+        if (!OnboardingActivity.showOnce(this, prefs)) warnAutoOff()
         Device.keepBooxLauncher(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(stalledLater)
+    }
+
+    /** 떠 있는 '자동 추가가 꺼져 있습니다'·'멈춰 있습니다' 창(홈에 돌아올 때마다 하나만) */
+    private var autoOffDialog: android.app.Dialog? = null
+    /** 떠 있는 창이 '멈춰 있습니다' 인가(아니면 '꺼져 있습니다') */
+    private var autoOffStalled = false
+    private val handler = Handler(Looper.getMainLooper())
+    /** 켜져 있는데 붙지 않은 채 [STALLED_WAIT_MS] 가 지났으면 '멈춰 있습니다' 창(홈이 앞에 있을 때만, onPause 에서 거둔다) */
+    private val stalledLater = Runnable {
+        if (ReaderWatchService.isEnabled(this) && !ReaderWatchService.bound && !(autoOffDialog?.isShowing == true && autoOffStalled)) warnStalled()
+    }
+
+    /**
+     * 읽는 책 자동 추가(접근성)가 꺼져 있으면 홈에 돌아올 때마다 화면 가운데에 알린다: 편 책이 읽고 있는 책에 들어오지 않고 읽은 시간도
+     * 어느 책인지 모르게 된다(업데이트·시스템이 저절로 끄기도 한다). 켜져 있는데 서비스가 붙지 않은 채면 조금 기다렸다 '멈춰 있습니다'([warnStalled]).
+     * 켜져 붙어 있으면 뜨지 않는다(떠 있던 창도 닫는다).
+     */
+    private fun warnAutoOff() {
+        handler.removeCallbacks(stalledLater)
+        if (!prefs.onboarded || !Storage.isUnlocked(this)) return
+        val on = ReaderWatchService.isEnabled(this)
+        val shown = autoOffDialog?.takeIf { it.isShowing }
+        // 켜져 붙어 있으면 그사이 켠 것이다: 떠 있던 안내는 닫는다
+        if (on && ReaderWatchService.bound) { shown?.dismiss(); return }
+        // 떠 있는 창이 지금 상태와 다르면(꺼짐 창이 떠 있는데 켰으나 멈춰 있음 등) 닫고 맞는 창을
+        if (shown != null) { if (autoOffStalled == on) return; shown.dismiss() }
+        // 켜져 있는데 아직 안 붙었다: 앱이 막 떠 붙는 중일 수 있어 조금 기다렸다 본다([warnStalled])
+        if (on) { handler.postDelayed(stalledLater, STALLED_WAIT_MS); return }
+        val restricted = ReaderWatchService.mayBeRestricted
+        fun sheet(hints: Boolean): Sheet {
+            val desc = listOfNotNull(R.string.auto_off_desc, R.string.allow_hint.takeIf { hints }, R.string.restricted_hint.takeIf { hints && restricted })
+                .joinToString("\n\n") { getString(it) }
+            val sheet = autoNotice(R.string.auto_off_title, desc)
+            if (restricted) sheet.item(getString(R.string.open_app_info)) { ReaderWatchService.openAppInfo(this) }
+            return sheet
+        }
+        // 글자를 키워 화면을 넘으면 켜는 법 안내(허용·제한된 설정)를 빼고 첫 설명과 버튼만(설정 › 독서의 같은 안내에 다 있다)
+        val full = sheet(hints = true)
+        autoOffDialog = (if (full.height() <= window.decorView.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels) full else sheet(hints = false)).show()
+        autoOffStalled = false
+    }
+
+    /** 자동 추가 안내 창(화면 가운데, 기록이 바뀌어도 닫지 않는다)과 `접근성 설정 열기` */
+    private fun autoNotice(title: Int, desc: String): Sheet = Sheet(this).header(getString(title), desc).centered().keepOnChange()
+        .item(getString(R.string.open_accessibility), bold = true) { ReaderWatchService.openSettings(this) }
+
+    /**
+     * 접근성에서는 켜져 있는데 서비스가 붙어 있지 않다(켜진 채 강제 중지되거나 메모리 정리로 죽은 뒤 다시 켜면 시스템이 '멈춘 서비스'로 두고 붙이지 않는다.
+     * 껐다 켜거나 앱을 업데이트해야 붙는다. 2026-10-16 에뮬레이터(안드로이드 11)에서 확인): 그동안은 편 책을 모르니 꺼짐과 같이 화면 가운데에 알린다.
+     */
+    private fun warnStalled() {
+        autoOffDialog?.takeIf { it.isShowing }?.dismiss()
+        autoOffDialog = autoNotice(R.string.auto_stalled_title, getString(R.string.auto_stalled_desc)).show()
+        autoOffStalled = true
     }
 
     /**
@@ -226,7 +292,11 @@ class HomeActivity : EinkActivity() {
         val grid = prefs.favGrid
 
         heroHeight = hero.height
-        val state = listOf(books, reading, favs, icons, grid, heroHeight)
+        // 책이 없으면 자리 표시의 안내 줄이 자동 추가 켜짐에 따라 달라진다
+        val watching = books.isEmpty() && ReaderWatchService.isEnabled(this)
+        // 진행률·반납일 글자(반납일은 날이 바뀌면 달라진다)
+        val status = books.map { bookStatus(it) }
+        val state = listOf(books, reading, favs, icons, grid, heroHeight, watching, status)
         if (!iconsChanged && state == shownState) return
         shownState = state
 
@@ -387,7 +457,10 @@ class HomeActivity : EinkActivity() {
         Palette.current.field(Palette.Area.HOME)?.let { setBackgroundColor(it) }
     }
 
-    /** 책이 없을 때: 표지 자리에 `+` 상자, 제목·저자·앱 자리에 회색 막대. 누르면 책 추가. */
+    /**
+     * 책이 없을 때: 표지 자리에 `+` 상자, 제목·저자·앱 자리에 회색 막대, 자동 추가가 켜져 있으면 그 아래 회색 안내
+     * `이북 앱에서 책을 펴면 여기에 들어옵니다`. 누르면 책을 넣는 법 안내([showAddGuide]).
+     */
     private fun skeleton(coverW: Int): View = hbox().apply {
         gravity = Gravity.TOP
         heroField()
@@ -402,8 +475,22 @@ class HomeActivity : EinkActivity() {
         info.addView(bar(0.7f, 26), lp(MATCH, WRAP).apply { topMargin = dp(14) })
         info.addView(bar(0.45f, 14), lp(MATCH, WRAP).apply { topMargin = dp(14) })
         info.addView(bar(0.4f, 18), lp(MATCH, WRAP).apply { topMargin = dp(30) })
+        if (ReaderWatchService.isEnabled(context)) {
+            info.addView(text(getString(R.string.home_empty_hint), 18f, color = Ui.GRAY, lines = 3), lp(MATCH, WRAP).apply { topMargin = dp(30) })
+        }
         addView(info, lp(0, coverH + dp(2), 1f).apply { marginStart = dp(24) })
-        setOnClickListener { startActivity(BookSearchActivity.intent(this@HomeActivity)) }
+        setOnClickListener { showAddGuide() }
+    }
+
+    /**
+     * 책을 넣는 법(빈 홈의 책 자리를 누르면): 책은 이북 앱에서 펴면 자동 추가가 넣는다. 자동 추가가 꺼져 있으면 `자동 추가 켜기 ›`(시스템 접근성 설정,
+     * 꺼짐 안내 창의 `접근성 설정 열기` 와 같다)를 먼저, 그 아래 `직접 추가 ›`(지원하지 않는 이북 앱용, 책 추가 ⑨). 읽고 있는 책 목록의 `책 추가 ›` 는 이 안내 없이 바로 ⑨.
+     */
+    private fun showAddGuide() {
+        val on = ReaderWatchService.isEnabled(this)
+        val sheet = Sheet(this).header(getString(R.string.add_guide_title), getString(if (on) R.string.add_guide_on else R.string.add_guide_off))
+        if (!on) sheet.item(getString(R.string.add_guide_turn_on), bold = true) { ReaderWatchService.openSettings(this) }
+        sheet.item(getString(R.string.add_guide_manual)) { startActivity(BookSearchActivity.intent(this)) }.show()
     }
 
     /** 표지 자리: 연한 회색으로 채우고 점선 테두리, 가운데에 + */
@@ -490,12 +577,14 @@ class HomeActivity : EinkActivity() {
 
     private fun coverView(book: ShelfBook, widthPx: Int): View = coverImage(BookShelf.cover(this, book, widthPx))
 
-    /** 책을 길게 누르면 올해 읽은 책과 같은 책 상세([showBookDetail]). 기록은 지금 읽는 것과 완독 횟수만. */
-    private fun showBookMenu(book: ShelfBook) = showBookDetail(BookRecord.of(this, book), full = false) { refresh() }
+    /** 책을 길게 누르면 올해 읽은 책과 같은 책 상세([showBookDetail]) */
+    private fun showBookMenu(book: ShelfBook) = showBookDetail(BookRecord.of(this, book)) { refresh() }
 
     companion object {
         /** 자주 쓰는 앱 고정 줄 수 */
         private const val FAV_ROWS = 3
+        /** 켜져 있는데 안 붙은 서비스를 '멈춤'으로 보기까지 기다리는 때(앱이 막 뜨면 붙는 데 1~2초 걸린다) */
+        private const val STALLED_WAIT_MS = 5_000L
         /** 맨 앞 책 표지는 남는 높이에 맞춰 COVER_DP~COVER_MAX_DP(여러 권이면 COVER_SMALLER_DP 부터) */
         private const val COVER_DP = 160
         private const val COVER_MAX_DP = 230

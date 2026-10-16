@@ -139,28 +139,39 @@ fun Context.reviewHint(halves: Int): String =
     if (halves == 0) getString(R.string.review_stars_hint) else getString(R.string.review_stars_set, starsLabel(halves))
 
 /**
- * 별점·감상 메뉴(완독·책 빼기·상세의 별점 칸이 같이 쓴다). 머리(표지·제목·[sub]) 아래 별 다섯, 여러 줄 감상, 맨 아래 `취소` / [action](굵게).
- * 이미 남긴 별점·감상을 채워 띄운다. [action] 을 누르면 고른 것을 [onDone] 에(비어 있어도. 별점 없이 완독·책 빼기만 해도 된다).
+ * 별점·감상 메뉴(완독·책 빼기·상세의 별점 칸·전체 기록의 회차 줄이 같이 쓴다). 머리(표지·제목·[sub]) 아래 별 다섯, 여러 줄 감상,
+ * 맨 아래 `취소` / [action](굵게). 그 회차에 남긴 것([initial])을 채워 띄운다. [top] 이 있으면 머리 아래에 둔다. [action] 을 누르면 고른 것을 [onDone] 에(비어 있어도.
+ * 별점 없이 완독·책 빼기만 해도 된다). 어떻게든 닫히면 [onDismiss](저장한 뒤에 온다).
  */
-fun Context.reviewSheet(book: ShelfBook, sub: CharSequence?, action: String, onDone: (Review) -> Unit) {
-    Sheet(this).header(book.title, sub, image = BookShelf.cover(this, book, dp(SHEET_COVER_DP)))
-        .review(BookShelf.reviews(this)[book.id] ?: Review(), action, onDone)
-        .show()
+fun Context.reviewSheet(
+    book: ShelfBook, sub: CharSequence?, action: String, initial: Review?, onDismiss: (() -> Unit)? = null, top: View? = null,
+    onDone: (Review) -> Unit,
+) {
+    val sheet = Sheet(this).header(book.title, sub, image = BookShelf.cover(this, book, dp(SHEET_COVER_DP)))
+        .review(initial ?: Review(), action, onDone)
+    // 머리와 별 사이에 둘 줄(전체 기록의 회차 메뉴: 완독한 날)
+    top?.let { sheet.note(it) }
+    onDismiss?.let { sheet.onDismiss(it) }
+    sheet.show()
 }
 
 /**
- * 책 상세(올해 읽은 책)의 별점·감상 칸: 별(반 개)·점수(회색)·오른쪽 `고치기 ›`, 그 아래 감상(메뉴가 화면을 넘지 않게 5줄까지, 전체는 `고치기`에서).
- * 남긴 것이 없으면 빈 별과 `별점·감상 남기기 ›` 한 줄. 누르면 [reviewSheet](부르는 쪽이 단다).
+ * 책 상세의 별점·감상 칸(마지막 회차의 것): 별(반 개)·점수(회색)·오른쪽 `고치기 ›`, 그 아래 감상([lines] 줄까지, 0 이면 두지 않는다. 메뉴가 화면을 넘지 않게
+ * 부르는 쪽이 정한다. 전체는 `고치기`에서). 남긴 것이 없으면 빈 별과 `별점·감상 남기기 ›` 한 줄. 누르면 [reviewSheet](부르는 쪽이 단다).
  */
-fun Context.reviewBlock(review: Review?): View = vbox().apply {
+fun Context.reviewBlock(review: Review?, lines: Int, enabled: Boolean): View = vbox().apply {
     addView(hbox().apply {
         val halves = review?.halves ?: 0
-        addView(StarBar(context, 28, 5).apply { this.halves = halves }, lp(WRAP, WRAP))
+        // 남길 수 없으면(5분 이상 읽지 않은 책) 별과 글자를 흐리게
+        addView(StarBar(context, 28, 5, empty = if (enabled) Ui.LIGHT_GRAY else Ui.DIVIDER).apply { this.halves = halves }, lp(WRAP, WRAP))
         if (halves > 0) addView(text(starsLabel(halves), 18f, color = Ui.GRAY), lp(WRAP, WRAP).apply { marginStart = dp(12) })
         addView(View(context), lp(0, 0, 1f))
-        addView(text(getString(if (review == null) R.string.review_add else R.string.review_edit), 18f, color = Ui.GRAY))
+        addView(text(getString(if (review == null) R.string.review_add else R.string.review_edit), 18f, color = if (enabled) Ui.GRAY else Ui.DIVIDER))
     }, lp(MATCH, WRAP))
-    review?.text?.takeIf { it.isNotBlank() }?.let {
-        addView(text(it, 20f, lines = 5).apply { setLineSpacing(0f, 1.15f) }, lp(MATCH, WRAP).apply { topMargin = dp(10) })
+    review?.text?.takeIf { it.isNotBlank() && lines > 0 }?.let {
+        addView(text(it, 20f, lines = lines).apply { setLineSpacing(0f, 1.15f) }, lp(MATCH, WRAP).apply { topMargin = dp(REVIEW_TEXT_TOP_DP) })
     }
 }
+
+/** 별점·감상 칸에서 별 줄과 감상 사이 */
+private const val REVIEW_TEXT_TOP_DP = 10

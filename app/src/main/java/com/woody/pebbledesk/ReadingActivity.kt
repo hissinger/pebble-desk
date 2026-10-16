@@ -77,7 +77,7 @@ class ReadingActivity : EinkActivity() {
         // 지난날은 그날 정해져 있던 목표로(목표를 바꿔도 지난 링은 그대로). 제목·오늘 링은 지금 목표.
         val goals = prefs.readingGoals()
         val goalMs = prefs.readingGoalMin * 60_000L
-        // 목표가 없던 날은 읽은 날(1분 이상)만 꽉 찬 링으로
+        // 목표가 없던 날은 읽은 날(5분 이상)만 꽉 찬 링으로
         fun frac(day: LocalDate): Float {
             val ms = days.total(day)
             val goal = goals(day) * 60_000L
@@ -264,21 +264,25 @@ class ReadingActivity : EinkActivity() {
     }
 
     /**
-     * 오른쪽 칸: 이번 주 책별 시간(많은 순, 한 쪽에 [BOOKS]권). 한 줄에 책 이름(목록에서 고친 이름으로) · 시간, 줄 사이에 옅은 선.
-     * 어떤 책인지 모르는 시간(이 기능 전, 그 앱에서 편 책을 한 번도 몰랐을 때)은 합계에만 들어가고 여기에는 보이지 않는다.
+     * 오른쪽 칸: 이번 주 책별 시간(많은 순, 한 쪽에 [BOOKS]권). 한 줄에 책 이름(그 책의 지금 제목, 목록에 없던 책은 편 책 제목) · 시간, 줄 사이에 옅은 선.
+     * 책은 읽은 시간 칸에 정해 둔 책 id 로 모은다(같은 제목의 두 책은 두 줄). 어떤 책인지 모르는 시간(이 기능 전, 그 앱에서 편 책을 한 번도
+     * 몰랐을 때)은 합계에만 들어가고 여기에는 보이지 않는다.
      */
     private fun byBook(days: ReadingDays, today: LocalDate, page: TextView): View {
         bookRows = null
         val week = days.filterKeys { it in startOfWeek(today)..today }.values
-        val perBook = mutableMapOf<String, Long>()
+        val known = BookShelf.list(this).associateBy { it.id } + BookShelf.history(this).associate { it.book.id to it.book }
+        val perBook = linkedMapOf<String, Pair<String, Long>>()
         week.forEach { keys ->
-            keys.forEach { (key, ms) ->
-                val title = readingTitle(key) ?: return@forEach
-                val label = BookShelf.findByTitle(this, title)?.title ?: title
-                perBook[label] = (perBook[label] ?: 0) + ms
+            keys.forEach { (k, ms) ->
+                val book = known[k.book]
+                if (book == null && k.title.isEmpty()) return@forEach
+                val id = book?.id ?: BookRecord.titleOnlyId(k.title)
+                val (label, sum) = perBook[id] ?: ((book?.title ?: k.title) to 0L)
+                perBook[id] = label to sum + ms
             }
         }
-        val books = perBook.filterValues { it >= 60_000 }.entries.sortedByDescending { it.value }
+        val books = perBook.values.filter { it.second >= 60_000 }.sortedByDescending { it.second }
         if (books.isEmpty()) {
             // 읽긴 했는데 어떤 책인지 모르면 자동 추가를 켜라고 알린다.
             val read = week.sumOf { it.values.sum() } >= 60_000

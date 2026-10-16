@@ -8,13 +8,13 @@ import android.view.accessibility.AccessibilityNodeInfo
  * 책장의 묶음 칸은 진행률 줄을 감춘다. 홈 탭의 '최근 목록' 줄은 표지만 있어(누르면 빈 알림) 읽는 화면 메뉴의 제목(`txtTitle`)으로 안다.
  * 읽는 화면(본문은 직접 그리는 뷰라 글자가 드러나지 않는다) 아래 상태 줄 오른쪽 `statusRight` 에 진행률(`30.9%`, 설정에 따라
  * `12/300`), 메뉴에 `txtTextViewPercent`(`30%`). 상태 줄 가운데(`statusMiddle`, `2장 (5/8)`)는 장 안의 쪽이라 쓰지 않는다.
- * 유료판(`com.flyersoft.moonreaderp`)은 같은 코드로 만든 앱이라(무료판 코드가 패키지 이름으로 판을 가른다) 화면 이름은 같고
- * 요소 이름 앞만 그 패키지가 된다고 본다 **(미확인)**.
+ * 유료판(`com.flyersoft.moonreaderp`)은 같은 코드로 만든 앱이지만 화면 클래스도 그 패키지 아래에 있다(`com.flyersoft.moonreaderp.ActivityMain`·
+ * `ActivityTxt`, 에뮬에서 확인). 그래서 화면 이름은 패키지 이름으로 만든다.
  */
 open class MoonReaderSpec(pkg: String) : ReaderSpec(
-    pkg = pkg, classPrefix = "com.flyersoft.moonreader",
-    shelves = setOf("com.flyersoft.moonreader.ActivityMain"),
-    viewers = setOf("com.flyersoft.moonreader.ActivityTxt"),
+    pkg = pkg, classPrefix = pkg,
+    shelves = setOf("$pkg.ActivityMain"),
+    viewers = setOf("$pkg.ActivityTxt"),
     titles = listOf("myBookName"), thumbs = listOf("myBookImage"), authors = listOf("myBookAuthor", "myAuthor"), progress = "progresTv", due = null,
     viewerProgress = listOf("statusRight", "txtTextViewPercent"), viewerTitle = "txtTitle",
     eagerCovers = true,

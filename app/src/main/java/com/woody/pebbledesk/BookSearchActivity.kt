@@ -72,7 +72,7 @@ class BookSearchActivity : EinkActivity() {
             })
         })
         root.addView(hline(2))
-        status = text(getString(R.string.book_search_idle), 17f, color = Ui.GRAY, lines = 2).apply {
+        status = text(getString(R.string.book_search_idle), 17f, color = Ui.GRAY, lines = 4).apply {
             setPadding(dp(Ui.MARGIN), dp(12), dp(Ui.MARGIN), dp(8))
         }
         root.addView(status)
@@ -118,7 +118,7 @@ class BookSearchActivity : EinkActivity() {
         val id = ++searchId
         status.setText(R.string.searching)
         Bg.run({ BookSearch.search(query) }) { result ->
-            if (id != searchId || isDestroyed) return@run
+            if (id != searchId || isFinishing || isDestroyed) return@run
             result.onSuccess { books ->
                 status.text = if (books.isEmpty()) getString(R.string.book_none) else getString(R.string.book_results, books.size)
                 rows.setRows(books.chunked(COLUMNS).map { line -> { gridRow(line) } })
@@ -163,45 +163,35 @@ class BookSearchActivity : EinkActivity() {
         }
     }
 
-    /** 표지를 받아 저장한 뒤 읽는 앱을 고르러 간다. */
+    /**
+     * 표지를 받아 새 책으로 맨 앞에 넣고 읽는 앱을 고르러 간다. 지원하지 않는 이북 앱용이라 제목으로 다른 책·읽은 시간과 잇지 않는다
+     * ([BookShelf.add], [manual]. 지원하는 앱의 책은 펴면 자동 추가가 넣는다. 이어 읽으려면 상세의 `다시 읽기`).
+     */
     private fun pick(book: BookResult) {
         if (busy) return
         replaceId?.let { old -> replaceCover(old, book); return }
-        // 다 차면 목록의 `책 추가` 가 흐려져 여기 오지 않는다. 검색하는 사이 자동 추가로 다 찼으면 목록으로 돌아간다.
-        if (BookShelf.isFull(this)) {
+        withCover(book, { bytes -> BookShelf.add(this, book, bytes) }) { added ->
+            startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, added.id))
             finish()
-            return
-        }
-        busy = true
-        status.setText(R.string.cover_loading)
-        Bg.run({
-            val bytes = runCatching { BookSearch.download(book.coverUrl) }.getOrElse { BookSearch.download(book.thumbUrl) }
-            BookShelf.add(this, book, bytes)
-        }) { result ->
-            busy = false
-            if (isDestroyed) return@run
-            result.onSuccess { added ->
-                // 표지를 받는 사이 자동 추가로 다 찼으면 넣지 않고(있던 책을 밀어내지 않는다) 목록으로 돌아간다.
-                if (added == null) {
-                    finish()
-                    return@onSuccess
-                }
-                startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, added.id))
-                finish()
-            }.onFailure { status.text = errorText(R.string.cover_error, it) }
         }
     }
 
-    private fun replaceCover(oldId: String, book: BookResult) {
+    private fun replaceCover(oldId: String, book: BookResult) =
+        withCover(book, { bytes -> BookShelf.replace(this, oldId, book, bytes) }) { finish() }
+
+    /**
+     * 표지를 받은 뒤 [save] 하고 [then]. 저장은 받은 뒤 화면 스레드에서 바로 한다(뒤로 가기도 화면 스레드라 '살아 있나' 확인과 저장 사이에
+     * 끼어들 수 없다. 받는 사이 뒤로 갔으면 저장하지 않아 취소한 것처럼 보였는데 나중에 책이 나타나지 않는다). 받기·저장이 실패하면 오류만 보인다.
+     */
+    private fun <T> withCover(book: BookResult, save: (ByteArray) -> T, then: (T) -> Unit) {
         busy = true
+        // 진행 중인 검색은 버린다(늦게 온 결과가 `표지 받는 중`과 고른 표지를 덮지 않게. 표지를 받는 동안은 다른 표지를 누를 수 없다)
+        searchId++
         status.setText(R.string.cover_loading)
-        Bg.run({
-            val bytes = runCatching { BookSearch.download(book.coverUrl) }.getOrElse { BookSearch.download(book.thumbUrl) }
-            BookShelf.replace(this, oldId, book, bytes)
-        }) { result ->
+        Bg.run({ runCatching { BookSearch.download(book.coverUrl) }.getOrElse { BookSearch.download(book.thumbUrl) } }) { got ->
             busy = false
-            if (isDestroyed) return@run
-            result.onSuccess { finish() }.onFailure { status.text = errorText(R.string.cover_error, it) }
+            if (isFinishing || isDestroyed) return@run
+            got.mapCatching(save).onSuccess(then).onFailure { status.text = errorText(R.string.cover_error, it) }
         }
     }
 

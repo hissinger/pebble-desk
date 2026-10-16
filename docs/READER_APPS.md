@@ -61,6 +61,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **공개 데이터 제공자**: 라이브러리 것(Sentry, androidx startup, iconics)뿐.
 - **서재 바로 열기**: `BookshelfActivity`·`MyLibraryBookListActivity` 는 외부 공개라 컴포넌트 이름으로 바로 열 수 있을 것이다 **(미확인)**. 뷰어는 필요한 값을 몰라 실패할 것.
 - **화면 글자(접근성)**: 서재 칸 `tv_book_title`·`progress_book_reading`(진행률 막대), 뷰어 머리·꼬리에 제목·진행률을 띄우는 옵션이 있다. 쓰지 않기로 함.
+- **읽는 화면 메뉴의 제목**(2026-10-16 페블에서 확인): 가운데를 누르면 위 막대 `epub_navibar`(뒤로 `epub_back_button`·책갈피 `epub_bookmark_button`) 가운데에 제목(`팩트풀니스`)이 **이름 없는** 글자로 뜬다(몇 초 뒤 닫힘). 이름으로 찾을 수 없어 위 막대 안의 글자 하나를 제목으로 읽는다(`Millie.readViewer`). 그래서 서재를 거치지 않고 다른 책으로 가도 메뉴를 한 번 띄우면 그 책으로 바뀐다. 화면 캡처는 막혀 있다(빈 그림).
 
 ## 그 밖의 앱 (사용자는 안 씀)
 
@@ -128,7 +129,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - 서재 화면은 뒤로 돌아올 때 `TYPE_WINDOW_STATE_CHANGED` 로 다시 읽힌다(갱신된 % 를 얻는 시점).
 - 교보도서관 뷰어는 쪽을 넘길 때마다 `TYPE_WINDOW_CONTENT_CHANGED` 가 많이 온다. 본문을 읽지 않도록 뷰어 화면에서는 트리를 읽지 않는다.
 - 밀리 읽는 화면은 책을 불러오는 처음 2초쯤 아래 오른쪽(`tv_viewer_add_on_right`)에 `0%`, 왼쪽(장 제목)은 비워 두고 보이다가 진짜 값으로 바꾼다. 불러오기 문구(`epub_loading_message` `도서를 불러오고 있습니다.`)는 그 뒤로도 20초쯤 남는다 → 문구가 보이는 동안의 `0%` 는 버린다(2026-10-06).
-- 밀리 서재 제목은 부제가 빠진다(`달러구트 꿈 백화점` ↔ 등록된 `달러구트 꿈 백화점 : 잠들어야만 입장 가능합니다`). 제목 맞추기는 부제(`:` 앞)·공백을 무시하고 앞부분이 같으면 같은 책으로 본다.
+- 밀리 서재 제목은 부제가 빠진다(`달러구트 꿈 백화점` ↔ 등록된 `달러구트 꿈 백화점 : 잠들어야만 입장 가능합니다`). 제목 맞추기는 부제(`:` 뒤)·공백·기호를 무시하고 전부 같으면 같은 책으로 본다(1.5.3 까지는 앞부분만 같아도 같은 책).
 - YES24 표지 검색: `렛뎀 이론`(+저자)·`팩트풀니스` 는 첫 결과가 맞지만 `달러구트 꿈 백화점` 은 첫 결과가 다른 권(`… 0`). → 자동 추가 때는 검색하지 않기로 했다(표지는 사용자가 '표지 다시 찾기'로 고른다).
 
 ### 교보도서관 보기 방식 (2026-10-05)
@@ -189,7 +190,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
   - 공개 방송 `com.flyersoft.moonreader.open_broadcast`(extra `bookFile`=경로)로도 열 수 있다. 문리더가 이미 떠 있을 때만 된다.
 - **저장소**: 표지 캐시가 `/sdcard/Books/.MoonReader/<파일 이름>_1.png` 에 남는다. DB·진행률은 앱 전용 저장소에 있다. `BookViewProvider` 는 공개되지 않는다.
 - 책장의 묶음 칸은 진행률 줄(`progressLay`)을 감춘다 → 진행률이 없는 칸은 책으로 보지 않는다.
-- **유료판** `com.flyersoft.moonreaderp`(Moon+ Reader Pro, Play ₩19,000·Play Pass, 10.7): **지원(코드만, 미확인)**. 무료판 코드가 패키지 이름으로 판을 가르므로(`com.flyersoft.moonreaderpj` 와 비교, AGP 8.10.1) 같은 코드로 만든 앱이라 보고 무료판 읽기를 그대로 쓴다(`MoonReaderSpec`). 화면 이름은 같은 `com.flyersoft.moonreader.ActivityMain`·`ActivityTxt`(2026-10-14 Ocean 5 Pro 기기 정보의 최근 화면 `com.flyersoft.moonreaderp / ActivityTxt`), 요소 이름 앞은 AGP 가 앱 패키지를 붙여 `com.flyersoft.moonreaderp:id/` 가 될 것 **(추정)**. 유료판은 광고 화면이 없다.
+- **유료판** `com.flyersoft.moonreaderp`(Moon+ Reader Pro, Play ₩19,000·Play Pass, 10.7): **지원**(2026-10-16 에뮬 MeebookE6_A11 에서 확인). 같은 코드로 만든 앱이라 무료판 읽기를 그대로 쓰되(`MoonReaderSpec`), 화면 클래스는 그 패키지 아래 `com.flyersoft.moonreaderp.ActivityMain`·`com.flyersoft.moonreaderp.ActivityTxt` 다(1.5.3 은 무료판 이름으로 맞춰 봐 서재·읽는 화면을 알아보지 못해 자동 추가·읽은 시간이 동작하지 않았다). 그래서 화면 이름을 패키지 이름으로 만든다. 유료판은 광고 화면이 없다.
 
 ### 밀리의서재 휴대폰 판 `kr.co.millie.millieshelf` (2026-10-10, 갤럭시 A23 안드로이드 14, 5.47.0.0, **지원**)
 

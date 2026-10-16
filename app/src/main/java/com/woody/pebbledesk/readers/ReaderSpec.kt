@@ -66,7 +66,7 @@ open class ReaderSpec(
     open val cellsByPosition: Boolean get() = false
 
     /** 메뉴를 띄웠을 때 읽는 화면에 제목이 보이는가(보이면 표지만 눌러 연 책도 알 수 있다) */
-    val tellsTitle: Boolean get() = viewerTitle != null
+    open val tellsTitle: Boolean get() = viewerTitle != null
 
     /**
      * 읽는 화면: 본문(웹 화면)은 훑지 않고 이름으로 찾은 요소만 읽는다. 진행률은 아래 줄([viewerProgress])에서,

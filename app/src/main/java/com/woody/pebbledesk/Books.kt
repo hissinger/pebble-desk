@@ -16,7 +16,9 @@ import com.woody.pebbledesk.Db.rows
 import com.woody.pebbledesk.Db.tx
 import org.json.JSONObject
 import java.io.File
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.io.IOException
 import java.util.UUID
 import java.net.HttpURLConnection
@@ -128,7 +130,7 @@ object Bg {
 
 /**
  * 읽고 있는 책 한 권: 표지는 앱 전용 저장소의 `books/<id>.jpg`, [app] 은 그 책을 읽는 앱(없으면 null).
- * [id] 는 넣을 때 런처가 만든다(`b-` + UUID). 같은 책을 두 번 넣어도 따로 다룬다(합치지 않는다).
+ * [id] 는 넣을 때 런처가 만든다(`b-` + UUID, `책 추가` 로 직접 넣은 책은 `m-` + UUID, [manual]). 같은 책을 두 번 넣어도 따로 다룬다(합치지 않는다).
  */
 data class ShelfBook(
     val id: String,
@@ -145,7 +147,7 @@ data class ShelfBook(
 )
 
 /**
- * 읽고 있는 책 목록에서 나간 책(완독했거나 뺀 책). 올해 읽은 책 목록에 보인다. 완독한 날은 따로 [BookShelf.finishes].
+ * 읽고 있는 책 목록에서 나간 책(완독했거나 뺀 책). 올해 읽은 책 목록에 보인다. 완독은 따로 [BookShelf.finishList].
  * 표지는 읽던 때 그대로 `books/<id>.jpg`. [hidden] 은 올해 읽은 책에서 지운 책(읽은 시간이 남아 있어도 다시 보이지 않게).
  */
 data class PastBook(val book: ShelfBook, val leftAt: Long, val hidden: Boolean = false)
@@ -165,24 +167,67 @@ fun Context.bookStatus(book: ShelfBook, today: LocalDate = LocalDate.now()): Lis
     return parts
 }
 
-/** 제목 맞추기용: 부제(`:` 뒤)·공백·기호를 빼고 소문자로. 이북 앱 서재는 부제를 빼고 보여 주기도 한다. */
-fun normTitle(title: String): String =
-    title.substringBefore(':').filter { it.isLetterOrDigit() }.lowercase()
-
-/** 같은 책으로 볼 만한가: 정리한 제목이 같거나, 한쪽이 다른 쪽의 앞부분(두 글자 이상) */
-fun sameTitle(a: String, b: String): Boolean {
-    val x = normTitle(a)
-    val y = normTitle(b)
-    if (x.length < 2 || y.length < 2) return x == y
-    return x == y || x.startsWith(y) || y.startsWith(x)
+/**
+ * 제목 맞추기용: 부제(`:` 뒤)·공백·기호를 빼고 소문자로. 이북 앱 서재는 부제를 빼고 보여 주기도 한다.
+ * `+`·`#` 은 제목을 가르니 남기고(『C++』≠『C#』), 기호만 있는 제목은 그대로(앞뒤 공백만 빼고) 비교한다. `:` 앞이 비어 있으면 부제로 나누지 않는다.
+ */
+fun normTitle(title: String): String {
+    // `:` 앞이 비어 있으면(`: 부제`, `::`) 부제로 나누지 않는다
+    val head = title.substringBefore(':').ifBlank { title }
+    return head.filter { it.isLetterOrDigit() || it == '+' || it == '#' }.lowercase().ifEmpty { head.trim() }
 }
 
 /**
- * 읽고 있는 책 목록(최대 [MAX]권). 앞 [HOME]권이 홈에 보이고(맨 앞 책은 크게), 맨 앞 책의 앱이 '읽고 있는 앱'이다.
+ * 같은 책인가: 정리한 제목([normTitle], 부제·공백·기호·대소문자 무시)이 전부 같다. 앞부분만 같은 제목(『데미안』과 『데미안 2』)은 다른 책
+ * (1.5.3 까지는 앞부분이 같아도 같은 책으로 봤다. 읽은 시간의 책은 한 번 정하면 바뀌지 않아 속편이 앞 책에 붙지 않게).
+ */
+fun sameTitle(a: String, b: String): Boolean = normTitle(a) == normTitle(b)
+
+/**
+ * `책 추가` 로 직접 넣은 책(지원하지 않는 이북 앱용). 이북 앱이 보여 주는 제목으로 찾지 않는다([hasTitle]): 지원하는 앱에서 펴면 자동 추가가 따로 넣고,
+ * 읽은 시간·진행률도 그 책에 붙는다(1.5.3 까지 넣은 책은 `b-` 라 예전처럼 제목으로 찾는다).
+ */
+val ShelfBook.manual: Boolean get() = id.startsWith(BookShelf.MANUAL_PREFIX)
+
+/**
+ * 이 책을 [title] 로 찾을 수 있는가: 지금 제목이 [sameTitle] 이거나, 앱이 보여 준 제목([ShelfBook.seenTitle])이 같다(제목을 고친 책).
+ * 직접 넣은 책([manual])은 제목으로 찾지 않는다(자동 추가·읽은 시간의 책 정하기·목록에 없던 책 모두).
+ */
+fun ShelfBook.hasTitle(title: String): Boolean =
+    !manual && (sameTitle(this.title, title) || (seenTitle.isNotEmpty() && normTitle(seenTitle) == normTitle(title)))
+
+/** 나간 책이 나간 날(지운 책은 지운 날) */
+fun leftOn(p: PastBook, zone: ZoneId = ZoneId.systemDefault()): LocalDate = Instant.ofEpochMilli(p.leftAt).atZone(zone).toLocalDate()
+
+/**
+ * [day] 에 [title] 을 읽은 시간을 붙일 책 id([ReadKey.book]). 정할 때(그날을 저장할 때, 마이그레이션) 한 번만 쓰고, 정한 id 는 다시 정하지 않는다.
+ * 그 제목([hasTitle])이고 그날 이미 있던 책(그 책 id 가 붙은 시간이 그날보다 뒤에야 처음 나오는 책은 아직 없던 책, [firstRead]) 중
+ * ① 나간 책(지운 책 포함) 중 그날이 나간 날(지운 책은 지운 날) 이전인 책, 여럿이면 먼저 나간 책
+ * (같은 제목의 새 책이 생겨도 나가기 전 시간은 그 책에) ② 읽고 있는 책(목록 앞쪽) ③ 지우지 않은 나간 책 중 가장 최근(목록에서 뒤쪽)
+ * ④ 없으면 null(목록에 없던 책. 그 책이 생기면 [ReadingLog.adopt]).
+ */
+fun bookFor(
+    title: String, day: LocalDate, shelf: List<ShelfBook>, past: List<PastBook>, firstRead: Map<String, LocalDate> = emptyMap(),
+    zone: ZoneId = ZoneId.systemDefault(),
+): String? {
+    fun existed(b: ShelfBook) = b.hasTitle(title) && firstRead[b.id]?.let { it <= day } != false
+    past.filter { existed(it.book) && day <= leftOn(it, zone) }.minByOrNull { it.leftAt }?.let { return it.book.id }
+    shelf.firstOrNull { existed(it) }?.let { return it.id }
+    return past.lastOrNull { !it.hidden && existed(it.book) }?.book?.id
+}
+
+/** 책 id 마다 그 id 가 붙은 읽은 시간이 처음 나오는 날([bookFor] 이 그 전 날의 시간을 그 책에 붙이지 않게) */
+fun ReadingDays.firstReadDays(): Map<String, LocalDate> {
+    val first = mutableMapOf<String, LocalDate>()
+    forEach { (day, keys) -> keys.keys.forEach { k -> if (k.book.isNotEmpty() && first[k.book]?.let { it > day } != false) first[k.book] = day } }
+    return first
+}
+
+/**
+ * 읽고 있는 책 목록(권수 제한 없음, 1.5.3 까지는 10권). 앞 [HOME]권이 홈에 보이고(맨 앞 책은 크게), 맨 앞 책의 앱이 '읽고 있는 앱'이다.
  * 목록은 DB([Db]) `shelf`, 나간 책은 `past`, 표지는 books/<id>.jpg.
  */
 object BookShelf {
-    const val MAX = 10
     /** 홈에 보이는 책 수: 맨 앞 책 + 함께 읽는 책 3칸 */
     const val HOME = 4
     private val covers = LruCache<String, Bitmap>(16)
@@ -216,27 +261,87 @@ object BookShelf {
         }.also { cachedHistory = it }
     }
 
-    @Volatile private var cachedFinishes: Map<String, List<LocalDate>>? = null
+    /**
+     * 완독 한 번(DB `finish` 한 줄): 줄 id(같은 날 두 번 완독해도 따로), 완독한 날, 완독을 누른 때(ms, 같은 날 두 완독의 순서. 버전 3 전의 완독은 null),
+     * 그 회차를 `다시 읽기`로 시작한 날(없으면 null), 그 회차의 별점·감상(없으면 null)
+     */
+    class Finish(val id: Long, val day: LocalDate, val at: Long?, val started: LocalDate?, val review: Review?)
 
-    /** 책(id)마다 완독한 날(오래된 순). 다시 읽어도 남는다. */
-    fun finishes(context: Context): Map<String, List<LocalDate>> = cachedFinishes ?: loadFinishes(context)
+    /** 완독 순서: 날, 같은 날이면 누른 때(기기를 옮겨도 그대로), 그다음 줄 id */
+    private val finishOrder = compareBy<Finish>({ it.day }, { it.at ?: 0 }, { it.id })
 
-    @Synchronized private fun loadFinishes(context: Context): Map<String, List<LocalDate>> {
+    @Volatile private var cachedFinishes: Map<String, List<Finish>>? = null
+
+    /** 책(id)마다 완독([finishOrder] 순, 오래된 순). 다시 읽어도 남는다. */
+    fun finishList(context: Context): Map<String, List<Finish>> = cachedFinishes ?: loadFinishes(context)
+
+    @Synchronized private fun loadFinishes(context: Context): Map<String, List<Finish>> {
         cachedFinishes?.let { return it }
-        return Db.get(context).rows("SELECT book_id, day FROM finish ORDER BY day") { it.getString(0) to LocalDate.ofEpochDay(it.getLong(1)) }
-            .groupBy({ it.first }, { it.second }).also { cachedFinishes = it }
+        return Db.get(context).rows("SELECT book_id, id, day, at, started, stars, text FROM finish") { c ->
+            c.getString(0) to Finish(
+                c.getLong(1), LocalDate.ofEpochDay(c.getLong(2)), if (c.isNull(3)) null else c.getLong(3),
+                if (c.isNull(4)) null else LocalDate.ofEpochDay(c.getLong(4)), if (c.isNull(5)) null else Review(c.getInt(5), c.getString(6).orEmpty()),
+            )
+        }.groupBy({ it.first }, { it.second }).mapValues { (_, l) -> l.sortedWith(finishOrder) }.also { cachedFinishes = it }
     }
 
-    /** [id] 책을 [on] 에 완독했다(같은 날 두 번은 한 번으로) */
-    @Synchronized private fun addFinish(context: Context, id: String, on: LocalDate) {
-        Db.get(context).insertWithOnConflict("finish", null, Db.values("book_id" to id, "day" to on.toEpochDay()), SQLiteDatabase.CONFLICT_IGNORE)
-        val all = finishes(context)
-        cachedFinishes = all + (id to ((all[id].orEmpty() + on).distinct().sorted()))
+    /**
+     * [id] 책을 [on] 에 완독했다(같은 날 두 번이면 두 번). 그때 남긴 [review] 는 이 회차의 것이 된다(비었으면 없음).
+     * 진행 중이던 회차의 별점·감상([reviews])은 지우고, `다시 읽기`한 날([roundStarts])은 이 완독 줄로 옮긴다(다음 회차는 빈 채로 시작).
+     */
+    @Synchronized private fun addFinish(context: Context, id: String, on: LocalDate, review: Review) {
+        val r = review.trimmed().takeUnless { it.isEmpty }
+        val started = roundStarts(context)[id]
+        // 넣기 전에 읽어 둔다(캐시가 비어 있으면 넣은 뒤 DB 에서 읽은 목록에 같은 완독을 한 번 더 붙이게 된다).
+        val before = finishList(context)
+        // 누른 때. 기기 시각이 뒤로 고쳐져도 같은 책의 앞 완독보다 늦게(같은 날 회차 순서가 뒤바뀌지 않게)
+        val at = maxOf(System.currentTimeMillis(), before[id].orEmpty().maxOfOrNull { (it.at ?: 0) + 1 } ?: 0)
+        val rowId = Db.get(context).tx {
+            delete("review", "book_id = ?", arrayOf(id))
+            delete("round_start", "book_id = ?", arrayOf(id))
+            insertOrThrow("finish", null, Db.values(
+                "uid" to UUID.randomUUID().toString().replace("-", ""), "book_id" to id, "day" to on.toEpochDay(), "at" to at,
+                "started" to started?.toEpochDay(), "stars" to r?.halves, "text" to r?.text,
+            ))
+        }
+        cachedFinishes = before + (id to (before[id].orEmpty() + Finish(rowId, on, at, started, r)).sortedWith(finishOrder))
+        cachedReviews = reviews(context) - id
+        cachedRoundStarts = roundStarts(context) - id
     }
+
+    /**
+     * 완독한 회차([id] 책의 [finishId] 완독)의 별점·감상을 [review] 로(둘 다 비면 없앤다), [day] 가 있으면 완독한 날도 바꾼다. 회차는 날 순서로 다시 센다.
+     * 그 완독 줄이 [id] 책의 것이 아니면 예외(다른 책의 줄을 고치면 DB 와 캐시가 어긋난다).
+     */
+    @Synchronized fun setFinish(context: Context, id: String, finishId: Long, review: Review, day: LocalDate? = null) {
+        val r = review.trimmed().takeUnless { it.isEmpty }
+        val values = Db.values("stars" to r?.halves, "text" to r?.text).apply { day?.let { put("day", it.toEpochDay()) } }
+        val n = Db.get(context).tx { update("finish", values, "id = ? AND book_id = ?", arrayOf(finishId.toString(), id)) }
+        check(n == 1) { "finish $finishId is not a finish of $id" }
+        val all = finishList(context)
+        cachedFinishes = all + (id to all[id].orEmpty().map { if (it.id == finishId) Finish(it.id, day ?: it.day, it.at, it.started, r) else it }
+            .sortedWith(finishOrder))
+    }
+
+    @Volatile private var cachedRoundStarts: Map<String, LocalDate?>? = null
+
+    /**
+     * 책(id)마다 진행 중인 회차가 있다는 표시와 그 회차를 `다시 읽기`로 시작한 날(그 뒤 처음 읽은 날이 있으면 그날이 시작). 완독하면 지운다.
+     * 날이 null 이면 진행 중인데 시작한 날을 모른다(1.5 판에서 다시 읽던 책. 책을 빼도 진행 중 회차가 남게 표시는 둔다).
+     */
+    fun roundStarts(context: Context): Map<String, LocalDate?> = cachedRoundStarts ?: loadRoundStarts(context)
+
+    @Synchronized private fun loadRoundStarts(context: Context): Map<String, LocalDate?> {
+        cachedRoundStarts?.let { return it }
+        return Db.get(context).rows("SELECT book_id, day FROM round_start") { it.getString(0) to if (it.isNull(1)) null else LocalDate.ofEpochDay(it.getLong(1)) }
+            .toMap().also { cachedRoundStarts = it }
+    }
+
+    private fun Review.trimmed() = copy(text = text.trim())
 
     @Volatile private var cachedReviews: Map<String, Review>? = null
 
-    /** 책(id)마다 별점·감상 */
+    /** 책(id)마다 진행 중인 마지막 회차(처음 읽는 중·다시 읽는 중·다시 읽다 뺀 회차)의 별점·감상. 완독한 회차의 것은 [finishList]. */
     fun reviews(context: Context): Map<String, Review> = cachedReviews ?: loadReviews(context)
 
     @Synchronized private fun loadReviews(context: Context): Map<String, Review> {
@@ -245,18 +350,21 @@ object BookShelf {
             .toMap().also { cachedReviews = it }
     }
 
-    /** [id] 책의 별점·감상을 바꾼다. 둘 다 비면 지운다. */
+    /** [id] 책의 진행 중인 마지막 회차의 별점·감상을 바꾼다. 둘 다 비면 지운다. */
     @Synchronized fun setReview(context: Context, id: String, review: Review) {
         val db = Db.get(context)
-        val r = review.copy(text = review.text.trim())
+        val r = review.trimmed()
         val all = reviews(context)
         cachedReviews = if (r.isEmpty) {
-            db.delete("review", "book_id = ?", arrayOf(id))
+            db.tx { delete("review", "book_id = ?", arrayOf(id)) }
             all - id
         } else {
-            db.insertWithOnConflict("review", null, Db.values(
-                "book_id" to id, "stars" to r.halves, "text" to r.text, "updated_at" to System.currentTimeMillis(),
-            ), SQLiteDatabase.CONFLICT_REPLACE)
+            // 실패하면 예외(캐시는 DB 에 들어간 뒤에만 바꾼다)
+            db.tx {
+                replaceOrThrow("review", null, Db.values(
+                    "book_id" to id, "stars" to r.halves, "text" to r.text, "updated_at" to System.currentTimeMillis(),
+                ))
+            }
             all + (id to r)
         }
     }
@@ -274,72 +382,120 @@ object BookShelf {
                 ))
             }
         }
-        cachedHistory = past
+        // 나간 책은 반납일을 저장하지 않는다(DB 에 칸이 없다): 메모리 사본도 같게(다시 띄운 뒤와 다르지 않게. 되살리면 서재에서 다시 읽는다)
+        cachedHistory = past.map { if (it.book.due < 0) it else it.copy(book = it.book.copy(due = -1)) }
     }
 
-    /** 읽고 있는 책을 목록에서 내보낸다(나간 책으로 남긴다). 표지는 남긴다. */
+    /**
+     * 여러 표를 한 트랜잭션으로 바꾼다(중간에 끊기면 아무것도 바뀌지 않는다). 안의 쓰기는 캐시를 바로 고치므로, 실패하면 캐시를 모두 비워
+     * 되돌린 DB 에서 다시 읽게 한다.
+     */
+    private inline fun <T> atomic(context: Context, block: () -> T): T =
+        try {
+            Db.get(context).tx { block() }
+        } catch (e: Exception) {
+            clearCaches()
+            throw e
+        }
+
+    /**
+     * 부르는 쪽의 여러 저장을 한 트랜잭션으로(목록에 없던 책을 적어 두고([claim]) 바로 완독·별점·감상·책 정보: 뒤가 실패하면 적어 둔 책도
+     * 되돌린다). 실패하면 캐시를 비운다.
+     */
+    @Synchronized fun <T> together(context: Context, block: () -> T): T = atomic(context, block)
+
+    /** [id] 책의 새 회차가 [today] 에 시작한다(다시 읽기, 완독한 책을 펴 자동으로 되살림. 펴서 되살리면 편 때의 날) */
+    private fun startRound(context: Context, id: String, today: LocalDate = LocalDate.now()) {
+        // 기기 날짜가 그 책의 마지막 완독일보다 이르면 회차는 열되 시작일은 모름으로 둔다(완독보다 앞선 시작이 된다. 날짜를 바꿔 적는 추측은 안 한다).
+        // 그때 회차는 마지막 완독 뒤 처음 읽은 날부터 센다.
+        val day = today.takeIf { t -> finishList(context)[id].orEmpty().none { it.day > t } }
+        val row = Db.get(context).tx { insertWithOnConflict("round_start", null, Db.values("book_id" to id, "day" to day?.toEpochDay()), SQLiteDatabase.CONFLICT_IGNORE) }
+        // 이미 있으면(진행 중이던 회차) 그날을 그대로 둔다(DB 는 넣지 않았으니 캐시도).
+        if (row != -1L) cachedRoundStarts = roundStarts(context) + (id to day)
+    }
+
+    /** 캐시를 모두 비워 다음에 DB 에서 다시 읽게 한다(트랜잭션을 되돌렸을 때, 테스트) */
+    internal fun clearCaches() {
+        cached = null; cachedHistory = null; cachedFinishes = null; cachedRoundStarts = null; cachedReviews = null
+    }
+
+    /** 읽고 있는 책을 목록에서 내보낸다(나간 책으로 남긴다). 표지는 남긴다. 나간 책에 넣기와 빼기를 한 번에(끊기면 같은 책이 양쪽에 남는다). */
     @Synchronized private fun leave(context: Context, id: String) {
         val books = list(context)
         val book = books.find { it.id == id } ?: return
-        writeHistory(context, history(context) + PastBook(book, System.currentTimeMillis()))
-        write(context, books.filter { it.id != id })
-    }
-
-    /** 완독: 오늘 완독한 날을 더하고 읽고 있는 책에서 뺀다(다시 읽던 책이면 두 번째 완독). */
-    @Synchronized fun finish(context: Context, id: String) {
-        addFinish(context, id, LocalDate.now())
-        leave(context, id)
-    }
-
-    /** 나간 책(뺀 책) 또는 목록에 없던 책([title], 그 책을 읽은 [app])을 [on] 에 완독한 책으로. 그 책의 id 를 돌려준다. */
-    @Synchronized fun finishPast(context: Context, pastId: String?, title: String, app: String?, on: LocalDate = LocalDate.now()): String {
-        val id = pastId?.takeIf { id -> history(context).any { it.book.id == id } } ?: keep(context, title, app).id
-        addFinish(context, id, on)
-        return id
+        atomic(context) {
+            // 1.3.0~1.5.3 은 두 표를 따로 저장해 끊기면 같은 책이 나간 책에도 남아 있을 수 있다: 그 줄은 이번 것으로 바꾼다(기본 키가 겹쳐 실패하지 않게)
+            writeHistory(context, history(context).filter { it.book.id != id } + PastBook(book, System.currentTimeMillis()))
+            write(context, books.filter { it.id != id })
+        }
     }
 
     /**
-     * 다시 읽기: 나간 책([pastId]) 또는 목록에 없던 책([title])을 읽고 있는 책 맨 앞으로(표지·앱·완독한 날 그대로).
-     * 목록이 다 찼으면 넣지 않고 false.
+     * 완독: [id] 책(읽고 있는 책·나간 책)에 오늘 완독한 날을 더하고(그때 남긴 [review] 는 이 회차의 것), 읽고 있는 책이면 뺀다(다시 읽던 책이면
+     * 두 번째 완독). 완독한 날은 회차 메뉴에서 고친다([setFinish]).
+     * 한 트랜잭션으로(완독만 남고 책이 읽고 있는 책에 남으면 바로 새 회차가 생긴 것처럼 보인다). 기기 날짜가 마지막 완독일보다 이르면 하지 않고 false.
      */
-    @Synchronized fun restore(context: Context, pastId: String?, title: String, app: String?): Boolean {
-        if (isFull(context)) return false
-        val past = history(context)
-        val book = past.find { it.book.id == pastId }?.book ?: titleOnly(title, app)
-        write(context, listOf(book.copy(updatedAt = System.currentTimeMillis())) + list(context))
-        if (past.any { it.book.id == pastId }) writeHistory(context, past.filter { it.book.id != pastId })
+    @Synchronized fun finish(context: Context, id: String, review: Review): Boolean {
+        // 기기 날짜가 마지막 완독일보다 이르면 받지 않는다(그날로 적으면 회차 순서가 뒤바뀐다. 날짜를 바꿔 적는 것은 추측이라 하지 않는다)
+        val today = LocalDate.now()
+        if (finishList(context)[id].orEmpty().any { it.day > today }) return false
+        atomic(context) {
+            addFinish(context, id, today, review)
+            leave(context, id)
+        }
         return true
     }
 
-    /** 올해 읽은 책에서 지운다(읽은 시간은 합계에 그대로). 목록에 없던 책은 그 제목을 지운 책으로 적어 둔다. 표지는 버린다. */
-    @Synchronized fun forget(context: Context, pastId: String?, title: String) {
+    /**
+     * 다시 읽기: 나간 책 [id] 를 읽고 있는 책 맨 앞으로(표지·앱·완독한 날 그대로). 이미 읽고 있는 책이면 그대로 true.
+     * [newRound] 면(마지막 회차가 완독으로 끝난 책. 부르는 쪽이 [BookRecord.rounds] 로 판단한다) 새 회차가 이날 시작한다(아직 읽지 않았어도).
+     * 진행 중이던 회차면 그대로 이어진다. 지운 책은 되살리지 않는다(오래 열어 둔 상세에서 누른 경우).
+     */
+    @Synchronized fun restore(context: Context, id: String, newRound: Boolean) {
+        if (list(context).any { it.id == id }) return
         val past = history(context)
-        val now = System.currentTimeMillis()
-        writeHistory(context, if (past.any { it.book.id == pastId }) past.map { if (it.book.id == pastId) it.copy(hidden = true, leftAt = now) else it }
-            else past + PastBook(titleOnly(title, null), now, hidden = true))
-        pastId?.let { dropFiles(context, it) }
+        val book = past.firstOrNull { it.book.id == id && !it.hidden }?.book ?: return
+        atomic(context) {
+            write(context, listOf(book.copy(updatedAt = System.currentTimeMillis())) + list(context))
+            writeHistory(context, past.filter { it.book.id != id })
+            if (newRound) startRound(context, id)
+        }
     }
 
-    /** 목록에 없던 책(읽은 시간에만 있는 제목)을 책으로. 앱이 보여 준 제목을 [ShelfBook.seenTitle] 로 둬 제목을 고쳐도 읽은 시간이 붙는다. */
-    private fun titleOnly(title: String, app: String?) = ShelfBook(newId(), title, "", app, System.currentTimeMillis(), seenTitle = title)
-
-    /** 목록에 없던 책을 나간 책으로 적어 두고 돌려준다(제목·저자·표지를 고칠 수 있게). */
-    @Synchronized fun keep(context: Context, title: String, app: String?): ShelfBook =
-        titleOnly(title, app).also { writeHistory(context, history(context) + PastBook(it, System.currentTimeMillis())) }
-
-    /** 나간 책 중 제목이 같은 책(지운 책 포함). 고친 제목이면 앱이 보여 준 제목으로도 찾는다. */
-    fun findPast(context: Context, title: String): PastBook? {
-        val norm = normTitle(title)
-        return history(context).lastOrNull { sameTitle(it.book.title, title) }
-            ?: history(context).lastOrNull { it.book.seenTitle.isNotEmpty() && normTitle(it.book.seenTitle) == norm }
+    /** 올해 읽은 책에서 지운다(읽은 시간은 합계에 그대로, 다시 보이지 않게 나간 책에 지운 표시). 표지는 버린다. 읽고 있는 책이면 지우지 않고 false. */
+    @Synchronized fun forget(context: Context, id: String): Boolean {
+        // 1.3.0~1.5.3 의 끊긴 저장으로 나간 책에도 같은 id 가 남아 있을 수 있다: 읽고 있는 책이면 그래도 지우지 않는다(표지를 버리지 않게)
+        if (list(context).any { it.id == id }) return false
+        val past = history(context)
+        if (past.none { it.book.id == id }) return false
+        // 이미 지운 책이면 그대로(지운 날을 덮지 않는다. 두 화면에서 지운 경우)
+        if (past.any { it.book.id == id && it.hidden }) return true
+        val now = System.currentTimeMillis()
+        writeHistory(context, past.map { if (it.book.id == id) it.copy(hidden = true, leftAt = now) else it })
+        dropFiles(context, id)
+        return true
     }
 
     /**
-     * 자동 추가로 넣어도 되는가: 목록에 자리가 있고, 완독한 책이 아니다
-     * (완독한 책을 확인하러 잠깐 열어도 다시 들어오지 않게. 다시 읽으려면 올해 읽은 책에서 `다시 읽기`).
+     * 목록에 없던 책(읽은 시간에만 있는 제목, id 가 없다)을 고치는 순간의 그 책: 그사이 같은 제목의 책이 생겼으면(자동 추가 등) 그 책
+     * (읽고 있는 책 목록 앞쪽 → 지우지 않은 나간 책 중 가장 최근), 없으면 나간 책으로 적어 둔다([keep]. 별점·감상·완독·책 정보를 그 책에 남기게).
      */
-    fun canAutoAdd(context: Context, title: String): Boolean =
-        !isFull(context) && findPast(context, title)?.let { !it.hidden && finishes(context)[it.book.id].orEmpty().isNotEmpty() } != true
+    @Synchronized fun claim(context: Context, title: String, app: String?): ShelfBook =
+        findByTitle(context, title) ?: findLivePast(context, title)?.book ?: keep(context, title, app)
+
+    /** 목록에 없던 책(읽은 시간에만 있는 제목)을 책으로. 앱이 보여 준 제목을 [ShelfBook.seenTitle] 로 둬 제목을 고쳐도 자동 추가가 찾는다. */
+    private fun titleOnly(title: String, app: String?) = ShelfBook(newId(), title, "", app, System.currentTimeMillis(), seenTitle = title)
+
+    /** 목록에 없던 책을 나간 책으로 적어 두고 돌려준다(제목·저자·표지를 고칠 수 있게). 그 제목으로 읽었는데 책을 몰라 비워 둔 시간을 이 책으로. */
+    @Synchronized fun keep(context: Context, title: String, app: String?): ShelfBook = titleOnly(title, app).also { book ->
+        atomic(context) {
+            writeHistory(context, history(context) + PastBook(book, System.currentTimeMillis()))
+            ReadingLog.adopt(context, book.title, book.seenTitle, book.id)
+        }
+    }
+
+    /** 나간 책 중 제목이 같은, 지우지 않은 책(가장 최근 것). 같은 제목의 지운 책이 더 최근이어도 그 앞의 책을 찾는다. */
+    fun findLivePast(context: Context, title: String): PastBook? = history(context).lastOrNull { !it.hidden && it.book.hasTitle(title) }
 
     @Synchronized private fun load(context: Context): List<ShelfBook> {
         cached?.let { return it }
@@ -348,6 +504,10 @@ object BookShelf {
     }
 
     private const val ID_PREFIX = "b-"
+    /** `책 추가` 로 직접 넣은 책의 id 머리([manual]) */
+    const val MANUAL_PREFIX = "m-"
+    /** 책 id(`book_id`)가 든 표: 책 id 를 바꾸면 모두 함께 바꾼다([migrateIds]) */
+    private val BOOK_ID_TABLES = listOf("finish", "review", "round_start", "reading_day", "book_open")
     private fun newId() = ID_PREFIX + UUID.randomUUID()
 
     private fun readIndex(context: Context): List<ShelfBook> =
@@ -362,7 +522,7 @@ object BookShelf {
         // 한 번이라도 완독한 책은 어디에 놓이든(홈·목록·메뉴·올해 읽은 책) `완독` 띠를 그려 넣는다.
         val tone = Crema.contrastTone(context)
         // 띠 글자는 앱 언어를 따르므로 키에 글자를 넣는다(빈 글자 = 띠 없음).
-        val ribbon = if (finishes(context)[book.id].orEmpty().isEmpty()) "" else context.getString(R.string.finish_book)
+        val ribbon = if (finishList(context)[book.id].isNullOrEmpty()) "" else context.getString(R.string.finish_book)
         val palette = Palette.current
         val key = "${book.id}@$widthPx@${book.updatedAt}@${book.app}@$tone@$ribbon@${palette.key}"
         covers.get(key)?.let { return it }
@@ -414,31 +574,61 @@ object BookShelf {
     }
 
     /**
-     * 검색에서 고른 책을 새 책으로 맨 앞에 넣는다. [MAX]권이 차 있으면 넣지 않고 null.
+     * 검색에서 고른 책을 새 책([manual], 지원하지 않는 이북 앱용)으로 맨 앞에 넣는다.
      * 책은 사용자가 직접 뺄 때만 빠진다(자동으로 밀어내지 않는다). 이미지가 아니면 IOException.
+     * 같은 제목의 책이 있어도 늘 새 책이고, 제목으로 다른 책·읽은 시간과 잇지 않는다(그 제목으로 읽은 어느 책에도 붙지 않은 시간도 가져오지 않는다.
+     * 그 시간은 지원하는 앱에서 읽은 것이라 자동 추가가 넣은 책의 것이다).
+     * 읽은 시간이 붙지 않으니 넣은 날 첫 회차가 시작한다([roundStarts]. 독서 기록·회차·올해 읽은 책에 넣은 날부터 보인다, [BookRecord.readYears]).
      */
     @Throws(IOException::class)
-    @Synchronized fun add(context: Context, book: BookResult, coverBytes: ByteArray): ShelfBook? {
-        if (isFull(context)) return null
-        val added = ShelfBook(newId(), book.title, book.author, null, System.currentTimeMillis())
+    @Synchronized fun add(context: Context, book: BookResult, coverBytes: ByteArray): ShelfBook {
+        val added = ShelfBook(MANUAL_PREFIX + UUID.randomUUID(), book.title, book.author, null, System.currentTimeMillis())
         saveCover(context, added.id, coverBytes)
-        write(context, listOf(added) + list(context))
+        try {
+            atomic(context) {
+                write(context, listOf(added) + list(context))
+                startRound(context, added.id)
+            }
+        } catch (e: Exception) {
+            dropFiles(context, added.id)  // 들어가지 못한 책의 표지를 남기지 않는다
+            throw e
+        }
         return added
     }
 
     /**
+     * 나간 책 [id] 를 이북 앱에서 다시 펴 되살릴 때 새 회차가 시작하는가: 완독한 적이 있고 진행 중 회차 표시가 없고
+     * 마지막 회차가 완독으로 끝났다(이미 진행 중이던 회차 — 다시 읽기·감상·완독 뒤 5분 넘게 읽음 — 면 이어진다).
+     */
+    private fun startsRoundOnReturn(context: Context, id: String): Boolean =
+        finishList(context)[id].orEmpty().isNotEmpty() && id !in roundStarts(context) &&
+            BookRecord.all(context).firstOrNull { it.book.id == id }?.reopenStartsRound != false
+
+    /**
      * 이북 앱에서 편 책을 맨 앞에 표지 그림 없이 넣는다(읽고 있는 책 자동 추가, 빈 표지로 보인다).
      * 전에 뺀 책(나간 책, 지운 책은 빼고)이면 새로 만들지 않고 그 책을 같은 id 로 되살린다(별점·감상·표지·고친 제목이 이어지게).
-     * [MAX]권이 차 있으면 넣지 않고 null(있던 책을 빼지 않는다. 사용자가 목록에서 직접 뺀다).
+     * 완독한 책이면 `다시 읽기`처럼 새 회차가 그날 시작한다([roundStarts]. 이미 진행 중이던 회차면 그대로 이어진다).
+     * 목록에 넣기와 나간 책에서 빼기는 한 트랜잭션으로. 권수 제한은 없다(빼는 것은 사용자가 목록에서).
      */
-    @Synchronized fun addOpened(context: Context, title: String, author: String, app: String?, progress: Int, due: Long): ShelfBook? {
-        if (isFull(context)) return null
+    @Synchronized fun addOpened(context: Context, title: String, author: String, app: String?, progress: Int, due: Long, at: Long = System.currentTimeMillis()): ShelfBook {
         val now = System.currentTimeMillis()
-        val past = findPast(context, title)?.takeIf { !it.hidden }?.book
-        val added = past?.copy(author = past.author.ifEmpty { author }, app = app ?: past.app, updatedAt = now, progress = progress, due = due)
+        val past = findLivePast(context, title)?.book
+        // 화면에서 모르는 진행률(-1)은 예전 값 그대로([updateStatus] 와 같게). 반납일은 나간 책에 남기지 않으니(writeHistory) 본 것으로
+        val added = past?.copy(
+            author = past.author.ifEmpty { author }, app = app ?: past.app, updatedAt = now,
+            progress = if (progress >= 0) progress else past.progress, due = due,
+        )
             ?: ShelfBook(newId(), title, author, app, now, progress, due, seenTitle = title)
-        write(context, listOf(added) + list(context))
-        if (past != null) writeHistory(context, history(context).filter { it.book.id != past.id })
+        // 마지막 회차가 완독으로 끝난 책이면 새 회차를 연다. 이미 진행 중이던 회차(다시 읽기·감상·완독 뒤 5분 넘게 읽음)면 이어진다.
+        val newRound = past != null && startsRoundOnReturn(context, past.id)
+        atomic(context) {
+            write(context, listOf(added) + list(context))
+            if (past != null) writeHistory(context, history(context).filter { it.book.id != past.id })
+            // 편 때(서재로 돌아와서야 알면 읽는 화면을 연 때)의 날. 자정을 넘겨 알아내도 그 회차는 편 날 시작
+            if (newRound) startRound(context, added.id, Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()).toLocalDate())
+            // 새 책: 그 제목으로 읽었는데 책을 몰라 비워 둔 시간을 이 책으로
+            if (past == null) ReadingLog.adopt(context, added.title, added.seenTitle, added.id)
+        }
         return added
     }
 
@@ -448,8 +638,27 @@ object BookShelf {
     @Throws(IOException::class)
     @Synchronized fun replace(context: Context, id: String, book: BookResult, coverBytes: ByteArray) {
         if (list(context).none { it.id == id } && history(context).none { it.book.id == id }) return
-        saveCover(context, id, coverBytes)
-        edit(context, id) { it.copy(title = book.title, author = book.author) }
+        withCover(context, id, coverBytes) { edit(context, id) { it.copy(title = book.title, author = book.author) } }
+    }
+
+    /**
+     * 표지 파일 [bytes] 와 책 정보 저장([save])을 함께: 저장이 실패하면 표지를 예전 것으로 되돌린다(없었으면 지운다. 표지가 있는 것으로 보여
+     * 다시 잘라 오지 않거나, 바뀐 표지가 다시 그려지지 않은 채 남지 않게).
+     */
+    private fun withCover(context: Context, id: String, bytes: ByteArray, save: () -> Unit) {
+        val cover = coverFile(context, id)
+        val backup = File(cover.parentFile, "${cover.name}.bak").also { it.delete() }
+        if (cover.exists()) cover.copyTo(backup, overwrite = true)
+        try {
+            saveCover(context, id, bytes)
+            save()
+        } catch (e: Exception) {
+            if (backup.exists()) backup.copyTo(cover, overwrite = true) else cover.delete()
+            clearCaches()
+            throw e
+        } finally {
+            backup.delete()
+        }
     }
 
     /** 이북 앱 서재에서 본 진행률·반납일(저자는 비어 있을 때만)을 적는다(순서는 그대로). 바뀐 게 없으면 쓰지 않는다. */
@@ -472,21 +681,15 @@ object BookShelf {
     @Synchronized fun setCover(context: Context, id: String, bytes: ByteArray) {
         val books = list(context)
         if (books.none { it.id == id }) return
-        saveCover(context, id, bytes)
         val now = System.currentTimeMillis()
-        write(context, books.map { if (it.id == id) it.copy(updatedAt = now) else it })
+        withCover(context, id, bytes) { write(context, books.map { if (it.id == id) it.copy(updatedAt = now) else it }) }
     }
 
     /**
      * 제목이 같은 책(부제·공백 무시). 사용자가 제목을 고친 자동 추가 책은 앱이 보여 준 제목([ShelfBook.seenTitle])으로도 찾는다
      * (그러지 않으면 다음에 펼 때 새 책으로 들어간다).
      */
-    fun findByTitle(context: Context, title: String): ShelfBook? {
-        val books = list(context)
-        val norm = normTitle(title)
-        return books.firstOrNull { sameTitle(it.title, title) }
-            ?: books.firstOrNull { it.seenTitle.isNotEmpty() && normTitle(it.seenTitle) == norm }
-    }
+    fun findByTitle(context: Context, title: String): ShelfBook? = list(context).firstOrNull { it.hasTitle(title) }
 
     @Throws(IOException::class)
     private fun saveCover(context: Context, id: String, bytes: ByteArray) {
@@ -500,9 +703,6 @@ object BookShelf {
         coverFile(context, id).delete()
         dir(context).listFiles { f -> f.name.startsWith("${id}_") }?.forEach { it.delete() }
     }
-
-    /** 새 책을 더 넣을 수 없으면 true */
-    fun isFull(context: Context): Boolean = list(context).size >= MAX
 
     @Synchronized fun moveToFront(context: Context, id: String) {
         val books = list(context)
@@ -541,15 +741,22 @@ object BookShelf {
         val now = System.currentTimeMillis()
         fun ShelfBook.changed() = change(this).copy(updatedAt = now, seenTitle = seenTitle.ifEmpty { title })
         val books = list(context)
+        val past = history(context)
         if (books.any { it.id == id }) write(context, books.map { if (it.id == id) it.changed() else it })
-        else writeHistory(context, history(context).map { if (it.book.id == id) it.copy(book = it.book.changed()) else it })
+        // 어디에도 없으면 쓰지 않는다(기록 판 번호가 올라 떠 있는 메뉴가 닫히지 않게)
+        else if (past.any { it.book.id == id }) writeHistory(context, past.map { if (it.book.id == id) it.copy(book = it.book.changed()) else it })
     }
 
     @Synchronized fun setApp(context: Context, id: String, app: String?) =
         write(context, list(context).map { if (it.id == id) it.copy(app = app) else it })
 
-    /** 책 빼기: 읽고 있는 책에서 빼서 뺀 책으로 남긴다(올해 읽은 시간이 있으면 올해 읽은 책에 보인다). */
-    fun remove(context: Context, id: String) = leave(context, id)
+    /** 책 빼기: 읽고 있는 책에서 빼서 나간 책으로 남긴다. [review] 가 있으면(빼기 메뉴에서 고친 별점·감상) 진행 중 회차의 것으로 같이 저장한다. */
+    @Synchronized fun remove(context: Context, id: String, review: Review? = null) = atomic(context) {
+        // 읽고 있는 책일 때만(그사이 다른 화면에서 완독·빼기를 했으면 감상을 지금 회차에 적지 않는다)
+        if (list(context).none { it.id == id }) return@atomic
+        leave(context, id)
+        review?.let { setReview(context, id, it) }
+    }
 
     /** 읽고 있는 책 목록을 한 트랜잭션으로 통째로 바꾼다(순서 = pos). */
     private fun write(context: Context, books: List<ShelfBook>) {
@@ -584,27 +791,39 @@ object BookShelf {
     /**
      * 예전 id(YES24 상품 번호, 자동 추가는 `auto-<정리한 제목>`, 옛 한 권은 `legacy`)를 런처가 만든 id 로 바꾼다(1.2.1 까지의 데이터).
      * `auto-` 책은 id 의 제목을 [ShelfBook.seenTitle] 로 옮겨, 제목을 고친 책도 계속 찾는다.
-     * 중간에 꺼져도 책·표지를 잃지 않게: 표지를 새 이름으로 **복사** → 목록 저장 → 예전 파일 지우기.
-     * 표지 복사나 목록 저장이 실패하면 예전 id 그대로 쓰고(id 는 이름일 뿐이라 그대로도 동작한다) 다음에 다시 한다.
+     * 중간에 꺼져도 책·표지를 잃지 않게: 표지를 새 이름으로 **복사** → 목록 저장(책 id 가 든 다른 표도 같은 트랜잭션으로 새 id 로) → 예전 파일 지우기.
+     * 표지 복사나 목록 저장이 실패하면 예전 id 그대로 쓰고(id 는 이름일 뿐이라 그대로도 동작한다) 다음에 읽고 있는 책 목록을 읽을 때 다시 한다.
+     * 그 사이 예전 id 로 남긴 완독·별점·감상·회차 시작·읽은 시간도 그때 함께 새 id 로 옮겨 끊기지 않는다. 그 사이 나간 책은 예전 id 그대로 남는다
+     * (읽고 있는 책만 바꾼다. 예전 id 로도 기록이 다 이어진다).
      */
     private fun migrateIds(context: Context, books: List<ShelfBook>): List<ShelfBook> {
-        if (books.all { it.id.startsWith(ID_PREFIX) }) return books
+        fun current(id: String) = id.startsWith(ID_PREFIX) || id.startsWith(MANUAL_PREFIX)
+        if (books.all { current(it.id) }) return books
         val moved = books.map { b ->
-            if (b.id.startsWith(ID_PREFIX)) return@map b
+            if (current(b.id)) return@map b
             val seen = b.seenTitle.ifEmpty { if (b.id.startsWith("auto-")) b.id.removePrefix("auto-") else "" }
             b.copy(id = newId(), seenTitle = seen)
         }
+        val renamed = books.zip(moved).filter { (old, new) -> old.id != new.id }
         val copied = runCatching {
-            books.zip(moved).filter { (old, new) -> old.id != new.id }.forEach { (old, new) ->
+            renamed.forEach { (old, new) ->
                 val cover = coverFile(context, old.id)
                 if (cover.exists()) cover.copyTo(coverFile(context, new.id), overwrite = true)
             }
-            write(context, moved)
+            Db.get(context).tx {
+                write(context, moved)
+                for ((old, new) in renamed) for (table in BOOK_ID_TABLES) {
+                    update(table, Db.values("book_id" to new.id), "book_id = ?", arrayOf(old.id))
+                }
+            }
         }
         if (copied.isFailure) {
             moved.filter { m -> books.none { it.id == m.id } }.forEach { coverFile(context, it.id).delete() }
             return books
         }
+        // 완독·감상·회차 시작·읽은 시간의 메모리 사본은 옛 id 로 읽었을 수 있다
+        cachedFinishes = null; cachedReviews = null; cachedRoundStarts = null
+        ReadingLog.clearCache()
         // 목록에 없는 표지·줄인 표지(예전 id 의 것, 앞서 실패한 복사본)를 지운다. 나간 책의 표지는 남긴다.
         val keep = moved.map { it.id } + history(context).map { it.book.id }
         dir(context).listFiles { f ->
