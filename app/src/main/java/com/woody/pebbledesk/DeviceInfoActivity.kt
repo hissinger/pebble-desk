@@ -61,9 +61,11 @@ class DeviceInfoActivity : EinkActivity() {
         section(list, R.string.device_section_device)
         val size = "${real.widthPixels}×${real.heightPixels}"
         val screen = "${getString(R.string.device_screen)} $size · ${sys.densityDpi}dpi · ${dpSize(sys.density)}" +
-            if (dm.densityDpi != sys.densityDpi || basis != size)
+            (if (dm.densityDpi != sys.densityDpi || basis != size)
                 " → ${getString(R.string.device_screen_app)} ${dm.densityDpi}dpi · ${dpSize(dm.density)} · ${getString(R.string.device_screen_basis, basis)}"
-            else ""
+            else "") +
+            // 앱이 맞춘 밀도가 먹히지 않았다(기기가 덮어씀, BOOX 앱 최적화의 앱별 DPI 등)
+            if (dm.densityDpi != Ui.designDpi) " · ${getString(R.string.device_screen_wanted, Ui.designDpi)}" else ""
         list.addView(text(listOf(
             "${Build.MODEL} (${Build.DEVICE})", Build.MANUFACTURER, Build.BRAND,
             "${getString(R.string.device_android)} ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",

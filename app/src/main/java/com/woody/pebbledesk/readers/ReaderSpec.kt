@@ -50,6 +50,18 @@ open class ReaderSpec(
     val secure: Boolean = false,
     /** 서재 편집(지우기·옮기기) 중에만 보이는 요소. 그동안은 칸을 눌러도 책을 고르는 것이라 서재를 읽지 않는다(알라딘) */
     val shelfEditing: String? = null,
+    /**
+     * 읽는 화면이 따로 액티비티가 아니라 서재 액티비티 안에 뜨는 앱(Libby): 그 묶음의 요소 이름. 이것이 보이는 동안을
+     * 읽는 화면 `<서재 액티비티>#<이름>`([viewers] 에 적는다)으로 보고, 읽은 시간도 그 동안만 센다([com.woody.pebbledesk.ReadingLog.viewerShown]).
+     */
+    val viewerHolder: String? = null,
+    /** 홈에서 책을 누르면 열 앱의 패키지. 실행 화면이 없는 앱(네오리더)은 그 책들이 있는 서재 앱(BOOX 런처) */
+    val appPkg: String = pkg,
+    /**
+     * 읽는 화면 액티비티가 여럿이고 하나가 책 한 권(탭)인 앱(네오리더 `ReaderTab1~4Activity`): 탭마다 메뉴로 마지막으로 안 책을
+     * 따로 기억해 두고, 다른 탭으로 넘어가면 그 탭의 책을 편 것으로 본다. 모르는 탭이면 메뉴로 알 때까지 진행률을 적지 않는다.
+     */
+    val viewerTabs: Boolean = false,
 ) {
     /** 서재에 보이는 책 칸들. 기본: 제목 요소마다 그것이 든 칸을 찾아 읽는다. */
     open fun shelfCells(root: AccessibilityNodeInfo): List<Cell> =

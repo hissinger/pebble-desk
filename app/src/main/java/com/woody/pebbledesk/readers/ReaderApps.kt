@@ -6,7 +6,7 @@ package com.woody.pebbledesk.readers
  */
 object ReaderApps {
     val ALL = listOf(
-        KyoboLibrary, KyoboEbook, KyoboEbookMobile, Millie, MillieMobile, Aladin, Bookers, Ridi, RidiOneStore, Yes24Library, Yes24Ebook, MyYes, MoonReader, MoonReaderPro, Kindle,
+        KyoboLibrary, KyoboEbook, KyoboEbookMobile, Millie, MillieMobile, Aladin, Bookers, Ridi, RidiOneStore, Yes24Library, Yes24Ebook, MyYes, MoonReader, MoonReaderPro, Kindle, Libby, NeoReader,
     )
 
     val byPackage = ALL.associateBy { it.pkg }
@@ -18,4 +18,10 @@ object ReaderApps {
 
     /** [cls](액티비티 전체 이름)가 이 앱들의 읽는 화면인가 */
     fun isViewer(cls: String) = cls in viewers
+
+    /** 읽는 화면이 안에 뜨는 서재 액티비티들([ReaderSpec.viewerHolder], Libby) */
+    private val hosts = ALL.filter { it.viewerHolder != null }.flatMap { it.shelves }.toSet()
+
+    /** [cls] 가 읽는 화면이 안에 뜨는 서재 액티비티인가(읽은 시간은 읽는 화면이 보인 동안만 센다) */
+    fun hostsViewer(cls: String) = cls in hosts
 }

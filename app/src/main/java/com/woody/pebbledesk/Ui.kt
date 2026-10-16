@@ -35,8 +35,18 @@ object Ui {
         densityBasis = "${dm.widthPixels}×${dm.heightPixels}"
         val shortPx = minOf(dm.widthPixels, dm.heightPixels)
         tallScreen = maxOf(dm.widthPixels, dm.heightPixels) >= shortPx * TALL_RATIO
-        return (shortPx * 160f / DESIGN_WIDTH_DP).roundToInt()
+        return (shortPx * 160f / DESIGN_WIDTH_DP).roundToInt().also { designDpi = it }
     }
+
+    /**
+     * 마지막으로 [designDensityDpi] 가 정한 밀도. 화면이 실제로 다른 밀도로 그려지면 기기가 앱의 밀도를 덮어쓴 것이다
+     * (BOOX 앱 최적화의 앱별 DPI. Poke3 에서 300 대신 350 → 490×662dp). 홈이 알리고 기기 정보가 보여 준다.
+     */
+    @Volatile var designDpi = 0
+        private set
+
+    /** [context] 가 앱이 맞춘 밀도([designDpi])로 그려지는가. 아니면 기기가 덮어쓴 것이다(BOOX 앱 최적화의 앱별 DPI 등). */
+    fun densityApplied(context: Context): Boolean = designDpi <= 0 || context.resources.displayMetrics.densityDpi == designDpi
 
     /**
      * 글자 배율(설정 › 글자 · 간격, [HomePrefs.textScalePercent]). 모든 글자는 [setSp]·[spf] 로 이 배율을 곱해 그린다.
@@ -52,6 +62,24 @@ object Ui {
 
     /** 줄 간격 배율(설정 › 글자 · 간격, [HomePrefs.rowScalePercent]). 목록·메뉴 줄 높이를 [rowDp] 로 이 배율만큼 늘리고 줄인다. */
     @Volatile var rowScale = 1f
+
+    /**
+     * 켜져 있으면 [setSp]·[spf] 가 글자 배율·기기 글꼴 크기 없이 기준 크기(sp 값 그대로 dp)로 만든다.
+     * 홈처럼 틀 높이를 글자 설정과 상관없이 고정하는 곳에서 그 높이를 잴 때만 켠다([atBaseText]).
+     */
+    @Volatile var baseText = false
+        private set
+
+    /** [block] 동안 [baseText] 를 켠다(그 안에서 만든 글자는 기준 크기) */
+    fun <T> atBaseText(block: () -> T): T {
+        val was = baseText
+        baseText = true
+        try {
+            return block()
+        } finally {
+            baseText = was
+        }
+    }
 
     /**
      * 바형(휴대폰 모양) 화면인가: 긴 변 ÷ 짧은 변이 [TALL_RATIO] 이상. 리더는 1.33~1.36, 바형은 1.67(Mudita Kompakt)~2.0(Tango·Palma 등).
@@ -112,10 +140,11 @@ fun Context.rowDp(v: Number): Int = dp(v.toFloat() * Ui.rowScale)
 
 /** 글자 크기 [sp](페블 기준 값) × [Ui.textScale] 를 기기 글꼴 크기대로 바꾼 크기(px). 직접 그리는 글자에 쓴다. */
 fun Context.spf(sp: Float): Float =
-    TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp * Ui.textScale, resources.displayMetrics)
+    if (Ui.baseText) dpf(sp) else TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp * Ui.textScale, resources.displayMetrics)
 
-/** 글자 크기를 [sp](페블 기준 값) × [Ui.textScale] 로(기기 글꼴 크기는 안드로이드가 곱한다). */
-fun TextView.setSp(sp: Float) = setTextSize(TypedValue.COMPLEX_UNIT_SP, sp * Ui.textScale)
+/** 글자 크기를 [sp](페블 기준 값) × [Ui.textScale] 로(기기 글꼴 크기는 안드로이드가 곱한다). [Ui.baseText] 면 기준 크기. */
+fun TextView.setSp(sp: Float) =
+    if (Ui.baseText) setTextSize(TypedValue.COMPLEX_UNIT_DIP, sp) else setTextSize(TypedValue.COMPLEX_UNIT_SP, sp * Ui.textScale)
 
 /**
  * 키운 글자([Ui.textScale])가 폭 [widthPx] 에서 [TextView.getMaxLines] 줄을 넘으면 1dp 씩 줄인다. 배율 100% 크기 아래로는 줄이지 않는다
@@ -264,6 +293,25 @@ class StampedRow(context: Context, private val sizeDp: Int, private val endDp: I
             context.resources, R.drawable.stamp_completed, BitmapFactory.Options().apply { inScaled = false },
         ).also { bitmap = it }
     }
+}
+
+/**
+ * 세로로 쌓되 칸 높이 안에 다 들어가는 자식만 그린다(위에서부터. 아래 끝에 걸치거나 넘친 자식은 그리지 않는다).
+ * 홈처럼 틀 높이를 고정하고 글자만 키우는 곳에서 반쯤 잘린 줄이 보이지 않게 한다.
+ * 자식은 높이 제한 없이 재서(남은 높이로 줄여 재면 글자가 칸 끝에서 잘린 채 그려진다) 다 들어가는지 본다.
+ */
+class FitColumn(context: Context) : LinearLayout(context) {
+    init {
+        orientation = VERTICAL
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
+        setMeasuredDimension(measuredWidth, resolveSize(measuredHeight, heightMeasureSpec))
+    }
+
+    override fun drawChild(canvas: Canvas, child: View, drawingTime: Long): Boolean =
+        child.bottom <= height - paddingBottom && super.drawChild(canvas, child, drawingTime)
 }
 
 /** 그림 한 장(앱 아이콘 등) */

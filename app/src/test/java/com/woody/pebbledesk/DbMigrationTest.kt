@@ -22,6 +22,18 @@ class DbMigrationTest {
     private fun SQLiteDatabase.columns(table: String) = rows("PRAGMA table_info($table)") { it.getString(1) }
     private fun SQLiteDatabase.count(sql: String) = rows(sql) { it.getLong(0) }.single()
 
+    /** 표마다 칸 이름(안드로이드·SQLite 자체 표는 빼고) */
+    private fun SQLiteDatabase.schema(): Map<String, List<String>> =
+        rows("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'android_metadata' ORDER BY name") { it.getString(0) }
+            .associateWith { columns(it) }
+
+    @Test fun `v1·v2 에서 올린 표가 새로 설치한 표와 같다(Libby 읽는 화면 viewer_mark 포함)`() {
+        val fresh = SQLiteDatabase.create(null).apply { Db.create(this) }.schema()
+        assertEquals(listOf("at", "pkg", "shown"), fresh["viewer_mark"])
+        assertEquals(fresh, v1().apply { Db.upgrade(this, 1) }.schema())
+        assertEquals(fresh, v2().apply { Db.upgrade(this, 2) }.schema())
+    }
+
     @Test fun `v2 에서 올리면 감상은 마지막 완독 회차로 옮기고 완독한 적 없는 책의 감상은 그대로`() {
         val db = v2().apply {
             execSQL("INSERT INTO shelf VALUES (0, 'b-reread', '다시 읽는 책', '', NULL, 1000, 20, -1, '')")

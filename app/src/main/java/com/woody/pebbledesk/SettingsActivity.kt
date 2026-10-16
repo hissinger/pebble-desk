@@ -416,6 +416,8 @@ class SettingsActivity : EinkActivity() {
             R.string.guide_yes24ebook to null,
             R.string.guide_moon to R.string.guide_moon_desc,
             R.string.guide_kindle to R.string.guide_kindle_desc,
+            R.string.guide_libby to R.string.guide_libby_desc,
+            R.string.guide_neo to R.string.guide_neo_desc,
         )
         val blocks = mutableListOf(
             PagedBlocks.Block(listOf(para(R.string.guide_intro, 12, 4))),
@@ -423,7 +425,7 @@ class SettingsActivity : EinkActivity() {
             PagedBlocks.Block(listOf(para(R.string.guide_cover_note, 4, 12))),
             PagedBlocks.Block(listOf(
                 sectionView(getString(R.string.guide_apps)),
-                text(apps.joinToString("  ·  ") { getString(it.first) }, 18f, Ui.bold, lines = 3).apply {
+                text(apps.joinToString("  ·  ") { getString(it.first) }, 18f, Ui.bold, lines = 6).apply {
                     setLineSpacing(0f, 1.2f)
                     setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(10))
                 },
@@ -436,7 +438,7 @@ class SettingsActivity : EinkActivity() {
             if (i == 0) views += sectionView(getString(R.string.guide_limits))
             views += hline(1, Ui.DIVIDER)
             views += text(getString(name), 19f, Ui.bold).apply { setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), 0) }
-            views += text(getString(desc), 17f, color = Ui.GRAY, lines = 3).apply {
+            views += text(getString(desc), 17f, color = Ui.GRAY, lines = 5).apply {
                 setPadding(dp(Ui.MARGIN), dp(2), dp(Ui.MARGIN), dp(8))
             }
             if (i == limited.lastIndex) views += hline(1, Ui.DIVIDER)
@@ -452,12 +454,14 @@ class SettingsActivity : EinkActivity() {
     }
 
     /**
-     * 자동 추가 창: 무엇을 읽는지 + `접근성 설정 열기`. 안드로이드 13+ 이면 늘 `앱 정보 열기` 도 두고,
+     * 자동 추가 창: 무엇을 읽는지 + `접근성 설정 열기`. 안드로이드 13+ 이면 `앱 정보 열기` 도 두고,
      * 꺼져 있으면([watching] 이 false) 허용이 안 보일 때 안내(BOOX Leaf2)와 13+ 의 제한된 설정 안내를 설명 아래 단락으로 붙인다.
+     * 서비스가 한 번이라도 연결된 적이 있으면(이미 켜 본 것. 제한된 설정도 풀려 있다) 두 안내와 `앱 정보 열기` 는 두지 않는다.
      */
     private fun autoBooksSheet(watching: Boolean) {
-        val restricted = ReaderWatchService.mayBeRestricted
-        val hints = if (watching) emptyList() else listOfNotNull(R.string.allow_hint, R.string.restricted_hint.takeIf { restricted })
+        val turnedOnBefore = ReaderWatchService.lifeLog(this).first > 0
+        val restricted = ReaderWatchService.mayBeRestricted && !turnedOnBefore
+        val hints = if (watching || turnedOnBefore) emptyList() else listOfNotNull(R.string.allow_hint, R.string.restricted_hint.takeIf { restricted })
         val desc = (listOf(R.string.auto_books_desc) + hints).joinToString("\n\n") { getString(it) }
         val sheet = Sheet(this).header(getString(R.string.auto_books), desc)
             .item(getString(R.string.open_accessibility), bold = true) { ReaderWatchService.openSettings(this) }

@@ -8,8 +8,8 @@ import android.view.accessibility.AccessibilityNodeInfo
  * 책장의 묶음 칸은 진행률 줄을 감춘다. 홈 탭의 '최근 목록' 줄은 표지만 있어(누르면 빈 알림) 읽는 화면 메뉴의 제목(`txtTitle`)으로 안다.
  * 읽는 화면(본문은 직접 그리는 뷰라 글자가 드러나지 않는다) 아래 상태 줄 오른쪽 `statusRight` 에 진행률(`30.9%`, 설정에 따라
  * `12/300`), 메뉴에 `txtTextViewPercent`(`30%`). 상태 줄 가운데(`statusMiddle`, `2장 (5/8)`)는 장 안의 쪽이라 쓰지 않는다.
- * 유료판(`com.flyersoft.moonreaderp`)은 같은 코드로 만든 앱이지만 화면 클래스도 그 패키지 아래에 있다(`com.flyersoft.moonreaderp.ActivityMain`·
- * `ActivityTxt`, 에뮬에서 확인). 그래서 화면 이름은 패키지 이름으로 만든다.
+ * 유료판(`com.flyersoft.moonreaderp`)은 같은 코드로 만든 앱이라 요소 이름은 같고, 화면 클래스도 그 패키지 아래에 있다
+ * (`com.flyersoft.moonreaderp.ActivityMain`·`ActivityTxt`, 10.7).
  */
 open class MoonReaderSpec(pkg: String) : ReaderSpec(
     pkg = pkg, classPrefix = pkg,
@@ -27,14 +27,11 @@ open class MoonReaderSpec(pkg: String) : ReaderSpec(
      * TXT·HTML 등은 파일 이름(`이름.txt`)이라 확장자만 뗀다(`저자 - 제목.txt` 같은 파일 이름은 나누지 않는다).
      */
     override fun splitTitle(text: String): Pair<String, String> {
-        BOOK_FILE.find(text)?.let { return text.substring(0, it.range.first) to "" }
+        withoutBookFile(text).takeIf { it != text }?.let { return it to "" }
         val i = text.lastIndexOf(" - ")
         return if (i > 0) text.substring(0, i).trim() to text.substring(i + 3).trim() else text to ""
     }
 }
-
-/** 파일로 연 책의 확장자(메뉴 제목이 파일 이름일 때 뗀다) */
-private val BOOK_FILE = Regex("""\.(txt|html?|xhtml|mht|mhtml|md|rtf|docx|odt|fb2(\.zip)?|chm|epub|mobi|azw3?|pdf|djvu|cbz|cbr|zip)$""", RegexOption.IGNORE_CASE)
 
 /** 무료판 */
 object MoonReader : MoonReaderSpec("com.flyersoft.moonreader")

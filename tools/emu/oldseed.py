@@ -204,6 +204,8 @@ def check(kind, path):
     want_rev = {"b-p2": (6, "모모의 시간")} if kind == "v2" else {}
     expect("남은 감상(완독한 적 없는 책만)", dict((i, (s, t)) for i, s, t in q("SELECT book_id, stars, text FROM review")), want_rev)
     expect("다시 읽는 중(완독한 적 있는 읽고 있는 책)", q("SELECT book_id, day FROM round_start"), [("b-s2", None)])
+    expect("Libby 읽는 화면 표 viewer_mark(빈 채)", ([r[1] for r in q("PRAGMA table_info(viewer_mark)")], q("SELECT count(*) FROM viewer_mark")[0][0]), (["at", "pkg", "shown"], 0))
+    expect("DB 버전", q("PRAGMA user_version")[0][0], 3)
     # 칸 전체(날·앱·제목·책 id)를 키로 센다(책 id 만 다른 줄이 더 생겨도 덮이지 않게)
     rows = [r for r in q("SELECT day, pkg, title, book_id, ms FROM reading_day") if r[0] < ep(TODAY)]
     want_rd = {

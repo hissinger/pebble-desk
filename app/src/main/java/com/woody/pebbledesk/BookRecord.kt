@@ -1,6 +1,7 @@
 package com.woody.pebbledesk
 
 import android.content.Context
+import com.woody.pebbledesk.readers.ReaderApps
 import java.time.LocalDate
 
 /**
@@ -193,7 +194,9 @@ class BookRecord(
                 reading[k.book]?.let { b -> return acc.getOrPut(b.id) { Acc(b, State.READING, false) } }
                 left[k.book]?.let { p -> return acc.getOrPut(p.book.id) { Acc(p.book, State.PAST, p.hidden) } }
                 // 책을 모르는 시간(목록에 없던 책). 있어서는 안 되지만 어디에도 없는 책 id 의 시간도 다른 책에 붙이지 않고 여기로.
-                val app = apps.firstOrNull { it.pkg == k.pkg }?.key
+                // 실행 화면이 없는 이북 앱(네오리더)은 그 책들이 있는 서재 앱으로.
+                val appPkg = ReaderApps.byPackage[k.pkg]?.appPkg ?: k.pkg
+                val app = apps.firstOrNull { it.pkg == appPkg }?.key
                 val id = titleOnlyId(k.title)
                 return acc.getOrPut(id) { Acc(ShelfBook(id, k.title, "", app, 0), State.TITLE_ONLY, false) }
             }
