@@ -61,7 +61,7 @@ data class DeviceStatus(
  *              10월 3일 토요일 · 100% · 와이파이 · BT · 조명 · ⑮
  * 안드로이드 상단바 대신 쓰므로 시계·배터리·와이파이 등을 직접 그린다.
  */
-class TopBarView(context: Context) : View(context) {
+class TopBarView(context: Context, private val fixedFrame: Boolean = true) : View(context) {
     private val logo: Drawable? = Crema.logo(context)
     private val clockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Ui.regular
@@ -129,6 +129,7 @@ class TopBarView(context: Context) : View(context) {
     /**
      * 높이는 글자 100%·기기 글꼴 100% 일 때로 고정한다(홈 틀이 글자 설정에 따라 움직이지 않게).
      * 키운 글자는 위 여백·줄 사이·아래 여백을 [MIN_PAD_DP] 까지 줄여 받고, 그래도 들지 않으면 상태 줄을 그리지 않는다(반쯤 잘린 줄을 보이지 않게).
+     * [fixedFrame] 이 false 면(기기가 앱의 밀도를 덮어씀) 고정하지 않고 글자 크기대로 높이를 잡는다(글자를 줄여 홈을 맞출 수 있게).
      */
     private val fixedHeight: Int
     private var drawPadTop = padTop
@@ -139,7 +140,8 @@ class TopBarView(context: Context) : View(context) {
         val baseStatus = Paint(statusPaint).apply { textSize = context.dpf(STATUS_SP) }
         val textOf = { clock: Int, paint: Paint -> clock + capHeight(paint) + paint.fontMetricsInt.descent }
         fixedHeight = padTop + lineGap + padBottom +
-            textOf(capHeight(Paint(clockPaint).apply { textSize = context.dpf(CLOCK_SP) }), baseStatus)
+            if (fixedFrame) textOf(capHeight(Paint(clockPaint).apply { textSize = context.dpf(CLOCK_SP) }), baseStatus)
+            else textOf(clockCap, statusPaint)
         val room = fixedHeight - textOf(clockCap, statusPaint)
         val full = padTop + lineGap + padBottom
         val min = context.dp(MIN_PAD_DP)

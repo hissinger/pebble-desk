@@ -57,6 +57,7 @@
     <string name="device_screen">Screen</string>
     <string name="device_screen_app">App uses</string>
     <string name="device_screen_basis">from %s</string>
+    <string name="device_screen_wanted">intended %1$ddpi not applied</string>
     <string name="device_kind_crema">Crema</string>
     <string name="device_kind_meebook">Meebook</string>
     <string name="device_kind_other">Other</string>
@@ -208,6 +209,10 @@
     <string name="auto_books_short">Auto-add</string>
     <string name="auto_books_desc">When you open a book in an e-book app, it goes to the top of your reading list. Only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, are read; book text and other apps are never seen. Turn on Pebble Desk in Accessibility.</string>
     <string name="open_accessibility">Open Accessibility</string>
+    <string name="dont_show_again">Don\'t show again</string>
+    <string name="density_changed_title">Screen looks enlarged</string>
+    <string name="density_changed_desc">Pebble Desk\'s screen DPI has been changed to %1$d. Everything looks larger and part of the home screen won\'t fit.\n\nTo fix: set Pebble Desk\'s DPI to %2$d in the device settings.</string>
+    <string name="density_changed_desc_boox">Pebble Desk\'s screen DPI has been changed to %1$d. Everything looks larger and part of the home screen won\'t fit.\n\nTo fix: long-press the Pebble Desk icon in the app list, open Optimize, and set DPI to %2$d or turn optimization off.</string>
     <string name="progress_pct">%1$d%% read</string>
     <string name="due_days">Due in %1$d days</string>
     <string name="due_today">Due today</string>

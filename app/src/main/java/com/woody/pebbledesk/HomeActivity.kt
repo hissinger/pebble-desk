@@ -1,5 +1,6 @@
 package com.woody.pebbledesk
 
+import android.app.Dialog
 import android.bluetooth.BluetoothAdapter
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -29,6 +30,17 @@ import android.widget.TextView
 /** ① 홈: 맨 위 두 줄 · 지금 읽는 책과 읽고 있는 앱 · 자주 쓰는 앱 · 하단 줄 */
 class HomeActivity : EinkActivity() {
     private lateinit var topBar: TopBarView
+    /**
+     * 홈 틀(상단·책 자리·함께 읽는 책 줄·자주 쓰는 앱)을 글자 · 간격 설정과 상관없이 고정하는가. 기기가 앱의 밀도를 덮어써
+     * 화면이 작아졌으면(BOOX 앱 최적화의 앱별 DPI) 고정하지 않고 글자 · 간격대로 잡는다(글자를 줄여 함께 읽는 책 줄을 맞출 수 있게).
+     */
+    private val fixedFrame by lazy { Ui.densityApplied(this) }
+
+    /** 틀 높이를 잴 때: 고정이면 기준 크기 글자로, 아니면 지금 글자대로 */
+    private fun <T> frameText(block: () -> T): T = if (fixedFrame) Ui.atBaseText(block) else block()
+
+    /** 글자 칸 묶음: 틀을 고정하면 다 들지 않는 줄을 그리지 않는다([FitColumn]). 고정하지 않으면 1.5.3 까지와 같다. */
+    private fun column(): LinearLayout = if (fixedFrame) FitColumn(this) else vbox()
     /** 읽고 있는 책 자리. 자주 쓰는 앱 높이가 고정이라 남는 높이를 모두 차지하고, 책이 한 권이면 표지가 그만큼 커진다. */
     private lateinit var hero: FrameLayout
     private var heroHeight = 0
@@ -67,8 +79,29 @@ class HomeActivity : EinkActivity() {
         refresh()
         // 읽은 시간은 다른 앱에서 돌아올 때만 바뀐다(레이아웃 때의 refresh 에서는 다시 세지 않는다).
         updateReading()
-        OnboardingActivity.showOnce(this, prefs)
+        if (!OnboardingActivity.showOnce(this, prefs)) warnDensity()
         Device.keepBooxLauncher(this)
+    }
+
+    /** 떠 있는 '화면이 크게 보입니다' 창(홈에 돌아올 때마다 하나만) */
+    private var densityDialog: Dialog? = null
+
+    /**
+     * 앱이 맞춘 밀도([Ui.designDpi])가 먹히지 않고 기기가 정한 밀도로 그려지면(BOOX 앱 최적화의 앱별 DPI 등) 홈에 돌아올 때마다 알린다.
+     * 화면 전체가 크게 보이고 홈의 함께 읽는 책 줄이 들지 않을 수 있다. 바꾸는 곳이 기기마다 달라 안내만 한다(BOOX 는 그 방법을 적는다).
+     * `다시 보지 않기` 를 누르면 그 값(`지금/맞출 값`)으로는 다시 알리지 않는다.
+     */
+    private fun warnDensity() {
+        val actual = resources.displayMetrics.densityDpi
+        val pair = "$actual/${Ui.designDpi}"
+        if (fixedFrame || prefs.densityWarnSkip == pair || densityDialog?.isShowing == true) return
+        val desc = getString(
+            if (Device.hasBooxLauncher(this)) R.string.density_changed_desc_boox else R.string.density_changed_desc,
+            actual, Ui.designDpi,
+        )
+        densityDialog = Sheet(this).header(getString(R.string.density_changed_title), desc).centered()
+            .item(getString(R.string.dont_show_again)) { prefs.densityWarnSkip = pair }
+            .show()
     }
 
     /**
@@ -157,7 +190,7 @@ class HomeActivity : EinkActivity() {
                 super.dispatchDraw(canvas)
             }
         }.apply { orientation = LinearLayout.VERTICAL }
-        topBar = TopBarView(this).apply { setOnClickListener { Device.openQuickSettings(this@HomeActivity) } }
+        topBar = TopBarView(this, fixedFrame).apply { setOnClickListener { Device.openQuickSettings(this@HomeActivity) } }
         root.addView(topBar, lp(MATCH, WRAP))
 
         hero = FrameLayout(this)
@@ -182,7 +215,7 @@ class HomeActivity : EinkActivity() {
             addView(favPage, lp(WRAP, MATCH))
         }
         favLine = hline(1)
-        favRows = PagedRows(this, dp(Ui.ROW_DP), fixedRows = FAV_ROWS).apply { header = listOf(favHeader, favLine) }
+        favRows = PagedRows(this, if (fixedFrame) dp(Ui.ROW_DP) else rowDp(Ui.ROW_DP), fixedRows = FAV_ROWS).apply { header = listOf(favHeader, favLine) }
         favPage.pagesClick(favRows)
         root.addView(favRows, lp(MATCH, WRAP))
 
@@ -290,7 +323,7 @@ class HomeActivity : EinkActivity() {
      * 글자를 아래(선 쪽)에 붙여, 키운 글자는 위 여백([topDp])으로 자란다.
      */
     private fun sectionTitle(title: String, topDp: Int) = text(title, 13f, Ui.bold, Ui.GRAY).apply {
-        val baseH = Ui.atBaseText { text(title, 13f, Ui.bold).run { measure(0, 0); measuredHeight } }
+        val baseH = frameText { text(title, 13f, Ui.bold).run { measure(0, 0); measuredHeight } }
         layoutParams = lp(MATCH, dp(topDp) + baseH + dp(8))
         gravity = Gravity.BOTTOM
         setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), dp(8))
@@ -341,7 +374,7 @@ class HomeActivity : EinkActivity() {
                         gravity = Gravity.TOP
                         setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), 0)
                         books.drop(1).forEachIndexed { i, book ->
-                            addView(smallBook(book, coverW, measureOnly), lp(0, if (measureOnly) WRAP else MATCH, 1f).apply { if (i > 0) marginStart = dp(GAP_DP) })
+                            addView(smallBook(book, coverW, measureOnly), lp(0, if (measureOnly || !fixedFrame) WRAP else MATCH, 1f).apply { if (i > 0) marginStart = dp(GAP_DP) })
                         }
                         // 두 권·세 권일 때도 표지 폭이 같도록 빈 칸을 채운다.
                         repeat(BookShelf.HOME - books.size) { addView(View(context), lp(0, 1, 1f).apply { marginStart = dp(GAP_DP) }) }
@@ -358,19 +391,23 @@ class HomeActivity : EinkActivity() {
                 val alsoW = if (Ui.tallScreen) {
                     // 바형은 세로가 남아 함께 읽는 책 표지를 키우되, 큰 표지와 크기 차이가 나게 그 [SMALL_COVER_RATIO] 배로 둔다
                     // (100dp ~ 칸 폭). 표지 말고 줄 높이(제목·앱·진행률)는 표지 크기와 상관없으니, 남는 높이를 두 표지에 그 비율로 나눈다.
-                    val textPart = Ui.atBaseText { alsoRow(dp(SMALL_COVER_DP * 2), measureOnly = true).measuredIn() } - (dp(SMALL_COVER_DP * 2) * 3 / 2 + dp(2))
+                    val textPart = frameText { alsoRow(dp(SMALL_COVER_DP * 2), measureOnly = true).measuredIn() } - (dp(SMALL_COVER_DP * 2) * 3 / 2 + dp(2))
                     val room = heroHeight - dp(heroPad) - dp(HERO_PAD_BOTTOM_DP) - textPart - dp(4)
                     val mainW = minOf(dp(COVER_MAX_DP), (room / (1.5f * (1 + SMALL_COVER_RATIO))).toInt())
                     val cellW = (hero.width - 2 * dp(Ui.MARGIN) - (BookShelf.HOME - 2) * dp(GAP_DP)) / (BookShelf.HOME - 1) - dp(2)
                     minOf(maxOf((mainW * SMALL_COVER_RATIO).toInt(), dp(SMALL_COVER_DP * 2)), cellW)
                 } else dp(SMALL_COVER_DP)
-                val alsoH = Ui.atBaseText { alsoRow(alsoW, measureOnly = true).measuredIn() }
+                val alsoH = frameText { alsoRow(alsoW, measureOnly = true).measuredIn() }
                 val main = mainBook(books.first(), reading, coverWidth(reserved = alsoH, min = COVER_SMALLER_DP))
                 // 책 자리에 남는 높이(아래 여백, 바형은 표지가 가장 커도 남는 높이)도 함께 읽는 책 줄에 준다(키운 글자가 더 든다. 틀 위치는 같다).
                 // 화면이 낮아 맨 앞 책 표지가 가장 작아도 함께 읽는 책 줄이 다 들지 않으면 그 줄을 그리지 않는다.
-                FitColumn(this@HomeActivity).apply {
+                // 틀을 고정하지 않으면(기기가 밀도를 덮어씀) 1.5.3 까지처럼 그대로 쌓는다(넘치면 책 자리 끝에서 잘린다).
+                if (fixedFrame) FitColumn(this@HomeActivity).apply {
                     addView(main)
                     addView(alsoRow(alsoW), lp(MATCH, maxOf(alsoH, heroHeight - main.measuredIn())))
+                } else vbox().apply {
+                    addView(main)
+                    addView(alsoRow(alsoW))
                 }
             }
         }
@@ -454,7 +491,7 @@ class HomeActivity : EinkActivity() {
         val coverH = coverW * 3 / 2
         addView(coverView(book, coverW), lp(coverW + dp(2), coverH + dp(2)))
         // 칸 높이는 표지 높이. 키운 글자가 다 들지 않으면 아래 줄부터 그리지 않는다.
-        val info = FitColumn(context)
+        val info = column()
         // 글자를 키웠을 때 긴 제목이 두 줄에서 잘리지 않게 줄인다(옆 칸 폭: 화면 − 좌우 여백 − 표지 − 사이).
         val infoW = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - (coverW + dp(2)) - dp(24)
         info.addView(text(book.title, 34f, Ui.heavy, Palette.current.title(Palette.Area.HOME), lines = 2).apply { fitLines(34f, infoW) }, lp(MATCH, WRAP).apply { topMargin = dp(10) })
@@ -485,7 +522,7 @@ class HomeActivity : EinkActivity() {
     private fun smallBook(book: ShelfBook, w: Int, measureOnly: Boolean = false): View = (if (Ui.tallScreen) vbox() else hbox()).apply {
         gravity = if (Ui.tallScreen) Gravity.CENTER_HORIZONTAL else Gravity.TOP
         addView(if (measureOnly) View(context) else coverView(book, w), lp(w + dp(2), w * 3 / 2 + dp(2)))
-        val info = FitColumn(context)
+        val info = column()
         info.addView(text(book.title, 16f, Ui.bold, lines = 2))
         book.app?.let(::findApp)?.let {
             info.addView(text(it.label, 13f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = dp(4) })
@@ -494,8 +531,8 @@ class HomeActivity : EinkActivity() {
         if (Ui.tallScreen) addView(info.apply {
             gravity = Gravity.CENTER_HORIZONTAL
             for (i in 0 until childCount) (getChildAt(i) as? TextView)?.gravity = Gravity.CENTER_HORIZONTAL
-        }, (if (measureOnly) lp(MATCH, WRAP) else lp(MATCH, 0, 1f)).apply { topMargin = dp(10) })
-        else addView(info, lp(0, if (measureOnly) WRAP else MATCH, 1f).apply { marginStart = dp(10) })
+        }, (if (measureOnly || !fixedFrame) lp(MATCH, WRAP) else lp(MATCH, 0, 1f)).apply { topMargin = dp(10) })
+        else addView(info, lp(0, if (measureOnly || !fixedFrame) WRAP else MATCH, 1f).apply { marginStart = dp(10) })
         setOnClickListener {
             BookShelf.moveToFront(this@HomeActivity, book.id)
             openBook(book)

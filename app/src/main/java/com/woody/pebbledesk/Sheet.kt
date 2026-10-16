@@ -3,6 +3,7 @@ package com.woody.pebbledesk
 import android.app.Dialog
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.drawable.GradientDrawable
 import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
@@ -41,6 +42,11 @@ class Sheet(private val context: Context) {
     private var locked = false
 
     fun locked() = apply { locked = true; closeRow = false }
+
+    /** 아래에 붙이지 않고 화면 가운데에 띄운다(테두리를 두르고 좌우를 띄운다). 놓치면 안 되는 안내(화면 크기가 바뀌어 있음). */
+    private var centered = false
+
+    fun centered() = apply { centered = true }
 
     /** 머리와 항목 사이에 두는 칸(책 상세의 회차별 기록·별점 칸). 칸마다 위에 옅은 선, 화면 폭으로(좌우 여백 안). [onClick] 이 있으면 칸 전체를 누를 수 있다. */
     private class Note(val view: View, val onClick: (() -> Unit)?)
@@ -85,8 +91,13 @@ class Sheet(private val context: Context) {
             dialog.dismiss(); action()
         }
         val root = c.vbox()
-        Crema.reserveHiddenBottom(root)
-        root.addView(c.hline(2, inset = false))
+        if (centered) {
+            // 가운데에 뜨면 아래가 가려지지 않는다. 위에 굵은 선 대신 둘레에 테두리.
+            root.background = GradientDrawable().apply { setColor(android.graphics.Color.WHITE); setStroke(c.dp(2), Ui.BLACK) }
+        } else {
+            Crema.reserveHiddenBottom(root)
+            root.addView(c.hline(2, inset = false))
+        }
         // 머리와 칸들을 한 묶음에 넣는다(정보 바탕을 칠할 때 도장이 넘친 자리까지 같은 바탕이게).
         val info = c.vbox()
         paper?.let { info.setBackgroundColor(it) }
@@ -215,8 +226,9 @@ class Sheet(private val context: Context) {
 
         dialog.setContentView(root)
         dialog.window?.apply {
-            setGravity(Gravity.BOTTOM)
-            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setGravity(if (centered) Gravity.CENTER else Gravity.BOTTOM)
+            val width = if (centered) context.resources.displayMetrics.widthPixels - context.dp(Ui.MARGIN) * 2 else ViewGroup.LayoutParams.MATCH_PARENT
+            setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
             decorView.setPadding(0, 0, 0, 0)
             // 입력 줄이 있으면 키보드를 띄우고, 메뉴가 키보드 위로 올라오게 한다.
             if (input != null) setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)

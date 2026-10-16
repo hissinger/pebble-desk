@@ -86,6 +86,11 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean(KEY_ENGLISH, false)
         set(v) = sp.edit().putBoolean(KEY_ENGLISH, v).apply()
 
+    /** '화면이 크게 보입니다' 창에서 `다시 보지 않기` 를 누른 때의 밀도(`지금/맞출 값`, 예: `350/300`). 값이 바뀌면 다시 알린다. */
+    var densityWarnSkip: String?
+        get() = sp.getString("density_warn_skip", null)
+        set(v) = sp.edit().putString("density_warn_skip", v).apply()
+
     /** 자주 쓰는 앱을 격자(아이콘 아래 이름, 한 줄에 4개)로. false 면 목록 */
     var favGrid: Boolean
         get() = sp.getBoolean("fav_grid", false)

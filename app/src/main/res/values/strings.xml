@@ -60,6 +60,7 @@
     <string name="device_screen">화면</string>
     <string name="device_screen_app">앱 기준</string>
     <string name="device_screen_basis">%s 로 셈</string>
+    <string name="device_screen_wanted">맞출 값 %1$ddpi 가 적용되지 않음</string>
     <string name="device_kind_crema">크레마</string>
     <string name="device_kind_meebook">메이북</string>
     <string name="device_kind_other">기타</string>
@@ -211,6 +212,10 @@
     <string name="auto_books_short">자동 추가</string>
     <string name="auto_books_desc">이북 앱에서 책을 펴면 그 책을 읽고 있는 책 맨 위에 넣습니다. 서재·검색 화면의 책 제목·저자·진행률·반납일과 표지, 읽는 화면의 책 제목·진행률만 읽고 본문과 다른 앱 화면은 보지 않습니다. 안드로이드 접근성에서 Pebble Desk 를 켜 주세요.</string>
     <string name="open_accessibility">접근성 설정 열기</string>
+    <string name="dont_show_again">다시 보지 않기</string>
+    <string name="density_changed_title">화면이 크게 보입니다</string>
+    <string name="density_changed_desc">Pebble Desk 의 화면 DPI 가 %1$d 로 바뀐 것을 감지했습니다. 이대로면 화면이 크게 보이고 홈의 일부가 보이지 않습니다.\n\n고치는 방법: 기기 설정에서 Pebble Desk 의 DPI 를 %2$d 로 바꿔 주세요.</string>
+    <string name="density_changed_desc_boox">Pebble Desk 의 화면 DPI 가 %1$d 로 바뀐 것을 감지했습니다. 이대로면 화면이 크게 보이고 홈의 일부가 보이지 않습니다.\n\n고치는 방법: 앱 목록에서 Pebble Desk 아이콘을 길게 눌러 최적화를 열고, DPI 를 %2$d 로 바꾸거나 최적화를 꺼 주세요.</string>
     <string name="progress_pct">%1$d%% 읽음</string>
     <string name="due_days">반납 %1$d일 남음</string>
     <string name="due_today">오늘 반납</string>

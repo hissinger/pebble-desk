@@ -262,13 +262,14 @@ class OnboardingActivity : EinkActivity() {
         /**
          * 홈에서 부른다. 아직 띄운 적이 없고(잠금이 풀린 뒤) 두 기능 중 하나라도 시스템에서 꺼져 있으면 한 번 띄운다.
          * 둘 다 이미 켜져 있으면 띄우지 않고 띄운 것으로 친다(나중에 꺼도 다시 나오지 않는다). 띄우는 순간 적어 두 번 뜨지 않게 하고,
-         * 시스템 설정에 갔다가 홈 버튼으로 나가도 다시 띄우지 않는다(설정 › 독서에 같은 것이 있다).
+         * 시스템 설정에 갔다가 홈 버튼으로 나가도 다시 띄우지 않는다(설정 › 독서에 같은 것이 있다). 띄웠으면 true.
          */
-        fun showOnce(activity: Activity, prefs: HomePrefs) {
-            if (prefs.onboarded || !Storage.isUnlocked(activity)) return
+        fun showOnce(activity: Activity, prefs: HomePrefs): Boolean {
+            if (prefs.onboarded || !Storage.isUnlocked(activity)) return false
             prefs.onboarded = true
-            if (ReaderWatchService.isEnabled(activity) && ReadingLog.hasAccess(activity)) return
+            if (ReaderWatchService.isEnabled(activity) && ReadingLog.hasAccess(activity)) return false
             activity.startActivity(Intent(activity, OnboardingActivity::class.java))
+            return true
         }
 
         /** 예시 책 표지. 직접 그리는 그림이라 크레마 화면 대비만큼 미리 밝힌다(홈 표지와 같다). */

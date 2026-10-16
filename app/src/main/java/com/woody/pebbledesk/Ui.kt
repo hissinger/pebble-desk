@@ -35,8 +35,18 @@ object Ui {
         densityBasis = "${dm.widthPixels}×${dm.heightPixels}"
         val shortPx = minOf(dm.widthPixels, dm.heightPixels)
         tallScreen = maxOf(dm.widthPixels, dm.heightPixels) >= shortPx * TALL_RATIO
-        return (shortPx * 160f / DESIGN_WIDTH_DP).roundToInt()
+        return (shortPx * 160f / DESIGN_WIDTH_DP).roundToInt().also { designDpi = it }
     }
+
+    /**
+     * 마지막으로 [designDensityDpi] 가 정한 밀도. 화면이 실제로 다른 밀도로 그려지면 기기가 앱의 밀도를 덮어쓴 것이다
+     * (BOOX 앱 최적화의 앱별 DPI. Poke3 에서 300 대신 350 → 490×662dp). 홈이 알리고 기기 정보가 보여 준다.
+     */
+    @Volatile var designDpi = 0
+        private set
+
+    /** [context] 가 앱이 맞춘 밀도([designDpi])로 그려지는가. 아니면 기기가 덮어쓴 것이다(BOOX 앱 최적화의 앱별 DPI 등). */
+    fun densityApplied(context: Context): Boolean = designDpi <= 0 || context.resources.displayMetrics.densityDpi == designDpi
 
     /**
      * 글자 배율(설정 › 글자 · 간격, [HomePrefs.textScalePercent]). 모든 글자는 [setSp]·[spf] 로 이 배율을 곱해 그린다.
