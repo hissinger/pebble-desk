@@ -241,13 +241,15 @@
     <string name="guide_moon_desc">Opened from a cover in the Home tab\'s recent row, open the menu while reading to add the book.</string>
     <string name="guide_kindle">Kindle</string>
     <string name="guide_kindle_desc">Books not yet downloaded, and progress while reading, come in only when you open the menu.\nThe grid library can\'t give covers of books you have read; open the list view once.</string>
+    <string name="guide_libby">Libby</string>
+    <string name="guide_libby_desc">Progress while reading comes in only when you open the menu. Covers come from the Shelf screen.\nReading time is counted only while auto-add is on.</string>
     <string name="guide_progress_note">For progress while reading, turn on the bottom info (page or progress) in the e-book app\'s viewer settings.</string>
     <string name="guide_cover_note">Covers are cut from the shelf screen. If a title or author is cut off, wrong or missing, long-press the book on the home screen to fix it.</string>
     <string name="edit_title">Edit title</string>
     <string name="add_author">Add author</string>
     <string name="edit_author">Edit author</string>
     <string name="save">Save</string>
-    <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, of Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi, YES24 (Library, my YES, eBook), Moon+ Reader and Kindle to fill your reading list. Book text and other apps are not seen, and nothing leaves the device.</string>
+    <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, of Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi, YES24 (Library, my YES, eBook), Moon+ Reader, Kindle and Libby to fill your reading list. Book text and other apps are not seen, and nothing leaves the device.</string>
     <string name="open_app_info">Open App info</string>
     <string name="allow_hint">If you can\'t see Allow, turn on the shortcut switch below.</string>
     <string name="restricted_hint">If Pebble Desk is greyed out in Accessibility (restricted setting), tap it once and close the notice first, then open App info › ⋮ at the top right › Allow restricted settings and turn it on again.</string>
