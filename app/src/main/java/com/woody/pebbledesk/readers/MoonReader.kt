@@ -27,14 +27,11 @@ open class MoonReaderSpec(pkg: String) : ReaderSpec(
      * TXT·HTML 등은 파일 이름(`이름.txt`)이라 확장자만 뗀다(`저자 - 제목.txt` 같은 파일 이름은 나누지 않는다).
      */
     override fun splitTitle(text: String): Pair<String, String> {
-        BOOK_FILE.find(text)?.let { return text.substring(0, it.range.first) to "" }
+        withoutBookFile(text).takeIf { it != text }?.let { return it to "" }
         val i = text.lastIndexOf(" - ")
         return if (i > 0) text.substring(0, i).trim() to text.substring(i + 3).trim() else text to ""
     }
 }
-
-/** 파일로 연 책의 확장자(메뉴 제목이 파일 이름일 때 뗀다) */
-private val BOOK_FILE = Regex("""\.(txt|html?|xhtml|mht|mhtml|md|rtf|docx|odt|fb2(\.zip)?|chm|epub|mobi|azw3?|pdf|djvu|cbz|cbr|zip)$""", RegexOption.IGNORE_CASE)
 
 /** 무료판 */
 object MoonReader : MoonReaderSpec("com.flyersoft.moonreader")

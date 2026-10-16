@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 읽는 책 자동 추가: 교보도서관·교보eBook(e-ink·휴대폰)·밀리의서재(e-ink·휴대폰)·알라딘·북커스·리디·YES24(전자도서관·my YES·eBook)·문리더·킨들·Libby 화면만 받는다(다른 앱은 시스템이 보내지 않음). -->
+<!-- 읽는 책 자동 추가: 교보도서관·교보eBook(e-ink·휴대폰)·밀리의서재(e-ink·휴대폰)·알라딘·북커스·리디·YES24(전자도서관·my YES·eBook)·문리더·킨들·Libby·네오리더 화면만 받는다(다른 앱은 시스템이 보내지 않음). -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:packageNames="kr.co.kyobobook.KEL,com.kyobo.ebook.eink,com.kyobo.ebook.common.b2c,kr.co.millie.eink,kr.co.aladin.ebook,com.bookers.ebook,com.initialcoms.ridi,com.ridi.books.onestore,com.yes24.ebook.einkstore,com.yes24.library.eink,com.flyersoft.moonreader,com.flyersoft.moonreaderp,com.yes24.ebook.fourth,kr.co.millie.millieshelf,com.amazon.kindle,com.overdrive.mobile.android.libby"
+    android:packageNames="kr.co.kyobobook.KEL,com.kyobo.ebook.eink,com.kyobo.ebook.common.b2c,kr.co.millie.eink,kr.co.aladin.ebook,com.bookers.ebook,com.initialcoms.ridi,com.ridi.books.onestore,com.yes24.ebook.einkstore,com.yes24.library.eink,com.flyersoft.moonreader,com.flyersoft.moonreaderp,com.yes24.ebook.fourth,kr.co.millie.millieshelf,com.amazon.kindle,com.overdrive.mobile.android.libby,com.onyx.kreader"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagReportViewIds|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"

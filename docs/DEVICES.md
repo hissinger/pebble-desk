@@ -484,6 +484,7 @@ jadx --no-res -d src/framework fs/system/system/framework/framework.jar
 ```
 
 - BOOX 런처는 `system/priv-app/kcb-release`(패키지 `com.onyx`). Onyx 가 더한 시스템 코드는 `framework.jar` 의 `android.onyx.*`.
+- 네오리더(BOOX 기본 리더)는 `system/app/kreader2-release`(패키지 `com.onyx.kreader`). 네이티브 라이브러리(`libneo_*`·`libonyx_*`)는 APK 밖 `system/lib64` 에 있어, 에뮬레이터에서 돌리려면 다시 서명하고 이것들을 APK 에 넣어야 한다. 문서를 열기 전 기기 검사도 따로 있다(docs/READER_APPS.md › 네오리더).
 
 ### 기종·버전별로 맞춰 본 것
 

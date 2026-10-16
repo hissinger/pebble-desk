@@ -66,6 +66,12 @@ internal fun authorName(text: String): String {
 /** 지은이 뒤의 `지음`·`저`(뒤에 옮긴이·출판사가 이어질 수 있다) */
 private val AUTHOR_ROLE = Regex("""\s+(지음|저)(?=\s*($|/|,))""")
 
+/** 파일로 연 책의 확장자(읽는 화면 제목이 파일 이름일 때 뗀다. 문리더·네오리더) */
+private val BOOK_FILE = Regex("""\.(txt|html?|xhtml|mht|mhtml|md|rtf|docx?|odt|fb2(\.zip)?|chm|epub|mobi|prc|azw3?|pdf|djvu|cbz|cbr|zip|caj)$""", RegexOption.IGNORE_CASE)
+
+/** `이름.epub` → `이름`(책 파일 확장자만 뗀다) */
+internal fun withoutBookFile(text: String): String = text.replace(BOOK_FILE, "")
+
 /** `47%` → 47, 소수(문리더 `30.9%`)는 버림. 없으면 -1 */
 internal fun percent(text: CharSequence): Int =
     Regex("""(\d{1,3})(?:[.,]\d+)?\s*%""").find(text)?.groupValues?.get(1)?.toInt()?.coerceIn(0, 100) ?: -1

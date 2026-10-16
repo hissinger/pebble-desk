@@ -19,6 +19,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 문리더 `com.flyersoft.moonreader`(유료판 `com.flyersoft.moonreaderp`. 내 파일, DRM 없음) | `ActivityTxt` | O (파일 위치를 알면 `ACTION_VIEW`) | O | X | 사용자가 둔 곳(공유 저장소) |
 | 킨들 `com.amazon.kindle`(휴대폰 판 하나, 한국어 없음) | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | Libby `com.overdrive.mobile.android.libby`(OverDrive, 휴대폰 판 하나) | X (액티비티 하나. 읽는 화면은 요소 `bifocalHolder`) | `https://libbyapp.com/…` 링크는 받는다 (책은 미확인) | ? | ? | 앱 전용 저장소 (미확인) |
+| 네오리더 `com.onyx.kreader`(BOOX 기본 리더, 시스템 앱. 내 파일) | `ReaderTab1~4Activity`(책 하나에 탭 하나) | 파일 위치를 알면 `ACTION_VIEW` (미확인) | X (서재는 BOOX 런처 `com.onyx`) | X | 사용자가 둔 곳(공유 저장소) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
 - 사용 기록에는 **앱·화면 이름과 시각만** 남는다. 어떤 책인지는 알 수 없다.
@@ -291,3 +292,25 @@ OverDrive 의 도서관 앱. 도서관 카드로 로그인해 빌린다. 카드 
 - 읽는 화면의 `모양`(Aa) 설정은 글자 크기·밝기(밝게·세피아·어둡게)·책 디자인(출판사 기본·가독성 높음·학술적·페이퍼백·OpenDyslexic·맞춤: 글꼴·정렬·행간·굵기)뿐이다. 메뉴 없이 쪽·% 를 늘 보이게 하는 옵션은 없다.
 - 반납일 문구(에뮬레이터 날짜를 옮겨 확인, 반납 10/30 03:1x): 10/29 23시 `만료일: 1일`/`Due In 1 Day`, 10/30 01시 `만료일: 2시간`/`Due In 2 Hours`, 03:10 `만료일: 3분`/`Due In 3 Minutes`, 04시 `지금 만료`/`Due Now`. 반납이 가까우면 칸 위 저자 자리에 `곧 만료 예정. 갱신하시겠습니까?`(`Expiring soon. Renew?`)가 뜬다. Pebble Desk 는 앞의 셋을 10/30, `지금 만료` 를 지난 것(10/29)으로 적었다.
 - 진행률: 서가 칸의 `0%를 읽음`, 읽는 화면 메뉴의 쪽(전체 쪽 수는 화면 크기·글자 크기에 따라 다르다. 오만과 편견 샘플이 휴대폰 59쪽, 페블 50쪽).
+
+### 네오리더(NeoReader) `com.onyx.kreader` (2026-10-16, BOOX Palma2 펌웨어 4.2(2026-08)의 38994, 에뮬레이터 `Poke3Dpi350_A10`(안드로이드 10), **지원**, BOOX 실기기 **(미확인)**)
+
+BOOX 기기에 들어 있는 리더(시스템 앱, 펌웨어의 `system/app/kreader2-release`. 받기·풀기는 docs/DEVICES.md › Onyx BOOX 펌웨어). 내 파일(EPUB·PDF·DJVU·CBZ·MOBI·TXT·DOCX 등)과 BOOX 서점 책을 연다.
+
+- **서재가 없다.** 실행 화면(LAUNCHER)도 없어 앱 목록에 나오지 않는다. 책은 BOOX 런처(`com.onyx`, 실행 화면 `com.onyx.StartupActivity` 'ONYX Launcher')의 서재나 파일 관리자에서 열어 `ui.ReaderHomeActivity`(파일·공유를 받아 탭으로 넘기고 바로 닫힌다)로 들어온다. 링크 없이 열면 아무것도 열지 않는다.
+- **읽는 화면**: `com.onyx.kreader.ui.ReaderTab1Activity`~`ReaderTab4Activity`. 책 하나에 탭 하나(여러 책을 동시에 열 수 있다, 최대 4), 탭마다 다른 프로세스·작업(singleTask). 여러 탭 끄기(BOOX 설정)면 한 탭을 다시 쓴다 **(추정)**. 본문은 `SurfaceView` 라 글자가 드러나지 않는다.
+- **진행률**: 아래 상태 줄(`reader_status_bar`)의 진행 칸 `page_name`. 기본 `12/300`(쪽), 설정 `진행률 % 보기` 면 `4.0%`, 쪽 이름(PDF 쪽 라벨)이 있으면 `iv(12/300)`, 새 엔진이 쪽을 세는 동안 `.`·`..`·`...`. 상태 줄 칸(시각·배터리·남은 시간·장·진행)은 사용자가 고르고 옮길 수 있다.
+- **제목**: 메뉴(가운데 누르기)의 아래 진행 칸(`progress_menu_layout`)에 제목 `tv_book_title`·장 `tv_book_chapter`·쪽 `page_num`(상태 줄과 같은 글자, 막대를 끄는 동안은 끌고 있는 쪽). 제목은 `ReaderBundleHelper.getDocTitle`: BOOX 설정 `책 제목 사용`(`OnyxSystemConfig.isLibraryUseBookTitle`)이 켜져 있으면 책 정보의 제목, 아니면 파일 이름(확장자 포함), 둘 다 없으면 경로의 파일 이름. 저자는 없다.
+- 책을 둘 이상 열면 메뉴 맨 위에 탭 줄(`doc_bar`, 탭마다 같은 제목 글자. 요소 이름 없음)이 나오고 상주 설정이면 읽는 화면 위에도(`reader_doc_bar`). 지금 탭은 `activated` 로만 표시돼 접근성으로는 알 수 없다.
+- 그 밖의 화면: 설정 `ui.settings.MainSettingsActivity` 등, 웹 `ui.WebViewActivity`.
+- **Pebble Desk**: 읽는 화면만 본다(`readers/NeoReader.kt`). 메뉴를 띄우면 제목(확장자를 뗀다)으로 책을 넣고, 진행률은 `page_name` → `page_num` 순. 탭마다 메뉴로 마지막으로 안 책을 기억해(`ReaderSpec.viewerTabs`) 탭을 오가면 그 탭의 책을 맨 앞으로 하고 진행률을 그 책에 적는다. 처음 보는 탭은 메뉴로 알 때까지 진행률을 적지 않고, 알면 그 탭이 열린 때부터 그 책으로 센다. 같은 탭에 다른 책을 열면 메뉴를 띄울 때까지는 앞 책으로 센다. 표지는 없다(빈 표지). 책의 앱은 BOOX 런처(`ReaderSpec.appPkg`)라 홈에서 책을 누르면 BOOX 서재가 열린다.
+- **에뮬레이터에서 돌리기**(2026-10-16, `Poke3Dpi350_A10` 안드로이드 10. 요소 이름 확인용, 만든 APK 는 scratchpad 밖으로 내보내지 않았다):
+  1. 펌웨어의 APK 는 v2 서명이 벗겨져 그대로는 깔리지 않는다 → `META-INF` 서명을 지우고 시험 키(디버그 키)로 다시 서명.
+  2. 네이티브 라이브러리는 APK 밖(`system/lib64`)이다. 코드의 `System.loadLibrary` 이름에서 ELF NEEDED 를 따라 에뮬레이터에 없는 31개(`libc++_shared`·`libmmkv`·`libneo_*`·`libonyx_*`·`libopencv_java4` 등, 129MB)를 `lib/arm64-v8a` 에 무압축으로 넣는다(`extractNativeLibs=false`).
+  3. 안드로이드 10 저장소 제한: `appops set --uid com.onyx.kreader LEGACY_STORAGE allow`(패키지 단위로는 안 된다) 뒤 `Download/` 의 파일을 `ACTION_VIEW`(`file://`, `ReaderHomeActivity`)로 연다. 앱 전용 폴더(`Android/data/…/files`)는 파일 제공자 경로를 되돌리지 못해 열리지 않았다.
+  4. 문서를 열기 직전 **기기 검사**(`OpenWithOptionsRequest.c()`: `Build.MANUFACTURER`·`BRAND`·지문에 `onyx` 가 없으면 `ReaderException(101)` → `Failed to open the document`, 늘 켜짐)가 있어, 시험판에서만 apktool 로 `classes12.dex` 의 이 메서드가 바로 참을 돌려주게 고쳤다.
+  - 그러면 EPUB 이 열린다(엔진 `NReaderPlugin`). 처음 열면 `Spacing Adjustment Notice` 창이 한 번 뜬다.
+- **확인한 요소**(uiautomator): 읽는 화면 `ReaderTab1Activity` 아래 상태 줄 `tv_time`(`03:26 PM`)·`tv_battery`(`100%`)·`tvChapter`(`1장 (1/35)`, 장 안의 쪽이라 쓰지 않는다)·`page_name`(`1/70`), 본문은 `surfaceview_content`(글자 없음). 가운데를 누르면 메뉴의 진행 칸이 기본으로 떠 `tv_book_title`(`neo-test.epub`, 에뮬레이터는 `책 제목 사용` 이 꺼진 상태라 파일 이름)·`tv_book_chapter`(`1장`)·`page_num`(`1/70`). 메뉴 위 줄 단추(`Doc`·`Sync`·`Share`·`Search`·`More`)와 아래 탭(`Contents`·`Progress`·`Style`·`Refresh`·`Display`)은 이름 없는 글자.
+- **자동 추가 시험**(진짜 네오리더): 탭을 처음 열면(메뉴 전) 책을 넣지 않음 → 메뉴를 띄우면 `neo-test`(확장자 뗌) 1% 로 새 책 → 메뉴 없이 쪽 6번 넘김 → 상태 줄 `7/70` 으로 10%. `reader_watch` 에 `tab_…ReaderTab1Activity = neo-test`.
+- 시험(에뮬레이터 `Poke3Dpi350_A10`, 흐름만): 같은 패키지·탭 이름·요소 이름의 가짜 앱(탭 2개, 메뉴를 켜고 끔)과 가짜 `com.onyx` 런처로: 모르는 탭은 책을 넣지 않음, 메뉴 → `가짜 첫 책.epub` 이 `가짜 첫 책` 4%(12/300), 탭 2 → 둘째 책 25%(`iv(50/200)`), 탭을 오가면 그 책이 맨 앞·진행률 10%·50%, `8.0%` → 8%, 같은 탭에 다른 책(`.pdf`)을 메뉴로 → 새 책·앱 `com.onyx/.StartupActivity`.
+- BOOX 런처 서재의 책 칸(표지·진행률)을 읽는 것은 하지 않았다(런처 전체 화면을 받게 되고 실기기로 확인할 수 없음).

@@ -1,6 +1,7 @@
 package com.woody.pebbledesk
 
 import android.content.Context
+import com.woody.pebbledesk.readers.ReaderApps
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -98,7 +99,9 @@ class BookRecord(
                 BookShelf.findPast(context, title)?.let { p ->
                     return acc.getOrPut(p.book.id) { Acc(p.book, State.PAST, p.hidden) }
                 }
-                val app = apps.firstOrNull { it.pkg == pkg }?.key
+                // 실행 화면이 없는 이북 앱(네오리더)은 그 책들이 있는 서재 앱으로.
+                val appPkg = ReaderApps.byPackage[pkg]?.appPkg ?: pkg
+                val app = apps.firstOrNull { it.pkg == appPkg }?.key
                 return acc.getOrPut(TITLE_ONLY + norm) { Acc(ShelfBook(TITLE_ONLY + norm, title, "", app, 0), State.TITLE_ONLY, false) }
             }
             ReadingLog.days(context, ReadingLog.readerPackages(context))?.forEach { (day, keys) ->
