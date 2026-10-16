@@ -11,8 +11,8 @@
 
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-./gradlew -q assembleRelease          # app/build/outputs/apk/release/PebbleDesk-1.5.3-release.apk
-adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.3-release.apk </dev/null
+./gradlew -q assembleRelease          # app/build/outputs/apk/release/PebbleDesk-1.5.4-release.apk
+adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.4-release.apk </dev/null
 ```
 
 - 릴리스는 R8 축소(약 540KB, 1.5.3 은 480KB. HTML 라이브러리 없이 YES24 검색 결과를 직접 읽는다). 덮어 설치하면 앱 데이터가 남는다.
