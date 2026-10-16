@@ -18,6 +18,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | YES24 eBook `com.yes24.ebook.fourth`(휴대폰·태블릿용) | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
 | 문리더 `com.flyersoft.moonreader`(유료판 `com.flyersoft.moonreaderp`. 내 파일, DRM 없음) | `ActivityTxt` | O (파일 위치를 알면 `ACTION_VIEW`) | O | X | 사용자가 둔 곳(공유 저장소) |
 | 킨들 `com.amazon.kindle`(휴대폰 판 하나, 한국어 없음) | O | ? | ? | ? | 앱 전용 저장소 (미확인) |
+| Libby `com.overdrive.mobile.android.libby`(OverDrive, 휴대폰 판 하나) | X (액티비티 하나. 읽는 화면은 요소 `bifocalHolder`) | `https://libbyapp.com/…` 링크는 받는다 (책은 미확인) | ? | ? | 앱 전용 저장소 (미확인) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
 - 사용 기록에는 **앱·화면 이름과 시각만** 남는다. 어떤 책인지는 알 수 없다.
@@ -263,3 +264,30 @@ e-ink 판이 따로 없다(킨들 단말기는 안드로이드가 아니다). �
 - **읽는 화면**: 본문·위 제목(`WUTHERING HEIGHTS`)·아래 `Learning reading speed`·`0%` 가 모두 직접 그리는 뷰(`KRFView`)라 드러나지 않는다. 가운데를 눌러 메뉴를 띄우면 제목 `command_bar_title_bottom`(`Wuthering Heights`)·진행률 `nln_text_secondary`(`Location 1 of 4559  •  0%`, 쪽이 있는 책은 `Page 15 of 325  •  4%`)·진행 막대 `krx_location_control`. 화면 캡처는 막혀 있지 않다.
 - **진행률**: 서재 칸 설명의 `Reading is 4% completed.` 는 읽는 화면을 닫고 돌아오면 바로 바뀐다.
 - **특정 책 바로 열기**: 매니페스트에 `kindle://` 링크가 있다 **(미확인)**. 내 파일(PDF·EPUB)도 `ACTION_VIEW` 로 받는다.
+
+### Libby `com.overdrive.mobile.android.libby` (2026-10-16, 갤럭시 A23 안드로이드 14 · WebView 154, 에뮬레이터 `CremaPebble_A11_Play`(안드로이드 11) · WebView 155, 옛 `CremaPebble_A11` · WebView 91, 9.5.0, **지원**)
+
+OverDrive 의 도서관 앱. 도서관 카드로 로그인해 빌린다. 카드 없이도 도서관을 골라 검색하고 `샘플 읽기` 는 된다. 한국에서 만들 수 있는 카드: 한국문학번역원 한국문학 디지털도서관(Libby 에서 `Literature Translation Institute of Korea (LTI Korea)`, 무료, 영어 등 번역서), Queens Public Library(연 $50, 해외 거주자도 온라인 신청). 시험 계정은 LTI(사용자 가입).
+
+- **화면**: 매니페스트에 액티비티가 `com.overdrive.mobile.android.nautilus.ui.Activity_Main` **하나뿐**이다. 모든 화면이 웹 화면이고, 서재·검색은 `clientHolder` › `fragment_webview` › `webViewHolder` 안, 책을 열면(샘플·빌린 책 모두) 그 자리에 읽는 화면 `bifocalHolder` › `fragment_webview_bifocal` 이 뜬다(닫으면 다시 `clientHolder`). 그래서 **사용 기록으로는 서재와 읽는 화면을 가를 수 없다**.
+- 링크: `https://libbyapp.com/library/<도서관>`, `https://libbyapp.com/search/<도서관>/search/query-<검색어>/page-1` 를 `Activity_Main` 이 받는다(NYPL `nypl`, LTI `lti`). 그 밖에 `libby:`, `dewey-oauth:`.
+- 웹 화면 요소: HTML id 가 요소 이름으로 나온다(앞에 패키지 없음. `footer-nav-shelf`, `aria-3a9f6c60` 처럼 바뀌는 것). 화면마다 숨은 글자 `현재 위치: 서가.`(검색 결과·도서관 등)가 있다. 아래 탭: 검색·도서관·메뉴·서가·태그.
+- **서가(서재)**: `대출 1`·`예약 0`·`타임라인`·`공지` 줄 아래 '최근 대출 자료', `대출` 을 누르면 대출 목록. 칸은 한 목록 아래 형제로
+  - 이름표 `책: Peace Under Heaven, Man-Sik Chae Kyung-Ja Chun별`(안에 제목 글자 `Peace Under Heaven`)
+  - 상태 단추 `도서 상태: 대출됨, 100% 다운로드 완료`
+  - 할 일 묶음: `책 열기`, `대출 관리`, `만료일: 14일`, `0%를 읽음`.
+  - 표지는 요소가 없다(배경 그림). 할 일 묶음 왼쪽에 이름표 왼쪽 끝부터 할 일 묶음 왼쪽까지·할 일 묶음 높이로 그려지고, 오른쪽·아래에 회색 그림자(폭의 3% 남짓)가 붙는다.
+  - 검색 결과 칸도 이름표·상태 단추(`도서 상태: 대기 목록, ~8주`)·할 일(`대출`·`예약`·`샘플 읽기`·`저장`) 모양이 같고 진행률이 없다.
+  - 아래 탭 위에 '지금 읽고 있는 자료' 띠(`지금 읽고 있는 자료: 제목.`·`대출 관리`·`지금 읽고 있는 자료 삭제` 단추, 탭 줄 바로 위에서 끝난다)가 떠 있고 누르면 그 책을 다시 연다. 목록은 이 띠와 탭 줄 밑으로도 이어져, 칸의 아래가 가려진다.
+  - 옛 WebView(91, 에뮬레이터)는 Libby 를 오래 쓰다 보면 웹 화면 안쪽을 통째로 내놓지 않는다(uiautomator 덤프도 `Null child`, Libby 를 다시 시작해도 그대로). 이때는 서가를 읽지 못한다.
+- **읽는 화면**: 열면 처음에 메뉴가 떠 있다. 늘 있는 숨은 안내 글자 `페이지 모드를 사용 중입니다. Pride and Prejudice, Jane Austen .`(메뉴가 떠 있으면 `탐색 모드를…`).
+  - 메뉴: 위 `책 닫기`(`뒤로`)·`모양`·`책에서 검색`·`책갈피`, 아래 `책 정보`(둥근 표지), `페이지 6`(단추)·`총 50 페이지`(같은 줄), 장 이름 `Chapter 1 . 목차`, 장 앞뒤(`챕터 시작 . 2 페이지로 돌아가기`. 새 WebView 에서는 설명, 옛 WebView 에서는 글자).
+  - 책을 막 열면 잠깐 `1%`·`페이지 계산 중...` 이 보인다.
+  - **본문**: 웹 화면이 책 본문 문단을 접근성 요소로 내놓는다(쪽들을 옆으로 이어 붙인 띠, 가로 -5364~32175. 지금 쪽만 화면 안). 그래서 읽는 화면 밖으로 나가는 묶음은 훑지 않는다.
+  - 옛 WebView(91)의 웹 화면 요소에는 문서 제목(= 책 제목, 서재는 `Libby - 검색 결과`)이 글자로 있다. 새 WebView(154)는 비어 있다. 옛 WebView 는 메뉴를 몇 번 열고 닫으면 안쪽 요소를 내놓지 않는다(자식이 null, `refresh()` 도 실패).
+- 시험(`CremaPebble_A11_Play`, WebView 155): 서가 › 대출 칸에서 표지(그림자 없이)·반납일(14일)을 읽고, `책 열기` → 안내 글자로 제목·저자가 새 책으로 들어가고 메뉴의 5/292쪽이 1%, 리더를 연 동안만 '오늘 1분'. 리더를 연 채 Pebble Desk 를 덮어 깔면 '닫힘'을 적었다가 Libby 의 다음 알림에서 '열림'으로 다시 적는다.
+- 표지와 '지금 읽고 있는 자료' 띠: 서가 첫 화면에서 칸 아래가 띠 밑으로 들어가 있으면 칸(진행률·반납일)은 읽되 표지는 자르지 않았고, 칸을 띠 위로 올린 뒤 다시 읽으면 깨끗한 표지를 잘라 왔다. 다만 웹 화면을 밀어 올릴 때는 내용 바뀜 알림이 오지 않아(밀기 알림만 오는 듯, 받지 않는다) 그 자리에서 바로 다시 읽지는 않고, 다른 화면에 갔다 오거나 내용이 바뀔 때 읽는다.
+- **영어**(Libby 메뉴 › 언어. 읽는 화면은 Libby 설정이 아니라 시스템 언어를 따른다): 서가 이름표 `Book: Peace Under Heaven, by Man-Sik Chae`, 할 일 `Open Book`·`Manage Loan`·`Due In 14 Days`·`You Have Read 2 Percent`(`%` 가 아니라 낱말), 띠 `Reading now: 제목.`. 읽는 화면 안내 글자 `You are in page mode. 제목, 저자 .`(메뉴 `You are in navigating mode. …`), 메뉴 쪽 `Page 5` · `292 pages in total`. 모두 확인했다(서가 진행률 2%·반납일 14일 뒤·저자에서 `by` 뺌, 읽는 화면 제목·1%).
+- 읽는 화면의 `모양`(Aa) 설정은 글자 크기·밝기(밝게·세피아·어둡게)·책 디자인(출판사 기본·가독성 높음·학술적·페이퍼백·OpenDyslexic·맞춤: 글꼴·정렬·행간·굵기)뿐이다. 메뉴 없이 쪽·% 를 늘 보이게 하는 옵션은 없다.
+- 반납일 문구(에뮬레이터 날짜를 옮겨 확인, 반납 10/30 03:1x): 10/29 23시 `만료일: 1일`/`Due In 1 Day`, 10/30 01시 `만료일: 2시간`/`Due In 2 Hours`, 03:10 `만료일: 3분`/`Due In 3 Minutes`, 04시 `지금 만료`/`Due Now`. 반납이 가까우면 칸 위 저자 자리에 `곧 만료 예정. 갱신하시겠습니까?`(`Expiring soon. Renew?`)가 뜬다. Pebble Desk 는 앞의 셋을 10/30, `지금 만료` 를 지난 것(10/29)으로 적었다.
+- 진행률: 서가 칸의 `0%를 읽음`, 읽는 화면 메뉴의 쪽(전체 쪽 수는 화면 크기·글자 크기에 따라 다르다. 오만과 편견 샘플이 휴대폰 59쪽, 페블 50쪽).

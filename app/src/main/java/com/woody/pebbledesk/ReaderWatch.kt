@@ -21,6 +21,7 @@ import com.woody.pebbledesk.readers.AppWindows
 import com.woody.pebbledesk.readers.Cell
 import com.woody.pebbledesk.readers.ReaderApps
 import com.woody.pebbledesk.readers.ReaderSpec
+import com.woody.pebbledesk.readers.byId
 import com.woody.pebbledesk.readers.usableThumb
 import java.time.LocalDate
 
@@ -92,6 +93,10 @@ class ReaderWatchService : AccessibilityService() {
     /** 진행률을 아직 못 읽어 다시 읽어 볼 횟수(메뉴의 쪽 정보는 조금 늦게 채워지고, 채워질 때 알림이 없다) */
     private var viewerRetries = 0
     private val viewerLater = Runnable { viewerSpec?.let(::readViewer) }
+    /** 읽는 화면이 서재 액티비티 안에 뜨는 앱([ReaderSpec.viewerHolder])을 마지막으로 본 때와, 미뤄 두고 다시 볼 앱 */
+    private var lastHolderCheck = 0L
+    private var holderSpec: ReaderSpec? = null
+    private val holderLater = Runnable { holderSpec?.let { holderSpec = null; checkHolder(it); readScreen(it, force = false) } }
 
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
@@ -104,33 +109,16 @@ class ReaderWatchService : AccessibilityService() {
                 // 대화상자 같은 것은 빼고 그 앱의 화면만 기억한다(문리더 목차 `PrefChapters` 처럼 앱 안의 대화상자도 이름이 앱 것이라 액티비티인지 본다).
                 val cls = e.className?.toString()
                 val isScreen = cls != null && cls.startsWith(spec.classPrefix) && isActivity(spec.pkg, cls)
-                WatchLog.add(this, if (isScreen) WatchLog.Kind.SCREEN else WatchLog.Kind.OTHER_WINDOW, spec.pkg, cls.orEmpty().substringAfterLast('.'),
-                    if (!isScreen) "" else when (cls) {
-                        in spec.shelves -> WatchLog.Role.SHELF.name
-                        in spec.viewers -> WatchLog.Role.VIEWER.name
-                        else -> WatchLog.Role.OTHER.name
-                    })
-                cls?.takeIf { isScreen }?.let {
-                    // 화면이 새로 열릴 때마다(홈에서 돌아온 서재 포함) 바로 자르기 횟수를 다시 센다.
-                    eagerTries.clear()
-                    val now = System.currentTimeMillis()
-                    lastTransition = now
-                    screen[spec.pkg] = it
-                    if (ReadingLog.isReaderScreen(it)) {
-                        // 서재를 떠나 처음 연 읽는 화면의 때만 적는다(읽는 중 목차 같은 다른 화면에 갔다 와도 처음부터 그 책으로 세게).
-                        // 줄이 바뀌기를 기다리다 서재에서 다시 읽으러 갔으면 이번 책의 때로 다시 적는다.
-                        if (spec.recent != null && (readSince.add(spec.pkg) || recentWait.remove(spec.pkg))) readerAt[spec.pkg] = now
-                        unknownClick.remove(spec.pkg)?.takeIf { now - it < CLICK_OPEN_MS }?.let {
-                            unknownOpen[spec.pkg] = now
-                            setOpened(spec.pkg, null)
-                        }
-                        webBook.remove(spec.pkg)?.let { book -> bookOpened(spec, book) }
-                        clicked.remove(spec.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.let { bookOpened(spec, it.first) }
-                    }
-                }
+                val name = cls?.takeIf { isScreen }?.let { withHolder(spec, it) }
+                logScreen(spec, name ?: cls.orEmpty(), isScreen)
+                // 화면이 새로 열릴 때마다(홈에서 돌아온 서재 포함) 바로 자르기 횟수를 다시 센다.
+                name?.let { eagerTries.clear(); enterScreen(spec, it) }
                 readScreen(spec, force = true)
             }
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> readScreen(spec, force = false)
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+                checkHolder(spec)
+                readScreen(spec, force = false)
+            }
             AccessibilityEvent.TYPE_VIEW_CLICKED -> if (screen[spec.pkg] in spec.shelves) {
                 val windows = windowsOf(spec)
                 if (windows.all.any(spec::editing)) return
@@ -151,6 +139,82 @@ class ReaderWatchService : AccessibilityService() {
                     else -> bookOpened(spec, cell)
                 }
             }
+        }
+    }
+
+    private fun logScreen(spec: ReaderSpec, name: String, isScreen: Boolean) {
+        WatchLog.add(this, if (isScreen) WatchLog.Kind.SCREEN else WatchLog.Kind.OTHER_WINDOW, spec.pkg, name.substringAfterLast('.'),
+            if (!isScreen) "" else when (name) {
+                in spec.shelves -> WatchLog.Role.SHELF.name
+                in spec.viewers -> WatchLog.Role.VIEWER.name
+                else -> WatchLog.Role.OTHER.name
+            })
+    }
+
+    /**
+     * 그 앱의 화면이 [name] 으로 바뀌었다(액티비티, 또는 서재 액티비티 안에 뜬 읽는 화면 `액티비티#요소`).
+     * 읽는 화면이 안에 뜨는 앱([ReaderSpec.viewerHolder])은 읽는 화면이 보이고 사라진 때를 읽은 시간에 적는다.
+     */
+    private fun enterScreen(spec: ReaderSpec, name: String) {
+        val now = System.currentTimeMillis()
+        lastTransition = now
+        screen[spec.pkg] = name
+        if (spec.viewerHolder != null) ReadingLog.viewerShown(this, spec.pkg, name in spec.viewers, now)
+        if (ReadingLog.isReaderScreen(name)) {
+            // 서재를 떠나 처음 연 읽는 화면의 때만 적는다(읽는 중 목차 같은 다른 화면에 갔다 와도 처음부터 그 책으로 세게).
+            // 줄이 바뀌기를 기다리다 서재에서 다시 읽으러 갔으면 이번 책의 때로 다시 적는다.
+            if (spec.recent != null && (readSince.add(spec.pkg) || recentWait.remove(spec.pkg))) readerAt[spec.pkg] = now
+            unknownClick.remove(spec.pkg)?.takeIf { now - it < CLICK_OPEN_MS }?.let {
+                unknownOpen[spec.pkg] = now
+                setOpened(spec.pkg, null)
+            }
+            webBook.remove(spec.pkg)?.let { book -> bookOpened(spec, book) }
+            clicked.remove(spec.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.let { bookOpened(spec, it.first) }
+        }
+    }
+
+    /**
+     * 서재 액티비티 [cls] 안에 읽는 화면([ReaderSpec.viewerHolder])이 떠 있으면 `cls#요소`, 아니면 [cls].
+     * 맨 앞 창이 그 앱이 아니면(알림 창 등) 알 수 없어 지금 화면 그대로 둔다.
+     */
+    private fun withHolder(spec: ReaderSpec, cls: String): String {
+        val holder = spec.viewerHolder ?: return cls
+        if (cls !in spec.shelves) return cls
+        val root = root(spec) ?: return screen[spec.pkg]?.takeIf { it.substringBefore('#') == cls } ?: cls
+        return if (root.byId(spec.pkg, holder).isNotEmpty()) "$cls#$holder" else cls
+    }
+
+    /**
+     * 읽는 화면이 서재 액티비티 안에 뜨는 앱은 화면 바뀜 알림 없이 내용만 바뀌므로, 내용이 바뀔 때 읽는 화면이 떴는지·닫혔는지 본다.
+     * 웹 화면은 알림이 잦아 [HOLDER_CHECK_MS] 에 한 번만 보고, 그 사이 알림은 마지막에 한 번 더 본다.
+     */
+    private fun checkHolder(spec: ReaderSpec) {
+        if (spec.viewerHolder == null) return
+        val now = System.currentTimeMillis()
+        handler.removeCallbacks(holderLater)
+        if (now - lastHolderCheck < HOLDER_CHECK_MS) {
+            holderSpec = spec
+            handler.postDelayed(holderLater, HOLDER_CHECK_MS)
+            return
+        }
+        lastHolderCheck = now
+        // 서비스가 그 앱이 떠 있는 동안 다시 시작되면 화면 바뀜 알림을 받지 못해 화면을 모른다. 서재 액티비티가 하나뿐이면(Libby) 그것으로 본다.
+        val base = screen[spec.pkg]?.substringBefore('#') ?: spec.shelves.singleOrNull()?.takeIf { root(spec) != null } ?: return
+        val name = withHolder(spec, base)
+        if (name == screen[spec.pkg]) return
+        logScreen(spec, name, isScreen = true)
+        enterScreen(spec, name)
+    }
+
+    /**
+     * 읽는 화면이 서재 액티비티 안에 뜨는 앱(Libby)의 읽는 화면을 닫힌 것으로 적는다(서비스가 붙을 때·끝날 때). 서비스가 없는 동안
+     * '열림'이 남으면 그 뒤 서재만 본 시간도 읽은 시간으로 센다. 읽는 화면이 떠 있으면 다음 알림에서 다시 '열림'으로 적힌다.
+     */
+    private fun closeHeldViewers() {
+        val now = System.currentTimeMillis()
+        for (spec in ReaderApps.ALL) if (spec.viewerHolder != null) {
+            screen.remove(spec.pkg)
+            ReadingLog.viewerShown(this, spec.pkg, shown = false, at = now)
         }
     }
 
@@ -417,6 +481,7 @@ class ReaderWatchService : AccessibilityService() {
         super.onServiceConnected()
         recordLife(this, connected = true)
         WatchLog.connected(this)
+        closeHeldViewers()
         // 설정 › 업데이트로 새 판이 깔린 뒤 다시 붙은 것이면 홈을 띄운다(깔린 직후의 알림에서는 막힐 때가 있다).
         Update.reopenHomeAfterUpdate(this, fromService = true)
     }
@@ -430,6 +495,8 @@ class ReaderWatchService : AccessibilityService() {
     override fun onDestroy() {
         handler.removeCallbacks(settleLater)
         handler.removeCallbacks(viewerLater)
+        handler.removeCallbacks(holderLater)
+        closeHeldViewers()
         WatchLog.add(this, WatchLog.Kind.DESTROYED)
         WatchLog.flush()
         super.onDestroy()
@@ -478,6 +545,8 @@ class ReaderWatchService : AccessibilityService() {
         private const val CLICK_OPEN_MS = 120_000L
         /** 화면이 바뀐 뒤 이만큼은 바로 자르지 않는다 */
         private const val TRANSITION_MS = 1000L
+        /** 읽는 화면이 서재 액티비티 안에 뜨는 앱에서 그 화면이 떴는지 보는 간격 */
+        private const val HOLDER_CHECK_MS = 500L
 
         /** 거의 한 가지 색뿐인 그림(아직 그려지지 않은 표지 칸)인가. 16×16 점의 밝기 차로 본다. */
         private fun isFlat(b: Bitmap): Boolean {

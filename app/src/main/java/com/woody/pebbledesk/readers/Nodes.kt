@@ -85,7 +85,11 @@ internal fun pagePercent(page: String?, total: String?, roundUp: Boolean): Int {
     return pct.toInt().coerceIn(0, 100)
 }
 
-/** `2026.10.20` → 그날, `반납 4일 남음`·`D-4` → 오늘 + 4일, `오늘 반납` → 오늘, `만료` → 어제(지남). 모르면 -1 */
+/**
+ * `2026.10.20` → 그날, `반납 4일 남음`·`D-4`·`Due In 4 Days`(Libby 영어) → 오늘 + 4일, `오늘 반납`·`5시간`·`3분`·`Due In 5 Hours` → 오늘,
+ * `만료`·`Expired`·`Due Now` → 어제(지남). 모르면 -1. Libby 는 `만료일: 14일`·`만료일: 2시간`·`만료일: 3분`(영어 `Due In 1 Day`·`Due In 2 Hours`·
+ * `Due In 3 Minutes`) 처럼 남은 기간 앞에 '만료'를 붙여 기간을 먼저 보고, 반납 시각이 지나면 `지금 만료`(`Due Now`)다(2026-10-16 에뮬레이터 날짜를 옮겨 확인).
+ */
 internal fun dueDate(text: String): Long {
     if (text.isEmpty()) return -1
     Regex("""(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})""").find(text)?.let { m ->
@@ -95,8 +99,10 @@ internal fun dueDate(text: String): Long {
     val today = LocalDate.now().toEpochDay()
     Regex("""D-\s*(\d+)""", RegexOption.IGNORE_CASE).find(text)?.let { return today + it.groupValues[1].toLong() }
     if (text.equals("D-Day", ignoreCase = true)) return today
-    Regex("""(\d+)\s*일""").find(text)?.let { return today + it.groupValues[1].toLong() }
-    if ("만료" in text) return today - 1
-    if ("오늘" in text) return today
+    Regex("""(\d+)\s*(일|days?\b)""", RegexOption.IGNORE_CASE).find(text)?.let { return today + it.groupValues[1].toLong() }
+    if (Regex("""\d+\s*(시간|분|(hours?|minutes?)\b)""", RegexOption.IGNORE_CASE).containsMatchIn(text)) return today
+    // '오늘'을 '만료'보다 먼저 본다(`오늘 만료` 처럼 둘 다 있으면 오늘).
+    if ("오늘" in text || "today" in text.lowercase()) return today
+    if ("만료" in text || Regex("""\b(expired|due now)\b""", RegexOption.IGNORE_CASE).containsMatchIn(text)) return today - 1
     return -1
 }
