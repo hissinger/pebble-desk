@@ -123,6 +123,12 @@ object Ui {
     val regular: Typeface = Typeface.create(Typeface.DEFAULT, 400, false)
 }
 
+/**
+ * 가로로 놓였는가(폭이 높이보다 크다). 화면은 돌릴 때마다 새로 만들어지니 만들 때 한 번 본다.
+ * 가로면 세로 화면의 칸 모양은 그대로 두고 남는 폭에 칸을 나란히 놓는다(홈·독서 기록·설정·아래 메뉴. DESIGN.md `가로 화면`).
+ */
+fun Context.landscape(): Boolean = resources.displayMetrics.let { it.widthPixels > it.heightPixels }
+
 /** 앱 버전 이름(설정 바닥글·기기 정보). 못 읽으면 빈 글자. */
 fun Context.appVersion(): String =
     runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
@@ -183,6 +189,29 @@ fun Context.hline(heightDp: Number, color: Int = Ui.BLACK, inset: Boolean = true
             marginStart = dp(Ui.MARGIN); marginEnd = dp(Ui.MARGIN)
         }
     }
+}
+
+/**
+ * 나란히 놓은 두 칸 사이의 옅은 세로 선(가로 화면). 위아래를 [insetDp] 씩 띄운다. [heightPx] 는 높이(보통 칸 높이에 맞춰 MATCH,
+ * 높이를 따로 맞추는 줄 안에서는 0 으로 재게 둔다).
+ */
+fun Context.vline(insetDp: Int, heightPx: Int = MATCH): View = View(this).apply {
+    setBackgroundColor(Ui.DIVIDER)
+    layoutParams = LinearLayout.LayoutParams(dp(1), heightPx).apply { topMargin = dp(insetDp); bottomMargin = dp(insetDp) }
+}
+
+/**
+ * 표지 격자(올해 읽은 책·책 추가): 표지 폭은 세로 화면(짧은 변)에서 [columns]권이 [gapDp] 사이로 들어가는 폭으로 고정하고,
+ * 가로 화면은 그 폭으로 한 줄에 들어가는 만큼 권수를 늘려 남는 폭을 칸 사이에 나눈다(세로는 그대로 [columns]권).
+ */
+class CoverGrid(val cellW: Int, val columns: Int, val gap: Int)
+
+fun Context.coverGrid(columns: Int, gapDp: Int): CoverGrid {
+    val dm = resources.displayMetrics
+    val inner = dm.widthPixels - 2 * dp(Ui.MARGIN)
+    val cellW = (minOf(dm.widthPixels, dm.heightPixels) - 2 * dp(Ui.MARGIN) - (columns - 1) * dp(gapDp)) / columns
+    val n = maxOf(columns, (inner + dp(gapDp)) / (cellW + dp(gapDp)))
+    return CoverGrid(cellW, n, (inner - n * cellW) / (n - 1))
 }
 
 /**
@@ -300,12 +329,14 @@ class StampedRow(context: Context, private val sizeDp: Int, private val endDp: I
  * 홈처럼 틀 높이를 고정하고 글자만 키우는 곳에서 반쯤 잘린 줄이 보이지 않게 한다.
  * 자식은 높이 제한 없이 재서(남은 높이로 줄여 재면 글자가 칸 끝에서 잘린 채 그려진다) 다 들어가는지 본다.
  */
-class FitColumn(context: Context) : LinearLayout(context) {
+class FitColumn(context: Context, private val unbounded: Boolean = true) : LinearLayout(context) {
     init {
         orientation = VERTICAL
     }
 
+    /** [unbounded] 가 false 면 보통 묶음처럼 잰다(남는 높이를 나눠 받는 자식이 있을 때. 가로 화면 독서 기록 왼쪽 칸) */
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        if (!unbounded) return super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
         setMeasuredDimension(measuredWidth, resolveSize(measuredHeight, heightMeasureSpec))
     }

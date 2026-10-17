@@ -6,6 +6,8 @@ import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.provider.Settings
+import android.view.Surface
+import android.view.WindowManager
 import kotlin.math.pow
 
 /** 크레마 기기에서만 쓰는 기능 */
@@ -17,9 +19,23 @@ object Crema {
     /** 페블 패널은 1456px 이지만 맨 아래 8px 쯤은 테두리에 가려 보이지 않는다(같은 6인치 패널의 보통 높이는 1448px). */
     private const val HIDDEN_BOTTOM_PX = 8
 
-    /** 화면 맨 아래에 붙는 [view] 의 아래를 가려지는 줄만큼 비워, 하단 줄이 보이는 영역의 가운데에 오게 한다. */
+    /**
+     * 화면 끝에 붙는 [view] 에서 패널의 가려지는 줄 쪽을 그만큼 비워, 하단 줄이 보이는 영역의 가운데에 오게 한다.
+     * 가려지는 줄은 패널의 아래 끝이라 화면을 돌리면 자리가 바뀐다: 세로 아래, 왼쪽으로 돌리면(ROTATION_90) 오른쪽, 오른쪽으로 돌리면 왼쪽, 거꾸로면 위.
+     */
+    @Suppress("DEPRECATION")
     fun reserveHiddenBottom(view: android.view.View) {
-        if (isCrema) view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, view.paddingBottom + HIDDEN_BOTTOM_PX)
+        if (!isCrema) return
+        val rotation = runCatching { view.context.getSystemService(WindowManager::class.java).defaultDisplay.rotation }.getOrDefault(Surface.ROTATION_0)
+        val px = HIDDEN_BOTTOM_PX
+        with(view) {
+            when (rotation) {
+                Surface.ROTATION_90 -> setPadding(paddingLeft, paddingTop, paddingRight + px, paddingBottom)
+                Surface.ROTATION_270 -> setPadding(paddingLeft + px, paddingTop, paddingRight, paddingBottom)
+                Surface.ROTATION_180 -> setPadding(paddingLeft, paddingTop + px, paddingRight, paddingBottom)
+                else -> setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom + px)
+            }
+        }
     }
 
     /**

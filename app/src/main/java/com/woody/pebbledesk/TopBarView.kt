@@ -128,7 +128,8 @@ class TopBarView(context: Context, private val fixedFrame: Boolean = true) : Vie
 
     /**
      * 높이는 글자 100%·기기 글꼴 100% 일 때로 고정한다(홈 틀이 글자 설정에 따라 움직이지 않게).
-     * 키운 글자는 위 여백·줄 사이·아래 여백을 [MIN_PAD_DP] 까지 줄여 받고, 그래도 들지 않으면 상태 줄을 그리지 않는다(반쯤 잘린 줄을 보이지 않게).
+     * 키운 글자는 위 여백·아래 여백을 먼저, 그다음 시계와 상태 줄 사이를 [MIN_PAD_DP] 까지 줄여 받고(시계와 상태 줄이 붙어 보이지 않게),
+     * 그래도 들지 않으면 상태 줄을 그리지 않는다(반쯤 잘린 줄을 보이지 않게).
      * [fixedFrame] 이 false 면(기기가 앱의 밀도를 덮어씀) 고정하지 않고 글자 크기대로 높이를 잡는다(글자를 줄여 홈을 맞출 수 있게).
      */
     private val fixedHeight: Int
@@ -147,9 +148,12 @@ class TopBarView(context: Context, private val fixedFrame: Boolean = true) : Vie
         val min = context.dp(MIN_PAD_DP)
         if (room < full) {
             if (room >= 3 * min) {
-                val f = (room - 3 * min).toFloat() / (full - 3 * min)
-                drawPadTop = min + ((padTop - min) * f).toInt()
-                drawLineGap = min + ((lineGap - min) * f).toInt()
+                // 모자란 만큼 위 여백 → 아래 여백 → 줄 사이 순으로 줄인다(아래 여백은 그리고 남는 자리라 따로 두지 않는다)
+                var lack = full - room
+                val fromTop = minOf(lack, padTop - min).also { lack -= it }
+                lack -= minOf(lack, padBottom - min)
+                drawPadTop = padTop - fromTop
+                drawLineGap = lineGap - minOf(lack, lineGap - min)
             } else {
                 showStatus = false
                 drawPadTop = maxOf(0, (fixedHeight - clockCap) / 2)
