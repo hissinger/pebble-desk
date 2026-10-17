@@ -267,7 +267,8 @@
     <string name="guide_libby">Libby</string>
     <string name="guide_libby_desc">Progress while reading comes in only when you open the menu. Covers come from the Shelf screen.\nReading time is counted only while auto-add is on.</string>
     <string name="guide_neo">NeoReader (BOOX)</string>
-    <string name="guide_neo_desc">Open the menu while reading to add the book. Covers are blank.\nTapping the book on the home screen opens the BOOX library (ONYX Launcher).</string>
+    <string name="guide_neo_desc">Covers are blank.\nTapping the book on the home screen opens its file in NeoReader.</string>
+    <string name="app_neoreader">NeoReader (BOOX)</string>
     <string name="guide_progress_note">For progress while reading, turn on the bottom info (page or progress) in the e-book app\'s viewer settings.</string>
     <string name="guide_cover_note">Covers are cut from the shelf screen. If a title or author is cut off, wrong or missing, long-press the book on the home screen to fix it.</string>
     <string name="edit_title">Edit title</string>

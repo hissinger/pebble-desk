@@ -12,8 +12,10 @@ import android.graphics.Canvas
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.StrictMode
 import android.provider.Settings
 import android.util.LruCache
+import android.webkit.MimeTypeMap
 import com.woody.pebbledesk.readers.ReaderApps
 import org.json.JSONArray
 import org.json.JSONObject
@@ -162,6 +164,63 @@ object AppStore {
             context.startActivity(intent, ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle())
         } catch (_: Exception) {
             // 지워졌거나 열 수 없는 앱. 다음에 홈으로 돌아올 때 목록에서 빠진다.
+        }
+    }
+
+    /**
+     * 실행 화면이 없어 런처 조회에 나오지 않고 파일로만 여는 이북 앱(네오리더, [com.woody.pebbledesk.readers.ReaderSpec.fileViewer])의 항목.
+     * 깔려 있고 켜져 있을 때만. 자동 추가로 그 앱의 책에 붙고, 책의 앱 이름과 그 책 열기에만 쓴다(모든 앱·자주 쓰는 앱·읽고 있는 앱 고르기에는
+     * 넣지 않는다. 그냥 띄우면 아무것도 하지 않고, 고를 파일이 없다).
+     */
+    private fun fileReaders(context: Context): List<AppEntry> = ReaderApps.ALL.mapNotNull { spec ->
+        val viewer = spec.fileViewer ?: return@mapNotNull null
+        val enabled = runCatching { context.packageManager.getApplicationInfo(spec.pkg, 0).enabled }.getOrDefault(false)
+        if (enabled) AppEntry(ComponentName(spec.pkg, viewer.activity), context.getString(viewer.label)) else null
+    }
+
+    /** 책의 앱 [key]. 앱 목록([apps])에 없으면 파일로만 여는 이북 앱([fileReaders])에서 찾는다. */
+    fun find(context: Context, key: String, apps: List<AppEntry> = load(context)): AppEntry? =
+        apps.find { it.key == key } ?: fileReaders(context).find { it.key == key }
+
+    /** 이북 앱 [pkg] 에서 편 책에 붙일 앱: 파일로만 여는 앱은 그 항목, 아니면 그 패키지의 실행 화면 */
+    fun readerKey(context: Context, pkg: String): String? =
+        fileReaders(context).firstOrNull { it.pkg == pkg }?.key ?: load(context).firstOrNull { it.pkg == pkg }?.key
+
+    /**
+     * 책의 앱을 연다. 파일로만 여는 이북 앱이면 그 책의 파일([BookShelf.filePath])을, 파일을 모르면 그 앱의 서재 앱(BOOX 런처)을 연다.
+     * 열 것이 없으면 false(고르러 간다).
+     */
+    fun openBook(context: Context, book: ShelfBook, app: AppEntry): Boolean {
+        val viewer = ReaderApps.byPackage[app.pkg]?.fileViewer?.takeIf { it.activity == app.component.className }
+        if (viewer == null) {
+            launch(context, app)
+            return true
+        }
+        BookShelf.filePath(context, book.id)?.let { if (openFile(context, app.component, it)) return true }
+        val shelf = viewer.shelfPkg?.let { pkg -> load(context).firstOrNull { it.pkg == pkg } } ?: return false
+        launch(context, shelf)
+        return true
+    }
+
+    /**
+     * [path] 를 [component] 로 연다(`file://`). 받는 앱(네오리더)은 저장소 전체를 읽는 시스템 앱이라 경로를 그대로 넘긴다.
+     * 안드로이드 7+ 은 다른 앱에 `file://` 를 넘기면 막으므로(FileUriExposedException) 여는 동안만 그 검사를 끈다.
+     * 파일이 지워졌으면 받는 앱이 알린다(이 앱은 저장소를 읽을 수 없어 미리 볼 수 없다).
+     */
+    private fun openFile(context: Context, component: ComponentName, path: String): Boolean {
+        val file = File(path)
+        val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase(Locale.ROOT))
+        val intent = Intent(Intent.ACTION_VIEW).setDataAndType(Uri.fromFile(file), type).setComponent(component)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val policy = StrictMode.getVmPolicy()
+        return try {
+            StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build())
+            context.startActivity(intent, ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle())
+            true
+        } catch (_: Exception) {
+            false
+        } finally {
+            StrictMode.setVmPolicy(policy)
         }
     }
 
