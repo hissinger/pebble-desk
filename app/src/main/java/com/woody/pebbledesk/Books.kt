@@ -224,11 +224,11 @@ fun ReadingDays.firstReadDays(): Map<String, LocalDate> {
 }
 
 /**
- * 읽고 있는 책 목록(권수 제한 없음, 1.5.3 까지는 10권). 앞 [HOME]권이 홈에 보이고(맨 앞 책은 크게), 맨 앞 책의 앱이 '읽고 있는 앱'이다.
+ * 읽고 있는 책 목록(권수 제한 없음, 1.5.3 까지는 10권). 앞 [HOME]권이 홈에 바로 보이고(맨 앞 책은 크게, 나머지는 함께 읽는 책 다음 쪽), 맨 앞 책의 앱이 '읽고 있는 앱'이다.
  * 목록은 DB([Db]) `shelf`, 나간 책은 `past`, 표지는 books/<id>.jpg.
  */
 object BookShelf {
-    /** 홈에 보이는 책 수: 맨 앞 책 + 함께 읽는 책 3칸 */
+    /** 홈 책 자리 한 쪽의 책 수: 맨 앞 책 + 함께 읽는 책 3칸(나머지는 함께 읽는 책 다음 쪽) */
     const val HOME = 4
     private val covers = LruCache<String, Bitmap>(16)
 

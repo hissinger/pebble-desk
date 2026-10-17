@@ -62,7 +62,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.4-release.apk </dev/
 | ReaderWatch | `ReaderWatchService`(접근성): 이북 앱 서재·읽는 화면에서 편 책 자동 추가, 진행률·반납일, 서재 표지 잘라 오기 |
 | WatchLog / WatchLogActivity | 자동 추가 서비스가 받은 알림·한 일 기록(최근 60줄 + 앱별 알림 수) / 기기 정보 › `기록 보기 ›` 화면(쪽 없이 한 화면, 사진으로 받는다) |
 | readers/ | 이북 앱마다 파일 하나(`KyoboLibrary`·`KyoboEbook`(e-ink)·`KyoboEbookMobile`(휴대폰)·`Millie`(e-ink)·`MillieMobile`(휴대폰)·`Aladin`·`Bookers`·`Ridi`·`Yes24Library`·`Yes24Ebook`·`MyYes`·`MoonReader`·`Kindle`·`Libby`·`NeoReader`. 패키지만 다른 판은 같은 클래스에 패키지만 줘서 객체 하나 더: 리디 원스토어판 `RidiOneStore`, 문리더 유료판 `MoonReaderPro`). 바탕 `ReaderSpec` 이 요소 이름으로 서재 칸·누른 칸·읽는 화면을 읽고, 다르게 읽어야 하는 앱은 그 앱 파일에서 메서드를 바꾼다(리디·휴대폰 밀리 서재, e-ink 밀리 검색 상세, 문리더 제목, 킨들 서재 칸 설명, Libby 서재·읽는 화면). 읽는 화면이 액티비티가 아니라 요소인 앱(Libby)은 `viewerHolder` 로 그 요소 이름을 준다. 읽는 화면 탭마다 책이 다른 앱(네오리더)은 `viewerTabs`, 실행 화면이 없어 파일로만 여는 앱은 `fileViewer`(앱 목록·고르기에는 넣지 않고 자동 추가된 책의 앱으로만, 홈에서 그 파일을 연다. `AppStore.fileReaders`·`find`·`openBook`), 앱 데이터로 책을 아는 앱은 `fileBook`. 서비스는 앱 종류로 갈라지지 않는다. 공통 도구 `Nodes`, 앱 목록 `ReaderApps`(이북 앱 패키지·읽는 화면도 여기서). 앱을 더하면 `res/xml/reader_watch.xml` 의 packageNames 도 |
-| Books / BooksActivity / BookSearchActivity | 읽고 있는 책(권수 제한 없음, 홈에는 4권, YES24 표지 검색. `책 추가`는 지원하지 않는 이북 앱용: 늘 새 책(id `m-`)이고 제목으로 다른 책·읽은 시간과 잇지 않는다)과 나간 책(완독·뺀 책, `BookShelf.history`), 책 목록 관리 |
+| Books / BooksActivity / BookSearchActivity | 읽고 있는 책(권수 제한 없음, 홈에는 맨 앞 책 + 함께 읽는 책 3권씩 쪽으로, YES24 표지 검색. `책 추가`는 지원하지 않는 이북 앱용: 늘 새 책(id `m-`)이고 제목으로 다른 책·읽은 시간과 잇지 않는다)과 나간 책(완독·뺀 책, `BookShelf.history`), 책 목록 관리 |
 | Apps | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시) |
 | AppListActivity / FavoritesActivity / SettingsActivity / DeviceInfoActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 / 기기 정보(사진으로 찍어 보내는 진단 화면: 속성·권한·자동 추가 서비스 기록·누른 키·시스템 화면 시험) |
 | OnboardingActivity | ⑭ 시작하기: 처음 한 번, 읽는 책 자동 추가·오늘 읽은 시간을 설명하고 켜게 한다(안드로이드 13+ 제한된 설정 안내 포함) |
@@ -77,7 +77,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.4-release.apk </dev/
 
 - 전자잉크 원칙: 애니메이션 없음, 스크롤 대신 페이지, 바뀐 것만 다시 그림, 그리기 전에 채워 빈 화면 한 번 그리지 않기.
 - 색: 처음은 흑백. 컬러('색면의 서가')는 사용자가 고른다(기기로 판단하지 않음). 화면마다 머리에 옅은 색면 하나와 큰 제목 색, 완독은 어디서나 주홍. 본문 글자·선·작은 별은 무채색, 그래프는 책별로 나누지 않는다(DESIGN.md `색`).
-- 책: 권수 제한 없음(1.5.3 까지 10권), 홈에는 앞 4권. 빼는 건 사용자만(자동으로 밀어내지 않는다). 맨 앞 책이 크게(표지가 남는 높이만큼), 다음 3권은 `함께 읽는 책` 3칸. 책이 없으면 스켈레톤(회색 표지 + `+`, 회색 막대).
+- 책: 권수 제한 없음(1.5.3 까지 10권), 홈에는 맨 앞 책과 `함께 읽는 책` 3칸(3권씩 쪽으로 넘김, 그 줄을 밀면 책을, 다른 곳을 밀면 자주 쓰는 앱을). 빼는 건 사용자만(자동으로 밀어내지 않는다). 맨 앞 책이 크게(표지가 남는 높이만큼), 책이 없으면 스켈레톤(회색 표지 + `+`, 회색 막대).
 - 자주 쓰는 앱: 직접 정한 순서, 높이는 목록 3줄로 고정(격자 4×2, 칸 가운데 정렬). 여러 쪽이면 제목 오른쪽 끝 `‹ 1 / 2 ›`. 이름을 따로 붙일 수 있다(`favorite_names`, 모든 앱에는 원래 이름. 빼면 지운다).
 - 글자 크기·줄 간격(설정 › 화면 › 글자 · 간격, 슬라이더 10% 씩): 글자 70~150%(기기 글꼴 크기에 곱한다, `Ui.textScale`·`setSp`·`spf`), 줄 간격 80~150%(목록·메뉴·설정 줄 높이, `Ui.rowScale`·`rowDp`). 둘 다 100% 면 1.5.0 과 같은 화면. 화면에 맞춰 자동으로 줄이지 않는다(사용자가 미리 보기를 보며 고른다). 홈은 틀(상단·표지·함께 읽는 책·자주 쓰는 앱·하단 줄) 높이를 100% 기준으로 고정하고 글자만 키운다(줄 간격은 홈에 안 씀). 칸에 다 들지 않는 줄은 그리지 않는다(`FitColumn`). 기기가 앱의 밀도를 덮어썼으면(BOOX 앱별 DPI) 홈에 `화면이 크게 보입니다` 창(`다시 보지 않기`)을 띄우고 틀은 1.5.3 까지처럼 그린다.
 - 바형 화면(긴 변 ÷ 짧은 변 1.5 이상, `Ui.tallScreen`. Tango·Palma 등 2.0): 홈 함께 읽는 책 표지 두 배(글자는 아래, 가운데), 독서 기록은 남는 높이가 있으면 달력과 그래프를 함께. 시험은 `Tango_A14` 에뮬레이터(824×1648, 400dpi, API 34).
