@@ -6,7 +6,7 @@ import android.view.accessibility.AccessibilityNodeInfo
  * 밀리의서재(휴대폰·태블릿 판 `kr.co.millie.millieshelf`, e-ink 판 [Millie] 와 다른 앱): 첫 화면 `MainTabActivity` 의 내서재 탭이 통째로
  * 웹 화면이라 요소 이름이 없다. 책 칸의 표지 단추 글자가 `제목/저자 지음 / 옮긴이 옮김 썸네일`(오디오북은 앞에 `오디오북 리더 … 완독` 같은 표시),
  * 제목 단추는 `제목 저자`. 눌러도 알림의 글자는 비어 있어 누른 단추의 글자로 안다. 서재에 진행률은 없다. 웹 화면은 처음 한 번 요청받은 뒤에야
- * 안의 요소를 내놓는다.
+ * 안의 요소를 내놓는다. 책을 여는 것은 표지 단추뿐이고, 제목 단추·`⋮` 는 책 메뉴(책 정보·독서 상태·다운로드…)를 띄운다(2026-10-17 갤럭시).
  * 읽는 화면(`MillieViewerActivity`, 화면 캡처 막힘)은 가운데를 눌러 메뉴를 띄우면 위 막대(`viewer_top_bar`)에 제목 `tv_title`,
  * 아래에 진행률 `tv_per`(`0%`)·쪽 `tv_current_page`/`tv_total_page`. 책을 열 때 뜨는 '읽던 페이지' 안내 창도 제목이 `tv_title`(`안내`)이다.
  */
@@ -22,7 +22,7 @@ object MillieMobile : ReaderSpec(
     ),
     titles = emptyList(), thumbs = emptyList(), authors = emptyList(), progress = null, due = null,
     viewerProgress = listOf("tv_viewer_add_on_right", "tv_per"), viewerPages = "tv_current_page" to "tv_total_page",
-    viewerTitle = "tv_title", eagerCovers = true,
+    viewerTitle = "tv_title", eagerCovers = true, openOnViewer = true,
 ) {
     override val cellsByPosition get() = true
 
@@ -45,12 +45,9 @@ object MillieMobile : ReaderSpec(
         return found.values.toList()
     }
 
-    /** 누른 단추: 표지 단추면 그 글자로, 제목 단추(`제목 저자`)면 방금 읽은 서재 칸 가운데 제목이 그 글자에 든 칸 */
-    override fun clickedCell(source: AccessibilityNodeInfo?, text: List<CharSequence>, windows: AppWindows, last: List<Cell>?): Cell? {
-        source?.let(::coverButton)?.let { return it }
-        val label = source?.let { (it.text ?: it.contentDescription)?.let(::plain) }.orEmpty()
-        return last?.filter { it.title.length >= 2 && it.title in label }?.maxByOrNull { it.title.length }
-    }
+    /** 누른 단추: 표지 단추면 그 책 칸. 제목 단추(`제목 저자`)는 책 메뉴만 띄워 책 칸으로 보지 않는다(메뉴의 `다운로드` 로 받기만 해도 들어왔다). */
+    override fun clickedCell(source: AccessibilityNodeInfo?, text: List<CharSequence>, windows: AppWindows, last: List<Cell>?): Cell? =
+        source?.let(::coverButton)
 
     /** 제목은 위 막대 안의 것만(안내 창의 `안내` 를 책 제목으로 보지 않게) */
     override fun titleRoots(windows: AppWindows): List<AccessibilityNodeInfo> = windows.all.flatMap { it.byId(pkg, "viewer_top_bar") }

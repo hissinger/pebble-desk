@@ -44,8 +44,13 @@ open class ReaderSpec(
      * 밀리는 앱을 다시 열 때 잠깐 칸을 다른 책으로 채우므로 쓰지 않는다.
      */
     val eagerCovers: Boolean = false,
-    /** 칸을 눌러도 읽는 화면이 열려야 편 것으로 본다(my YES: 누르면 내려받기·기간 만료 안내가 먼저 뜬다) */
+    /** 칸을 눌러도 읽는 화면이 열려야 편 것으로 본다(my YES: 누르면 내려받기·기간 만료 안내가 먼저 뜬다. 밀리: 받지 않은 책은 누르면 받기만 한다) */
     val openOnViewer: Boolean = false,
+    /**
+     * 누른 요소가 든 칸을 못 찾았을 때 누른 곳 자리의 칸으로 본다. 끄는 앱: my YES(구매목록 창이 책장 위에 겹쳐 뒤 창의 칸을 고를 수 있다),
+     * Libby(칸 안의 `책 열기`·`대출 관리` 단추도 칸 자리에 든다)
+     */
+    val clickByPlace: Boolean = true,
     /** 앱 화면 전체가 화면 캡처를 막아(검게 찍힌다) 표지를 자르지 않는다(my YES) */
     val secure: Boolean = false,
     /** 서재 편집(지우기·옮기기) 중에만 보이는 요소. 그동안은 칸을 눌러도 책을 고르는 것이라 서재를 읽지 않는다(알라딘) */
@@ -127,7 +132,7 @@ open class ReaderSpec(
      * 누른 책 칸. 이벤트로 받은 요소는 위(부모)로 올라갈 수 없어서, 그 앱의 창(맨 앞 창부터)을 한 번 훑어 누른 요소를 찾고
      * 거기서 위로 올라가며 제목이 하나 든 가장 가까운 묶음을 칸으로 본다(표지 그림만 눌린 것으로 오기도 한다).
      * 창이 겹치는 앱(my YES 구매목록 창 뒤의 책장)에서 위치로 고르면 뒤 창의 칸을 고를 수 있고, 누르자마자 창이 닫히기도 해서 빨리 찾는다.
-     * 못 찾으면, 창이 겹치지 않는 앱은 누른 곳의 가운데가 들어 있는 칸, 그래도 없으면 누른 요소 안에서 읽는다.
+     * 못 찾으면 누른 곳의 가운데가 들어 있는 칸([clickByPlace] 인 앱), 그래도 없으면 누른 요소 안에서 읽는다.
      */
     private fun clickedNode(source: AccessibilityNodeInfo, windows: AppWindows): Cell? {
         val at = source.bounds()
@@ -141,7 +146,7 @@ open class ReaderSpec(
                 break
             }
         }
-        if (!openOnViewer) {
+        if (clickByPlace) {
             windows.active?.let(::shelfCells)?.firstOrNull { it.cell.contains(at.centerX(), at.centerY()) }?.let { return it }
         }
         return cellOf(source)?.let(::readCell)

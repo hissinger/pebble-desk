@@ -376,6 +376,8 @@ class ReaderWatchService : AccessibilityService() {
      */
     private fun bookOpened(spec: ReaderSpec, seen: Cell, at: Long? = null) {
         webBook.remove(spec.pkg)
+        // 앞서 눌러 내려받기만 한 칸이 그 뒤 연 다른 책 대신 들어가지 않게
+        clicked -= spec.pkg
         unknownClick -= spec.pkg
         unknownOpen -= spec.pkg
         // 편 때는 한 번만 정해 회차 시작일과 편 책 기록에 같이 쓴다(자정에 걸쳐도 같은 날)

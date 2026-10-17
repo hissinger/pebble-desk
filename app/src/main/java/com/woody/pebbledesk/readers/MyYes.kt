@@ -19,5 +19,5 @@ object MyYes : ReaderSpec(
     titles = listOf("textView_title", "tv_buylist_title"), thumbs = listOf("grid_book_cover", "aiv_buylist_thumbnail"),
     authors = listOf("textView_author", "tv_buylist_author"), progress = null, due = "tv_book_disable_message",
     viewerProgress = listOf("bottom_page_no", "text_space_page"), viewerTitle = "tv_book_title",
-    openOnViewer = true, secure = true,
+    openOnViewer = true, secure = true, clickByPlace = false,
 )

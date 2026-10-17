@@ -9,6 +9,7 @@ import kotlin.math.abs
  * 책장 안(읽고있는 책 등)은 `BookShelfDetailActivity`. 칸에 제목·표지·진행률. 검색 탭(웹 화면) 책 상세의 `바로 읽기`·`이어 읽기` 로도 연다.
  * 읽는 화면은 아래 오른쪽 진행률(불러오는 동안의 `0%` 는 뺀다). 가운데를 누르면 뜨는 위 막대 `epub_navibar` 가운데에 제목(`팩트풀니스`)이
  * 이름 없는 글자로 있다(2026-10-16 페블에서 확인. 몇 초 뒤 저절로 닫힌다).
+ * 전체도서 탭·책장 안의 받지 않은 책 칸은 누르면 내려받기만 해서, 누른 칸은 읽는 화면이 열릴 때 편 것으로 본다([openOnViewer]).
  */
 object Millie : ReaderSpec(
     pkg = "kr.co.millie.eink", classPrefix = "kr.co.millie",
@@ -20,6 +21,7 @@ object Millie : ReaderSpec(
     ),
     titles = listOf("tv_book_title"), thumbs = listOf("iv_thumbnail"), authors = emptyList(), progress = "bookshelf_cell_reading", due = null,
     viewerProgress = listOf("tv_viewer_add_on_right"), viewerLoading = "epub_loading_message",
+    openOnViewer = true,
 ) {
     /** 읽는 화면 메뉴(위 막대)에 제목이 보인다(이름 없는 글자라 [viewerTitle] 대신 [readViewer] 에서 읽는다) */
     override val tellsTitle: Boolean get() = true

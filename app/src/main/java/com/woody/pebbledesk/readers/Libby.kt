@@ -19,7 +19,7 @@ object Libby : ReaderSpec(
     viewers = setOf("$MAIN#$HOLDER"),
     titles = emptyList(), thumbs = emptyList(), authors = emptyList(), progress = null, due = null,
     viewerProgress = emptyList(), viewerHolder = HOLDER,
-    eagerCovers = true, openOnViewer = true,
+    eagerCovers = true, openOnViewer = true, clickByPlace = false,
 ) {
     /** 읽는 화면은 메뉴 없이도 안내 글자로 제목을 알려 준다 */
     override val tellsTitle get() = true
