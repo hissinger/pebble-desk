@@ -316,6 +316,8 @@ object AppIcons {
     private var packageSequence = 0
 
     private fun dir(context: Context) = File(Storage.of(context).filesDir, "icons")
+    /** 파일 이름에 쓰지 않는 글자(실행 화면 키의 `/`·`$` 등) */
+    private val UNSAFE_NAME = Regex("[^A-Za-z0-9._]")
 
     fun icon(context: Context, app: AppEntry, px: Int): Bitmap {
         val gray = !Palette.current.color
@@ -323,8 +325,9 @@ object AppIcons {
         cache.get(key)?.let { return it }
         val pm = context.packageManager
         val updated = runCatching { pm.getPackageInfo(app.pkg, MATCH_ALL_BOOT_STATES).lastUpdateTime }.getOrNull()
-        val name = app.key.replace(Regex("[^A-Za-z0-9._]"), "_")
-        val file = updated?.let { File(dir(context), "${name}@$px${if (gray) "g" else "c"}@$it.png") }
+        // 같은 앱·크기·색의 파일 이름 머리(뒤에 앱을 업데이트한 때)
+        val prefix = "${app.key.replace(UNSAFE_NAME, "_")}@$px${if (gray) "g" else "c"}@"
+        val file = updated?.let { File(dir(context), "$prefix$it.png") }
         file?.takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.path) }?.let { cache.put(key, it); return it }
         // 못 찾으면 기본 아이콘을 쓰되 기억하지 않는다(다음에 다시 찾는다).
         val found = runCatching {
@@ -339,7 +342,7 @@ object AppIcons {
         }
         if (found != null) {
             cache.put(key, out)
-            if (file != null) Bg.run({ save(file, "${name}@$px${if (gray) "g" else "c"}@", out) }) {}
+            if (file != null) Bg.run({ save(file, prefix, out) }) {}
         }
         return out
     }
