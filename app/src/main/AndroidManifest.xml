@@ -34,7 +34,6 @@
             android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="portrait"
             android:stateNotNeeded="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -51,62 +50,52 @@
         <activity
             android:name=".AppListActivity"
             android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+            android:exported="false" />
 
         <activity
             android:name=".FavoritesActivity"
             android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+            android:exported="false" />
 
         <activity
             android:name=".BooksActivity"
             android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+            android:exported="false" />
 
         <activity
             android:name=".BookSearchActivity"
             android:excludeFromRecents="true"
             android:exported="false"
-            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ReadingActivity"
             android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+            android:exported="false" />
 
         <activity
             android:name=".YearBooksActivity"
             android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+            android:exported="false" />
 
         <activity
             android:name=".OnboardingActivity"
             android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+            android:exported="false" />
 
         <activity
             android:name=".SettingsActivity"
             android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+            android:exported="false" />
 
         <activity
             android:name=".DeviceInfoActivity"
             android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+            android:exported="false" />
         <activity
             android:name=".WatchLogActivity"
             android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+            android:exported="false" />
 
         <!-- 설정 › 업데이트: 설치 세션 결과(사용자 확인이 필요하면 설치 창을 띄운다) -->
         <receiver

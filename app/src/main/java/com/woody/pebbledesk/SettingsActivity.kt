@@ -24,6 +24,8 @@ import kotlin.math.roundToInt
 /** ⑧ 설정. 회색 소제목으로 묶고 값은 오른쪽에 같은 굵기로 쓴다. 켜짐은 검정, 꺼짐은 진회색, `›` 는 다음 화면. */
 class SettingsActivity : EinkActivity() {
     private lateinit var list: LinearLayout
+    /** 줄을 넣는 곳: 보통 [list], 가로 화면의 설정 첫 화면은 왼쪽·오른쪽 칸 중 하나 */
+    private lateinit var col: LinearLayout
     /** 업데이트 줄 자리(상태가 바뀌면 이 줄만 다시 그린다) */
     private var updateSlot: LinearLayout? = null
     /** 최신 판 줄을 눌러 다시 확인하는 중(끝나서 여전히 최신이면 알린다) */
@@ -58,6 +60,7 @@ class SettingsActivity : EinkActivity() {
             root.addView(guide, lp(MATCH, 0, 1f))
         } else {
             list = vbox()
+            col = list
             root.addView(list, lp(MATCH, 0, 1f))
         }
         // 맨 아래 지금 판, 늘 보인다(업데이트 줄은 새 판이 있으면 새 판 번호를 보여 지금 판이 안 보인다)
@@ -97,6 +100,9 @@ class SettingsActivity : EinkActivity() {
     private fun render() {
         list.removeAllViews()
         AppStore.loadAndPrune(this, prefs)
+        // 가로 화면이면 묶음째 두 칸으로: 왼쪽 독서·화면·언어와 정보, 오른쪽 앱 관리(묶음은 쪼개지 않는다)
+        val right = splitColumns()
+        val left = col
 
         // 맨 위 소제목 없이 독서(읽고 있는 책·자동 추가·오늘 읽은 시간·하루 목표·한 주 시작·독서 기록). 줄이 많아 한 화면에 모은다.
         row(getString(R.string.reading_settings), null, next = true) { open(PAGE_READING) }
@@ -114,6 +120,7 @@ class SettingsActivity : EinkActivity() {
             }
         }
 
+        col = right
         section(getString(R.string.section_apps))
         row(getString(R.string.favorites), prefs.favoriteList.size.toString(), next = true) {
             startActivity(FavoritesActivity.intent(this))
@@ -127,9 +134,10 @@ class SettingsActivity : EinkActivity() {
         }
 
         // 정보
+        col = left
         section(getString(R.string.section_info))
         row(getString(R.string.device_info), Build.MODEL, next = true) { startActivity(DeviceInfoActivity.intent(this)) }
-        updateSlot = vbox().also { list.addView(it) }
+        updateSlot = vbox().also { col.addView(it) }
         renderUpdate()
     }
 
@@ -294,6 +302,8 @@ class SettingsActivity : EinkActivity() {
     /** 독서 화면: 읽고 있는 책, 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */
     private fun renderReading() {
         list.removeAllViews()
+        // 가로 화면이면 두 칸으로: 왼쪽 책·자동 추가, 오른쪽 읽은 시간·목표·독서 기록(일곱 줄이 낮은 화면을 넘지 않게)
+        val right = splitColumns()
         // 읽고 있는 앱은 책을 정할 때 함께 고른다(책 없이 바꾸려면 앱을 길게 눌러 '읽고 있는 앱으로 설정').
         // 맨 앞 책 제목이 길면 줄임표로 자르고 `외 3권` 은 늘 보인다.
         val books = BookShelf.list(this)
@@ -314,6 +324,7 @@ class SettingsActivity : EinkActivity() {
             startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, PAGE_GUIDE))
         }
         // 오늘 읽은 시간 = 사용 기록 액세스 허용. 켜고 끄기 모두 그 시스템 화면에서 한다.
+        col = right
         val access = ReadingLog.hasAccess(this)
         row(
             getString(R.string.reading_time), getString(if (access) R.string.on else R.string.off),
@@ -350,6 +361,8 @@ class SettingsActivity : EinkActivity() {
      */
     private fun renderText() {
         list.removeAllViews()
+        // 가로 화면이면 왼쪽에 슬라이더, 오른쪽에 미리 보기(세로로 쌓으면 미리 보기가 화면 아래로 넘친다)
+        val right = splitColumns()
         val preview = vbox()
         fun showPreview() {
             preview.removeAllViews()
@@ -361,27 +374,28 @@ class SettingsActivity : EinkActivity() {
         }
         fun slider(label: Int, steps: List<Int>, value: Int, apply: (Int) -> Unit) {
             val valueText = text("$value%", 20f, Ui.medium)
-            list.addView(hbox().apply {
+            col.addView(hbox().apply {
                 setPadding(dp(Ui.MARGIN), dp(18), dp(Ui.MARGIN), 0)
                 addView(text(getString(label), ROW_LABEL_SP), lp(0, WRAP, 1f))
                 addView(valueText)
             })
-            list.addView(StepSlider(this, steps, value, onStep = { valueText.text = "$it%" }) { apply(it); showPreview() })
+            col.addView(StepSlider(this, steps, value, onStep = { valueText.text = "$it%" }) { apply(it); showPreview() })
         }
         slider(R.string.text_size, HomePrefs.TEXT_SCALES, prefs.textScalePercent) {
             prefs.textScalePercent = it; Ui.textScale = it / 100f
         }
         // 기기 글꼴 크기를 바꿔 두었으면 그 위에 곱한다는 것을 알린다.
         val deviceFont = (resources.configuration.fontScale * 100).roundToInt()
-        if (deviceFont != 100) list.addView(text(getString(R.string.text_size_device, deviceFont), 15f, color = Ui.GRAY).apply {
+        if (deviceFont != 100) col.addView(text(getString(R.string.text_size_device, deviceFont), 15f, color = Ui.GRAY).apply {
             setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
         })
         slider(R.string.line_spacing, HomePrefs.ROW_SCALES, prefs.rowScalePercent) {
             prefs.rowScalePercent = it; Ui.rowScale = it / 100f
         }
+        col = right
         section(getString(R.string.preview))
-        list.addView(hline(1))
-        list.addView(preview)
+        col.addView(hline(1))
+        col.addView(preview)
         showPreview()
     }
 
@@ -469,7 +483,24 @@ class SettingsActivity : EinkActivity() {
         sheet.show()
     }
 
-    private fun section(title: String) = list.addView(sectionView(title))
+    /**
+     * 가로 화면이면 [list] 를 두 칸(사이에 옅은 세로 선)으로 나눠 [col] 을 왼쪽 칸으로 두고 오른쪽 칸을 돌려준다.
+     * 세로 화면이면 [col] 도 오른쪽도 [list] 그대로(한 칸).
+     */
+    private fun splitColumns(): LinearLayout {
+        col = list
+        if (!landscape()) return list
+        list.orientation = LinearLayout.HORIZONTAL
+        val left = vbox()
+        val right = vbox()
+        list.addView(left, lp(0, WRAP, 1f))
+        list.addView(vline(12))
+        list.addView(right, lp(0, WRAP, 1f))
+        col = left
+        return right
+    }
+
+    private fun section(title: String) = col.addView(sectionView(title))
 
     private fun sectionView(title: String) = text(title, 16f, color = Ui.LIGHT_GRAY).apply {
         setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), dp(2))
@@ -481,7 +512,7 @@ class SettingsActivity : EinkActivity() {
      */
     private fun row(
         label: String, value: String?, on: Boolean = true, next: Boolean = false, last: Boolean = false,
-        hint: String? = null, tail: String? = null, into: LinearLayout = list, action: () -> Unit,
+        hint: String? = null, tail: String? = null, into: LinearLayout = col, action: () -> Unit,
     ) {
         val color = if (on) Ui.BLACK else Ui.GRAY
         val row = hbox().apply {

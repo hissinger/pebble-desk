@@ -39,7 +39,7 @@ class PagedRows(
 
     /**
      * 격자 모드: 목록일 때 들어갈 높이를 그대로 쓰고 그 안을 [gridRows] 줄로 나눈다(줄 사이 선 없음).
-     * 덜 차도 그 높이를 비워 두어 머리(제목·선) 위치가 목록일 때와 같다. 0 이면 목록.
+     * 덜 차도 그 높이를 비워 두어 머리(제목·선) 위치가 목록일 때와 같다. 0 이면 목록, [GRID_AUTO] 면 높이에 맞춰 목록 줄 수의 2/3.
      */
     private var gridRows = 0
 
@@ -116,8 +116,8 @@ class PagedRows(
         val listFit = if (fixedRows > 0) fixedRows else maxOf(1, (h - headerHeight() + dividerPx) / (listRowPx + dividerPx))
         val fit: Int
         val rowPx: Int
-        if (gridRows > 0) {
-            fit = minOf(gridRows, listFit)
+        if (gridRows != 0) {
+            fit = if (gridRows == GRID_AUTO) maxOf(1, listFit * 2 / 3) else minOf(gridRows, listFit)
             rowPx = (listFit * (listRowPx + dividerPx) - dividerPx) / fit
         } else {
             fit = listFit
@@ -159,10 +159,15 @@ class PagedRows(
         }
         // 덜 찬 페이지도 같은 높이를 쓴다(아래를 비워 제목·선 위치가 움직이지 않게).
         // 목록은 페이지가 여러 개일 때만, 격자는 늘(목록과 같은 높이를 유지).
-        val missing = if (pageCount > 1 || gridRows > 0 || fixedRows > 0) perPage - (to - from) else 0
-        val gap = if (gridRows > 0) 0 else dividerPx
+        val missing = if (pageCount > 1 || gridRows != 0 || fixedRows > 0) perPage - (to - from) else 0
+        val gap = if (gridRows != 0) 0 else dividerPx
         if (missing > 0) addView(View(context), lp(MATCH, missing * (rowHeightPx + gap)))
         onPageChanged?.invoke()
+    }
+
+    companion object {
+        /** [setGrid]: 격자 줄 수를 높이에 맞춰 목록 줄 수의 2/3 로(홈 격자가 목록 세 줄 높이에 두 줄인 것과 같은 비율. 가로 화면의 자주 쓰는 앱) */
+        const val GRID_AUTO = -1
     }
 }
 

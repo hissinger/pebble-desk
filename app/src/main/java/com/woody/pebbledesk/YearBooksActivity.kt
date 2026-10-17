@@ -31,7 +31,13 @@ class YearBooksActivity : EinkActivity() {
     private lateinit var viewToggle: TextView
     private lateinit var filterToggle: TextView
     private lateinit var empty: TextView
-    private var cellW = 0
+    /**
+     * 격자 칸 폭·한 줄 권수·칸 사이([coverGrid]). 세로 화면은 [COLUMNS]권. 가로 화면은 표지를 세로 화면과 같은 크기로 두고 들어가는 만큼 늘리며,
+     * 남는 폭은 칸 사이에 나눈다(페블 5권, 바형 8권).
+     */
+    private lateinit var fit: CoverGrid
+    /** 목록 한 줄의 책 수: 가로로 넓어 한 칸이 [LIST_COLUMN_DP] 넘게 남으면 두 권씩 나란히(바형), 아니면 한 권 */
+    private var listColumns = 1
     /** 격자 표지 크기: 칸 높이는 그대로 두고 아래 별 줄만큼 줄인다(2:3) */
     private var gridCoverW = 0
     private var gridCoverH = 0
@@ -65,11 +71,14 @@ class YearBooksActivity : EinkActivity() {
             setPadding(dp(Ui.MARGIN), dp(40), dp(Ui.MARGIN), 0)
         }
         root.addView(empty)
-        cellW = (resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - (COLUMNS - 1) * dp(GAP_DP)) / COLUMNS
+        // 표지 크기는 세로 화면(짧은 변) 기준, 가로면 권수를 늘린다
+        fit = coverGrid(COLUMNS, GAP_DP)
+        val inner = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN)
+        listColumns = if (inner >= 2 * dp(LIST_COLUMN_DP) + 2 * dp(Ui.MARGIN)) 2 else 1
         // 글자를 키우면 줄·격자 글자 칸도 그만큼 높인다(줄이면 고정 크기 표지가 잘리므로 100% 아래로는 그대로).
         listRows = PagedRows(this, rowDp(ROW_DP * Ui.textGrow))
-        gridRows = PagedRows(this, cellW * 3 / 2 + dp(GRID_TEXT_DP * Ui.textGrow), dividers = false)
-        gridCoverH = cellW * 3 / 2 - dp(GRID_STARS_DP)
+        gridRows = PagedRows(this, fit.cellW * 3 / 2 + dp(GRID_TEXT_DP * Ui.textGrow), dividers = false)
+        gridCoverH = fit.cellW * 3 / 2 - dp(GRID_STARS_DP)
         gridCoverW = gridCoverH * 2 / 3
         val pages = FrameLayout(this)
         pages.addView(listRows, FrameLayout.LayoutParams(MATCH, MATCH))
@@ -148,7 +157,16 @@ class YearBooksActivity : EinkActivity() {
         filterToggle.visibility = viewToggle.visibility
         listRows.visibility = if (grid) View.GONE else View.VISIBLE
         gridRows.visibility = if (grid) View.VISIBLE else View.GONE
-        if (grid) gridRows.setRows(list.chunked(COLUMNS).map { line -> { gridRow(line) } })
+        if (grid) gridRows.setRows(list.chunked(fit.columns).map { line -> { gridRow(line) } })
+        else if (listColumns > 1) listRows.setRows(list.chunked(listColumns).map { line ->
+            {
+                // 두 권씩 나란히(왼쪽에서 오른쪽, 위에서 아래로). 덜 찬 줄도 칸 폭이 같게 빈 칸을 채운다.
+                hbox().apply {
+                    line.forEach { addView(bookRow(it), lp(0, MATCH, 1f)) }
+                    repeat(listColumns - line.size) { addView(View(context), lp(0, MATCH, 1f)) }
+                }
+            }
+        })
         else listRows.setRows(list.map { r -> { bookRow(r) } })
         showPage()
     }
@@ -162,7 +180,7 @@ class YearBooksActivity : EinkActivity() {
     }
 
     /**
-     * 표지 [COLUMNS]권 한 줄. 표지 아래에 책 이름 한 줄(완독한 책은 표지의 띠로 안다), 별점이 있으면 그 아래 작은 별(없으면 빈 자리).
+     * 표지 한 줄([CoverGrid.columns]권). 표지 아래에 책 이름 한 줄(완독한 책은 표지의 띠로 안다), 별점이 있으면 그 아래 작은 별(없으면 빈 자리).
      * 표지를 가리지 않게 별 줄만큼 표지를 줄였다(칸 높이는 그대로).
      */
     private fun gridRow(line: List<Row>): View = hbox().apply {
@@ -174,7 +192,7 @@ class YearBooksActivity : EinkActivity() {
                 addView(text(r.book.title, 13f, Ui.medium).apply { gravity = Gravity.CENTER_HORIZONTAL }, lp(MATCH, WRAP).apply { topMargin = dp(6) })
                 stars(r, 12)?.let { addView(it, lp(WRAP, WRAP).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(5) }) }
                 setOnClickListener { showMenu(r) }
-            }, lp(cellW, MATCH).apply { if (i > 0) marginStart = dp(GAP_DP) })
+            }, lp(fit.cellW, MATCH).apply { if (i > 0) marginStart = fit.gap })
         }
     }
 
@@ -215,8 +233,8 @@ class YearBooksActivity : EinkActivity() {
     /** 목록 줄 표지 그림 폭(테두리 빼고): 줄 높이에서 위아래 [COVER_GAP_DP] 와 테두리를 뺀 높이의 2/3 */
     private val coverW get() = (rowDp(ROW_DP * Ui.textGrow) - dp(2 * COVER_GAP_DP + 2)) * 2 / 3
 
-    /** 목록 줄 글자 칸 폭(화면 폭 - 여백 - 표지 - 도장 자리) */
-    private fun Row.textWidth() = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - coverW - dp(2) - dp(16) - (if (finished) stampSpace else 0)
+    /** 목록 줄 글자 칸 폭(한 권 칸 폭 - 여백 - 표지 - 도장 자리) */
+    private fun Row.textWidth() = resources.displayMetrics.widthPixels / listColumns - 2 * dp(Ui.MARGIN) - coverW - dp(2) - dp(16) - (if (finished) stampSpace else 0)
 
     /** 마지막 회차에 별점이 있으면 작은 별 다섯(회색, 반 개), 없으면 null */
     private fun stars(r: Row, sizeDp: Int): View? {
@@ -240,6 +258,8 @@ class YearBooksActivity : EinkActivity() {
         private const val COLUMNS = 4
         private const val GAP_DP = 14
         private const val GRID_TEXT_DP = 34
+        /** 가로 화면 목록: 한 권 칸(여백 안)이 이만큼 넓게 남으면 두 권씩 나란히 */
+        private const val LIST_COLUMN_DP = 440
         /** 격자 별 줄(별 12dp + 위 5dp): 표지를 이만큼 줄인다 */
         private const val GRID_STARS_DP = 17
         /** 목록 저자와 별 사이 `·` 양옆 틈과 `·` 자리(점 폭 넉넉히) */

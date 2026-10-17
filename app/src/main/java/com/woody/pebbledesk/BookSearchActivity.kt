@@ -28,7 +28,8 @@ class BookSearchActivity : EinkActivity() {
     private lateinit var status: TextView
     private lateinit var rows: PagedRows
     private lateinit var pageText: TextView
-    private var cellW = 0
+    /** 칸 폭·한 줄 권수·칸 사이([coverGrid]): 세로 화면은 [COLUMNS]권, 가로 화면은 표지를 세로와 같은 크기로 두고 들어가는 만큼(남는 폭은 칸 사이에) */
+    private lateinit var fit: CoverGrid
     private var coverH = 0
     /** 늦게 끝난 옛 검색이 새 결과를 덮지 않도록 검색마다 번호를 붙인다. */
     private var searchId = 0
@@ -38,9 +39,8 @@ class BookSearchActivity : EinkActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val screenW = resources.displayMetrics.widthPixels
-        cellW = (screenW - 2 * dp(Ui.MARGIN) - (COLUMNS - 1) * dp(GAP_DP)) / COLUMNS
-        coverH = cellW * 3 / 2
+        fit = coverGrid(COLUMNS, GAP_DP)
+        coverH = fit.cellW * 3 / 2
 
         val root = vbox()
         root.addView(titleRow(getString(if (replaceId != null) R.string.find_cover else R.string.book_search_title), Palette.Area.LIBRARY) { finish() })
@@ -56,7 +56,8 @@ class BookSearchActivity : EinkActivity() {
             setPadding(0, dp(8), 0, dp(8))
             isSingleLine = true
             inputType = InputType.TYPE_CLASS_TEXT
-            imeOptions = EditorInfo.IME_ACTION_SEARCH
+            // 가로 화면에서도 전체 화면 입력 창으로 바꾸지 않는다(결과 칸이 가려진다)
+            imeOptions = EditorInfo.IME_ACTION_SEARCH or EditorInfo.IME_FLAG_NO_EXTRACT_UI
             setOnEditorActionListener { _, action, event ->
                 if (action == EditorInfo.IME_ACTION_SEARCH || event?.keyCode == KeyEvent.KEYCODE_ENTER) {
                     search(); true
@@ -121,7 +122,7 @@ class BookSearchActivity : EinkActivity() {
             if (id != searchId || isFinishing || isDestroyed) return@run
             result.onSuccess { books ->
                 status.text = if (books.isEmpty()) getString(R.string.book_none) else getString(R.string.book_results, books.size)
-                rows.setRows(books.chunked(COLUMNS).map { line -> { gridRow(line) } })
+                rows.setRows(books.chunked(fit.columns).map { line -> { gridRow(line) } })
                 rows.showPage(0)
             }.onFailure { status.text = errorText(R.string.book_error, it) }
         }
@@ -137,12 +138,12 @@ class BookSearchActivity : EinkActivity() {
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     setBackgroundColor(0xFFEEEEEE.toInt())
                 }
-                addView(cover, lp(cellW, coverH))
+                addView(cover, lp(fit.cellW, coverH))
                 loadThumb(cover, book.thumbUrl)
                 addView(text(book.title, 14f, Ui.bold), lp(MATCH, WRAP).apply { topMargin = dp(6) })
                 if (book.author.isNotBlank()) addView(text(book.author, 12f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(2) })
                 setOnClickListener { pick(book) }
-            }, lp(cellW, MATCH).apply { if (i > 0) marginStart = dp(GAP_DP) })
+            }, lp(fit.cellW, MATCH).apply { if (i > 0) marginStart = fit.gap })
         }
     }
 
@@ -152,7 +153,7 @@ class BookSearchActivity : EinkActivity() {
         val gray = !Palette.current.color
         val key = if (gray) url else "$url@c"
         thumbs.get(key)?.let { view.setImageBitmap(it); view.background = null; return }
-        val width = cellW
+        val width = fit.cellW
         Bg.run({ BookSearch.scaledCover(BookSearch.download(url), width, gray) }) { result ->
             val bmp = result.getOrNull() ?: return@run
             thumbs.put(key, bmp)

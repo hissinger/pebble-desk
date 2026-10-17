@@ -16,11 +16,13 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Space
 
 /**
  * 아래에서 올라오는 메뉴. 위쪽 굵은 선, 머리(아이콘·이름·설명), 항목들, 맨 아래 오른쪽 `닫기`.
  * 별점·감상 칸([review])이 있으면 항목 대신 별·감상 입력과 맨 아래 `취소` / 할 일 한 줄.
  * 박스 없이 선으로만 나눈다.
+ * 가로 화면에서 항목이 있는 메뉴는 두 칸으로 나눈다: 왼쪽에 머리·칸, 오른쪽에 항목과 맨 아래 `닫기`(세로로 쌓으면 화면 높이를 넘는다).
  */
 class Sheet(private val context: Context) {
     companion object {
@@ -124,10 +126,23 @@ class Sheet(private val context: Context) {
         input = initial to onDone; date = true; inputHint = hint; this.check = check
     }
 
-    /** 머리: 앱 아이콘 또는 표지, 제목·설명, 도장이 있으면 그 자리를 비운다. */
+    /** 가로 화면에서 두 칸으로 나누는가: 아래에 붙는 메뉴이고 항목이 있으며 별점·감상·입력 칸이 없을 때(키보드와 함께 쓰는 메뉴는 한 칸) */
+    private val split get() = !centered && review == null && input == null && items.isNotEmpty() && context.landscape()
+
+    /** 두 칸 메뉴의 오른쪽(항목) 칸 폭 */
+    private fun menuWidth() = maxOf(context.dp(SPLIT_MENU_DP), (context.resources.displayMetrics.widthPixels * SPLIT_MENU_RATIO).toInt())
+
+    /** 가운데 창 폭: 화면 폭에서 좌우 여백을 뺀 만큼. 가로 화면은 [CENTERED_MAX_DP] 까지(낮은 화면에 글이 덜 접히게, 너무 넓지는 않게) */
+    private fun centeredWidth(): Int =
+        minOf(context.resources.displayMetrics.widthPixels - context.dp(Ui.MARGIN) * 2, context.dp(CENTERED_MAX_DP))
+
+    /** 머리: 앱 아이콘 또는 표지, 제목·설명, 도장이 있으면 그 자리를 비운다. 두 칸이면 왼쪽 칸이 좁아 도장을 줄인다. */
     private fun head(): LinearLayout {
         val c = context
-        val head = (if (stamped) StampedRow(c, STAMP_DP, STAMP_END_DP, STAMP_TOP_DP) else c.hbox())
+        val small = split
+        val stampDp = if (small) SPLIT_STAMP_DP else STAMP_DP
+        val stampEnd = if (small) SPLIT_STAMP_END_DP else STAMP_END_DP
+        val head = (if (stamped) StampedRow(c, stampDp, stampEnd, if (small) SPLIT_STAMP_TOP_DP else STAMP_TOP_DP) else c.hbox())
             .apply { setPadding(c.dp(Ui.MARGIN), c.dp(22), c.dp(Ui.MARGIN), c.dp(20)) }
         app?.let {
             head.addView(c.picture(AppIcons.icon(c, it, c.dp(45))),
@@ -146,7 +161,7 @@ class Sheet(private val context: Context) {
         head.addView(names, lp(0, WRAP, 1f).apply {
             if (image != null) gravity = Gravity.TOP
             // 제목이 도장에 덮이지 않게 도장 왼쪽 끝까지 비운다.
-            if (stamped) marginEnd = c.dp(STAMP_END_DP + STAMP_DP / 2 - Ui.MARGIN)
+            if (stamped) marginEnd = c.dp(stampEnd + stampDp / 2 - Ui.MARGIN)
         })
         return head
     }
@@ -157,7 +172,7 @@ class Sheet(private val context: Context) {
      */
     fun height(): Int {
         val screen = context.resources.displayMetrics.widthPixels
-        val h = layout(Dialog(context, R.style.Sheet)).heightAt(if (centered) screen - context.dp(Ui.MARGIN) * 2 else screen)
+        val h = layout(Dialog(context, R.style.Sheet)).heightAt(if (centered) centeredWidth() else screen)
         notes.forEach { (it.view.parent as? ViewGroup)?.removeView(it.view) }
         return h
     }
@@ -191,7 +206,7 @@ class Sheet(private val context: Context) {
         dialog.setContentView(root)
         dialog.window?.apply {
             setGravity(if (centered) Gravity.CENTER else Gravity.BOTTOM)
-            val width = if (centered) context.resources.displayMetrics.widthPixels - context.dp(Ui.MARGIN) * 2 else ViewGroup.LayoutParams.MATCH_PARENT
+            val width = if (centered) centeredWidth() else ViewGroup.LayoutParams.MATCH_PARENT
             setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
             decorView.setPadding(0, 0, 0, 0)
             // 입력 줄이 있으면 키보드를 띄우고, 메뉴가 키보드 위로 올라오게 한다.
@@ -224,7 +239,23 @@ class Sheet(private val context: Context) {
         // 머리와 칸들을 한 묶음에 넣는다(정보 바탕을 칠할 때 도장이 넘친 자리까지 같은 바탕이게).
         val info = c.vbox()
         paper?.let { info.setBackgroundColor(it) }
-        root.addView(info, lp(MATCH, WRAP))
+        // 항목과 `닫기`를 넣을 곳: 두 칸이면 오른쪽 칸(옅은 세로 선 뒤), 아니면 머리 아래
+        val split = split
+        val menu: LinearLayout
+        if (split) {
+            // 아래 여백을 두고, 오른쪽 칸은 위에도 여백을 둔다(왼쪽은 머리의 위 여백이 있고, 위에 두면 도장이 메뉴 위 선을 덮는다)
+            val columns = EqualHeightRow(c).apply { setPadding(0, 0, 0, c.dp(SPLIT_PAD_DP)) }
+            root.addView(columns, lp(MATCH, WRAP))
+            columns.addView(info, lp(0, WRAP, 1f))
+            // 선은 높이 0 으로 재고([EqualHeightRow] 가 칸 높이로 늘린다. WRAP 이면 빈 뷰가 화면 높이를 다 차지한다)
+            columns.addView(c.vline(16, heightPx = 0))
+            menu = c.vbox().apply { setPadding(0, c.dp(SPLIT_PAD_DP), 0, 0) }
+            columns.addView(menu, lp(menuWidth(), WRAP))
+            if (stamped) columns.clipChildren = false
+        } else {
+            root.addView(info, lp(MATCH, WRAP))
+            menu = root
+        }
         // 도장은 머리 아래로 조금 넘쳐 기록 칸 위에 걸친다(뒤에 그리는 선·글자가 위에 온다).
         if (stamped) { root.clipChildren = false; info.clipChildren = false }
 
@@ -260,6 +291,8 @@ class Sheet(private val context: Context) {
                 gravity = Gravity.TOP or Gravity.START
                 setPadding(0, c.dp(14), 0, c.dp(14))
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                // 가로 화면에서도 전체 화면 입력 창으로 바꾸지 않는다(별점이 가려진다)
+                imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI
                 minLines = 4
                 maxLines = 4
                 filters = arrayOf(InputFilter.LengthFilter(2000))
@@ -300,7 +333,7 @@ class Sheet(private val context: Context) {
                     numeric -> InputType.TYPE_CLASS_NUMBER
                     else -> InputType.TYPE_CLASS_TEXT
                 }
-                imeOptions = EditorInfo.IME_ACTION_DONE
+                imeOptions = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_EXTRACT_UI
             }
             val hint = inputHint?.let { c.text(it, 15f, color = Ui.LIGHT_GRAY, lines = 2) }
             val save = {
@@ -325,16 +358,20 @@ class Sheet(private val context: Context) {
             field.requestFocus()
         }
 
-        items.forEach { item ->
-            root.addView(c.hline(1, Ui.DIVIDER))
-            root.addView(c.hbox().apply {
+        items.forEachIndexed { i, item ->
+            // 두 칸이면 첫 항목 위 선은 두지 않는다(메뉴 위 굵은 선 바로 아래라)
+            if (!split || i > 0) menu.addView(c.hline(1, Ui.DIVIDER))
+            menu.addView(c.hbox().apply {
                 setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
                 addView(c.text(item.label, 24f, if (item.bold) Ui.bold else Ui.regular), lp(MATCH, WRAP))
                 setOnClickListener { dismissThen(item.action) }
             }, lp(MATCH, c.rowDp(Ui.ROW_DP)))
         }
-        if (review == null) root.addView(c.hline(1, Ui.DIVIDER))
-        if (closeRow) root.addView(c.text(c.getString(R.string.close), 21f, Ui.bold).apply {
+        if (review == null) menu.addView(c.hline(1, Ui.DIVIDER))
+        // 두 칸이면 `닫기`는 오른쪽 칸 맨 아래(왼쪽 칸이 더 높아도)
+        // (빈 뷰는 높이를 모를 때 화면 높이를 다 차지한다. Space 는 0 이다가 [EqualHeightRow] 가 높이를 정하면 남는 만큼 늘어난다)
+        if (split) menu.addView(Space(c), lp(MATCH, 0, 1f))
+        if (closeRow) menu.addView(c.text(c.getString(R.string.close), 21f, Ui.bold).apply {
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
             setPadding(c.dp(Ui.MARGIN), 0, c.dp(Ui.MARGIN), 0)
             setOnClickListener { dialog.dismiss() }
@@ -344,6 +381,30 @@ class Sheet(private val context: Context) {
         // 버려지며(쪽이 넘어가지 않는다) 누를 수 있는 글자에 회색 초점 표시가 남는다.
         if (input == null && review == null) root.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         return root
+    }
+}
+
+/**
+ * 칸들을 나란히 두고 모두 가장 높은 칸의 높이로 맞추는 줄(두 칸 메뉴: 오른쪽 칸의 `닫기`를 맨 아래에, 가운데 세로 선을 끝까지).
+ * 높이가 WRAP 인 줄 안의 MATCH 칸은 다른 칸 높이를 따라가 더 높은 칸이 잘려서 직접 맞춘다.
+ */
+private class EqualHeightRow(context: Context) : LinearLayout(context) {
+    init {
+        orientation = HORIZONTAL
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        val h = measuredHeight - paddingTop - paddingBottom
+        for (i in 0 until childCount) {
+            val child = getChildAt(i)
+            val m = child.layoutParams as MarginLayoutParams
+            val target = h - m.topMargin - m.bottomMargin
+            if (child.measuredHeight != target) child.measure(
+                MeasureSpec.makeMeasureSpec(child.measuredWidth, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(maxOf(0, target), MeasureSpec.EXACTLY),
+            )
+        }
     }
 }
 
@@ -359,6 +420,17 @@ private const val CLOSE_ROW_DP = 62
 private const val STAMP_DP = 220
 private const val STAMP_END_DP = 110
 private const val STAMP_TOP_DP = 64
+
+/** 가로 화면 두 칸 메뉴: 오른쪽 항목 칸 폭(최소 dp, 화면 폭에 대한 비율 중 큰 것), 왼쪽 칸이 좁아 줄인 도장(지름·오른쪽에서·위에서) */
+private const val SPLIT_MENU_DP = 340
+private const val SPLIT_MENU_RATIO = 0.36f
+private const val SPLIT_STAMP_DP = 170
+private const val SPLIT_STAMP_END_DP = 85
+private const val SPLIT_STAMP_TOP_DP = 50
+/** 두 칸 메뉴의 아래 여백과 오른쪽(항목) 칸 위 여백 */
+private const val SPLIT_PAD_DP = 14
+/** 가운데 창의 가장 넓은 폭(가로 화면) */
+private const val CENTERED_MAX_DP = 720
 
 /**
  * 되돌리기 어려운 일 확인: 머리 [title]·[subtitle], 아래에 두 줄 `[action]`(굵게, 누르면 [onConfirm]) / `취소`.

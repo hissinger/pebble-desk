@@ -84,7 +84,7 @@ class AppListActivity : EinkActivity() {
         rows = PagedRows(this, rowDp(Ui.ROW_DP))
         body.addView(rows, lp(0, MATCH, 1f))
         if (mode == Mode.ALL) {
-            indexCol = vbox().apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL }
+            indexCol = IndexColumn(this).apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL }
             body.addView(indexCol, lp(dp(48), MATCH).apply { marginEnd = dp(Ui.MARGIN - 18) })
         }
         root.addView(body, lp(MATCH, 0, 1f))
@@ -201,19 +201,36 @@ class AppListActivity : EinkActivity() {
         val letters = initials.distinct()
         val from = rows.page * rows.perPage
         val onPage = initials.subList(from, minOf(initials.size, from + rows.perPage)).toSet()
-        val cell = if (col.height > 0) minOf(dp(48), col.height / letters.size) else dp(48)
         letters.forEach { letter ->
             val current = letter in onPage
             col.addView(text(letter, 18f, if (current) Ui.heavy else Ui.regular, if (current) Ui.BLACK else Ui.LIGHT_GRAY).apply {
                 gravity = Gravity.CENTER
                 setOnClickListener { rows.showPage(rows.pageOf(initials.indexOf(letter))) }
-            }, lp(MATCH, cell))
+            }, lp(MATCH, dp(INDEX_CELL_DP)))
+        }
+    }
+
+    /** 색인 칸: 글자 칸 높이를 [INDEX_CELL_DP] 로 두되, 칸 높이에 다 들지 않으면(낮은 화면·가로) 칸 높이를 글자 수로 나눈다. 잴 때 정한다. */
+    private class IndexColumn(context: Context) : LinearLayout(context) {
+        init {
+            orientation = VERTICAL
+        }
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val h = MeasureSpec.getSize(heightMeasureSpec)
+            if (childCount > 0 && h > 0) {
+                val cell = minOf(context.dp(INDEX_CELL_DP), h / childCount)
+                for (i in 0 until childCount) getChildAt(i).layoutParams.height = cell
+            }
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         }
     }
 
     companion object {
         private const val EXTRA_MODE = "mode"
         private const val EXTRA_BOOK = "book"
+        /** 색인 글자 칸 높이(낮은 화면에서는 줄인다, [IndexColumn]) */
+        private const val INDEX_CELL_DP = 48
 
         fun intent(context: Context, mode: Mode, bookId: String? = null): Intent =
             Intent(context, AppListActivity::class.java).putExtra(EXTRA_MODE, mode.name).putExtra(EXTRA_BOOK, bookId)

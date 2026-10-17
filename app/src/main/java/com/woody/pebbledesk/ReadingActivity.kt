@@ -11,6 +11,7 @@ import android.graphics.RectF
 import android.os.Bundle
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -35,6 +36,12 @@ class ReadingActivity : EinkActivity() {
     /** 이번 주 읽은 책(다섯 권이 넘으면 쪽을 넘긴다). 읽은 책이 없으면 null. */
     private var bookRows: PagedRows? = null
 
+    /**
+     * 가로 화면: 왼쪽 요약 칸(연속일·오늘 링, 읽은 시간, 이번 주 읽은 책)과 오른쪽 달력·그래프(남는 높이를 채운다).
+     * 오른쪽이 넓어 달력 둘이 들어가면(바형) 달력과 그래프를 나란히, 아니면(페블) 지금처럼 하나씩 바꿔 본다.
+     */
+    private val wide by lazy { landscape() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = vbox()
@@ -49,6 +56,8 @@ class ReadingActivity : EinkActivity() {
         root.addView(hline(2))
         body = vbox()
         root.addView(body, lp(MATCH, 0, 1f))
+        // 가로면 달력과 그래프를 함께 둘지는 오른쪽 칸 폭으로 정한다(높이는 잴 필요 없다)
+        if (wide) both = (resources.displayMetrics.widthPixels - summaryWidth()) / 2 - 2 * dp(Ui.MARGIN) >= dp(CAL_MIN_DP)
         checkRoom()
         setContentView(root)
     }
@@ -58,7 +67,7 @@ class ReadingActivity : EinkActivity() {
         render()
     }
 
-    /** 달력과 그래프를 함께 보일 높이가 있는가(처음 그리기 전에 한 번 잰다, [checkRoom]). 모르면 null */
+    /** 달력과 그래프를 함께 보이는가: 세로는 높이가 있으면(처음 그리기 전에 한 번 잰다, [checkRoom]), 가로는 오른쪽 칸 폭으로 만들 때 정한다. 모르면 null */
     private var both: Boolean? = null
     /** 지금 화면에 달력이 있는가(사용 기록 권한이 없으면 안내 글뿐이라 높이를 재지 않는다) */
     private var hasCalendar = false
@@ -85,6 +94,10 @@ class ReadingActivity : EinkActivity() {
         }
 
         val since = ReadingLog.since(this) ?: today
+        if (wide) {
+            renderWide(days, today, since, goalMs, ::frac)
+            return
+        }
         body.addView(hero(days, today, goalMs, frac(today), monthGoal(days, today, since, goalMs, ::frac)))
         // 연속일 줄과 달력 사이는 조금 띄운다(달력 제목 줄이 오늘 링 바로 밑에 붙지 않게).
         body.addView(calendar(days, today, since, goalMs, ::frac), lp(MATCH, WRAP).apply {
@@ -98,6 +111,34 @@ class ReadingActivity : EinkActivity() {
             val page = text("", 13f, Ui.bold, Ui.GRAY)
             addView(section(getString(R.string.books_this_week), byBook(days, today, page), page), lp(0, WRAP, 1f).apply { marginStart = dp(BOOKS_GAP) })
         })
+    }
+
+    /** 가로 화면 왼쪽 요약 칸 폭(좌우 여백 포함). 홈처럼 글자 · 간격과 상관없이 같다(칸 자리가 움직이지 않게). */
+    private fun summaryWidth() = dp(SUMMARY_DP) + 2 * dp(Ui.MARGIN)
+
+    /**
+     * 가로 화면: 왼쪽 요약 칸 | 옅은 세로 선 | 오른쪽 달력·그래프(높이를 채운다).
+     * 홈처럼 틀은 글자 · 간격과 상관없이 같다: 칸 폭, 머리(연속일·오늘 링)·칸 제목·읽은 시간 줄·이번 주 읽은 책 줄의 높이는 기준 크기 글자(100%)로 정하고
+     * 글자만 키운다. 다 들지 않는 줄은 그리지 않는다([FitColumn]).
+     */
+    private fun renderWide(days: ReadingDays, today: LocalDate, since: LocalDate, goalMs: Long, frac: (LocalDate) -> Float) {
+        val month = monthGoal(days, today, since, goalMs, frac)
+        val heroH = Ui.atBaseText { heroCompact(days, today, goalMs, frac(today), month).heightAt(summaryWidth()) }
+        body.addView(hbox().apply {
+            gravity = Gravity.TOP
+            // 글자를 키워 칸 높이를 넘으면 다 들지 않는 칸은 그리지 않는다(반쯤 잘린 줄이 보이지 않게)
+            addView(FitColumn(context, unbounded = false).apply {
+                addView(heroCompact(days, today, goalMs, frac(today), month, heroH), lp(MATCH, heroH))
+                fun LinearLayout.LayoutParams.inset() = apply { marginStart = dp(Ui.MARGIN); marginEnd = dp(Ui.MARGIN) }
+                addView(section(getString(R.string.read_time), totalsCompact(days, today), titleTopDp = 12), lp(MATCH, WRAP).inset())
+                val page = text("", 13f, Ui.bold, Ui.GRAY)
+                // 이번 주 읽은 책은 남는 높이에 들어가는 만큼 한 쪽에
+                addView(section(getString(R.string.books_this_week), byBook(days, today, page), page, fill = true, titleTopDp = 14),
+                    lp(MATCH, 0, 1f).inset().apply { bottomMargin = dp(12) })
+            }, lp(summaryWidth(), MATCH))
+            addView(vline(16))
+            addView(calendar(days, today, since, goalMs, frac, fill = true), lp(0, MATCH, 1f))
+        }, lp(MATCH, MATCH))
     }
 
     /**
@@ -114,15 +155,20 @@ class ReadingActivity : EinkActivity() {
         }
     }
 
-    /** 제목(오른쪽 끝에 [page]: 쪽 표시) · 그 아래 선 · [content] */
-    private fun section(title: String, content: View, page: TextView? = null) = vbox().apply {
+    /**
+     * 제목(오른쪽 끝에 [page]: 쪽 표시) · 그 아래 선 · [content]. [fill] 이면 [content] 가 남는 높이를 채운다(이 칸도 높이를 받아야 한다).
+     * [titleTopDp] 가 있으면(가로 화면) 제목 줄 높이를 그 위 여백 + 기준 크기 글자로 고정하고 글자를 선 쪽에 붙인다(키운 글자는 위 여백으로 자란다. 홈 구역 제목처럼).
+     */
+    private fun section(title: String, content: View, page: TextView? = null, fill: Boolean = false, titleTopDp: Int? = null) = vbox().apply {
+        val titleH = titleTopDp?.let { top -> dp(top) + Ui.atBaseText { text(title, 13f, Ui.bold).run { measure(0, 0); measuredHeight } } } ?: WRAP
         addView(hbox().apply {
+            gravity = Gravity.BOTTOM
             addView(text(title, 13f, Ui.bold, Ui.GRAY), lp(0, WRAP, 1f))
             // 쪽 표시가 작아 누르기 어려우므로 제목 줄 어디를 눌러도 넘긴다.
             page?.let { addView(it, lp(WRAP, WRAP)); setOnClickListener { _ -> it.performClick() } }
-        }, lp(MATCH, WRAP).apply { bottomMargin = dp(8) })
+        }, lp(MATCH, titleH).apply { bottomMargin = dp(8) })
         addView(hline(1, inset = false))
-        addView(content, lp(MATCH, WRAP).apply { topMargin = dp(4) })
+        addView(content, lp(MATCH, if (fill) 0 else WRAP, if (fill) 1f else 0f).apply { topMargin = dp(4) })
     }
 
     /** 왼쪽 큰 연속일과 이번 달 목표 달성([month]: 제목 to 값), 오른쪽 오늘 링(가운데 오늘 읽은 시간) */
@@ -135,22 +181,60 @@ class ReadingActivity : EinkActivity() {
         addView(vbox().apply {
             addView(text(getString(R.string.streak_sub, ReadingLog.longestStreak(days)), 15f, Ui.medium, Ui.GRAY))
             addView(text(getString(R.string.streak_days), 28f, Ui.bold), lp(WRAP, WRAP).apply { topMargin = dp(4) })
-            addView(hbox().apply {
-                addView(text(month.first, 15f, Ui.medium, Ui.GRAY))
-                addView(text(month.second, 15f, Ui.bold), lp(WRAP, WRAP).apply { marginStart = dp(6) })
-            }, lp(WRAP, WRAP).apply { topMargin = dp(8) })
+            addView(monthLine(month), lp(WRAP, WRAP).apply { topMargin = dp(8) })
         }, lp(0, WRAP, 1f).apply { marginStart = dp(10) })
+        addView(todayRing(days, today, goalMs, todayFrac), lp(dp(RING), dp(RING)))
+    }
+
+    /**
+     * 가로 화면 왼쪽 위: 왼쪽에 `읽는 중 · 최장 N일` · 큰 연속일과 `일 연속` · 이번 달 목표 달성을 위아래로, 오른쪽 오늘 링.
+     * 세로 화면([hero])은 큰 숫자가 글자 왼쪽에 있어 좁은 칸에 들지 않는다.
+     */
+    private fun heroCompact(days: ReadingDays, today: LocalDate, goalMs: Long, todayFrac: Float, month: Pair<String, String>, frameH: Int? = null) = hbox().apply {
+        gravity = Gravity.TOP
+        val field = Palette.current.field(Palette.Area.READING)
+        field?.let { setBackgroundColor(it) }
+        setPadding(dp(Ui.MARGIN), dp(12), dp(Ui.MARGIN), if (field != null) dp(FIELD_BOTTOM_DP) else 0)
+        val number = text(ReadingLog.streak(days, today).toString(), STREAK_WIDE_SP, Ui.heavy, Palette.current.goal)
+        // 칸 높이가 정해져 있으면(글자 · 간격과 상관없이) 다 들지 않는 줄은 그리지 않는다
+        val column = FitColumn(context).apply {
+            addView(text(getString(R.string.streak_sub, ReadingLog.longestStreak(days)), 15f, Ui.medium, Ui.GRAY))
+            addView(hbox().apply {
+                gravity = Gravity.BOTTOM
+                addView(number)
+                addView(text(getString(R.string.streak_days), 24f, Ui.bold), lp(WRAP, WRAP).apply { marginStart = dp(8); bottomMargin = dp(6) })
+            }, lp(WRAP, WRAP).apply { topMargin = dp(4) })
+            addView(monthLine(month), lp(WRAP, WRAP).apply { topMargin = dp(6) })
+        }
+        // 키운 글자로 칸을 넘으면 큰 숫자를 기준 크기로 줄여 이번 달 목표 달성 줄이 들게 한다(홈 큰 제목처럼)
+        frameH?.let { h ->
+            val columnW = dp(SUMMARY_DP) - dp(RING) - dp(10)
+            if (column.heightAt(columnW) > h - paddingTop - paddingBottom) number.setTextSize(TypedValue.COMPLEX_UNIT_DIP, STREAK_WIDE_SP)
+        }
+        // WRAP 이라야 기준 크기로 잴 때 글자 칸 높이가 든다(높이가 WRAP 인 가로 줄은 MATCH 자식을 높이 계산에서 뺀다). 칸 높이가 정해지면 그 안으로 줄어든다.
+        addView(column, lp(0, WRAP, 1f))
+        addView(todayRing(days, today, goalMs, todayFrac), lp(dp(RING), dp(RING)).apply { marginStart = dp(10) })
+    }
+
+    /** 이번 달 목표 달성 한 줄(`10월 목표 달성` 회색 + `11 / 15일` 굵게, [month]: 제목 to 값) */
+    private fun monthLine(month: Pair<String, String>) = hbox().apply {
+        addView(text(month.first, 15f, Ui.medium, Ui.GRAY))
+        addView(text(month.second, 15f, Ui.bold), lp(WRAP, WRAP).apply { marginStart = dp(6) })
+    }
+
+    /** 오늘 링(가운데 오늘 읽은 시간과 `/ 30분`) */
+    private fun todayRing(days: ReadingDays, today: LocalDate, goalMs: Long, todayFrac: Float): View {
         val time = text(duration(days.total(today)), 17f, Ui.bold)
         val goal = if (goalMs > 0) text(getString(R.string.goal_of, duration(goalMs)), 11f, Ui.medium, Ui.GRAY) else null
         fitInRing(time, goal)
-        addView(FrameLayout(context).apply {
+        return FrameLayout(this).apply {
             addView(RingView(context, RING_STROKE).apply { frac = todayFrac }, FrameLayout.LayoutParams(MATCH, MATCH))
             addView(vbox().apply {
                 gravity = Gravity.CENTER_HORIZONTAL
                 addView(time, lp(WRAP, WRAP))
                 goal?.let { addView(it, lp(WRAP, WRAP)) }
             }, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER))
-        }, lp(dp(RING), dp(RING)))
+        }
     }
 
     /** 오늘 링 안쪽 동그라미에 들어가게 [time] 글자를 줄인다(`1시간 34분`처럼 길면 링에 겹친다). */
@@ -176,16 +260,19 @@ class ReadingActivity : EinkActivity() {
      * 둘 다 들어갈 높이가 있으면([both]) 달력 아래에 그래프를 함께 두고 `달력 · 그래프` 는 뺀다.
      * 달력: 날짜는 링 위에 작게, 오늘은 검은 동그라미 안에. 기록 전([since] 전)·앞날은 흐린 빈 링.
      * 제목 줄 오른쪽 `9월 14일 – 10월 11일  ‹ ›` 로 두 보기를 함께 4주씩 넘긴다. 기록 시작 전으로·이번 주 뒤로는 가지 않는다(흐리게).
+     * [fill] 이면(가로 화면) 남는 높이를 채우고, 함께 둘 때는 달력과 그래프를 나란히.
      */
-    private fun calendar(days: ReadingDays, today: LocalDate, since: LocalDate, goalMs: Long, progress: (LocalDate) -> Float) = vbox().apply {
+    private fun calendar(days: ReadingDays, today: LocalDate, since: LocalDate, goalMs: Long, progress: (LocalDate) -> Float, fill: Boolean = false) = vbox().apply {
         val locale = resources.configuration.locales[0]
         val latest = startOfWeek(today).minusWeeks(WEEKS - 1L)
         val dateFmt = DateTimeFormatter.ofPattern(getString(R.string.date_short_fmt), locale)
         val yearFmt = DateTimeFormatter.ofPattern(getString(R.string.date_year_fmt), locale)
         // 요일 줄과 4주치 날짜·링을 뷰 하나에 그린다(칸마다 뷰를 만들면 백 개가 넘어 느리다).
-        val cal = RingCalendar(context, latest, today, since, WEEKS, progress)
+        // 가로(fill)는 틀을 글자 · 간격과 상관없이 두어 요일·날짜 칸을 글자 배율만큼 넓히지 않는다
+        val grow = if (fill) 1f else Ui.textGrow
+        val cal = RingCalendar(context, latest, today, since, WEEKS, progress, grow)
         // 그래프는 달력 자리에 겹쳐 두고 달력 높이를 그대로 쓴다(달력은 숨길 때 INVISIBLE 로 자리를 지킨다).
-        val graph = ReadingGraph(context, latest, today, since, WEEKS, goalMs, { days.total(it) }, { progress(it) >= 1f })
+        val graph = ReadingGraph(context, latest, today, since, WEEKS, goalMs, { days.total(it) }, { progress(it) >= 1f }, grow)
         val toggle = text("", 13f, Ui.bold)
         fun showView() {
             val graphOn = prefs.readingGraph
@@ -207,12 +294,20 @@ class ReadingActivity : EinkActivity() {
         fun arrow(symbol: String) = text(symbol, 20f, Ui.bold).apply { gravity = Gravity.CENTER; minWidth = dp(40) }
         val prev = arrow("‹")
         val next = arrow("›")
+        // 가로에서 글자를 키워(또는 지난해의 연도가 붙어) 범위가 제목 줄에 다 들지 않으면 짧게(`9/21 – 10/18`). 달력·그래프 글자와 `‹ ›` 를 먼저 둔다.
+        val room = if (!fill) Float.MAX_VALUE else (resources.displayMetrics.widthPixels - summaryWidth() - dp(1) - dp(2 * Ui.MARGIN - 12) - dp(4) -
+            2 * maxOf(dp(40), prev.paint.measureText("‹").toInt())).toFloat() - (if (together) 0f else toggle.paint.measureText(toggle.text.toString()))
+        val shortFmt = DateTimeFormatter.ofPattern("M/d", locale)
+        val shortYearFmt = DateTimeFormatter.ofPattern("yyyy/M/d", locale)
         fun show(start: LocalDate) {
             cal.start = start
             graph.start = start
             val end = start.plusDays(WEEKS * 7L - 1)
             // 지난해까지 넘기면 연도를 붙인다.
-            range.text = "${start.format(if (start.year != today.year) yearFmt else dateFmt)} – ${end.format(if (end.year != today.year) yearFmt else dateFmt)}"
+            fun label(day: DateTimeFormatter, yearDay: DateTimeFormatter) =
+                "${start.format(if (start.year != today.year) yearDay else day)} – ${end.format(if (end.year != today.year) yearDay else day)}"
+            val full = label(dateFmt, yearFmt)
+            range.text = if (range.paint.measureText(full) > room) label(shortFmt, shortYearFmt) else full
             val canPrev = start > since
             val canNext = start < latest
             prev.setTextColor(if (canPrev) Ui.BLACK else Ui.DIVIDER)
@@ -221,6 +316,8 @@ class ReadingActivity : EinkActivity() {
             next.setOnClickListener { if (canNext) show(start.plusWeeks(WEEKS.toLong())) }
         }
         show(latest)
+        // 가로는 제목 줄 높이도 기준 크기 글자로 고정한다(키운 글자에 달력이 밀려 내려가지 않게)
+        val headerH = if (fill) Ui.atBaseText { arrow("‹").run { measure(0, 0); measuredHeight } } + dp(6) else WRAP
         addView(hbox().apply {
             setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN - 12), dp(2))
             // 하루 목표는 오늘 링(`/ 30분`)과 그래프의 목표선에 보인다.
@@ -229,8 +326,21 @@ class ReadingActivity : EinkActivity() {
             addView(range, lp(WRAP, WRAP).apply { marginEnd = dp(4) })
             addView(prev, lp(WRAP, WRAP))
             addView(next, lp(WRAP, WRAP))
-        })
+        }, lp(MATCH, headerH))
         addView(hline(1))
+        if (fill) {
+            // 가로: 남는 높이를 채운다(달력은 주 사이를 넓히고, 그래프는 막대를 높인다)
+            if (together) addView(hbox().apply {
+                addView(cal, lp(0, MATCH, 1f))
+                addView(graph, lp(0, MATCH, 1f))
+            }, lp(MATCH, 0, 1f))
+            else addView(FrameLayout(context).apply {
+                addView(cal, FrameLayout.LayoutParams(MATCH, MATCH))
+                addView(graph, FrameLayout.LayoutParams(MATCH, MATCH))
+            }, lp(MATCH, 0, 1f))
+            addView(View(context), lp(MATCH, dp(16)))
+            return@apply
+        }
         if (together) {
             addView(cal, lp(MATCH, WRAP))
             addView(graph, lp(MATCH, WRAP).apply { topMargin = dp(GRAPH_GAP_DP) })
@@ -263,8 +373,23 @@ class ReadingActivity : EinkActivity() {
         }
     }
 
+    /** 가로 화면 왼쪽 칸: 이번 주 · 이번 달 · 올해 읽은 시간을 한 줄씩(이름 왼쪽, 시간 오른쪽. 줄 높이는 글자 · 간격과 상관없이 같다) */
+    private fun totalsCompact(days: ReadingDays, today: LocalDate) = vbox().apply {
+        fun sum(from: LocalDate) = days.filterKeys { it in from..today }.keys.sumOf { days.total(it) }
+        listOf(
+            getString(R.string.this_week) to duration(sum(startOfWeek(today))),
+            getString(R.string.this_month) to duration(sum(today.withDayOfMonth(1))),
+            getString(R.string.this_year) to duration(sum(today.withDayOfYear(1))),
+        ).forEach { (label, value) ->
+            addView(hbox().apply {
+                addView(text(label, 14f, Ui.medium, Ui.GRAY), lp(0, WRAP, 1f))
+                addView(text(value, 19f, Ui.bold), lp(WRAP, WRAP).apply { marginStart = dp(12) })
+            }, lp(MATCH, dp(TOTAL_ROW_DP)))
+        }
+    }
+
     /**
-     * 오른쪽 칸: 이번 주 책별 시간(많은 순, 한 쪽에 [BOOKS]권). 한 줄에 책 이름(그 책의 지금 제목, 목록에 없던 책은 편 책 제목) · 시간, 줄 사이에 옅은 선.
+     * 오른쪽 칸: 이번 주 책별 시간(많은 순, 한 쪽에 [BOOKS]권. 가로 화면은 남는 높이에 들어가는 만큼). 한 줄에 책 이름(그 책의 지금 제목, 목록에 없던 책은 편 책 제목) · 시간, 줄 사이에 옅은 선.
      * 책은 읽은 시간 칸에 정해 둔 책 id 로 모은다(같은 제목의 두 책은 두 줄). 어떤 책인지 모르는 시간(이 기능 전, 그 앱에서 편 책을 한 번도
      * 몰랐을 때)은 합계에만 들어가고 여기에는 보이지 않는다.
      */
@@ -291,7 +416,9 @@ class ReadingActivity : EinkActivity() {
             }
         }
         // 자주 쓰는 앱처럼 [BOOKS]줄씩, 넘치면 제목 오른쪽 `‹ 1 / 2 ›`(누르거나 밀면 다음 쪽). 덜 찬 쪽도 높이는 같다.
-        val rows = PagedRows(this, rowDp(BOOK_ROW * Ui.textGrow), fixedRows = BOOKS, insetDividers = false)
+        // 가로 화면은 홈처럼 줄 높이를 글자 · 간격과 상관없이 두고 남는 높이에 들어가는 만큼
+        val rows = if (wide) PagedRows(this, dp(BOOK_ROW), insetDividers = false)
+        else PagedRows(this, rowDp(BOOK_ROW * Ui.textGrow), fixedRows = BOOKS, insetDividers = false)
         rows.onPageChanged = { page.text = pageLabel(rows) }
         page.pagesClick(rows)
         rows.setRows(books.map { (label, ms) -> {
@@ -328,6 +455,12 @@ class ReadingActivity : EinkActivity() {
         /** 오늘 링 지름·굵기(dp) */
         private const val RING = 104
         private const val RING_STROKE = 12f
+        /** 가로 화면: 왼쪽 요약 칸 폭(여백 안, dp), 읽은 시간 한 줄 높이, 달력 하나의 최소 폭(여백 안. 오른쪽이 두 개만큼 넓으면 그래프와 나란히) */
+        private const val SUMMARY_DP = 290
+        private const val TOTAL_ROW_DP = 36
+        /** 가로 화면 큰 연속일 글자(sp, 칸을 넘으면 이 크기 dp 로 줄인다) */
+        private const val STREAK_WIDE_SP = 48f
+        private const val CAL_MIN_DP = 280
 
         fun intent(context: Context) = Intent(context, ReadingActivity::class.java)
     }
@@ -380,6 +513,8 @@ private class RingCalendar(
     private val since: LocalDate,
     private val weeks: Int,
     private val progress: (LocalDate) -> Float,
+    /** 요일·날짜 칸을 넓히는 배율(보통 [Ui.textGrow], 가로 화면은 1: 틀을 글자와 상관없이) */
+    grow: Float = Ui.textGrow,
 ) : View(context) {
     /** 첫 주의 첫날. 바꾸면(달력 넘기기) 다시 그린다. 늘 같은 요일(한 주 시작 요일)이다. */
     var start: LocalDate = start
@@ -388,10 +523,10 @@ private class RingCalendar(
     private val weekdays = (0L..6L).map { start.dayOfWeek.plus(it).getDisplayName(TextStyle.NARROW, context.resources.configuration.locales[0]) }
     private val margin = context.dpf(Ui.MARGIN)
     private val weekdayTop = context.dpf(8)
-    private val weekdayH = context.dpf(CAL_WEEKDAY_DP * Ui.textGrow)
+    private val weekdayH = context.dpf(CAL_WEEKDAY_DP * grow)
     private val rowGap = context.dpf(CAL_ROW_GAP_DP)
-    private val labelH = context.dpf(CAL_LABEL_DP * Ui.textGrow)
-    private val pillHalf = context.dpf(10 * Ui.textGrow)
+    private val labelH = context.dpf(CAL_LABEL_DP * grow)
+    private val pillHalf = context.dpf(10 * grow)
     private val ringGap = context.dpf(CAL_RING_GAP_DP)
     private val ring = context.dpf(CAL_RING_DP)
     private val rowH = rowGap + labelH + ringGap + ring
@@ -402,8 +537,9 @@ private class RingCalendar(
     private val todayPaint = context.calPaint(11f, Ui.bold, Color.WHITE)
     private val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Ui.BLACK }
 
+    /** 높이가 정해져 오면(가로 화면에서 남는 높이를 채울 때) 그 높이, 아니면 [ringCalendarHeight] */
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), ringCalendarHeight(context, weeks))
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), calendarHeight(context, weeks, heightMeasureSpec))
     }
 
     /** [cy] 에 세로 가운데로 */
@@ -413,10 +549,12 @@ private class RingCalendar(
     override fun onDraw(canvas: Canvas) {
         val cw = (width - 2 * margin) / 7
         weekdays.forEachIndexed { i, d -> canvas.centerText(d, margin + cw * (i + 0.5f), weekdayTop + (weekdayH - weekdayTop) / 2, weekdayPaint) }
+        // 높이가 남으면(가로 화면) 주 사이를 넓힌다: 주마다 남는 높이의 반을 위에 둔다
+        val slotH = maxOf(rowH, (height - weekdayH) / weeks)
         for (w in 0 until weeks) for (i in 0 until 7) {
             val day = start.plusDays(w * 7L + i)
             val cx = margin + cw * (i + 0.5f)
-            val top = weekdayH + w * rowH + rowGap
+            val top = weekdayH + w * slotH + rowGap + (slotH - rowH) / 2
             val label = if (day.dayOfMonth == 1) "${day.monthValue}/1" else day.dayOfMonth.toString()
             val noData = day > today || day < since
             if (day == today) {
@@ -439,6 +577,11 @@ private const val CAL_ROW_GAP_DP = 4
 private const val CAL_LABEL_DP = 17
 private const val CAL_RING_GAP_DP = 2
 private const val CAL_RING_DP = 28
+
+/** [heightMeasureSpec] 이 정해진 높이면 그 높이(가로 화면에서 채울 때), 아니면 [ringCalendarHeight] */
+private fun calendarHeight(context: Context, weeks: Int, heightMeasureSpec: Int): Int =
+    if (View.MeasureSpec.getMode(heightMeasureSpec) == View.MeasureSpec.EXACTLY) View.MeasureSpec.getSize(heightMeasureSpec)
+    else ringCalendarHeight(context, weeks)
 
 /** 링 달력 높이. 같은 자리의 그래프도 이 높이를 쓴다. */
 private fun ringCalendarHeight(context: Context, weeks: Int): Int {
@@ -469,14 +612,16 @@ private class ReadingGraph(
     private val goalMs: Long,
     private val ms: (LocalDate) -> Long,
     private val met: (LocalDate) -> Boolean,
+    /** 막대 위아래 글자 자리를 넓히는 배율(보통 [Ui.textGrow], 가로 화면은 1) */
+    grow: Float = Ui.textGrow,
 ) : View(context) {
     /** 첫날. 바꾸면(넘기기) 다시 그린다. */
     var start: LocalDate = start
         set(v) { field = v; invalidate() }
     private val margin = context.dpf(Ui.MARGIN)
     /** 위(막대 위 시간)·아래(날짜) 글자 자리 */
-    private val topRoom = context.dpf(34 * Ui.textGrow)
-    private val bottomRoom = context.dpf(28 * Ui.textGrow)
+    private val topRoom = context.dpf(34 * grow)
+    private val bottomRoom = context.dpf(28 * grow)
     private val valuePaint = context.calPaint(12f, Ui.bold, Ui.BLACK)
     private val datePaint = context.calPaint(11f, Ui.medium, Ui.GRAY)
     private val todayPaint = context.calPaint(11f, Ui.bold, Color.WHITE)
@@ -489,8 +634,8 @@ private class ReadingGraph(
         pathEffect = DashPathEffect(floatArrayOf(context.dpf(4), context.dpf(4)), 0f)
     }
     private val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Ui.BLACK }
-    private val pillHalf = context.dpf(10 * Ui.textGrow)
-    private val pillH = context.dpf(17 * Ui.textGrow)
+    private val pillHalf = context.dpf(10 * grow)
+    private val pillH = context.dpf(17 * grow)
     private val minBar = context.dpf(2)
     private val goalLine = Path()
     /** `목표 30분` 뒤의 흰 바탕 */
@@ -499,7 +644,7 @@ private class ReadingGraph(
     private fun Canvas.centerText(s: String, cx: Float, cy: Float, p: Paint) = drawText(s, cx, cy - (p.ascent() + p.descent()) / 2, p)
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), ringCalendarHeight(context, weeks))
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), calendarHeight(context, weeks, heightMeasureSpec))
     }
 
     /** 주 첫날 날짜 글자(`10/12`)가 바로 옆 오늘 표시에 겹치면 날짜를 뺀다(오늘이 주 둘째 날·앞 주 마지막 날일 때). */
