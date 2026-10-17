@@ -82,7 +82,7 @@ zip 하나.
 ### 읽은 시간은 따로 둔다: `reading_import`
 
 - `reading_day` 에 바로 더하면, `through` 다음 날(오늘 포함)은 사용 기록으로 다시 세어 통째로 덮어써 가져온 몫이 사라진다(`saved.days + counted`).
-- 그래서 DB 버전 4 에 `reading_import (day, pkg, title, book_id, ms, PRIMARY KEY (day, pkg, title, book_id))`(`reading_day` 와 같은 꼴)를 더하고, 가져온 시간은 여기에만 쓴다. `ReadingLog.read` 에서 `reading_day` 에 더해 읽는다(연속일·링·그래프가 모두 합친 값을 본다).
+- 그래서 DB 버전 5(4 는 네오리더 책 파일 경로 `book_file`)에 `reading_import (day, pkg, title, book_id, ms, PRIMARY KEY (day, pkg, title, book_id))`(`reading_day` 와 같은 꼴)를 더하고, 가져온 시간은 여기에만 쓴다. `ReadingLog.read` 에서 `reading_day` 에 더해 읽는다(연속일·링·그래프가 모두 합친 값을 본다).
 - 가져온 시간을 되돌려야 하면 이 표만 비우면 된다.
 
 ### 두 번 가져오기 막기
@@ -119,7 +119,7 @@ zip 하나.
 
 - TROUBLESHOOTING: `기기를 바꿨는데 기록이 없습니다` → 이전 기기에서 내보내기, 파일 옮기는 방법(USB·SD 카드), 가져오기.
 - DESIGN.md: 메뉴 위치·확인 창.
-- CLAUDE.md: 저장 구조에 `reading_import`, DB 버전 4(버전 3 은 회차마다 별점·감상).
+- CLAUDE.md: 저장 구조에 `reading_import`, DB 버전 5(버전 3 은 회차마다 별점·감상, 4 는 `book_file`).
 
 ## 시험
 

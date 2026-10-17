@@ -1,5 +1,6 @@
 package com.woody.pebbledesk.readers
 
+import android.content.Context
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -60,8 +61,8 @@ open class ReaderSpec(
      * 읽는 화면 `<서재 액티비티>#<이름>`([viewers] 에 적는다)으로 보고, 읽은 시간도 그 동안만 센다([com.woody.pebbledesk.ReadingLog.viewerShown]).
      */
     val viewerHolder: String? = null,
-    /** 홈에서 책을 누르면 열 앱의 패키지. 실행 화면이 없는 앱(네오리더)은 그 책들이 있는 서재 앱(BOOX 런처) */
-    val appPkg: String = pkg,
+    /** 실행 화면이 없어 파일로만 여는 앱(네오리더): 파일을 받는 화면과 고르기에 보일 이름, 파일을 모를 때 열 서재 앱 */
+    val fileViewer: FileViewer? = null,
     /**
      * 읽는 화면 액티비티가 여럿이고 하나가 책 한 권(탭)인 앱(네오리더 `ReaderTab1~4Activity`): 탭마다 메뉴로 마지막으로 안 책을
      * 따로 기억해 두고, 다른 탭으로 넘어가면 그 탭의 책을 편 것으로 본다. 모르는 탭이면 메뉴로 알 때까지 진행률을 적지 않는다.
@@ -108,6 +109,13 @@ open class ReaderSpec(
         val (name, author) = splitTitle(title)
         return ViewerInfo(name, author, progress)
     }
+
+    /**
+     * 읽는 화면만으로는 어떤 책인지 모르거나 제목이 파일 이름일 때, 그 앱이 내놓은 데이터에서 책(제목·저자·파일 경로)을 찾는다.
+     * [info] 는 읽는 화면에서 읽은 것(메뉴 제목이 보이면 그 책을), [since] 는 이 읽는 화면이 열린 때(제목을 모르면 그 뒤에 연 책만 믿는다).
+     * 기본: 없음(null)
+     */
+    open fun fileBook(context: Context, info: ViewerInfo, since: Long): FileBook? = null
 
     /** 읽는 화면 제목을 찾을 요소 이름들(앞에서부터, 글자가 있는 것). 기본: [viewerTitle] 하나 */
     protected open val viewerTitleIds: List<String> get() = listOfNotNull(viewerTitle)

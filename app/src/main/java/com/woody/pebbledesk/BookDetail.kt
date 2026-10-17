@@ -139,7 +139,7 @@ private fun Context.showEditMenu(r: BookRecord, onChange: () -> Unit) {
 
 /** 책 머리의 제목 아래: 저자(알면), 회색 줄 `교보도서관 · 47% 읽음 · 반납 4일 남음`(아는 것만, 진행률·반납일은 [reading] 일 때만) */
 fun Context.bookSubtitle(book: ShelfBook, reading: Boolean): String? {
-    val app = book.app?.let { key -> AppStore.load(this).find { it.key == key }?.label }
+    val app = book.app?.let { key -> AppStore.find(this, key)?.label }
     val status = (listOfNotNull(app) + if (reading) bookStatus(book) else emptyList()).joinToString("  ·  ")
     return listOfNotNull(book.author.takeIf { it.isNotBlank() }, status.ifEmpty { null }).joinToString("\n").ifEmpty { null }
 }

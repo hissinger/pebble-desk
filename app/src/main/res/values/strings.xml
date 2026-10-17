@@ -270,7 +270,8 @@
     <string name="guide_libby">Libby</string>
     <string name="guide_libby_desc">읽는 중 진행률은 메뉴를 띄워야 들어옵니다. 표지는 서가 화면에서 가져옵니다.\n오늘 읽은 시간은 자동 추가를 켜 둬야 셉니다.</string>
     <string name="guide_neo">네오리더(BOOX)</string>
-    <string name="guide_neo_desc">읽다가 메뉴를 띄워야 책이 추가됩니다. 표지는 빈 표지입니다.\n홈에서 책을 누르면 BOOX 서재(ONYX Launcher)가 열립니다.</string>
+    <string name="guide_neo_desc">표지는 빈 표지입니다.\n홈에서 책을 누르면 그 파일을 네오리더로 바로 엽니다.</string>
+    <string name="app_neoreader">네오리더(BOOX)</string>
     <string name="guide_progress_note">읽는 중 진행률은 이북 앱 뷰어 설정에서 화면 아래 정보(쪽·진행률) 표시를 켜 두면 들어옵니다.</string>
     <string name="guide_cover_note">표지는 서재 화면의 표지를 잘라 옵니다. 제목이 잘리거나 다르면 홈에서 책을 길게 눌러 고치세요. 저자도 같은 메뉴에서 넣거나 고칠 수 있습니다.</string>
     <string name="edit_title">제목 고치기</string>

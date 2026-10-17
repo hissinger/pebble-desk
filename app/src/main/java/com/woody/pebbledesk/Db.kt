@@ -25,12 +25,13 @@ import java.time.LocalDate
  * - `review`: 책(id)마다 진행 중인 마지막 회차의 별점(반 개 단위 0~10)과 감상([Review]). 완독하면 그 회차(`finish`)로 옮긴다. 버전 2에서 더했다.
  * - `round_start`: 완독한 책(id)에 진행 중 회차가 있다는 표시와 `다시 읽기`한 날(그 회차의 시작, 모르면 null). 완독하면 지운다. 버전 3에서 더했다.
  * - `viewer_mark`: 읽는 화면이 서재 안에 뜨는 앱(Libby)에서 그 화면이 보이고 사라진 때([ReadingLog.viewerShown]). 버전 3에서 더했다.
+ * - `book_file`: 책(id)마다 이북 앱이 연 파일의 경로(네오리더처럼 파일로만 여는 앱, 홈에서 그 파일을 바로 연다. [BookShelf.filePath]). 버전 4에서 더했다.
  * 처음 열 때 1.2.1 까지의 JSON 파일을 옮기고 `<이름>.migrated` 로 바꿔 둔다([importFiles]).
  * 낮은 버전으로 되돌리기(새 판 DB 위에 옛 판을 까는 것)는 지원하지 않는다. 안드로이드가 낮은 판 덮어 설치를 막고, 억지로 깔면 DB 를 열지 못한다.
  */
 object Db {
     private const val NAME = "pebble.db"
-    private const val VERSION = 3
+    private const val VERSION = 4
 
     @Volatile private var db: SQLiteDatabase? = null
 
@@ -81,6 +82,7 @@ object Db {
         createReview(db)
         createRoundStart(db)
         createViewerMark(db)
+        createBookFile(db)
     }
 
     /** [oldVersion] 의 DB 를 지금 버전으로(SQLiteOpenHelper 가 한 트랜잭션으로 돌린다. 마이그레이션 테스트도 쓴다) */
@@ -115,6 +117,8 @@ object Db {
             // 읽는 화면이 서재 안에 뜨는 앱(Libby)의 화면이 뜨고 닫힌 때
             createViewerMark(db)
         }
+        // 파일로만 여는 이북 앱(네오리더)에서 연 책 파일의 경로
+        if (oldVersion < 4) createBookFile(db)
     }
 
     /** 날마다 읽은 시간: 그날·앱·편 책 제목·붙은 책이 키(모르는 것은 "", 기본 키에 NULL 은 겹쳐도 막히지 않아 쓰지 않는다) */
@@ -161,6 +165,9 @@ object Db {
 
     private fun createViewerMark(db: SQLiteDatabase) =
         db.execSQL("CREATE TABLE viewer_mark (at INTEGER NOT NULL, pkg TEXT NOT NULL, shown INTEGER NOT NULL)")
+
+    private fun createBookFile(db: SQLiteDatabase) =
+        db.execSQL("CREATE TABLE book_file (book_id TEXT PRIMARY KEY, path TEXT NOT NULL)")
 
     private fun createRoundStart(db: SQLiteDatabase) =
         db.execSQL("CREATE TABLE round_start (book_id TEXT PRIMARY KEY, day INTEGER)")

@@ -403,7 +403,7 @@ class HomeActivity : EinkActivity() {
         setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), dp(8))
     }
 
-    private fun findApp(key: String): AppEntry? = apps.find { it.key == key }
+    private fun findApp(key: String): AppEntry? = AppStore.find(this, key, apps)
 
     /** 하단 가운데의 `오늘 42분 · 5일째`. 사용 기록 액세스가 없으면(= 오늘 읽은 시간 꺼짐) 비운다. */
     private fun updateReading() {
@@ -417,11 +417,12 @@ class HomeActivity : EinkActivity() {
         if (readingText.text.toString() != line) readingText.text = line
     }
 
-    /** 그 책의 앱을 연다. 앱을 아직 안 정했거나 지워졌으면 고르러 간다. */
+    /** 그 책의 앱을 연다(파일로만 여는 이북 앱은 그 책의 파일). 앱을 아직 안 정했거나 지워졌으면 고르러 간다. */
     private fun openBook(book: ShelfBook) {
         val app = book.app?.let(::findApp)
-        if (app != null) AppStore.launch(this, app)
-        else startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, book.id))
+        if (app == null || !AppStore.openBook(this, book, app)) {
+            startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, book.id))
+        }
     }
 
     /**

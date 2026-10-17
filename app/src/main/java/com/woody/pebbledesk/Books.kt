@@ -462,7 +462,7 @@ object BookShelf {
         }
     }
 
-    /** 올해 읽은 책에서 지운다(읽은 시간은 합계에 그대로, 다시 보이지 않게 나간 책에 지운 표시). 표지는 버린다. 읽고 있는 책이면 지우지 않고 false. */
+    /** 올해 읽은 책에서 지운다(읽은 시간은 합계에 그대로, 다시 보이지 않게 나간 책에 지운 표시). 표지와 책 파일 경로는 버린다. 읽고 있는 책이면 지우지 않고 false. */
     @Synchronized fun forget(context: Context, id: String): Boolean {
         // 1.3.0~1.5.3 의 끊긴 저장으로 나간 책에도 같은 id 가 남아 있을 수 있다: 읽고 있는 책이면 그래도 지우지 않는다(표지를 버리지 않게)
         if (list(context).any { it.id == id }) return false
@@ -473,6 +473,7 @@ object BookShelf {
         val now = System.currentTimeMillis()
         writeHistory(context, past.map { if (it.book.id == id) it.copy(hidden = true, leftAt = now) else it })
         dropFiles(context, id)
+        Db.get(context).tx { delete("book_file", "book_id = ?", arrayOf(id)) }
         return true
     }
 
@@ -507,7 +508,7 @@ object BookShelf {
     /** `책 추가` 로 직접 넣은 책의 id 머리([manual]) */
     const val MANUAL_PREFIX = "m-"
     /** 책 id(`book_id`)가 든 표: 책 id 를 바꾸면 모두 함께 바꾼다([migrateIds]) */
-    private val BOOK_ID_TABLES = listOf("finish", "review", "round_start", "reading_day", "book_open")
+    private val BOOK_ID_TABLES = listOf("finish", "review", "round_start", "reading_day", "book_open", "book_file")
     private fun newId() = ID_PREFIX + UUID.randomUUID()
 
     private fun readIndex(context: Context): List<ShelfBook> =
@@ -537,7 +538,7 @@ object BookShelf {
                 dir(context).listFiles { f -> f != thumb && stale.matches(f.name) }?.forEach { it.delete() }
                 runCatching { thumb.outputStream().use { made.compress(Bitmap.CompressFormat.PNG, 100, it) } }
             }
-            ?: BlankCover.draw(book.title, book.author, book.app?.let { app -> AppStore.load(context).find { it.key == app }?.label }, widthPx)
+            ?: BlankCover.draw(book.title, book.author, book.app?.let { app -> AppStore.find(context, app)?.label }, widthPx)
         val out = if (ribbon.isEmpty()) bmp else withRibbon(bmp, ribbon, palette.ribbon)
         covers.put(key, out)
         return out
@@ -749,6 +750,23 @@ object BookShelf {
 
     @Synchronized fun setApp(context: Context, id: String, app: String?) =
         write(context, list(context).map { if (it.id == id) it.copy(app = app) else it })
+
+    /** 이북 앱이 이 책으로 연 파일의 경로(네오리더처럼 파일로만 여는 앱). 모르면 null */
+    fun filePath(context: Context, id: String): String? =
+        Db.get(context).rows("SELECT path FROM book_file WHERE book_id = ?", arrayOf(id)) { it.getString(0) }.firstOrNull()
+
+    /** [path] 파일로 넣은 책(읽고 있는 책, 없으면 나간 책)의 제목. 없으면 null */
+    fun titleByFile(context: Context, path: String): String? {
+        val ids = Db.get(context).rows("SELECT book_id FROM book_file WHERE path = ?", arrayOf(path)) { it.getString(0) }.toSet()
+        if (ids.isEmpty()) return null
+        return list(context).firstOrNull { it.id in ids }?.title ?: history(context).lastOrNull { it.book.id in ids }?.book?.title
+    }
+
+    /** 책이 나간 책이 되어도 남긴다(다시 읽을 때 그 파일을 연다). */
+    fun setFilePath(context: Context, id: String, path: String) {
+        if (filePath(context, id) == path) return
+        Db.get(context).tx { insertWithOnConflict("book_file", null, Db.values("book_id" to id, "path" to path), SQLiteDatabase.CONFLICT_REPLACE) }
+    }
 
     /** 책 빼기: 읽고 있는 책에서 빼서 나간 책으로 남긴다. [review] 가 있으면(빼기 메뉴에서 고친 별점·감상) 진행 중 회차의 것으로 같이 저장한다. */
     @Synchronized fun remove(context: Context, id: String, review: Review? = null) = atomic(context) {

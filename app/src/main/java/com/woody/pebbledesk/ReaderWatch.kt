@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import java.io.ByteArrayOutputStream
+import java.io.File
 import android.view.Display
 import android.os.Build
 import android.os.Handler
@@ -19,10 +20,13 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.woody.pebbledesk.readers.AppWindows
 import com.woody.pebbledesk.readers.Cell
+import com.woody.pebbledesk.readers.FileBook
 import com.woody.pebbledesk.readers.ReaderApps
 import com.woody.pebbledesk.readers.ReaderSpec
+import com.woody.pebbledesk.readers.ViewerInfo
 import com.woody.pebbledesk.readers.byId
 import com.woody.pebbledesk.readers.usableThumb
+import com.woody.pebbledesk.readers.withoutBookFile
 import java.time.LocalDate
 
 /**
@@ -64,6 +68,12 @@ class ReaderWatchService : AccessibilityService() {
     /** 탭마다 책이 다른 앱([ReaderSpec.viewerTabs])에서 [unknownOpen] 을 적은 탭(같은 모르는 탭에 다시 와도 처음 열린 때를 둔다) */
     private val unknownTab = mutableMapOf<String, String>()
     private var lastWebRead = 0L
+    /** 앱마다 읽는 화면이 마지막으로 앞에 온 때 */
+    private val viewerAt = mutableMapOf<String, Long>()
+    /** 이북 앱 데이터로 책을 아는 앱([ReaderSpec.fileBook])에 메뉴 없이 물어볼 남은 횟수(읽는 화면이 앞에 올 때마다 다시 센다) */
+    private val fileTries = mutableMapOf<String, Int>()
+    /** 그 앱에서 마지막으로 메뉴 제목으로 물어본 결과(못 찾았으면 null. 메뉴를 띄워 둔 동안 다시 묻지 않게, 읽는 화면이 앞에 올 때마다 비운다) */
+    private val fileTitles = mutableMapOf<String, Pair<String, FileBook?>>()
     /**
      * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 알라딘·리디처럼 서재를 잠깐만 보는
      * 앱의 서재가 보일 때(보이는 대로, 그리고 멈췄을 때) 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
@@ -166,6 +176,9 @@ class ReaderWatchService : AccessibilityService() {
         screen[spec.pkg] = name
         if (spec.viewerHolder != null) ReadingLog.viewerShown(this, spec.pkg, name in spec.viewers, now)
         if (ReadingLog.isReaderScreen(name)) {
+            viewerAt[spec.pkg] = now
+            fileTries[spec.pkg] = FILE_TRIES
+            fileTitles -= spec.pkg
             // 서재를 떠나 처음 연 읽는 화면의 때만 적는다(읽는 중 목차 같은 다른 화면에 갔다 와도 처음부터 그 책으로 세게).
             // 줄이 바뀌기를 기다리다 서재에서 다시 읽으러 갔으면 이번 책의 때로 다시 적는다.
             if (spec.recent != null && (readSince.add(spec.pkg) || recentWait.remove(spec.pkg))) readerAt[spec.pkg] = now
@@ -186,9 +199,10 @@ class ReaderWatchService : AccessibilityService() {
     }
 
     /**
-     * 탭마다 책이 다른 앱([ReaderSpec.viewerTabs])에서 읽는 화면 탭 [cls] 가 앞에 왔다. 그 탭으로 메뉴에서 마지막으로 안 책이 지금 편 책과
+     * 탭마다 책이 다른 앱([ReaderSpec.viewerTabs])에서 읽는 화면 탭 [cls] 가 앞에 왔다. 그 탭으로 마지막으로 안 책이 지금 편 책과
      * 다르면 그 책을 편 것으로 본다(탭을 오가며 읽으면 진행률·읽은 시간이 앞 탭의 책에 붙지 않게). 모르는 탭이면 앞서 편 책과 다를 수 있어
-     * '책 모름'을 적고(진행률·읽은 시간을 앞 책에 붙이지 않는다), 메뉴로 알면 탭이 열린 때부터 그 책으로 센다. 같은 탭에 다른 책을 열면 메뉴를 띄울 때까지는 알 수 없다.
+     * '책 모름'을 적고(진행률·읽은 시간을 앞 책에 붙이지 않는다), 메뉴나 이북 앱 데이터([ReaderSpec.fileBook])로 알면 탭이 열린 때부터 그 책으로 센다. 같은 탭에 다른 책을 열면 데이터로 아는 앱은
+     * 방금 연 책으로 바로잡고, 아니면 메뉴를 띄울 때까지는 알 수 없다.
      */
     private fun enterTab(spec: ReaderSpec, cls: String, now: Long) {
         val title = tabBook(cls)
@@ -298,7 +312,9 @@ class ReaderWatchService : AccessibilityService() {
         viewerSpec = null
         if (screen[spec.pkg] !in spec.viewers) return
         val windows = windowsOf(spec).takeIf { it.all.isNotEmpty() } ?: return logNoWindow(spec)
-        val info = spec.readViewer(windows)
+        val shown = spec.readViewer(windows)
+        val file = fileBook(spec, shown)
+        val info = file?.let { ViewerInfo(knownTitle(it), it.author, shown.progress) } ?: shown
         val progress = info.progress
         if (progress >= 0 || info.title != null) WatchLog.add(this, WatchLog.Kind.PROGRESS, spec.pkg, "$progress", info.title.orEmpty())
         if (progress < 0 && viewerRetries-- > 0) {
@@ -312,9 +328,13 @@ class ReaderWatchService : AccessibilityService() {
             // 편 책 기록의 책이 이 제목의 읽고 있는 책이면 그 책을 읽는 중이다(같은 제목의 책이 여럿이어도 목록 순서로 다른 책으로 바꾸지 않는다).
             // 아니면(서비스가 꺼졌다 켜져 '책 모름'·다른 책·책 id 없는 옛 줄·그 책이 목록에 없음) 이 제목의 책을 편 것으로 다시 적는다(그래야 그 뒤 시간이 이 책에)
             if (first || recordedBook(spec)?.hasTitle(title) != true) {
-                bookOpened(spec, Cell(title, info.author, progress, -1, null, Rect()), unknownOpen[spec.pkg])
+                // 메뉴 없이 이북 앱 데이터로 방금 연 책을 알았으면 읽는 화면이 열린 때부터 그 책으로 센다.
+                val at = unknownOpen[spec.pkg] ?: viewerAt[spec.pkg]?.takeIf { file != null && shown.title == null }
+                bookOpened(spec, Cell(title, info.author, progress, -1, null, Rect()), at)
+                file?.let { saveFile(title, it.path) }
                 return
             }
+            file?.let { saveFile(title, it.path) }
         }
         if (progress < 0) return
         // 진행률은 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다)
@@ -325,6 +345,38 @@ class ReaderWatchService : AccessibilityService() {
     /** 편 책 기록([ReadingLog.openBook])이 가리키는 읽고 있는 책(책 모름·목록에 없으면 null) */
     private fun recordedBook(spec: ReaderSpec): ShelfBook? =
         ReadingLog.openBook(this, spec.pkg)?.let { id -> BookShelf.list(this).firstOrNull { it.id == id } }
+
+    /**
+     * 이북 앱 데이터로 책을 아는 앱([ReaderSpec.fileBook], 네오리더). 쪽을 넘길 때마다 그 앱을 깨우지 않도록 메뉴 제목이 새로 보일 때(결과는 기억)와
+     * 읽는 화면이 앞에 온 뒤 메뉴 없이 [FILE_TRIES]번까지만 묻는다(방금 연 책을 찾으면 그만 묻는다).
+     */
+    private fun fileBook(spec: ReaderSpec, shown: ViewerInfo): FileBook? {
+        val title = shown.title
+        if (title != null) {
+            fileTitles[spec.pkg]?.let { (t, book) -> if (t == title) return book }
+            return spec.fileBook(this, shown, 0).also { fileTitles[spec.pkg] = title to it }
+        }
+        val tries = fileTries[spec.pkg] ?: 0
+        if (tries <= 0) return null
+        fileTries[spec.pkg] = tries - 1
+        val since = viewerAt[spec.pkg] ?: return null
+        return spec.fileBook(this, shown, since)?.also { fileTries[spec.pkg] = 0 }
+    }
+
+    /**
+     * 이북 앱 데이터로 찾은 책이 이미 있으면 그 책의 제목: 그 파일로 넣은 책, 없으면 파일 이름(확장자 뗌)으로 넣은 책(메뉴 제목이 파일 이름이던
+     * 1.5.4 에서 넣은 책. 읽고 있는 책·지우지 않은 나간 책). 그래야 같은 책이 책 정보의 제목으로 한 번 더 들어가지 않고, 나간 책은 그 책으로 되살아난다.
+     */
+    private fun knownTitle(file: FileBook): String {
+        BookShelf.titleByFile(this, file.path)?.let { return it }
+        val fileTitle = withoutBookFile(File(file.path).name)
+        return BookShelf.findByTitle(this, fileTitle)?.title ?: BookShelf.findLivePast(this, fileTitle)?.book?.title ?: file.title
+    }
+
+    /** 이북 앱이 [title] 로 연 파일을 그 책에 적어 둔다(홈에서 그 파일을 바로 연다) */
+    private fun saveFile(title: String, path: String) {
+        BookShelf.findByTitle(this, title)?.let { BookShelf.setFilePath(this, it.id, path) }
+    }
 
     /**
      * 책 칸이 아닌 것을 눌렀다: 검색 화면의 `바로 읽기`일 수 있으니 지금 보이는 책 상세를 기억하고 표지를 찍어 둔다
@@ -388,8 +440,8 @@ class ReaderWatchService : AccessibilityService() {
             BookShelf.updateStatus(this, it.id, seen.progress, seen.due, seen.author)
         } ?: run {
             // 완독한 책도 펴면 들어온다(새 회차가 그날 시작, [BookShelf.addOpened]. 1.5.3 까지는 완독한 책은 넣지 않았고, 10권이 차면 넣지 않았다).
-            // 실행 화면이 없는 이북 앱(네오리더)은 그 책들이 있는 서재 앱으로
-            val app = AppStore.load(this).firstOrNull { it.pkg == spec.appPkg }?.key
+            // 파일로만 여는 이북 앱(네오리더)은 그 항목([AppStore.fileReaders])으로
+            val app = AppStore.readerKey(this, spec.pkg)
             result = WatchLog.Opened.NEW
             BookShelf.addOpened(this, seen.title, seen.author, app, seen.progress, seen.due, openedAt)
         }
@@ -580,6 +632,8 @@ class ReaderWatchService : AccessibilityService() {
         /** 진행률이 비어 있으면 이 간격으로 이만큼 더 읽어 본다 */
         private const val VIEWER_RETRY_MS = 1000L
         private const val VIEWER_RETRIES = 3
+        /** 읽는 화면이 앞에 온 뒤 메뉴 없이 이북 앱 데이터에 물어볼 횟수(책을 여는 동안 연 때가 늦게 적힐 수 있다) */
+        private const val FILE_TRIES = 3
         private const val SHOT_INTERVAL_MS = 1100L
         /** 서재 화면이 이만큼 그대로여야 표지를 찍는다 */
         private const val SETTLE_MS = 1500L

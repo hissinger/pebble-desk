@@ -27,11 +27,14 @@ class DbMigrationTest {
         rows("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'android_metadata' ORDER BY name") { it.getString(0) }
             .associateWith { columns(it) }
 
-    @Test fun `v1·v2 에서 올린 표가 새로 설치한 표와 같다(Libby 읽는 화면 viewer_mark 포함)`() {
+    @Test fun `v1·v2·v3 에서 올린 표가 새로 설치한 표와 같다(Libby 읽는 화면 viewer_mark, 네오리더 책 파일 book_file 포함)`() {
         val fresh = SQLiteDatabase.create(null).apply { Db.create(this) }.schema()
         assertEquals(listOf("at", "pkg", "shown"), fresh["viewer_mark"])
         assertEquals(fresh, v1().apply { Db.upgrade(this, 1) }.schema())
         assertEquals(fresh, v2().apply { Db.upgrade(this, 2) }.schema())
+        // 1.5.4 판(v3): 지금 표에서 버전 4 의 book_file 만 없다
+        val v3 = SQLiteDatabase.create(null).apply { Db.create(this); execSQL("DROP TABLE book_file") }
+        assertEquals(fresh, v3.apply { Db.upgrade(this, 3) }.schema())
     }
 
     @Test fun `v2 에서 올리면 감상은 마지막 완독 회차로 옮기고 완독한 적 없는 책의 감상은 그대로`() {

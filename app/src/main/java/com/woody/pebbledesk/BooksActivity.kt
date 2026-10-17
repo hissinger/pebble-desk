@@ -83,7 +83,7 @@ class BooksActivity : EinkActivity() {
     }
 
     private fun bookRow(book: ShelfBook, i: Int, count: Int, apps: List<AppEntry>): View {
-        val app = book.app?.let { key -> apps.find { it.key == key } }
+        val app = book.app?.let { key -> AppStore.find(this, key, apps) }
         return hbox().apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)

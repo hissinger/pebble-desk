@@ -16,6 +16,15 @@ data class Cell(
 /** 읽는 화면에서 읽은 것. [title]·[author] 는 메뉴에 제목이 보일 때만(모르면 null), [progress] 는 모르면 -1 */
 class ViewerInfo(val title: String?, val author: String, val progress: Int)
 
+/**
+ * 실행 화면이 없어 파일로만 여는 이북 앱(네오리더). [activity] 는 파일(`ACTION_VIEW`)을 받는 화면, [label] 은 읽고 있는 앱 고르기에 보일 이름,
+ * [shelfPkg] 는 책의 파일을 모를 때 대신 열 서재 앱(BOOX 런처)
+ */
+class FileViewer(val activity: String, val label: Int, val shelfPkg: String?)
+
+/** 이북 앱 데이터에서 찾은 책([ReaderSpec.fileBook]) */
+class FileBook(val title: String, val author: String, val path: String)
+
 /** 화면에 떠 있는 그 앱의 창들. [active] 는 맨 앞 창(다른 앱이면 null), [all] 은 읽는 화면 + 위에 뜬 메뉴·알림 창 */
 class AppWindows(val active: AccessibilityNodeInfo?, val all: List<AccessibilityNodeInfo>)
 
