@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.net.Uri
 import android.os.Handler
@@ -58,6 +59,7 @@ object AppStore {
         cachedApps?.let { if (changed == null && locale == cachedLocale) return it }
         changed?.let { packageSequence = it.sequenceNumber }
         cachedLocale = locale
+        cachedFileReaders = null
         return queryApps(context).also { cachedApps = it; save(context, it, locale) }
     }
 
@@ -119,17 +121,22 @@ object AppStore {
                 }
             }
 
-    /** 앱 목록을 읽고, 지워진 앱을 설정과 읽고 있는 책에서 정리한다. */
+    /** 지난번에 정리한 앱 목록([loadAndPrune]. 목록이 그대로면 다시 정리하지 않는다) */
+    private var prunedApps: List<AppEntry>? = null
+
+    /** 앱 목록을 읽고, 지워진 앱을 설정과 읽고 있는 책에서 정리한다(앱 목록이 바뀌었을 때만). */
     fun loadAndPrune(context: Context, prefs: HomePrefs): List<AppEntry> {
         val apps = load(context)
         // 잠금 해제 전에는 앱 정보가 덜 보일 수 있어, 지워진 앱 정리는 잠금이 풀린 뒤에만 한다.
-        if (!Storage.isUnlocked(context)) return apps
+        if (!Storage.isUnlocked(context) || apps === prunedApps) return apps
         // 숨긴(hidden) 앱도 설치된 것으로 본다. 기본 조회로는 지워진 앱처럼 못 찾는다.
-        val fix = keyFixer(apps) { pkg ->
+        // 파일로만 여는 이북 앱(네오리더)의 항목도 있는 앱으로 본다(앱 목록에 없어 패키지를 묻지 않게).
+        val fix = keyFixer(apps + fileReaders(context)) { pkg ->
             runCatching { context.packageManager.getPackageInfo(pkg, PackageManager.MATCH_UNINSTALLED_PACKAGES) }.isSuccess
         }
         prefs.prune(fix)
         BookShelf.pruneApps(context, fix)
+        prunedApps = apps
         return apps
     }
 
@@ -172,11 +179,14 @@ object AppStore {
      * 깔려 있고 켜져 있을 때만. 자동 추가로 그 앱의 책에 붙고, 책의 앱 이름과 그 책 열기에만 쓴다(모든 앱·자주 쓰는 앱·읽고 있는 앱 고르기에는
      * 넣지 않는다. 그냥 띄우면 아무것도 하지 않고, 고를 파일이 없다).
      */
-    private fun fileReaders(context: Context): List<AppEntry> = ReaderApps.ALL.mapNotNull { spec ->
+    private fun fileReaders(context: Context): List<AppEntry> = cachedFileReaders ?: ReaderApps.ALL.mapNotNull { spec ->
         val viewer = spec.fileViewer ?: return@mapNotNull null
         val enabled = runCatching { context.packageManager.getApplicationInfo(spec.pkg, 0).enabled }.getOrDefault(false)
         if (enabled) AppEntry(ComponentName(spec.pkg, viewer.activity), context.getString(viewer.label)) else null
-    }
+    }.also { cachedFileReaders = it }
+
+    /** [fileReaders] 를 앱 목록을 다시 읽을 때까지 담아 둔다(홈의 책 칸마다 앱 정보를 묻지 않게). 언어가 바뀌면 이름도 바뀌어 같이 비운다. */
+    @Volatile private var cachedFileReaders: List<AppEntry>? = null
 
     /** 책의 앱 [key]. 앱 목록([apps])에 없으면 파일로만 여는 이북 앱([fileReaders])에서 찾는다. */
     fun find(context: Context, key: String, apps: List<AppEntry> = load(context)): AppEntry? =
@@ -295,17 +305,27 @@ fun favoriteApps(apps: List<AppEntry>, prefs: HomePrefs): List<AppEntry> {
         .map { app -> names[app.key]?.let { app.copy(label = it) } ?: app }
 }
 
-/** 앱 아이콘 캐시. 흑백으로 바꿔 그리고, 컬러 [Palette] 면 원래 색 그대로. */
+/**
+ * 앱 아이콘 캐시. 흑백으로 바꿔 그리고, 컬러 [Palette] 면 원래 색 그대로.
+ * 다른 앱의 아이콘을 불러오는 것은 느리므로(그 앱의 리소스를 연다) 그린 아이콘을 `files/icons/` 에도 두고, 앱이 새로 뜰 때는 그것을 읽는다.
+ * 파일 이름에 앱을 업데이트한 때를 넣어 앱이 바뀌면 다시 그린다.
+ */
 object AppIcons {
     private val cache = LruCache<String, Bitmap>(200)
     private val grayPaint = Ui.grayPaint()
     private var packageSequence = 0
+
+    private fun dir(context: Context) = File(Storage.of(context).filesDir, "icons")
 
     fun icon(context: Context, app: AppEntry, px: Int): Bitmap {
         val gray = !Palette.current.color
         val key = "${app.key}@$px@$gray"
         cache.get(key)?.let { return it }
         val pm = context.packageManager
+        val updated = runCatching { pm.getPackageInfo(app.pkg, MATCH_ALL_BOOT_STATES).lastUpdateTime }.getOrNull()
+        val name = app.key.replace(Regex("[^A-Za-z0-9._]"), "_")
+        val file = updated?.let { File(dir(context), "${name}@$px${if (gray) "g" else "c"}@$it.png") }
+        file?.takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.path) }?.let { cache.put(key, it); return it }
         // 못 찾으면 기본 아이콘을 쓰되 기억하지 않는다(다음에 다시 찾는다).
         val found = runCatching {
             pm.getActivityInfo(app.component, MATCH_ALL_BOOT_STATES or PackageManager.MATCH_DISABLED_COMPONENTS).loadIcon(pm)
@@ -317,8 +337,20 @@ object AppIcons {
             Canvas(it).drawBitmap(color, 0f, 0f, grayPaint)
             color.recycle()
         }
-        if (found != null) cache.put(key, out)
+        if (found != null) {
+            cache.put(key, out)
+            if (file != null) Bg.run({ save(file, "${name}@$px${if (gray) "g" else "c"}@", out) }) {}
+        }
         return out
+    }
+
+    /** 그린 아이콘을 [file] 로 두고 같은 앱·크기·색의 예전 파일([prefix], 앱을 업데이트하기 전)은 지운다. */
+    private fun save(file: File, prefix: String, bitmap: Bitmap) {
+        file.parentFile?.mkdirs()
+        val tmp = File(file.parentFile, "${file.name}.tmp")
+        tmp.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        if (!tmp.renameTo(file)) tmp.delete()
+        file.parentFile?.listFiles { f -> f != file && f.name.startsWith(prefix) }?.forEach { it.delete() }
     }
 
     /** 앱이 설치·업데이트·삭제됐을 때만 캐시를 비운다(아이콘이 바뀌었을 수 있으므로). 비웠으면 true. */

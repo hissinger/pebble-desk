@@ -497,6 +497,7 @@ class ReaderWatchService : AccessibilityService() {
             val book = BookShelf.findByTitle(this, web.title)
             if (book != null && web.thumb != null && !BookShelf.hasCover(this, book.id)) targets += web.title to web.thumb
         }
+        val statuses = mutableListOf<BookShelf.Status>()
         for (s in seen) {
             val book = BookShelf.findByTitle(this, s.title)
             if (book == null) {
@@ -506,9 +507,11 @@ class ReaderWatchService : AccessibilityService() {
                 if (spec.eagerCovers && thumb != null && wantsPendingCover(s.title)) targets += s.title to thumb
                 continue
             }
-            BookShelf.updateStatus(this, book.id, s.progress, s.due, s.author)
+            statuses += BookShelf.Status(book.id, s.progress, s.due, s.author)
             if (s.thumb != null && !BookShelf.hasCover(this, book.id)) targets += s.title to s.thumb
         }
+        // 서재 한 화면의 진행률·반납일을 한 번에 쓴다
+        BookShelf.updateStatuses(this, statuses)
         if (!spec.secure) captureCovers(spec, targets)
     }
 
@@ -607,13 +610,20 @@ class ReaderWatchService : AccessibilityService() {
 
     /**
      * [cls] 가 [pkg] 의 액티비티인가. 대화상자가 닫힐 때는 화면 바뀜 알림이 다시 오지 않아, 대화상자를 화면으로 기억하면
-     * 그 아래 읽는 화면을 읽지 않게 된다. 창이 바뀔 때만 불리고 앱이 업데이트될 수 있어 담아 두지 않는다. 앱 정보를 못 읽으면 액티비티로 본다.
+     * 그 아래 읽는 화면을 읽지 않게 된다. 액티비티 목록은 크므로(킨들·교보는 수백 개) 앱마다 담아 두고 앱이 업데이트됐을 때만 다시 읽는다.
+     * 앱 정보를 못 읽으면 액티비티로 본다.
      */
     private fun isActivity(pkg: String, cls: String): Boolean {
-        val activities = runCatching { packageManager.getPackageInfo(pkg, PackageManager.GET_ACTIVITIES).activities }.getOrNull()
+        val updated = runCatching { packageManager.getPackageInfo(pkg, 0).lastUpdateTime }.getOrNull() ?: return true
+        val known = activities[pkg]?.takeIf { it.first == updated }?.second
+            ?: runCatching { packageManager.getPackageInfo(pkg, PackageManager.GET_ACTIVITIES).activities }.getOrNull()
+                ?.mapTo(HashSet()) { it.name }?.also { activities[pkg] = updated to it }
             ?: return true
-        return activities.any { it.name == cls }
+        return cls in known
     }
+
+    /** 이북 앱마다 (업데이트한 때, 액티비티 이름들)([isActivity]) */
+    private val activities = HashMap<String, Pair<Long, Set<String>>>()
 
     /** 지금 앞에 있는 그 앱의 화면(다른 앱·시스템 창이면 null) */
     private fun root(spec: ReaderSpec): AccessibilityNodeInfo? = rootInActiveWindow?.takeIf { it.packageName == spec.pkg }

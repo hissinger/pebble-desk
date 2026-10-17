@@ -538,4 +538,44 @@ class BookShelfStoreTest {
         assertEquals(read, ReadingLog.days(app, setOf("pkg"))!!.getValue(today).values.sum())
         assertEquals(before, dbDays())
     }
+
+    private fun dbShelf() = db.rows("SELECT pos, id, progress, due, author FROM shelf ORDER BY pos") {
+        listOf(it.getInt(0), it.getString(1), it.getInt(2), it.getLong(3), it.getString(4))
+    }
+
+    @Test fun `서재에서 본 여러 책의 진행률을 순서 그대로 한 번에 쓴다`() {
+        db.execSQL("INSERT INTO shelf VALUES (1, 'b-2', '싯다르타', '', NULL, 0, -1, -1, '')")
+        db.execSQL("INSERT INTO shelf VALUES (2, 'b-3', '모모', '', NULL, 0, 5, -1, '')")
+        BookShelf.clearCaches()
+        val before = Db.changes()
+        BookShelf.updateStatuses(app, listOf(
+            BookShelf.Status("b-3", 40, 20_000L, "미하엘 엔데"),
+            BookShelf.Status("b-1", -1, -1),          // 모르는 값은 그대로
+            BookShelf.Status("b-2", 30, -1),
+            BookShelf.Status("b-2", -1, -1),          // 같은 책의 뒤 칸이 모르면 앞 칸에서 본 값이 남는다
+        ))
+        assertEquals(before + 1, Db.changes())
+        val want = listOf(listOf(0, "b-1", 10, -1L, ""), listOf(1, "b-2", 30, -1L, ""), listOf(2, "b-3", 40, 20_000L, "미하엘 엔데"))
+        assertEquals(want, dbShelf())
+        assertEquals(want.map { it[1] to it[2] }, BookShelf.list(app).map { it.id to it.progress })
+    }
+
+    @Test fun `바뀐 게 없거나 이미 맨 앞이면 쓰지 않는다`() {
+        BookShelf.list(app)
+        val before = Db.changes()
+        BookShelf.updateStatus(app, "b-1", 10, -1)
+        BookShelf.moveToFront(app, "b-1")
+        BookShelf.updateStatuses(app, emptyList())
+        assertEquals(before, Db.changes())
+    }
+
+    @Test fun `순서가 바뀌면 표를 다시 쓴다`() {
+        db.execSQL("INSERT INTO shelf VALUES (1, 'b-2', '싯다르타', '', NULL, 0, -1, -1, '')")
+        BookShelf.clearCaches()
+        BookShelf.moveToFront(app, "b-2")
+        assertEquals(listOf("b-2", "b-1"), dbShelf().map { it[1] })
+        assertEquals(listOf(0, 1), dbShelf().map { it[0] })
+        BookShelf.clearCaches()
+        assertEquals(listOf("b-2", "b-1"), BookShelf.list(app).map { it.id })
+    }
 }

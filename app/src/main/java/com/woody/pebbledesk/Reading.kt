@@ -140,7 +140,10 @@ object ReadingLog {
         c.feed(context)
         val raw = c.totals(opens(context), marks(context))
         // 그 책 id 가 처음 붙은 날(저장한 날들과 지금 센 날들에서): 그 전 날의 모르는 시간은 그 책에 붙이지 않는다
-        val counted = withBooks(raw, shelf, past, (saved.days + raw).firstReadDays())
+        // 저장한 날들 쪽은 저장이 바뀔 때만 다시 센다(홈으로 돌아올 때마다 전체 기록을 훑지 않게). 센 날은 저장한 날 뒤라 겹치지 않는다.
+        val firstRead = savedFirstRead(saved.days).toMutableMap()
+        raw.firstReadDays().forEach { (book, day) -> firstRead.merge(book, day, ::minOf) }
+        val counted = withBooks(raw, shelf, past, firstRead)
         // 기록이 시작된 날(그 전은 '안 읽음'이 아니라 '기록 없음')
         val since = saved.since ?: (saved.days.keys + from).min()
         val days = saved.days + counted
@@ -148,6 +151,12 @@ object ReadingLog {
         if (!back && (saved.through != today.minusDays(1) || saved.since == null)) save(context, Saved(today.minusDays(1), since, days - today), counted - today)
         return days
     }
+
+    /** 저장한 날들([days])의 [firstReadDays] 와 그 날들(같은 사본이면 다시 세지 않는다) */
+    private var firstReadCache: Pair<ReadingDays, Map<String, LocalDate>>? = null
+
+    private fun savedFirstRead(days: ReadingDays): Map<String, LocalDate> =
+        firstReadCache?.takeIf { it.first === days }?.second ?: days.firstReadDays().also { firstReadCache = days to it }
 
     /**
      * 책 id 를 모르는 칸([ReadKey.book] "", 제목이 있는 칸만)을 [bookFor] 로 정한다. 같은 칸이 되면 더한다.

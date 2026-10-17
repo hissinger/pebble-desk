@@ -188,12 +188,15 @@ class BookRecord(
             val acc = linkedMapOf<String, Acc>()
             val reading = shelf.associateBy { it.id }
             val left = history.associateBy { it.book.id }
+            // 앱마다 한 번만 묻는다(책마다 앱 목록이 바뀌었는지 시스템에 묻지 않게)
+            val readerKeys = HashMap<String, String?>()
+            fun readerKey(pkg: String) = if (pkg in readerKeys) readerKeys[pkg] else AppStore.readerKey(context, pkg).also { readerKeys[pkg] = it }
             fun accOf(k: ReadKey): Acc {
                 reading[k.book]?.let { b -> return acc.getOrPut(b.id) { Acc(b, State.READING, false) } }
                 left[k.book]?.let { p -> return acc.getOrPut(p.book.id) { Acc(p.book, State.PAST, p.hidden) } }
                 // 책을 모르는 시간(목록에 없던 책). 있어서는 안 되지만 어디에도 없는 책 id 의 시간도 다른 책에 붙이지 않고 여기로.
                 val id = titleOnlyId(k.title)
-                return acc.getOrPut(id) { Acc(ShelfBook(id, k.title, "", AppStore.readerKey(context, k.pkg), 0), State.TITLE_ONLY, false) }
+                return acc.getOrPut(id) { Acc(ShelfBook(id, k.title, "", readerKey(k.pkg), 0), State.TITLE_ONLY, false) }
             }
             days?.forEach { (day, keys) ->
                 keys.forEach { (k, ms) ->

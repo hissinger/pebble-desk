@@ -83,12 +83,12 @@ internal fun withoutBookFile(text: String): String = text.replace(BOOK_FILE, "")
 
 /** `47%` → 47, 소수(문리더 `30.9%`)는 버림. 없으면 -1 */
 internal fun percent(text: CharSequence): Int =
-    Regex("""(\d{1,3})(?:[.,]\d+)?\s*%""").find(text)?.groupValues?.get(1)?.toInt()?.coerceIn(0, 100) ?: -1
+    PERCENT.find(text)?.groupValues?.get(1)?.toInt()?.coerceIn(0, 100) ?: -1
 
 /** 읽는 화면의 진행률: `2% (4/226p)` 처럼 % 가 있으면 그것, 없으면 쪽 `6 / 368` 로 계산(알라딘·북커스). 모르면 -1 */
 internal fun viewerPercent(text: CharSequence, roundUp: Boolean): Int {
     percent(text).takeIf { it >= 0 }?.let { return it }
-    val m = Regex("""(\d+)\s*/\s*(\d+)""").find(text) ?: return -1
+    val m = PAGES.find(text) ?: return -1
     return pagePercent(m.groupValues[1], m.groupValues[2], roundUp)
 }
 
@@ -107,17 +107,26 @@ internal fun pagePercent(page: String?, total: String?, roundUp: Boolean): Int {
  */
 internal fun dueDate(text: String): Long {
     if (text.isEmpty()) return -1
-    Regex("""(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})""").find(text)?.let { m ->
+    DUE_DATE.find(text)?.let { m ->
         val (y, mo, d) = m.destructured
         runCatching { return LocalDate.of(y.toInt(), mo.toInt(), d.toInt()).toEpochDay() }
     }
     val today = LocalDate.now().toEpochDay()
-    Regex("""D-\s*(\d+)""", RegexOption.IGNORE_CASE).find(text)?.let { return today + it.groupValues[1].toLong() }
+    DUE_D.find(text)?.let { return today + it.groupValues[1].toLong() }
     if (text.equals("D-Day", ignoreCase = true)) return today
-    Regex("""(\d+)\s*(일|days?\b)""", RegexOption.IGNORE_CASE).find(text)?.let { return today + it.groupValues[1].toLong() }
-    if (Regex("""\d+\s*(시간|분|(hours?|minutes?)\b)""", RegexOption.IGNORE_CASE).containsMatchIn(text)) return today
+    DUE_DAYS.find(text)?.let { return today + it.groupValues[1].toLong() }
+    if (DUE_HOURS.containsMatchIn(text)) return today
     // '오늘'을 '만료'보다 먼저 본다(`오늘 만료` 처럼 둘 다 있으면 오늘).
     if ("오늘" in text || "today" in text.lowercase()) return today
-    if ("만료" in text || Regex("""\b(expired|due now)\b""", RegexOption.IGNORE_CASE).containsMatchIn(text)) return today - 1
+    if ("만료" in text || DUE_PAST.containsMatchIn(text)) return today - 1
     return -1
 }
+
+// 서재 칸마다 부르므로 한 번만 만든다([percent]·[viewerPercent]·[dueDate])
+private val PERCENT = Regex("""(\d{1,3})(?:[.,]\d+)?\s*%""")
+private val PAGES = Regex("""(\d+)\s*/\s*(\d+)""")
+private val DUE_DATE = Regex("""(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})""")
+private val DUE_D = Regex("""D-\s*(\d+)""", RegexOption.IGNORE_CASE)
+private val DUE_DAYS = Regex("""(\d+)\s*(일|days?\b)""", RegexOption.IGNORE_CASE)
+private val DUE_HOURS = Regex("""\d+\s*(시간|분|(hours?|minutes?)\b)""", RegexOption.IGNORE_CASE)
+private val DUE_PAST = Regex("""\b(expired|due now)\b""", RegexOption.IGNORE_CASE)
