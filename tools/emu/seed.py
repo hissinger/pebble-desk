@@ -57,6 +57,8 @@ def v3_schema(db):
     x("CREATE INDEX finish_book ON finish (book_id)")
     x("CREATE TABLE review (book_id TEXT PRIMARY KEY, stars INTEGER NOT NULL, text TEXT NOT NULL, updated_at INTEGER NOT NULL)")
     x("CREATE TABLE round_start (book_id TEXT PRIMARY KEY, day INTEGER)")
+    # 버전 3에서 함께 더한 표(Db.createViewerMark). 빠지면 버전이 같아 앱이 만들지 않고 홈이 `no such table` 로 멈춘다
+    x("CREATE TABLE viewer_mark (at INTEGER NOT NULL, pkg TEXT NOT NULL, shown INTEGER NOT NULL)")
     db.execute("PRAGMA user_version=3")
 
 
