@@ -44,7 +44,7 @@
 | B4 | S:unknown: 이번 주 시간이 모두 책 모름(합쳐 1분 이상) | 독서 기록 | `이번 주 읽은 책` 자리에 `읽는 책 자동 추가를 켜면 책별로 보입니다` |
 | B5 | S:week: 같은 제목 두 책(A 나간 책·B 읽는 중) 모두 이번 주에 읽음 | 독서 기록 | `이번 주 읽은 책` 에 `데미안` 두 줄(각자 시간) |
 | B6 | S:week: 책 제목을 고친 책(이번 주 시간은 그 id, 편 책 제목은 고치기 전) | 독서 기록 | 고친 제목으로 한 줄 |
-| B7 | S:week: 6권 이상 이번 주에 읽음 | 독서 기록 | 다섯 권씩 쪽, `‹ 1 / 2 ›`, 페이지 키로 넘김 |
+| B7 | S:week: 6권 이상 이번 주에 읽음 | 독서 기록 | 다섯 권씩 쪽, `‹ 1 / 2 ›`, 누르거나 밀어서 넘김 |
 | B8 | S: 목표 30분, 달력·그래프 | `달력 · 그래프` 전환, `‹ ›` 4주 넘김 | 두 보기 같은 높이, 기록 시작일 전으로는 안 감 |
 | B9 | S:week: 이번 주 목록에 없던 책(빈 id, 제목 있음) 12분 | 독서 기록 | `이번 주 읽은 책` 에 그 제목 한 줄 |
 | B10 | S:week: 이번 주 책 A 59초, 책 B 60초 | 독서 기록 | B 만 보임(1분 이상) |
@@ -185,9 +185,8 @@
 | K1f | 자동 추가 꺼짐 안내 창을 연 채 화면을 끄고 자정을 넘겨 켬 | 안내 창이 그대로(닫히지 않음) |
 | K2 | 컬러(설정 › 화면 › 색) | 상세 색면·도장·완독 띠, 안내 창 테두리 |
 | K3 | 좁은 화면 에뮬(720×1440) | 상세·전체 기록·안내 창이 화면 안 |
-| K4 | 페이지 키 | 전체 기록 쪽 넘김, 첫 키가 버려지지 않음 |
+| K4 | `adb shell input keyevent 93`·`92`·`291`·`292`(페이지 키) | 어느 화면·메뉴에서도 쪽이 넘어가지 않음(키 처리 없음, 1.5.4 까지는 넘어갔다) |
 | K5 | 1.5.3 에서 남은 자동 추가 기록(`목록이 다 참`·`완독한 책이라 넣지 않음`) | 설정 › 정보 › 기기 정보 › `기록 보기 ›` 에서 그 줄이 그대로 읽힘 |
-| K6 | `adb shell input keyevent 291` / `292`(메이북 페이지 키) | 전체 기록·이번 주 읽은 책·목록이 넘어감 |
 
 ## L. 엣지 케이스
 
@@ -372,7 +371,7 @@ U = 단위 테스트(`app/src/test`), 나머지는 위 케이스 ID. 단위 테�
 | `BookShelf.migrateIds`(실패 뒤 다시) | U `옛 id 바꾸기가 실패하면…` |
 | `showBookDetail`·`detailSheet`·`bookSheet`·`bookId`·`reviewLocked` | D1~D9, E, L5 |
 | `editRound`·`finishDayRow`·`parseDay`·`finishDayRangeText`·`saveRoundReview` | E4, E5, L4, U(ParseDayTest·RecordTextTest) |
-| `showHistory`·`paginate`·`Timeline` | D3, D8, D10, L4-14, L9-2, K4 |
+| `showHistory`·`paginate`·`Timeline` | D3, D8, D10, L4-14, L9-2 |
 | `recordView`·`recordPeriod`·`roundTime`·`finishSummary`·`recordMore`·`historyRest`·`roundDetail`·`period` | D1~D3, D10, L1-12, L4-6, L4-7, A3, U(RecordTextTest) |
 | `Sheet.height`·`layout`·`centered`·`dateInput`·초점 막기 | D5, D8, J1, E5, K4 |
 | `Review.reviewSheet`(top·onDismiss)·`reviewBlock`(lines·enabled) | D1, D4, D5, E4 |
@@ -382,9 +381,6 @@ U = 단위 테스트(`app/src/test`), 나머지는 위 케이스 ID. 단위 테�
 | `ReaderWatchService.bookOpened`(권수 제한 없음)·`unknownOpen` 줄·`onUnbind`·표지 미리 자르기 | I1~I8, J4, J8, L7-9, L10 |
 | `BookSearchActivity.pick`·`replaceCover`·`withCover` | G1, G4~G8, L6-1, L6-2, E13 |
 | `BooksActivity` 권수 표시 | G3, L6-3, L6-4 |
-| `pageKey`(키 매핑) | U `페이지 키 - …` |
-| `Sheet.paged`(떠 있는 메뉴의 쪽 넘김) | K4, K6(전체 기록) |
-| `EinkActivity.onKeyDown`(화면의 쪽 넘김) | K6(이번 주 읽은 책·목록) |
 | `WatchLog.Opened` 옛 값 | K5 |
 
 ## codex 리뷰 지적 회귀

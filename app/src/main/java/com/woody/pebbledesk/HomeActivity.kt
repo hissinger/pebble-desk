@@ -262,7 +262,7 @@ class HomeActivity : EinkActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() = Unit
 
-    /** 함께 읽는 책 줄에서 시작한 밀기는 책을, 그 밖(과 페이지 버튼)은 자주 쓰는 앱을 넘긴다. 책이 한 쪽뿐이면 자주 쓰는 앱. */
+    /** 함께 읽는 책 줄에서 시작한 밀기는 책을, 그 밖은 자주 쓰는 앱을 넘긴다. 책이 한 쪽뿐이면 자주 쓰는 앱. */
     override fun onSwipe(toLeft: Boolean): Boolean {
         val rows: Paged = if (touchOnAlso && alsoCount > 1) alsoPaged else favRows
         if (rows.pageCount <= 1) return false
@@ -272,10 +272,7 @@ class HomeActivity : EinkActivity() {
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) touchOnAlso = alsoView?.let { touches(it, ev) } == true
-        val handled = super.dispatchTouchEvent(ev)
-        // 밀기는 손을 뗄 때 위에서 처리했다. 페이지 버튼이 이 값을 쓰지 않게 지운다.
-        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) touchOnAlso = false
-        return handled
+        return super.dispatchTouchEvent(ev)
     }
 
     /** [view] 가 그려져 있고(칸에 다 들지 않아 그리지 않은 줄은 빼고) 손가락이 그 안에서 눌렸는가 */
