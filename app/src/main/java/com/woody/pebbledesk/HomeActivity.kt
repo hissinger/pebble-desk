@@ -20,6 +20,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -62,10 +63,31 @@ class HomeActivity : EinkActivity() {
     private lateinit var hero: FrameLayout
     private var heroHeight = 0
     /** 자주 쓰는 앱 제목 줄: 왼쪽 제목, 오른쪽 끝에 페이지(여러 쪽일 때만) */
-    private lateinit var favHeader: LinearLayout
     private lateinit var favPage: TextView
     private lateinit var favLine: View
     private lateinit var favRows: PagedRows
+    /** 함께 읽는 책 쪽: 지금 쪽, 쪽 수, 그 책들(바뀌면 1쪽부터) */
+    private var alsoPage = 0
+    private var alsoCount = 0
+    private var alsoIds: List<String> = emptyList()
+    /** 그린 함께 읽는 책 줄(밀기를 여기서 시작했는지 본다)과, 쪽을 바꿔 그 줄의 칸만 다시 채우는 함수. 줄이 없으면 null. */
+    private var alsoView: View? = null
+    private var fillAlso: ((Int) -> Unit)? = null
+    private val alsoPaged = object : Paged {
+        override val page get() = alsoPage
+        override val pageCount get() = alsoCount
+        override fun next() = showAlso(alsoPage + 1)
+        override fun prev() = showAlso(alsoPage - 1)
+    }
+    /** 이번 손가락이 함께 읽는 책 줄에서 시작했는가(그 줄을 밀면 책을, 다른 곳을 밀면 자주 쓰는 앱을 넘긴다) */
+    private var touchOnAlso = false
+
+    private fun showAlso(page: Int) {
+        if (page !in 0 until alsoCount || page == alsoPage) return
+        alsoPage = page
+        fillAlso?.invoke(page)
+    }
+
     /** 하단 가운데: 오늘 읽은 시간 · 연속 독서일(켜 두었고 권한이 있을 때만) */
     private lateinit var readingText: TextView
 
@@ -224,20 +246,39 @@ class HomeActivity : EinkActivity() {
         if (hasFocus) applyStatusBar()
     }
 
-    /** 홈 버튼을 다시 누르면 첫 페이지로 */
+    /** 홈 버튼을 다시 누르면 첫 페이지로(자주 쓰는 앱·함께 읽는 책 모두) */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (::favRows.isInitialized) favRows.showPage(0)
+        showAlso(0)
     }
 
     /** 홈에서 뒤로 가기는 아무것도 하지 않는다. */
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() = Unit
 
+    /** 함께 읽는 책 줄에서 시작한 밀기는 책을, 그 밖(과 페이지 버튼)은 자주 쓰는 앱을 넘긴다. 책이 한 쪽뿐이면 자주 쓰는 앱. */
     override fun onSwipe(toLeft: Boolean): Boolean {
-        if (favRows.pageCount <= 1) return false
-        if (toLeft) favRows.next() else favRows.prev()
+        val rows: Paged = if (touchOnAlso && alsoCount > 1) alsoPaged else favRows
+        if (rows.pageCount <= 1) return false
+        if (toLeft) rows.next() else rows.prev()
         return true
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) touchOnAlso = alsoView?.let { touches(it, ev) } == true
+        val handled = super.dispatchTouchEvent(ev)
+        // 밀기는 손을 뗄 때 위에서 처리했다. 페이지 버튼이 이 값을 쓰지 않게 지운다.
+        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) touchOnAlso = false
+        return handled
+    }
+
+    /** [view] 가 그려져 있고(칸에 다 들지 않아 그리지 않은 줄은 빼고) 손가락이 그 안에서 눌렸는가 */
+    private fun touches(view: View, ev: MotionEvent): Boolean {
+        val parent = view.parent as? View ?: return false
+        if (!view.isShown || view.bottom > parent.height) return false
+        val at = IntArray(2).also { view.getLocationInWindow(it) }
+        return ev.x >= at[0] && ev.x < at[0] + view.width && ev.y >= at[1] && ev.y < at[1] + view.height
     }
 
     /**
@@ -296,22 +337,12 @@ class HomeActivity : EinkActivity() {
 
         // 자주 쓰는 앱: 책 수와 상관없이 늘 목록 세 줄(격자는 그 높이 안에 두 줄) 높이
         // 홈의 틀(상단·책 자리·함께 읽는 책 줄·자주 쓰는 앱·하단 줄)은 글자 · 간격 설정과 상관없이 높이가 같다. 줄 간격은 홈에 쓰지 않고 글자만 키운다.
-        // 페이지 표시 `‹ 1 / 2 ›` 는 제목과 같은 글자·여백으로 오른쪽 끝에. 왼쪽 절반은 앞 쪽, 오른쪽 절반은 다음 쪽(목록을 만든 뒤 연결).
-        // 가로면 상단 바로 아래라 조금 더 내린다
-        val favTitle = sectionTitle(getString(R.string.favorites), topDp = if (wide) FAV_TITLE_TOP_WIDE_DP else 18)
-        favPage = text("", 13f, Ui.bold, Ui.GRAY).apply {
-            gravity = Gravity.BOTTOM
-            setPadding(dp(24), 0, dp(Ui.MARGIN), dp(8))
-        }
-        favHeader = hbox().apply {
-            layoutParams = lp(MATCH, favTitle.layoutParams.height)
-            addView(favTitle, lp(0, MATCH, 1f))
-            addView(favPage, lp(WRAP, MATCH))
-        }
+        // 가로면 상단 바로 아래라 조금 더 내린다. 쪽 표시는 목록을 만든 뒤 연결한다.
+        val (favHeader, page) = pagedHeader(getString(R.string.favorites), if (wide) FAV_TITLE_TOP_WIDE_DP else 18) { favRows }
+        favPage = page
         favLine = hline(1)
         // 가로면 오른쪽 칸 높이에 들어가는 만큼(책 자리와 따로라 줄 수를 고정하지 않아도 책 자리가 움직이지 않는다)
         favRows = PagedRows(this, if (fixedFrame) dp(Ui.ROW_DP) else rowDp(Ui.ROW_DP), fixedRows = if (wide) 0 else FAV_ROWS).apply { header = listOf(favHeader, favLine) }
-        favPage.pagesClick(favRows)
         if (wide) body.addView(favRows, lp(0, MATCH, 1f)) else root.addView(favRows, lp(MATCH, WRAP))
 
         root.addView(hline(1, inset = false))
@@ -346,8 +377,8 @@ class HomeActivity : EinkActivity() {
     private fun refresh() {
         val iconsChanged = AppIcons.clearIfPackagesChanged(this)
         apps = AppStore.loadAndPrune(this, prefs)
-        // 홈에는 앞 몇 권만 보인다(나머지는 읽고 있는 책 목록에만).
-        val books = BookShelf.list(this).take(BookShelf.HOME)
+        // 맨 앞 책은 크게, 나머지는 함께 읽는 책 줄에서 쪽으로 넘긴다.
+        val books = BookShelf.list(this)
         // 맨 앞 책의 앱이 곧 읽고 있는 앱이다.
         val reading = books.firstOrNull()?.app?.let(::findApp)
         // 자주 쓰는 앱은 직접 넣고 뺀 그대로 보인다(위의 책·앱과 상관없다).
@@ -438,6 +469,25 @@ class HomeActivity : EinkActivity() {
         setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), dp(8))
     }
 
+    /**
+     * 쪽으로 넘기는 구역(함께 읽는 책 · 자주 쓰는 앱)의 제목 줄: 왼쪽 [sectionTitle], 오른쪽 끝에 쪽 표시 `‹ 1 / 2 ›`(제목과 같은 글자·여백,
+     * 글자는 부르는 쪽이 채운다). 쪽 표시의 왼쪽 절반은 앞 쪽, 오른쪽 절반은 다음 쪽([rows]).
+     */
+    private fun pagedHeader(title: String, topDp: Int, rows: () -> Paged): Pair<LinearLayout, TextView> {
+        val titleView = sectionTitle(title, topDp)
+        val page = text("", 13f, Ui.bold, Ui.GRAY).apply {
+            gravity = Gravity.BOTTOM
+            setPadding(dp(24), 0, dp(Ui.MARGIN), dp(8))
+            pagesClick(rows)
+        }
+        val header = hbox().apply {
+            layoutParams = lp(MATCH, titleView.layoutParams.height)
+            addView(titleView, lp(0, MATCH, 1f))
+            addView(page, lp(WRAP, MATCH))
+        }
+        return header to page
+    }
+
     private fun findApp(key: String): AppEntry? = AppStore.find(this, key, apps)
 
     /** 하단 가운데의 `오늘 42분 · 5일째`. 사용 기록 액세스가 없으면(= 오늘 읽은 시간 꺼짐) 비운다. */
@@ -467,6 +517,16 @@ class HomeActivity : EinkActivity() {
      */
     private fun buildHero(books: List<ShelfBook>, reading: AppEntry?) {
         hero.removeAllViews()
+        alsoView = null
+        fillAlso = null
+        // 함께 읽는 책(맨 앞 책 다음)을 [ALSO_PER_PAGE] 권씩 쪽으로. 책이 바뀌었으면(누른 책이 맨 앞으로 올라감 등) 1쪽부터.
+        val rest = books.drop(1)
+        val pages = rest.chunked(ALSO_PER_PAGE)
+        val ids = rest.map { it.id }
+        if (ids != alsoIds) alsoPage = 0
+        alsoIds = ids
+        alsoCount = pages.size
+        alsoPage = alsoPage.coerceIn(0, maxOf(0, alsoCount - 1))
         if (heroHeight <= 0) return
         val view: View = when (books.size) {
             0 -> skeleton(coverWidth())
@@ -476,19 +536,35 @@ class HomeActivity : EinkActivity() {
                  * [measureOnly] 면 표지 그림 대신 같은 크기의 빈 칸(높이만 잴 때. 표지는 폭마다 줄인 파일을 남긴다).
                  * 잴 때는 칸을 내용 높이로, 그릴 때는 잰 높이를 채우게 둔다(높이를 모를 때 채우는 칸은 높이 계산에서 빠진다).
                  */
-                fun alsoRow(coverW: Int, measureOnly: Boolean = false) = vbox().apply {
+                fun LinearLayout.alsoCells(coverW: Int, page: Int, measureOnly: Boolean) {
+                    val shown = pages[page]
+                    shown.forEachIndexed { i, book ->
+                        addView(smallBook(book, coverW, measureOnly), lp(0, if (measureOnly || !fixedFrame) WRAP else MATCH, 1f).apply { if (i > 0) marginStart = dp(GAP_DP) })
+                    }
+                    // 덜 찬 쪽도 표지 폭·자리가 같도록 빈 칸을 채운다.
+                    repeat(ALSO_PER_PAGE - shown.size) { addView(View(context), lp(0, 1, 1f).apply { marginStart = dp(GAP_DP) }) }
+                }
+                fun alsoRow(coverW: Int, page: Int, measureOnly: Boolean = false) = vbox().apply {
                     // 컬러면 맨 앞 책 색면이 그만큼 아래로 내려와 있어 위 여백을 줄인다(줄 높이는 같게).
-                    addView(sectionTitle(getString(R.string.also_reading), topDp = 28 - fieldBottom))
+                    val (header, pageText) = pagedHeader(getString(R.string.also_reading), 28 - fieldBottom) { alsoPaged }
+                    if (!measureOnly) pageText.text = pageLabel(alsoPaged)
+                    addView(header)
                     addView(hline(1))
-                    addView(hbox().apply {
+                    val cells = hbox().apply {
                         gravity = Gravity.TOP
                         setPadding(dp(Ui.MARGIN), dp(14), dp(Ui.MARGIN), 0)
-                        books.drop(1).forEachIndexed { i, book ->
-                            addView(smallBook(book, coverW, measureOnly), lp(0, if (measureOnly || !fixedFrame) WRAP else MATCH, 1f).apply { if (i > 0) marginStart = dp(GAP_DP) })
+                        alsoCells(coverW, page, measureOnly)
+                    }
+                    addView(cells, lp(MATCH, 0, 1f))
+                    if (!measureOnly) {
+                        alsoView = this
+                        // 쪽을 넘기면 칸과 쪽 표시만 바꾼다(맨 앞 책은 다시 그리지 않는다).
+                        fillAlso = { p ->
+                            cells.removeAllViews()
+                            cells.alsoCells(coverW, p, false)
+                            pageText.text = pageLabel(alsoPaged)
                         }
-                        // 두 권·세 권일 때도 표지 폭이 같도록 빈 칸을 채운다.
-                        repeat(BookShelf.HOME - books.size) { addView(View(context), lp(0, 1, 1f).apply { marginStart = dp(GAP_DP) }) }
-                    }, lp(MATCH, 0, 1f))
+                    }
                 }
                 fun View.measuredIn(): Int {
                     measure(
@@ -497,27 +573,29 @@ class HomeActivity : EinkActivity() {
                     )
                     return measuredHeight
                 }
+                // 쪽마다 줄 높이(제목 줄 수·진행률)가 다를 수 있어 가장 높은 쪽으로 잰다(넘겨도 맨 앞 책 표지 크기가 그대로).
+                fun alsoHeight(coverW: Int) = frameText { pages.indices.maxOf { alsoRow(coverW, it, measureOnly = true).measuredIn() } }
                 // 함께 읽는 책 줄 높이를 먼저 재고(기준 크기 글자로), 남는 높이를 맨 앞 책 표지에 준다.
                 val alsoW = if (tall) {
                     // 바형은 세로가 남아 함께 읽는 책 표지를 키우되, 큰 표지와 크기 차이가 나게 그 [SMALL_COVER_RATIO] 배로 둔다
                     // (100dp ~ 칸 폭). 표지 말고 줄 높이(제목·앱·진행률)는 표지 크기와 상관없으니, 남는 높이를 두 표지에 그 비율로 나눈다.
-                    val textPart = frameText { alsoRow(dp(SMALL_COVER_DP * 2), measureOnly = true).measuredIn() } - (dp(SMALL_COVER_DP * 2) * 3 / 2 + dp(2))
+                    val textPart = alsoHeight(dp(SMALL_COVER_DP * 2)) - (dp(SMALL_COVER_DP * 2) * 3 / 2 + dp(2))
                     val room = heroHeight - dp(heroPad) - dp(HERO_PAD_BOTTOM_DP) - textPart - dp(4)
                     val mainW = minOf(dp(COVER_MAX_DP), (room / (1.5f * (1 + SMALL_COVER_RATIO))).toInt())
-                    val cellW = (hero.width - 2 * dp(Ui.MARGIN) - (BookShelf.HOME - 2) * dp(GAP_DP)) / (BookShelf.HOME - 1) - dp(2)
+                    val cellW = (hero.width - 2 * dp(Ui.MARGIN) - (ALSO_PER_PAGE - 1) * dp(GAP_DP)) / ALSO_PER_PAGE - dp(2)
                     minOf(maxOf((mainW * SMALL_COVER_RATIO).toInt(), dp(SMALL_COVER_DP * 2)), cellW)
                 } else dp(SMALL_COVER_DP)
-                val alsoH = frameText { alsoRow(alsoW, measureOnly = true).measuredIn() }
+                val alsoH = alsoHeight(alsoW)
                 val main = mainBook(books.first(), reading, coverWidth(reserved = alsoH, min = COVER_SMALLER_DP))
                 // 책 자리에 남는 높이(아래 여백, 바형은 표지가 가장 커도 남는 높이)도 함께 읽는 책 줄에 준다(키운 글자가 더 든다. 틀 위치는 같다).
                 // 화면이 낮아 맨 앞 책 표지가 가장 작아도 함께 읽는 책 줄이 다 들지 않으면 그 줄을 그리지 않는다.
                 // 틀을 고정하지 않으면(기기가 밀도를 덮어씀) 1.5.3 까지처럼 그대로 쌓는다(넘치면 책 자리 끝에서 잘린다).
                 if (fixedFrame) FitColumn(this@HomeActivity).apply {
                     addView(main)
-                    addView(alsoRow(alsoW), lp(MATCH, maxOf(alsoH, heroHeight - main.measuredIn())))
+                    addView(alsoRow(alsoW, alsoPage), lp(MATCH, maxOf(alsoH, heroHeight - main.measuredIn())))
                 } else vbox().apply {
                     addView(main)
-                    addView(alsoRow(alsoW))
+                    addView(alsoRow(alsoW, alsoPage))
                 }
             }
         }
@@ -689,6 +767,8 @@ class HomeActivity : EinkActivity() {
         private const val HERO_PAD_BOTTOM_DP = 22
         /** 기기 상단 바를 보일 때(홈 상단을 뺄 때) 상단 바 아래 빈 띠 */
         private const val STATUS_BAR_GAP_DP = 16
+        /** 함께 읽는 책 한 쪽의 칸 수(맨 앞 책과 함께 [BookShelf.HOME]) */
+        private const val ALSO_PER_PAGE = BookShelf.HOME - 1
         /** 함께 읽는 책 표지 폭 */
         private const val SMALL_COVER_DP = 50
         /** 바형 화면에서 함께 읽는 책 표지 폭 ÷ 맨 앞 책 표지 폭 */
