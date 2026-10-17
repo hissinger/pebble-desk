@@ -87,8 +87,15 @@ abstract class EinkActivity : Activity() {
         Ui.rowScale = rowScale
         Palette.current = createdPalette
         if (prefs.english != createdEnglish || prefs.textScalePercent != createdTextScale ||
-            prefs.rowScalePercent != createdRowScale || prefs.palette != createdPalette) recreate()
+            prefs.rowScalePercent != createdRowScale || prefs.palette != createdPalette) {
+            recreating = true
+            recreate()
+        }
     }
+
+    /** 설정(언어·글자·간격·색)이 바뀌어 [onResume] 에서 이 화면을 다시 만드는 중. 이어지는 일(다시 세기·그리기)은 새 화면이 한다. */
+    protected var recreating = false
+        private set
 
     override fun setContentView(view: View) {
         Crema.reserveHiddenBottom(view)

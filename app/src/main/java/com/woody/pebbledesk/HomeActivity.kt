@@ -92,8 +92,12 @@ class HomeActivity : EinkActivity() {
     private lateinit var readingText: TextView
 
     private var apps: List<AppEntry> = emptyList()
-    /** 지난번에 그린 홈의 내용. 같으면 다시 만들지 않는다(빠른 설정을 닫거나 앱에서 돌아올 때 불필요한 전자잉크 갱신을 막는다). */
-    private var shownState: List<Any?>? = null
+    /**
+     * 지난번에 그린 책 자리와 자주 쓰는 앱의 내용. 같으면 다시 만들지 않는다(빠른 설정을 닫거나 앱에서 돌아올 때 불필요한 전자잉크 갱신을 막는다).
+     * 둘을 따로 보아 바뀐 쪽만 다시 만든다(책 자리 높이가 정해지거나 책이 바뀌어도 자주 쓰는 앱은 그대로).
+     */
+    private var shownHero: List<Any?>? = null
+    private var shownFavs: List<Any?>? = null
 
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -120,6 +124,7 @@ class HomeActivity : EinkActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (recreating) return
         applyStatusBar()
         refresh()
         // 읽은 시간은 다른 앱에서 돌아올 때만 바뀐다(레이아웃 때의 refresh 에서는 다시 세지 않는다).
@@ -332,7 +337,7 @@ class HomeActivity : EinkActivity() {
         // 높이가 정해지면(보통 처음 한 번) 이번 그리기를 건너뛰고 그 높이에 맞춰 책 자리를 채운 뒤 그린다.
         // (다음 차례로 미루면 빈 자리를 한 번 그린 뒤 다시 그리게 되어 전자잉크가 깜빡인다.)
         hero.viewTreeObserver.addOnPreDrawListener {
-            if (hero.height == heroHeight) true else { shownState = null; refresh(); false }
+            if (hero.height == heroHeight) true else { shownHero = null; refresh(); false }
         }
 
         // 자주 쓰는 앱: 책 수와 상관없이 늘 목록 세 줄(격자는 그 높이 안에 두 줄) 높이
@@ -391,12 +396,14 @@ class HomeActivity : EinkActivity() {
         val watching = books.isEmpty() && ReaderWatchService.isEnabled(this)
         // 진행률·반납일 글자(반납일은 날이 바뀌면 달라진다)
         val status = books.map { bookStatus(it) }
-        val state = listOf(books, reading, favs, icons, grid, heroHeight, watching, status)
-        if (!iconsChanged && state == shownState) return
-        shownState = state
-
-        buildHero(books, reading)
-
+        val heroState = listOf(books, reading, icons, heroHeight, watching, status)
+        if (iconsChanged || heroState != shownHero) {
+            shownHero = heroState
+            buildHero(books, reading)
+        }
+        val favState = listOf(favs, icons, grid)
+        if (!iconsChanged && favState == shownFavs) return
+        shownFavs = favState
         favRows.setGrid(if (!grid) 0 else if (wide) PagedRows.GRID_AUTO else GRID_ROWS)
         favRows.setRows(
             if (favs.isEmpty()) listOf {
@@ -576,16 +583,18 @@ class HomeActivity : EinkActivity() {
                 // 쪽마다 줄 높이(제목 줄 수·진행률)가 다를 수 있어 가장 높은 쪽으로 잰다(넘겨도 맨 앞 책 표지 크기가 그대로).
                 fun alsoHeight(coverW: Int) = frameText { pages.indices.maxOf { alsoRow(coverW, it, measureOnly = true).measuredIn() } }
                 // 함께 읽는 책 줄 높이를 먼저 재고(기준 크기 글자로), 남는 높이를 맨 앞 책 표지에 준다.
+                var textPart = 0
                 val alsoW = if (tall) {
                     // 바형은 세로가 남아 함께 읽는 책 표지를 키우되, 큰 표지와 크기 차이가 나게 그 [SMALL_COVER_RATIO] 배로 둔다
                     // (100dp ~ 칸 폭). 표지 말고 줄 높이(제목·앱·진행률)는 표지 크기와 상관없으니, 남는 높이를 두 표지에 그 비율로 나눈다.
-                    val textPart = alsoHeight(dp(SMALL_COVER_DP * 2)) - (dp(SMALL_COVER_DP * 2) * 3 / 2 + dp(2))
+                    textPart = alsoHeight(dp(SMALL_COVER_DP * 2)) - (dp(SMALL_COVER_DP * 2) * 3 / 2 + dp(2))
                     val room = heroHeight - dp(heroPad) - dp(HERO_PAD_BOTTOM_DP) - textPart - dp(4)
                     val mainW = minOf(dp(COVER_MAX_DP), (room / (1.5f * (1 + SMALL_COVER_RATIO))).toInt())
                     val cellW = (hero.width - 2 * dp(Ui.MARGIN) - (ALSO_PER_PAGE - 1) * dp(GAP_DP)) / ALSO_PER_PAGE - dp(2)
                     minOf(maxOf((mainW * SMALL_COVER_RATIO).toInt(), dp(SMALL_COVER_DP * 2)), cellW)
                 } else dp(SMALL_COVER_DP)
-                val alsoH = alsoHeight(alsoW)
+                // 바형은 표지 말고 줄 높이가 표지 크기와 상관없어 위에서 잰 것에 표지 높이만 더한다(모든 쪽을 다시 재지 않게)
+                val alsoH = if (tall) textPart + alsoW * 3 / 2 + dp(2) else alsoHeight(alsoW)
                 val main = mainBook(books.first(), reading, coverWidth(reserved = alsoH, min = COVER_SMALLER_DP))
                 // 책 자리에 남는 높이(아래 여백, 바형은 표지가 가장 커도 남는 높이)도 함께 읽는 책 줄에 준다(키운 글자가 더 든다. 틀 위치는 같다).
                 // 화면이 낮아 맨 앞 책 표지가 가장 작아도 함께 읽는 책 줄이 다 들지 않으면 그 줄을 그리지 않는다.

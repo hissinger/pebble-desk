@@ -230,7 +230,10 @@ fun ReadingDays.firstReadDays(): Map<String, LocalDate> {
 object BookShelf {
     /** 홈 책 자리 한 쪽의 책 수: 맨 앞 책 + 함께 읽는 책 3칸(나머지는 함께 읽는 책 다음 쪽) */
     const val HOME = 4
-    private val covers = LruCache<String, Bitmap>(16)
+    /** 줄인 표지(바이트로 재서 앱 메모리의 1/8 까지. 권수로 재면 큰 홈 표지가 작은 목록 표지 몇 장에 밀려난다) */
+    private val covers = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 8).toInt()) {
+        override fun sizeOf(key: String, value: Bitmap) = value.byteCount
+    }
 
     private fun dir(context: Context) = File(Storage.of(context).filesDir, "books").apply { mkdirs() }
     private fun coverFile(context: Context, id: String) = File(dir(context), "$id.jpg")
@@ -533,10 +536,13 @@ object BookShelf {
         val thumb = File(dir(context), "${book.id}_${widthPx}t${(tone * 100).toInt()}${if (palette.color) "c" else ""}.png")
         val bmp = thumb.takeIf { it.lastModified() >= original.lastModified() }?.let { BitmapFactory.decodeFile(it.path) }
             ?: runCatching { BookSearch.scaledCover(original.readBytes(), widthPx, gray = !palette.color)?.also { Crema.undoContrast(it, tone) } }.getOrNull()?.also { made ->
-                // 같은 폭의 예전 줄인 표지(대비·색이 다르거나 예전 이름)는 지운다.
-                val stale = Regex("""${Regex.escape("${book.id}_$widthPx")}(g|t\d+c?)?\.png""")
-                dir(context).listFiles { f -> f != thumb && stale.matches(f.name) }?.forEach { it.delete() }
-                runCatching { thumb.outputStream().use { made.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+                // 파일로 두기는 화면을 기다리게 하지 않게 뒤에서(PNG 압축은 느린 기기에서 100ms 넘게 걸린다)
+                Bg.run({
+                    runCatching { writeAtomically(thumb) { f -> f.outputStream().use { made.compress(Bitmap.CompressFormat.PNG, 100, it) } } }
+                    // 같은 폭의 예전 줄인 표지(대비·색이 다르거나 예전 이름)는 지운다.
+                    val stale = Regex("""${Regex.escape("${book.id}_$widthPx")}(g|t\d+c?)?\.png""")
+                    dir(context).listFiles { f -> f != thumb && stale.matches(f.name) }?.forEach { it.delete() }
+                }) {}
             }
             ?: BlankCover.draw(book.title, book.author, book.app?.let { app -> AppStore.find(context, app)?.label }, widthPx)
         val out = if (ribbon.isEmpty()) bmp else withRibbon(bmp, ribbon, palette.ribbon)
@@ -662,18 +668,27 @@ object BookShelf {
         }
     }
 
+    /** 이북 앱 서재에서 본 책 [id] 의 진행률·반납일(모르면 -1)·저자([updateStatuses]) */
+    data class Status(val id: String, val progress: Int, val due: Long, val author: String = "")
+
     /** 이북 앱 서재에서 본 진행률·반납일(저자는 비어 있을 때만)을 적는다(순서는 그대로). 바뀐 게 없으면 쓰지 않는다. */
-    @Synchronized fun updateStatus(context: Context, id: String, progress: Int, due: Long, author: String = "") {
-        val books = list(context)
-        val book = books.find { it.id == id } ?: return
-        val p = if (progress >= 0) progress else book.progress
-        val d = if (due >= 0) due else book.due
-        // 저자는 비어 있을 때만 채운다(읽는 화면 메뉴의 제목으로 먼저 들어온 책).
-        val a = book.author.ifBlank { author }
-        if (p == book.progress && d == book.due && a == book.author) return
-        // 저자가 채워지면 빈 표지를 다시 그리도록 updatedAt 도 새로.
-        val updated = if (a != book.author) System.currentTimeMillis() else book.updatedAt
-        write(context, books.map { if (it.id == id) it.copy(progress = p, due = d, author = a, updatedAt = updated) else it })
+    fun updateStatus(context: Context, id: String, progress: Int, due: Long, author: String = "") =
+        updateStatuses(context, listOf(Status(id, progress, due, author)))
+
+    /** 서재 한 화면에서 본 여러 책의 [updateStatus] 를 한 번에 쓴다. */
+    @Synchronized fun updateStatuses(context: Context, statuses: List<Status>) {
+        val now = System.currentTimeMillis()
+        fun ShelfBook.with(s: Status): ShelfBook {
+            val p = if (s.progress >= 0) s.progress else progress
+            val d = if (s.due >= 0) s.due else due
+            // 저자는 비어 있을 때만 채운다(읽는 화면 메뉴의 제목으로 먼저 들어온 책).
+            val a = author.ifBlank { s.author }
+            if (p == progress && d == due && a == author) return this
+            // 저자가 채워지면 빈 표지를 다시 그리도록 updatedAt 도 새로.
+            return copy(progress = p, due = d, author = a, updatedAt = if (a != author) now else updatedAt)
+        }
+        // 같은 책이 여러 칸이면 차례로(앞 칸에서 본 값을 뒤 칸의 모르는 값(-1)이 지우지 않게)
+        write(context, statuses.fold(list(context)) { books, s -> books.map { if (it.id == s.id) it.with(s) else it } })
     }
 
     fun hasCover(context: Context, id: String) = coverFile(context, id).length() > 0
@@ -707,6 +722,7 @@ object BookShelf {
 
     @Synchronized fun moveToFront(context: Context, id: String) {
         val books = list(context)
+        if (books.firstOrNull()?.id == id) return
         val book = books.find { it.id == id } ?: return
         write(context, listOf(book) + books.filter { it.id != id })
     }
@@ -776,15 +792,24 @@ object BookShelf {
         review?.let { setReview(context, id, it) }
     }
 
-    /** 읽고 있는 책 목록을 한 트랜잭션으로 통째로 바꾼다(순서 = pos). */
+    /**
+     * 읽고 있는 책 목록을 한 트랜잭션으로 바꾼다(순서 = pos). 바뀐 게 없으면 쓰지 않고(기록 판 번호가 올라 떠 있는 메뉴가 닫히지 않게),
+     * 책과 순서가 그대로면 바뀐 줄만 고친다(서재에서 진행률을 볼 때마다 표 전체를 다시 쓰지 않게).
+     */
     private fun write(context: Context, books: List<ShelfBook>) {
+        // list() 가 아니라(처음 읽는 중 옮기기에서도 부른다) 지금 DB 의 목록
+        val before = cached ?: readIndex(context)
+        if (books == before) return
+        fun ShelfBook.values(pos: Int) = Db.values(
+            "pos" to pos, "id" to id, "title" to title, "author" to author, "app" to app.orEmpty(),
+            "updated_at" to updatedAt, "progress" to progress, "due" to due, "seen_title" to seenTitle,
+        )
         Db.get(context).tx {
-            delete("shelf", null, null)
-            books.forEachIndexed { i, b ->
-                insertOrThrow("shelf", null, Db.values(
-                    "pos" to i, "id" to b.id, "title" to b.title, "author" to b.author, "app" to b.app.orEmpty(),
-                    "updated_at" to b.updatedAt, "progress" to b.progress, "due" to b.due, "seen_title" to b.seenTitle,
-                ))
+            if (books.map { it.id } == before.map { it.id }) {
+                books.forEachIndexed { i, b -> if (b != before[i]) update("shelf", b.values(i), "id = ?", arrayOf(b.id)) }
+            } else {
+                delete("shelf", null, null)
+                books.forEachIndexed { i, b -> insertOrThrow("shelf", null, b.values(i)) }
             }
         }
         cached = books

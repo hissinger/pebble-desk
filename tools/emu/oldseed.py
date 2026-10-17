@@ -4,7 +4,7 @@
     python3 tools/emu/oldseed.py json OUT_DIR   # 1.2.1 까지: files/reading.json, files/books/books.json·표지, shared_prefs/reader_watch.xml
     python3 tools/emu/oldseed.py v1   OUT_DIR   # 1.3.0~1.4.2: databases/pebble.db (버전 1) + 표지
     python3 tools/emu/oldseed.py v2   OUT_DIR   # 1.5.0~1.5.3: databases/pebble.db (버전 2, review) + 표지
-    python3 tools/emu/oldseed.py check KIND DB  # 이 브랜치가 옮긴 DB(버전 3)를 기대와 대조
+    python3 tools/emu/oldseed.py check KIND DB  # 이 브랜치가 옮긴 DB(버전 4)를 기대와 대조
 
 OUT_DIR 아래를 앱 데이터 폴더(/data/user_de/0/com.woody.pebbledesk/)에 그대로 덮는다(루트 에뮬, tools/emu/oldmig.sh).
 날짜는 2026-10-16 을 오늘로 고정한다(에뮬 날짜가 같아야 기대가 맞는다).
@@ -166,12 +166,13 @@ def expect(name, got, want):
 def check(kind, path):
     db = sqlite3.connect(path)
     q = lambda s, *a: db.execute(s, a).fetchall()
-    expect("버전", q("PRAGMA user_version")[0][0], 3)
+    expect("버전", q("PRAGMA user_version")[0][0], 4)
     cols = lambda t: [r[1] for r in q(f"PRAGMA table_info({t})")]
     expect("reading_day 칸", cols("reading_day"), ["day", "pkg", "title", "book_id", "ms"])
     expect("book_open 칸", cols("book_open"), ["at", "pkg", "title", "book_id"])
     expect("finish 칸", cols("finish"), ["id", "uid", "book_id", "day", "at", "started", "stars", "text"])
     expect("round_start 칸", cols("round_start"), ["book_id", "day"])
+    expect("책 파일 표 book_file(빈 채)", (cols("book_file"), q("SELECT count(*) FROM book_file")[0][0]), (["book_id", "path"], 0))
     if kind == "json":
         shelf = q("SELECT pos, id, title, author, app, progress, due, seen_title FROM shelf ORDER BY pos")
         expect("읽고 있는 책 수", len(shelf), 3)
@@ -205,7 +206,6 @@ def check(kind, path):
     expect("남은 감상(완독한 적 없는 책만)", dict((i, (s, t)) for i, s, t in q("SELECT book_id, stars, text FROM review")), want_rev)
     expect("다시 읽는 중(완독한 적 있는 읽고 있는 책)", q("SELECT book_id, day FROM round_start"), [("b-s2", None)])
     expect("Libby 읽는 화면 표 viewer_mark(빈 채)", ([r[1] for r in q("PRAGMA table_info(viewer_mark)")], q("SELECT count(*) FROM viewer_mark")[0][0]), (["at", "pkg", "shown"], 0))
-    expect("DB 버전", q("PRAGMA user_version")[0][0], 3)
     # 칸 전체(날·앱·제목·책 id)를 키로 센다(책 id 만 다른 줄이 더 생겨도 덮이지 않게)
     rows = [r for r in q("SELECT day, pkg, title, book_id, ms FROM reading_day") if r[0] < ep(TODAY)]
     want_rd = {
