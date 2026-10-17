@@ -416,7 +416,7 @@ internal fun Context.period(s: BookRecord.Round, withYear: Boolean): String {
  * 그 아래 최근 회차부터 세로 타임라인([Timeline]): 줄마다 해를 붙인 기간 / 회색 `5회 · 3시간 12분`(진행 중이면 `2회 · 진행 중 · …`)과
  * 그 회차의 작은 별 / 그 회차의 감상 한 줄(넘치면 `…`), 남긴 것이 없으면 옅은 회색 `별점·감상 남기기 ›`. 완독한 회차는 채운 점, 진행 중은 테두리만.
  * 줄을 누르면 그 회차 메뉴([editRound]: 완독한 날·별점·감상)를 띄우고 닫으면 다시 전체 기록으로.
- * 화면에 다 들어가지 않으면 쪽으로 나눠 요약 줄 오른쪽에 `‹ 1 / 2 ›`(누르거나 페이지 버튼으로 넘김). 닫으면(닫기·뒤로 가기·바깥) 상세로 돌아간다([back]).
+ * 화면에 다 들어가지 않으면 쪽으로 나눠 요약 줄 오른쪽에 `‹ 1 / 2 ›`(눌러서 넘김). 닫으면(닫기·뒤로 가기·바깥) 상세로 돌아간다([back]).
  */
 private fun Context.showHistory(r: BookRecord, sub: String?, onChange: () -> Unit, back: () -> Unit) {
     val rounds = r.rounds.asReversed()
@@ -492,7 +492,7 @@ private fun Context.showHistory(r: BookRecord, sub: String?, onChange: () -> Uni
         addView(summary)
         addView(timeline, lp(MATCH, WRAP).apply { topMargin = dp(TIMELINE_TOP_DP) })
     })
-    dialog = sheet.paged(timeline).onDismiss { if (!editing && alive()) back() }.show()
+    dialog = sheet.onDismiss { if (!editing && alive()) back() }.show()
 }
 
 private const val TIMELINE_TOP_DP = 16

@@ -234,6 +234,8 @@ object BookShelf {
     private val covers = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 8).toInt()) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
+    /** 뒤에서 쓰는 중인 줄인 표지 파일([cover]) */
+    private val writingThumbs: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     private fun dir(context: Context) = File(Storage.of(context).filesDir, "books").apply { mkdirs() }
     private fun coverFile(context: Context, id: String) = File(dir(context), "$id.jpg")
@@ -534,14 +536,23 @@ object BookShelf {
         val original = coverFile(context, book.id)
         // 화면 대비만큼 미리 밝힌 그림이라 대비 값을, 컬러로 줄인 것은 `c` 를 이름에 넣는다.
         val thumb = File(dir(context), "${book.id}_${widthPx}t${(tone * 100).toInt()}${if (palette.color) "c" else ""}.png")
-        val bmp = thumb.takeIf { it.lastModified() >= original.lastModified() }?.let { BitmapFactory.decodeFile(it.path) }
+        // 줄인 표지의 시각은 줄일 때 읽은 원본의 시각(뒤에서 쓰는 사이 원본이 바뀌면 다음에 다시 만든다)
+        val source = original.lastModified()
+        val bmp = thumb.takeIf { it.lastModified() >= source }?.let { BitmapFactory.decodeFile(it.path) }
             ?: runCatching { BookSearch.scaledCover(original.readBytes(), widthPx, gray = !palette.color)?.also { Crema.undoContrast(it, tone) } }.getOrNull()?.also { made ->
-                // 파일로 두기는 화면을 기다리게 하지 않게 뒤에서(PNG 압축은 느린 기기에서 100ms 넘게 걸린다)
-                Bg.run({
-                    runCatching { writeAtomically(thumb) { f -> f.outputStream().use { made.compress(Bitmap.CompressFormat.PNG, 100, it) } } }
-                    // 같은 폭의 예전 줄인 표지(대비·색이 다르거나 예전 이름)는 지운다.
-                    val stale = Regex("""${Regex.escape("${book.id}_$widthPx")}(g|t\d+c?)?\.png""")
-                    dir(context).listFiles { f -> f != thumb && stale.matches(f.name) }?.forEach { it.delete() }
+                // 파일로 두기는 화면을 기다리게 하지 않게 뒤에서(PNG 압축은 느린 기기에서 100ms 넘게 걸린다). 같은 파일을 쓰는 중이면 두 번 쓰지 않는다.
+                if (writingThumbs.add(thumb.path)) Bg.run({
+                    try {
+                        runCatching {
+                            writeAtomically(thumb) { f -> f.outputStream().use { made.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+                            thumb.setLastModified(source)
+                        }
+                        // 같은 폭의 예전 줄인 표지(대비·색이 다르거나 예전 이름)는 지운다.
+                        val stale = Regex("""${Regex.escape("${book.id}_$widthPx")}(g|t\d+c?)?\.png""")
+                        dir(context).listFiles { f -> f != thumb && stale.matches(f.name) }?.forEach { it.delete() }
+                    } finally {
+                        writingThumbs.remove(thumb.path)
+                    }
                 }) {}
             }
             ?: BlankCover.draw(book.title, book.author, book.app?.let { app -> AppStore.find(context, app)?.label }, widthPx)

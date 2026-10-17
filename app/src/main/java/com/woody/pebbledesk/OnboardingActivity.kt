@@ -89,7 +89,7 @@ class OnboardingActivity : EinkActivity() {
         render()
     }
 
-    /** 밀기·페이지 버튼: 1쪽에서 다음은 자동 추가가 켜져 있을 때만 */
+    /** 밀기: 1쪽에서 다음은 자동 추가가 켜져 있을 때만 */
     override fun onSwipe(toLeft: Boolean): Boolean {
         val to = if (toLeft) 1 else 0
         if (to == page || (to == 1 && !ReaderWatchService.isEnabled(this))) return false

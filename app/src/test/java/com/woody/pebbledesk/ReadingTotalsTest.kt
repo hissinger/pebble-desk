@@ -85,12 +85,4 @@ class ReadingTotalsTest {
         assertEquals(10 * min, days.getValue(day)[ReadKey("pkg", "데미안", "b-a")])
         assertEquals(20 * min, days.getValue(day.plusDays(1))[ReadKey("pkg", "데미안", "b-a")])
     }
-
-    @Test fun `페이지 키 - 표준·메이북 키, 그 밖은 null`() {
-        assertEquals(true, pageKey(android.view.KeyEvent.KEYCODE_PAGE_DOWN))
-        assertEquals(false, pageKey(android.view.KeyEvent.KEYCODE_PAGE_UP))
-        assertEquals(true, pageKey(292))
-        assertEquals(false, pageKey(291))
-        assertEquals(null, pageKey(android.view.KeyEvent.KEYCODE_VOLUME_DOWN))
-    }
 }

@@ -7,7 +7,6 @@ import android.graphics.drawable.GradientDrawable
 import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -177,11 +176,6 @@ class Sheet(private val context: Context) {
         return h
     }
 
-    /** 칸 안에 쪽으로 나뉜 것이 있으면 페이지 버튼([pageKey])으로 넘긴다(메뉴가 떠 있으면 키가 화면 대신 메뉴로 온다). */
-    private var paged: Paged? = null
-
-    fun paged(p: Paged) = apply { paged = p }
-
     /** 닫히면(닫기·뒤로 가기·바깥 누르기, 항목을 눌러 닫힐 때도) 부를 일 */
     private var onDismiss: (() -> Unit)? = null
 
@@ -195,14 +189,6 @@ class Sheet(private val context: Context) {
         // 닫지 못하게 한 메뉴(받는 중 진행 막대)와 기록을 저장하지 않는 안내 창은 기록이 바뀌어도 닫지 않는다
         if (!locked && !keep) open += shown
         dialog.setOnDismissListener { open -= shown; onDismiss?.invoke() }
-        paged?.let { p ->
-            dialog.setOnKeyListener { _, keyCode, event ->
-                val next = pageKey(keyCode) ?: return@setOnKeyListener false
-                // 누르고 있을 때 오는 반복은 넘기지 않는다(한 번 누르면 한 쪽).
-                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) { if (next) p.next() else p.prev() }
-                true
-            }
-        }
         dialog.setContentView(root)
         dialog.window?.apply {
             setGravity(if (centered) Gravity.CENTER else Gravity.BOTTOM)
@@ -377,8 +363,7 @@ class Sheet(private val context: Context) {
             setOnClickListener { dialog.dismiss() }
         }, lp(MATCH, c.dp(CLOSE_ROW_DP)))
 
-        // 입력이 없는 메뉴는 초점을 받지 않는다. 받을 수 있으면 터치 모드에서 처음 누른 페이지 키가 터치 모드를 벗어나는 데 쓰이고
-        // 버려지며(쪽이 넘어가지 않는다) 누를 수 있는 글자에 회색 초점 표시가 남는다.
+        // 입력이 없는 메뉴는 초점을 받지 않는다(받을 수 있으면 기기 버튼을 눌렀을 때 누를 수 있는 글자에 회색 초점 표시가 남는다).
         if (input == null && review == null) root.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         return root
     }
