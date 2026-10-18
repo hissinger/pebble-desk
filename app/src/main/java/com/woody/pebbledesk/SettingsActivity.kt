@@ -76,11 +76,20 @@ class SettingsActivity : EinkActivity() {
         root.addView(hline(2))
         if (page == PAGE_GUIDE) {
             // 한 화면에 다 들어가지 않아 쪽으로 나눈다. 쪽 표시 `‹ 1 / 2 ›` 는 제목 줄 오른쪽 끝(아래 줄이 없는 화면).
+            // 제목 줄은 누르면 뒤로 가므로, 쪽 표시가 줄 높이·오른쪽 끝까지 받아 그 근처를 눌러도 뒤로 가지 않게 한다(한 쪽뿐이면 숨긴다).
             guide = PagedBlocks(this)
-            val guidePage = text("", 21f).apply { setPadding(dp(24), dp(12), 0, dp(12)); pagesClick(guide) }
+            val guidePage = text("", 21f).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(24), 0, dp(Ui.MARGIN), 0)
+                pagesClick(guide)
+            }
+            titleRow.setPadding(titleRow.paddingLeft, 0, 0, 0)
             titleRow.addView(View(this), lp(0, 1, 1f))
-            titleRow.addView(guidePage)
-            guide.onPageChanged = { guidePage.text = pageLabel(guide) }
+            titleRow.addView(guidePage, lp(WRAP, MATCH))
+            guide.onPageChanged = {
+                guidePage.text = pageLabel(guide)
+                guidePage.visibility = if (guide.pageCount > 1) View.VISIBLE else View.GONE
+            }
             root.addView(guide, lp(MATCH, 0, 1f))
         } else {
             list = vbox()
