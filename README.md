@@ -138,7 +138,7 @@ Android Studio의 JDK로 빌드한다(minSdk 28, targetSdk 34).
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ./gradlew assembleRelease
-adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.7-release.apk
+adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.8-release.apk
 ```
 
 ## 문서
