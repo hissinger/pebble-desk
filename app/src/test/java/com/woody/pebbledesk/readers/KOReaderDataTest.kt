@@ -77,16 +77,17 @@ class KOReaderDataTest {
         assertNull(LuaData.parse("x = 1".toByteArray()))
     }
 
-    @Test fun `맨 앞 책과 연 때, KOReader 안내서는 뺀다`() {
+    @Test fun `맨 앞 책과 연 때, KOReader 안내서만 뺀다`() {
         write(File(ko, "history.lua"), """
             return {
                 [2] = { ["time"] = 100, ["file"] = "/b/old.epub" },
                 [1] = { ["time"] = 300, ["file"] = "${ko.path}/help/quickstart-ko.html" },
                 [3] = { ["time"] = 200, ["file"] = "/b/c.pdf" },
+                [4] = { ["time"] = 50, ["file"] = "${ko.path}/books/in-koreader.epub" },
             }
         """.trimIndent())
-        // 오래된 것부터, 지금 책이 끝
-        assertEquals(listOf("/b/c.pdf", "/b/old.epub"), KOReaderData(ko).books(0)?.map { it.path })
+        // 오래된 것부터, 지금 책이 끝. koreader 폴더 안에 둔 책은 넣는다
+        assertEquals(listOf("${ko.path}/books/in-koreader.epub", "/b/c.pdf", "/b/old.epub"), KOReaderData(ko).books(0)?.map { it.path })
         // 책 파일이 없어 접근 시각을 모른다: 열림·닫힘 모름
         assertEquals(0L, KOReaderData(ko).books(0)?.last()?.openedAt)
     }

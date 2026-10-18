@@ -47,7 +47,7 @@ object KOReaderFdroid : KOReaderSpec("org.koreader.launcher.fdroid")
 internal class KOReaderData(private val dir: File) {
     /**
      * history.lua 의 책들 가운데 [since](ms) 뒤에 열었거나 닫은 책과 맨 앞 책(지금 책), 오래된 것부터(지금 책이 끝, 최근 [MAX_BOOKS]권까지).
-     * KOReader 안내서 등 KOReader 폴더 안의 문서는 뺀다. 기록이 없으면 빈 목록, 못 읽으면 null.
+     * KOReader 안내서(`koreader/help/`, 처음 켜면 책처럼 연다)는 뺀다(사용자가 koreader 폴더에 둔 책은 넣는다). 기록이 없으면 빈 목록, 못 읽으면 null.
      * 책마다 열림·닫힘: KOReader 는 책을 열 때 history.lua 맨 앞 줄의 때를 적고 그 책 파일의 접근 시각(atime)을 같은 때(초)로 맞추며
      * (`ReadHistory:addItem` 의 `lfs.touch`), 닫을 때는 그 줄의 때만 다시 적는다(`updateLastBookTime`). 저장소는 noatime 이라 읽기만으로는
      * 접근 시각이 바뀌지 않는다. 그래서 접근 시각 = 줄의 때면 열려 있음(연 때), 줄의 때가 더 늦으면 닫힘(닫은 때), 접근 시각이 더 늦으면(다른 앱이 바꿈) 모름.
@@ -67,12 +67,12 @@ internal class KOReaderData(private val dir: File) {
         }
     }
 
-    /** history.lua 의 책들(최근 것부터, 경로와 그 줄의 때 ms). KOReader 폴더 안의 문서는 뺀다. 못 읽으면 null */
+    /** history.lua 의 책들(최근 것부터, 경로와 그 줄의 때 ms). KOReader 안내서는 뺀다. 못 읽으면 null */
     private fun history(): List<Pair<String, Long>>? {
         val list = read(File(dir, "history.lua")) as? Map<*, *> ?: return null
         return list.keys.filterIsInstance<Double>().sorted()
             .mapNotNull { list[it] as? Map<*, *> }
-            .mapNotNull { e -> e.str("file")?.takeIf { !it.startsWith(dir.path + "/") }?.let { it to ((e.num("time") ?: 0.0) * 1000).toLong() } }
+            .mapNotNull { e -> e.str("file")?.takeIf { !it.startsWith(dir.path + "/help/") }?.let { it to ((e.num("time") ?: 0.0) * 1000).toLong() } }
     }
 
     sealed class State {
