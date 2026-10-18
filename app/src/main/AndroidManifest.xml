@@ -19,9 +19,18 @@
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <!-- 읽는 책 자동 추가(KOReader): KOReader 가 저장소에 남기는 기록(koreader/history.lua, 책 옆 .sdr)과 책 파일(제목·표지)을 읽는다.
+         안드로이드 11+ 은 '모든 파일 액세스'(사용자가 설정 › 독서에서 허용), 10 까지는 저장소 읽기 권한(10 은 예전 저장소 방식으로) -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
 
     <application
         android:allowBackup="false"
+        android:requestLegacyExternalStorage="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"

@@ -1,5 +1,6 @@
 package com.woody.pebbledesk
 
+import com.woody.pebbledesk.ReadingLog.Mark
 import com.woody.pebbledesk.ReadingLog.Open
 import com.woody.pebbledesk.ReadingLog.Span
 import org.junit.Assert.assertEquals
@@ -23,6 +24,26 @@ class ReadingTotalsTest {
     private val min = 60_000L
 
     private fun ReadingDays.minutes() = getValue(day).mapKeys { "${it.key.title}|${it.key.book}" }.mapValues { it.value / min }
+
+    @Test fun `보인 동안만 세는 앱 - Libby 는 적힌 것이 없으면 안 셈, KOReader 는 다 셈`() {
+        val opens = listOf(Open(at(9), "org.koreader.launcher", "데미안", "b-a"), Open(at(9), "com.overdrive.mobile.android.libby", "싯다르타", "b-b"))
+        val spans = listOf(
+            Span("org.koreader.launcher", at(10), at(11), hosted = true),
+            Span("com.overdrive.mobile.android.libby", at(12), at(13), hosted = true),
+        )
+        assertEquals(mapOf("데미안|b-a" to 60L), ReadingLog.totalsOf(spans, opens, zone).minutes())
+    }
+
+    @Test fun `KOReader 책을 닫고 연 사이(파일 목록)는 빼고 센다`() {
+        val opens = listOf(Open(at(9), "org.koreader.launcher", "데미안", "b-a"), Open(at(10, 40), "org.koreader.launcher", "싯다르타", "b-b"))
+        val marks = listOf(
+            Mark(at(10), "org.koreader.launcher", true),
+            Mark(at(10, 20), "org.koreader.launcher", false),
+            Mark(at(10, 40), "org.koreader.launcher", true),
+        )
+        val days = ReadingLog.totalsOf(listOf(Span("org.koreader.launcher", at(10), at(11), hosted = true)), opens, zone, marks)
+        assertEquals(mapOf("데미안|b-a" to 20L, "싯다르타|b-b" to 20L), days.minutes())
+    }
 
     @Test fun `구간 안에서 다른 책을 펴면 그때 나눈다`() {
         val opens = listOf(Open(at(9), "pkg", "데미안", "b-a"), Open(at(10, 30), "pkg", "싯다르타", "b-b"))

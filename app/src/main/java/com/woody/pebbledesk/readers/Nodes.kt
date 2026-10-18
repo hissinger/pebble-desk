@@ -22,8 +22,14 @@ class ViewerInfo(val title: String?, val author: String, val progress: Int)
  */
 class FileViewer(val activity: String, val label: Int, val shelfPkg: String?)
 
-/** 이북 앱 데이터에서 찾은 책([ReaderSpec.fileBook]) */
-class FileBook(val title: String, val author: String, val path: String)
+/**
+ * 이북 앱 데이터에서 찾은 책([ReaderSpec.fileBook]·[ReaderSpec.fileBooks]). [progress] 는 데이터에 진행률이 있으면(KOReader, 모르면 -1).
+ * 열고 닫은 때를 아는 앱(KOReader): [openedAt] 은 이 책을 연 때, [closedAt] 은 닫았으면 닫은 때(열려 있으면 0. ms, 모르면 0)
+ */
+class FileBook(
+    val title: String, val author: String, val path: String, val progress: Int = -1,
+    val openedAt: Long = 0, val closedAt: Long = 0,
+)
 
 /** 화면에 떠 있는 그 앱의 창들. [active] 는 맨 앞 창(다른 앱이면 null), [all] 은 읽는 화면 + 위에 뜬 메뉴·알림 창 */
 class AppWindows(val active: AccessibilityNodeInfo?, val all: List<AccessibilityNodeInfo>)

@@ -68,6 +68,14 @@ open class ReaderSpec(
      * 따로 기억해 두고, 다른 탭으로 넘어가면 그 탭의 책을 편 것으로 본다. 모르는 탭이면 메뉴로 알 때까지 진행률을 적지 않는다.
      */
     val viewerTabs: Boolean = false,
+    /**
+     * 책이 열려 있는지를 화면이 아니라 이북 앱 데이터([fileBooks] 의 [FileBook.openedAt]·[FileBook.closedAt])로 아는 앱(KOReader):
+     * 화면이 직접 그려져 앱 안에서 책을 열고 닫아도 알림이 없지만 그 때가 데이터에 남아, 그 앱이 앞에 올 때와 홈으로 돌아올 때 지난번 뒤의 일을
+     * 한꺼번에 맞춘다([com.woody.pebbledesk.ReaderWatchService.syncFileApps]). 읽은 시간은 책이 열려 있던 동안만 센다([ReaderApps.hostsViewer]).
+     */
+    val fileState: Boolean = false,
+    /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([fileBooks] 로 안 경로)을 바로 여는 앱(KOReader). 파일을 모르면 앱을 연다. */
+    val opensBookFile: Boolean = false,
 ) {
     /** 서재에 보이는 책 칸들. 기본: 제목 요소마다 그것이 든 칸을 찾아 읽는다. */
     open fun shelfCells(root: AccessibilityNodeInfo): List<Cell> =
@@ -116,6 +124,12 @@ open class ReaderSpec(
      * 기본: 없음(null)
      */
     open fun fileBook(context: Context, info: ViewerInfo, since: Long): FileBook? = null
+
+    /**
+     * 책이 열려 있는지를 데이터로 아는 앱([fileState]): [since](ms) 뒤에 열었거나 닫은 책들과 지금 책(마지막), 오래된 것부터.
+     * 기록이 없으면 빈 목록, 데이터를 읽을 수 없으면 null. 기본: null
+     */
+    open fun fileBooks(context: Context, since: Long): List<FileBook>? = null
 
     /** 읽는 화면 제목을 찾을 요소 이름들(앞에서부터, 글자가 있는 것). 기본: [viewerTitle] 하나 */
     protected open val viewerTitleIds: List<String> get() = listOfNotNull(viewerTitle)

@@ -19,6 +19,7 @@ import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.woody.pebbledesk.readers.AppWindows
+import com.woody.pebbledesk.readers.BookFiles
 import com.woody.pebbledesk.readers.Cell
 import com.woody.pebbledesk.readers.FileBook
 import com.woody.pebbledesk.readers.ReaderApps
@@ -129,6 +130,8 @@ class ReaderWatchService : AccessibilityService() {
                 readScreen(spec, force = true)
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+                // 책이 열려 있는지를 데이터로 아는 앱(KOReader)은 앞에 올 때만 맞춘다(내용이 바뀔 때마다 파일을 읽지 않는다)
+                if (spec.fileState) return
                 checkHolder(spec)
                 readScreen(spec, force = false)
             }
@@ -252,12 +255,16 @@ class ReaderWatchService : AccessibilityService() {
     /**
      * 읽는 화면이 서재 액티비티 안에 뜨는 앱(Libby)의 읽는 화면을 닫힌 것으로 적는다(서비스가 붙을 때·끝날 때). 서비스가 없는 동안
      * '열림'이 남으면 그 뒤 서재만 본 시간도 읽은 시간으로 센다. 읽는 화면이 떠 있으면 다음 알림에서 다시 '열림'으로 적힌다.
+     * 책이 열린 동안을 데이터로 아는 앱(KOReader)은 거꾸로 '열림'으로 적는다(서비스가 없는 동안 '닫힘'이 남으면 읽은 시간을 놓친다).
      */
     private fun closeHeldViewers() {
         val now = System.currentTimeMillis()
         for (spec in ReaderApps.ALL) if (spec.viewerHolder != null) {
             screen.remove(spec.pkg)
             ReadingLog.viewerShown(this, spec.pkg, shown = false, at = now)
+        } else if (spec.fileState) {
+            // 책이 열린 동안을 데이터로 아는 앱(KOReader)은 서비스가 없는 동안 열림·닫힘을 모르니 앞에 있던 동안을 다 센다(다시 읽으면 고친다)
+            ReadingLog.viewerShown(this, spec.pkg, shown = true, at = now)
         }
     }
 
@@ -311,6 +318,8 @@ class ReaderWatchService : AccessibilityService() {
     private fun readViewer(spec: ReaderSpec) {
         viewerSpec = null
         if (screen[spec.pkg] !in spec.viewers) return
+        // 책이 열려 있는지를 데이터로 아는 앱(KOReader)은 화면을 읽지 않고 데이터로 맞춘다(앞에 온 때 한 번)
+        if (spec.fileState) return syncFiles(spec)
         val windows = windowsOf(spec).takeIf { it.all.isNotEmpty() } ?: return logNoWindow(spec)
         val shown = spec.readViewer(windows)
         val file = fileBook(spec, shown)
@@ -340,6 +349,76 @@ class ReaderWatchService : AccessibilityService() {
         // 진행률은 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다)
         val book = recordedBook(spec) ?: return
         BookShelf.updateStatus(this, book.id, progress, -1)
+    }
+
+    /** 책이 열려 있는지를 데이터로 아는 앱(KOReader)을 모두 맞춘다(홈으로 돌아올 때, [syncFileApps]). 깔려 있는 앱만 */
+    private fun syncFiles() {
+        for (spec in ReaderApps.ALL) if (spec.fileState && runCatching { packageManager.getApplicationInfo(spec.pkg, 0) }.isSuccess) syncFiles(spec)
+    }
+
+    /**
+     * 책이 열려 있는지를 데이터로 아는 앱(KOReader, [ReaderSpec.fileState])을 그 앱의 데이터로 맞춘다. 그 앱이 앞에 올 때와 홈으로 돌아올 때만
+     * 부르고(지켜보지 않는다), 지난번에 맞춘 뒤([since])의 일을 데이터에 적힌 때로 한꺼번에 적는다:
+     * - 그 사이 열었다 닫은 앞 책들(앱 안에서 책을 바꿈): 오래된 것부터 연 때에 편 것으로(목록에 없으면 넣는다), 열려 있던 동안만 읽은 시간으로.
+     * - 지금 책: 그 사이 열었으면(지금 닫혀 있어도) 연 때에 편 것으로. 그 전부터 열려 있던 책은 편 책 기록이 다르면(서비스가 다시 시작됨 등)
+     *   다시 적되, 목록에 없는 책은 처음 보는 파일일 때만 넣는다(완독·빼기 한 책이 그 앱에 열려 있어도 되살아나지 않게). 진행률을 그 책에.
+     * 처음 맞출 때는 지금 책만 본다(그 앱의 지난 기록을 모두 넣지 않게). 데이터를 읽을 수 없으면 앞에 있던 동안을 다 센다.
+     */
+    private fun syncFiles(spec: ReaderSpec) {
+        val now = System.currentTimeMillis()
+        val key = "sync_${spec.pkg}"
+        // 그 앱은 때를 초로 버려 적으므로 지난번에 맞춘 그 초에 일어난 일도 다시 본다(같은 것은 다시 적히지 않는다)
+        val since = openedPrefs.getLong(key, 0L).let { if (it > 0) it / 1000 * 1000 - 1000 else 0L }
+        // 처음 맞출 때는 지금 책만 묻는다(지난 기록의 책들을 읽지 않게)
+        val books = spec.fileBooks(this, if (since > 0) since else Long.MAX_VALUE)
+            ?: return ReadingLog.viewerShown(this, spec.pkg, shown = true, at = now)
+        openedPrefs.edit().putLong(key, now).apply()
+        val current = books.lastOrNull() ?: return
+        if (since > 0) for (b in books.dropLast(1)) {
+            if (b.openedAt > since) {
+                fileOpened(spec, b, b.openedAt)
+                ReadingLog.viewerShown(this, spec.pkg, shown = true, at = b.openedAt, current = false)
+            }
+            if (b.closedAt > since) ReadingLog.viewerShown(this, spec.pkg, shown = false, at = b.closedAt, current = false)
+        }
+        markFileViewer(spec, current)
+        val title = knownTitle(current)
+        val newFile = newFile(spec, current.path)
+        if (recordedBook(spec)?.hasTitle(title) != true) when {
+            since > 0 && current.openedAt > since -> return fileOpened(spec, current, current.openedAt)
+            current.closedAt == 0L && (newFile || BookShelf.findByTitle(this, title) != null) ->
+                return fileOpened(spec, current, viewerAt[spec.pkg] ?: now)
+        }
+        saveFile(title, current.path)
+        if (current.progress < 0) return
+        val book = recordedBook(spec)?.takeIf { it.hasTitle(title) } ?: return
+        BookShelf.updateStatus(this, book.id, current.progress, -1)
+    }
+
+    /** 데이터로 안 책 [b] 를 [at] 에 편 것으로 적는다(목록에 없으면 넣고 맨 앞으로, 그 파일을 적어 둔다) */
+    private fun fileOpened(spec: ReaderSpec, b: FileBook, at: Long) {
+        val title = knownTitle(b)
+        bookOpened(spec, Cell(title, b.author, b.progress, -1, null, Rect()), at)
+        saveFile(title, b.path)
+    }
+
+    /**
+     * 지금 책의 열림·닫힘을 적는다([ReadingLog.viewerShown], 읽은 시간은 열려 있던 동안만): 닫혔으면 열려 있던 동안을 지난 일로 적고 지금은 닫힘,
+     * 열려 있으면 연 때부터 열림, 모르면(다른 앱이 접근 시각을 바꿈) 열림(앞에 있던 동안을 다 센다). 지금 상태가 앞서 적은 것보다 앞의 때면 앞서 적은 때부터.
+     */
+    private fun markFileViewer(spec: ReaderSpec, file: FileBook) {
+        if (file.closedAt > 0) {
+            if (file.openedAt > 0) ReadingLog.viewerShown(this, spec.pkg, shown = true, at = file.openedAt, current = false)
+            ReadingLog.viewerShown(this, spec.pkg, shown = false, at = file.closedAt)
+        } else ReadingLog.viewerShown(this, spec.pkg, shown = true, at = file.openedAt.takeIf { it > 0 } ?: System.currentTimeMillis())
+    }
+
+    /** 그 앱 데이터의 지금 책 파일이 지난번에 본 것과 다른가(처음 보면 참). 지금 것을 적어 둔다(서비스가 다시 시작돼도 남긴다) */
+    private fun newFile(spec: ReaderSpec, path: String): Boolean {
+        val key = "file_${spec.pkg}"
+        if (openedPrefs.getString(key, null) == path) return false
+        openedPrefs.edit().putString(key, path).apply()
+        return true
     }
 
     /** 편 책 기록([ReadingLog.openBook])이 가리키는 읽고 있는 책(책 모름·목록에 없으면 null) */
@@ -373,10 +452,23 @@ class ReaderWatchService : AccessibilityService() {
         return BookShelf.findByTitle(this, fileTitle)?.title ?: BookShelf.findLivePast(this, fileTitle)?.book?.title ?: file.title
     }
 
-    /** 이북 앱이 [title] 로 연 파일을 그 책에 적어 둔다(홈에서 그 파일을 바로 연다) */
+    /**
+     * 이북 앱이 [title] 로 연 파일을 그 책에 적어 둔다(홈에서 그 파일을 바로 연다). 표지가 없으면 책 파일(EPUB)의 표지를 넣는다
+     * (저장소를 읽을 수 있을 때, 파일마다 서비스가 떠 있는 동안 한 번만 해 본다).
+     */
     private fun saveFile(title: String, path: String) {
-        BookShelf.findByTitle(this, title)?.let { BookShelf.setFilePath(this, it.id, path) }
+        val book = BookShelf.findByTitle(this, title) ?: return
+        BookShelf.setFilePath(this, book.id, path)
+        if (BookShelf.hasCover(this, book.id) || !BookFiles.canRead(this) || !coverTried.add(path)) return
+        val context = applicationContext
+        Bg.run({ BookFiles.cover(path) }) { result ->
+            val bytes = result.getOrNull() ?: return@run
+            if (!BookShelf.hasCover(context, book.id)) runCatching { BookShelf.setCover(context, book.id, bytes) }
+        }
     }
+
+    /** 표지를 꺼내 본 책 파일들([saveFile]) */
+    private val coverTried = mutableSetOf<String>()
 
     /**
      * 책 칸이 아닌 것을 눌렀다: 검색 화면의 `바로 읽기`일 수 있으니 지금 보이는 책 상세를 기억하고 표지를 찍어 둔다
@@ -575,6 +667,7 @@ class ReaderWatchService : AccessibilityService() {
         downSince(this)?.let { ReadingLog.watchStopped(this, it) }
         recordLife(this, connected = true)
         bound = true
+        instance = this
         WatchLog.connected(this)
         closeHeldViewers()
         // 설정 › 업데이트로 새 판이 깔린 뒤 다시 붙은 것이면 홈을 띄운다(깔린 직후의 알림에서는 막힐 때가 있다).
@@ -583,6 +676,7 @@ class ReaderWatchService : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         bound = false
+        instance = null
         recordLife(this, connected = false)
         // 사용자가 접근성에서 끈 것이면(설정에서도 꺼짐) 그 뒤 읽은 시간은 어느 책인지 모른다(꺼지기 전에 마지막으로 편 책에 붙이지 않게).
         // 업데이트·재부팅처럼 설정은 켜진 채 잠깐 떨어진 것이면 다시 붙을 때 끊긴 때로 적는다([downSince]).
@@ -594,6 +688,7 @@ class ReaderWatchService : AccessibilityService() {
 
     override fun onDestroy() {
         bound = false
+        instance = null
         handler.removeCallbacks(settleLater)
         handler.removeCallbacks(viewerLater)
         handler.removeCallbacks(holderLater)
@@ -758,6 +853,17 @@ class ReaderWatchService : AccessibilityService() {
          */
         @Volatile var bound = false
             private set
+
+        /** 붙어 있는 서비스([syncFileApps]) */
+        @Volatile private var instance: ReaderWatchService? = null
+
+        /**
+         * 책이 열려 있는지를 데이터로 아는 앱(KOReader)을 맞춘다: 홈으로 돌아올 때(읽은 시간·책을 그리기 전에) 부른다. 그 앱을 지켜보지 않으므로
+         * 앱 안에서 책을 바꾸거나 닫은 것은 이때 데이터에 적힌 때로 적힌다. 자동 추가 서비스가 붙어 있을 때만.
+         */
+        fun syncFileApps() {
+            instance?.syncFiles()
+        }
 
         /** 꺼져 있는 서비스가 편 책을 모르게 된 때([downSince], 기록이 없으면 지금). 그 뒤 시간이 꺼지기 전에 편 책에 붙지 않게([ReadingLog.days]). */
         fun stoppedAt(context: Context): Long = downSince(context) ?: System.currentTimeMillis()
