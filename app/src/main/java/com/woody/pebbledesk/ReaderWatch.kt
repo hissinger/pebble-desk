@@ -76,8 +76,8 @@ class ReaderWatchService : AccessibilityService() {
     /** 그 앱에서 마지막으로 메뉴 제목으로 물어본 결과(못 찾았으면 null. 메뉴를 띄워 둔 동안 다시 묻지 않게, 읽는 화면이 앞에 올 때마다 비운다) */
     private val fileTitles = mutableMapOf<String, Pair<String, FileBook?>>()
     /**
-     * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 알라딘·리디처럼 서재를 잠깐만 보는
-     * 앱의 서재가 보일 때(보이는 대로, 그리고 멈췄을 때) 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
+     * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 서재가 멈췄을 때(모든 앱),
+     * 알라딘·리디처럼 서재를 잠깐만 보는 앱은 서재가 보이는 대로도 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
      */
     private val pendingCovers = object : LinkedHashMap<String, ByteArray>() {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?) = size > PENDING_MAX
@@ -541,7 +541,7 @@ class ReaderWatchService : AccessibilityService() {
         // 편 책 기록에는 앱이 보여 준 제목을 적는다(제목을 고친 책이어도. 지운 뒤 그 시간을 다시 정할 때 같은 제목의 새 책을 찾게)
         ReadingLog.bookOpened(this, spec.pkg, seen.title, book.id, openedAt)
         if (spec.viewerTabs) screen[spec.pkg]?.takeIf { it in spec.viewers }?.let { setTabBook(it, seen.title) }
-        // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 알라딘 서재)
+        // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 서재)
         pendingFor(book.title)?.let { key ->
             val bytes = pendingCovers.remove(key) ?: return@let
             if (!BookShelf.hasCover(this, book.id)) runCatching { BookShelf.setCover(this, book.id, bytes) }
@@ -557,7 +557,7 @@ class ReaderWatchService : AccessibilityService() {
 
     /**
      * 서재 화면이 [SETTLE_MS] 동안 그대로면: 보이는 책들의 진행률·반납일을 적고, 표지 없는 책은 표지 칸을 찍어 잘라 온다
-     * ([ReaderSpec.eagerCovers] 앱은 목록에 없는 책도 잘라 둔다).
+     * (목록에 없는 책도 잘라 두었다가 그 책이 들어오면 붙인다).
      * (밀리는 앱을 다시 열 때 잠깐 모든 칸을 한 책·0% 로 채웠다가 고친다. 그 사이 값을 적지 않도록 멈춘 뒤에 읽는다.)
      */
     private fun settleShelf(spec: ReaderSpec) {
@@ -593,10 +593,11 @@ class ReaderWatchService : AccessibilityService() {
         for (s in seen) {
             val book = BookShelf.findByTitle(this, s.title)
             if (book == null) {
-                // 서재를 잠깐만 보고 책으로 넘어가는 앱은 목록에 없는 책도 멈춘 지금 잘라 둔다. 리디 서재는 다 그려진 뒤 알림이 없어
+                // 목록에 없는 책도 멈춘 지금 잘라 두어, 그 책을 펴면 처음부터 표지가 붙게 한다(밀리·교보도서관 등. 1.5.7 까지는
+                // 바로 자르기 앱만, 그 밖의 앱은 편 뒤 서재로 돌아와야 채웠다). 리디 서재는 다 그려진 뒤 알림이 없어
                 // 바로 자르기([readScreen])는 칸을 누른 순간에야 찍고, 그때는 화면이 넘어가는 중이라 버려진다.
                 val thumb = s.thumb?.takeIf(::usableThumb)
-                if (spec.eagerCovers && thumb != null && wantsPendingCover(s.title)) targets += s.title to thumb
+                if (thumb != null && wantsPendingCover(s.title)) targets += s.title to thumb
                 continue
             }
             statuses += BookShelf.Status(book.id, s.progress, s.due, s.author)
