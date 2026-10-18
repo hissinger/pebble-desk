@@ -24,7 +24,8 @@ import java.time.LocalDate
  *   줄 id·시작한 날·별점·감상은 버전 3에서 더했다(그 전은 책·날이 키).
  * - `review`: 책(id)마다 진행 중인 마지막 회차의 별점(반 개 단위 0~10)과 감상([Review]). 완독하면 그 회차(`finish`)로 옮긴다. 버전 2에서 더했다.
  * - `round_start`: 완독한 책(id)에 진행 중 회차가 있다는 표시와 `다시 읽기`한 날(그 회차의 시작, 모르면 null). 완독하면 지운다. 버전 3에서 더했다.
- * - `viewer_mark`: 읽는 화면이 서재 안에 뜨는 앱(Libby)에서 그 화면이 보이고 사라진 때([ReadingLog.viewerShown]). 버전 3에서 더했다.
+ * - `viewer_mark`: 읽는 화면이 서재 안에 뜨는 앱(Libby)에서 그 화면이 보이고 사라진 때, KOReader 에서 책을 열고 닫은 때(KOReader 가 남긴 파일로 안 때)
+ *   ([ReadingLog.viewerShown]). 버전 3에서 더했다.
  * - `book_file`: 책(id)마다 이북 앱이 연 파일의 경로(네오리더처럼 파일로만 여는 앱, 홈에서 그 파일을 바로 연다. [BookShelf.filePath]). 버전 4에서 더했다.
  * 처음 열 때 1.2.1 까지의 JSON 파일을 옮기고 `<이름>.migrated` 로 바꿔 둔다([importFiles]).
  * 낮은 버전으로 되돌리기(새 판 DB 위에 옛 판을 까는 것)는 지원하지 않는다. 안드로이드가 낮은 판 덮어 설치를 막고, 억지로 깔면 DB 를 열지 못한다.

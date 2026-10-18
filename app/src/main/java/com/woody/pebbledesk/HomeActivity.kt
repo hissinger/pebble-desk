@@ -126,6 +126,8 @@ class HomeActivity : EinkActivity() {
         super.onResume()
         if (recreating) return
         applyStatusBar()
+        // KOReader 처럼 지켜보지 않고 데이터로 아는 앱에서 그사이 열고 닫은 책을 먼저 맞춘다(책 자리·읽은 시간을 그리기 전에)
+        if (Storage.isUnlocked(this)) ReaderWatchService.syncFileApps()
         refresh()
         // 읽은 시간은 다른 앱에서 돌아올 때만 바뀐다(레이아웃 때의 refresh 에서는 다시 세지 않는다).
         updateReading()

@@ -46,7 +46,8 @@ fun Context.duration(ms: Long): String {
  * 앞에 떠 있던 시간을 더한다. 어떤 책인지는 접근성 서비스가 그 앱에서 마지막으로 편 책([bookOpened])으로 나누고,
  * 그 앱에서 편 책을 한 번도 몰랐으면 앱으로만 센다(서비스가 꺼진 동안 읽은 시간은 책 없이 시간만, [watchStopped]).
  * 읽는 화면이 따로 액티비티가 아닌 앱(Libby)은 그 액티비티가 앞에 있던 시간 가운데 접근성 서비스가 읽는 화면을 본 동안([viewerShown])만 센다
- * (서비스를 끈 동안은 세지 않는다).
+ * (서비스를 끈 동안은 세지 않는다). 파일 목록과 읽는 화면이 한 액티비티인 KOReader 는 책이 열려 있던 동안만(KOReader 가 남긴 파일로 안다.
+ * 모르면 앞에 있던 동안을 다).
  * 사용 기록은 며칠만 남으므로 끝난 날의 합계는 DB([Db]) `reading_day` 에 남겨 둔다(지우지 않는다. 지난해 읽은 책을 보려고).
  */
 object ReadingLog {
@@ -213,7 +214,7 @@ object ReadingLog {
     /** 접근성 서비스가 알아낸 '[at] 에 [pkg] 에서 [title] 을 폈다'(그 책 id [book], 넣지 못한 책이면 ""). 읽는 화면 시간을 그때 편 책으로 센다. */
     internal class Open(val at: Long, val pkg: String, val title: String, val book: String = "")
 
-    /** [pkg] 의 읽는 화면이 [a]~[b](ms)에 앞에 있었다. [hosted] 면 읽는 화면이 안에 뜨는 서재 액티비티(Libby)라 그 화면이 떠 있던 동안만 센다. */
+    /** [pkg] 의 읽는 화면이 [a]~[b](ms)에 앞에 있었다. [hosted] 면 읽는 화면이 보인 동안만 세는 액티비티(Libby 서재, KOReader)라 그 화면이 떠 있던 동안만 센다. */
     internal class Span(val pkg: String, val a: Long, val b: Long, val hosted: Boolean = false)
 
     /**
@@ -345,15 +346,20 @@ object ReadingLog {
     }.also { marks = it }
 
     /**
-     * 읽는 화면이 서재 액티비티 안에 뜨는 앱(Libby, [ReaderApps.hostsViewer])에서 그 화면이 [at] 에 떴다([shown])·닫혔다.
+     * 읽는 화면이 보인 동안만 세는 앱([ReaderApps.hostsViewer]: Libby 서재 안의 읽는 화면, KOReader 의 책)에서 그 화면이 [at] 에 떴다([shown])·닫혔다.
      * 그 액티비티가 앞에 있던 시간 가운데 떠 있던 동안만 읽은 시간으로 센다. 앞서 적은 것과 같으면 적지 않는다.
+     * 앞서 적은 것보다 앞의 때면: 지금 상태([current])는 앞서 적은 때부터로 적고, 지난 일(KOReader 의 앞 책을 닫은 때 등)은 적지 않는다.
      * [bookOpened] 처럼 다시 셀 수 있는 날 남짓만 남기고, 앱마다 마지막 것은 남긴다.
      */
     @Synchronized
-    fun viewerShown(context: Context, pkg: String, shown: Boolean, at: Long = System.currentTimeMillis()) {
+    fun viewerShown(context: Context, pkg: String, shown: Boolean, at: Long = System.currentTimeMillis(), current: Boolean = true) {
         val list = marks(context)
-        if ((list.lastOrNull { it.pkg == pkg }?.shown ?: false) == shown) return
-        val kept = keepRecent(list + Mark(at, pkg, shown), at, { it.pkg }, { it.at })
+        val last = list.lastOrNull { it.pkg == pkg }
+        if ((last?.shown ?: ReaderApps.shownByDefault(pkg)) == shown) return
+        val time = if (last != null && at < last.at) { if (!current) return; last.at } else at
+        // 같은 때·같은 상태를 이미 적었으면(KOReader 를 맞출 때 지난번의 마지막 초를 다시 본다) 다시 적지 않는다
+        if (list.any { it.pkg == pkg && it.at == time && it.shown == shown }) return
+        val kept = keepRecent(list + Mark(time, pkg, shown), time, { it.pkg }, { it.at })
         marks = kept
         runCatching {
             Db.get(context).tx {
@@ -375,7 +381,7 @@ object ReadingLog {
     /** [pkg] 의 [a]~[b] 가운데 읽는 화면이 떠 있던 구간들([viewerShown]) */
     internal fun List<Mark>.shownWithin(pkg: String, a: Long, b: Long): List<Pair<Long, Long>> {
         val mine = filter { it.pkg == pkg }
-        var on = mine.lastOrNull { it.at <= a }?.shown ?: false
+        var on = mine.lastOrNull { it.at <= a }?.shown ?: ReaderApps.shownByDefault(pkg)
         var from = a
         val out = mutableListOf<Pair<Long, Long>>()
         for (m in mine) {
@@ -450,7 +456,7 @@ object ReadingLog {
                     UsageEvents.Event.MOVE_TO_FOREGROUND -> {
                         if (openAt >= 0) add(openPkg, openAt, e.timeStamp)
                         val cls = e.className
-                        val hosted = cls != null && !isReaderScreen(cls) && ReaderApps.hostsViewer(cls)
+                        val hosted = cls != null && ReaderApps.hostsViewer(cls)
                         val reading = e.packageName in packages && cls != null && (isReaderScreen(cls) || hosted)
                         openAt = if (reading) e.timeStamp else -1
                         openPkg = e.packageName

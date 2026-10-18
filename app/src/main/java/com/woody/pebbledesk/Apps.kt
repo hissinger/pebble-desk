@@ -17,6 +17,7 @@ import android.os.StrictMode
 import android.provider.Settings
 import android.util.LruCache
 import android.webkit.MimeTypeMap
+import com.woody.pebbledesk.readers.BookFiles
 import com.woody.pebbledesk.readers.ReaderApps
 import org.json.JSONArray
 import org.json.JSONObject
@@ -198,11 +199,16 @@ object AppStore {
 
     /**
      * 책의 앱을 연다. 파일로만 여는 이북 앱이면 그 책의 파일([BookShelf.filePath])을, 파일을 모르면 그 앱의 서재 앱(BOOX 런처)을 연다.
+     * 책 파일을 바로 여는 앱(KOReader, [com.woody.pebbledesk.readers.ReaderSpec.opensBookFile])은 파일을 알면 그 파일을, 모르면 앱을 연다.
      * 열 것이 없으면 false(고르러 간다).
      */
     fun openBook(context: Context, book: ShelfBook, app: AppEntry): Boolean {
-        val viewer = ReaderApps.byPackage[app.pkg]?.fileViewer?.takeIf { it.activity == app.component.className }
+        val spec = ReaderApps.byPackage[app.pkg]
+        val viewer = spec?.fileViewer?.takeIf { it.activity == app.component.className }
         if (viewer == null) {
+            // 지워진 파일이면(읽을 수 있을 때만 안다) 앱을 연다
+            if (spec?.opensBookFile == true) BookShelf.filePath(context, book.id)?.takeIf { !BookFiles.canRead(context) || File(it).isFile }
+                ?.let { if (openFile(context, app.component, it)) return true }
             launch(context, app)
             return true
         }
@@ -213,9 +219,9 @@ object AppStore {
     }
 
     /**
-     * [path] 를 [component] 로 연다(`file://`). 받는 앱(네오리더)은 저장소 전체를 읽는 시스템 앱이라 경로를 그대로 넘긴다.
+     * [path] 를 [component] 로 연다(`file://`). 받는 앱(네오리더·KOReader)은 저장소 전체를 읽는 앱이라 경로를 그대로 넘긴다.
      * 안드로이드 7+ 은 다른 앱에 `file://` 를 넘기면 막으므로(FileUriExposedException) 여는 동안만 그 검사를 끈다.
-     * 파일이 지워졌으면 받는 앱이 알린다(이 앱은 저장소를 읽을 수 없어 미리 볼 수 없다).
+     * 파일이 지워졌으면 받는 앱이 알린다(책 파일 읽기를 허용하지 않았으면 이 앱은 미리 볼 수 없다. 허용했으면 KOReader 는 [openBook] 이 미리 본다).
      */
     private fun openFile(context: Context, component: ComponentName, path: String): Boolean {
         val file = File(path)
