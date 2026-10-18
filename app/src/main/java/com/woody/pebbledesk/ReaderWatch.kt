@@ -19,7 +19,6 @@ import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.woody.pebbledesk.readers.AppWindows
-import com.woody.pebbledesk.readers.BookFiles
 import com.woody.pebbledesk.readers.Cell
 import com.woody.pebbledesk.readers.FileBook
 import com.woody.pebbledesk.readers.ReaderApps
@@ -452,23 +451,10 @@ class ReaderWatchService : AccessibilityService() {
         return BookShelf.findByTitle(this, fileTitle)?.title ?: BookShelf.findLivePast(this, fileTitle)?.book?.title ?: file.title
     }
 
-    /**
-     * 이북 앱이 [title] 로 연 파일을 그 책에 적어 둔다(홈에서 그 파일을 바로 연다). 표지가 없으면 책 파일(EPUB)의 표지를 넣는다
-     * (저장소를 읽을 수 있을 때, 파일마다 서비스가 떠 있는 동안 한 번만 해 본다).
-     */
+    /** 이북 앱이 [title] 로 연 파일을 그 책에 적어 둔다(홈에서 그 파일을 바로 열고, 표지가 없으면 그릴 때 그 파일에서 꺼낸다 [BookShelf.cover]) */
     private fun saveFile(title: String, path: String) {
-        val book = BookShelf.findByTitle(this, title) ?: return
-        BookShelf.setFilePath(this, book.id, path)
-        if (BookShelf.hasCover(this, book.id) || !BookFiles.canRead(this) || !coverTried.add(path)) return
-        val context = applicationContext
-        Bg.run({ BookFiles.cover(path) }) { result ->
-            val bytes = result.getOrNull() ?: return@run
-            if (!BookShelf.hasCover(context, book.id)) runCatching { BookShelf.setCover(context, book.id, bytes) }
-        }
+        BookShelf.findByTitle(this, title)?.let { BookShelf.setFilePath(this, it.id, path) }
     }
-
-    /** 표지를 꺼내 본 책 파일들([saveFile]) */
-    private val coverTried = mutableSetOf<String>()
 
     /**
      * 책 칸이 아닌 것을 눌렀다: 검색 화면의 `바로 읽기`일 수 있으니 지금 보이는 책 상세를 기억하고 표지를 찍어 둔다
