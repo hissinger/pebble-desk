@@ -14,6 +14,7 @@ import android.text.Html
 import android.util.LruCache
 import com.woody.pebbledesk.Db.rows
 import com.woody.pebbledesk.Db.tx
+import com.woody.pebbledesk.readers.BookFiles
 import org.json.JSONObject
 import java.io.File
 import java.time.Instant
@@ -530,22 +531,25 @@ object BookShelf {
         // 띠 글자는 앱 언어를 따르므로 키에 글자를 넣는다(빈 글자 = 띠 없음).
         val ribbon = if (finishList(context)[book.id].isNullOrEmpty()) "" else context.getString(R.string.finish_book)
         val palette = Palette.current
-        val key = "${book.id}@$widthPx@${book.updatedAt}@${book.app}@$tone@$ribbon@${palette.key}"
-        covers.get(key)?.let { return it }
-        // 원본(큰 JPEG)을 매번 줄이지 않도록, 화면 폭으로 줄인 표지를 파일로 둔다. 원본이 바뀌면 다시 만든다.
         val original = coverFile(context, book.id)
+        // 표지 그림이 없으면 책 파일에서 꺼낼 수 있는지가 키에 든다(빈 표지를 그린 뒤 책 파일 읽기를 허용하면 다시 그리게)
+        val source = if (original.length() > 0) "o" else if (BookFiles.canRead(context)) "f" else "-"
+        val key = "${book.id}@$widthPx@${book.updatedAt}@${book.app}@$tone@$ribbon@${palette.key}@$source"
+        covers.get(key)?.let { return it }
+        if (source == "f") fileCover(context, book.id)
+        // 원본(큰 JPEG)을 매번 줄이지 않도록, 화면 폭으로 줄인 표지를 파일로 둔다. 원본이 바뀌면 다시 만든다.
         // 화면 대비만큼 미리 밝힌 그림이라 대비 값을, 컬러로 줄인 것은 `c` 를 이름에 넣는다.
         val thumb = File(dir(context), "${book.id}_${widthPx}t${(tone * 100).toInt()}${if (palette.color) "c" else ""}.png")
         // 줄인 표지의 시각은 줄일 때 읽은 원본의 시각(뒤에서 쓰는 사이 원본이 바뀌면 다음에 다시 만든다)
-        val source = original.lastModified()
-        val bmp = thumb.takeIf { it.lastModified() >= source }?.let { BitmapFactory.decodeFile(it.path) }
-            ?: runCatching { BookSearch.scaledCover(original.readBytes(), widthPx, gray = !palette.color)?.also { Crema.undoContrast(it, tone) } }.getOrNull()?.also { made ->
+        val made = original.lastModified()
+        val bmp = thumb.takeIf { it.lastModified() >= made }?.let { BitmapFactory.decodeFile(it.path) }
+            ?: runCatching { BookSearch.scaledCover(original.readBytes(), widthPx, gray = !palette.color)?.also { Crema.undoContrast(it, tone) } }.getOrNull()?.also { scaled ->
                 // 파일로 두기는 화면을 기다리게 하지 않게 뒤에서(PNG 압축은 느린 기기에서 100ms 넘게 걸린다). 같은 파일을 쓰는 중이면 두 번 쓰지 않는다.
                 if (writingThumbs.add(thumb.path)) Bg.run({
                     try {
                         runCatching {
-                            writeAtomically(thumb) { f -> f.outputStream().use { made.compress(Bitmap.CompressFormat.PNG, 100, it) } }
-                            thumb.setLastModified(source)
+                            writeAtomically(thumb) { f -> f.outputStream().use { scaled.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+                            thumb.setLastModified(made)
                         }
                         // 같은 폭의 예전 줄인 표지(대비·색이 다르거나 예전 이름)는 지운다.
                         val stale = Regex("""${Regex.escape("${book.id}_$widthPx")}(g|t\d+c?)?\.png""")
@@ -719,6 +723,22 @@ object BookShelf {
     fun findByTitle(context: Context, title: String): ShelfBook? = list(context).firstOrNull { it.hasTitle(title) }
 
     @Throws(IOException::class)
+    /**
+     * 표지 그림이 없는 책: 이북 앱이 연 책 파일([filePath], KOReader·네오리더)이 EPUB 이면 그 표지를 꺼내 이 책의 표지로 둔다([BookFiles.cover]).
+     * 그릴 때([cover]) 꺼내므로 책을 넣은 때와 상관없이 처음 그릴 때부터 보이고, 한 번 둔 표지는 책 파일을 지우거나 권한을 꺼도 남는다.
+     * 표지가 없는 파일(EPUB 이 아님 등)은 그 파일이 바뀔 때까지 다시 열지 않는다.
+     */
+    private fun fileCover(context: Context, id: String) {
+        val path = filePath(context, id) ?: return
+        val tried = "$path@${File(path).lastModified()}"
+        if (tried in noFileCover) return
+        val bytes = BookFiles.cover(path) ?: run { noFileCover += tried; return }
+        runCatching { saveCover(context, id, bytes) }
+    }
+
+    /** 표지를 꺼내 봤지만 없던 책 파일(경로@수정 시각, [fileCover]) */
+    private val noFileCover = mutableSetOf<String>()
+
     private fun saveCover(context: Context, id: String, bytes: ByteArray) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
