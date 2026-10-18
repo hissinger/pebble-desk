@@ -28,24 +28,28 @@ object Device {
         }
     }
 
-    /** 조명 상태가 들어 있는 `Settings.System` 키. 바뀌면 상태 줄을 다시 그린다. */
+    /**
+     * 조명 상태가 들어 있는 `Settings.System` 키. 바뀌면 상태 줄을 다시 그린다.
+     * 그 밖의 기기는 조명 단계 `EinkLightStep`(iReader SmartOS: Ocean·Neo 에서 확인)을 본다. 제조사로 가르지 않는다:
+     * 같은 회사라도 기종·펌웨어마다 없을 수 있고, 없으면 0 으로 읽혀 꺼짐이다.
+     */
     val lightKeys: List<String>
         get() = when (kind) {
             Kind.CREMA -> listOf("screen_brightness", "warm_light")
             Kind.MEEBOOK -> listOf("isLightOn")
-            Kind.OTHER -> emptyList()
+            Kind.OTHER -> listOf("EinkLightStep")
         }
 
     /**
      * 조명 켜짐. 크레마는 백색(screen_brightness)·온색(warm_light) 중 하나라도 0보다 크면 켜짐.
      * 메이북은 꺼도 밝기 값이 남아 SystemUI 가 쓰는 `isLightOn`("true"/"false")을 본다.
+     * `EinkLightStep` 은 끄면 0 이다(iReader 의 `screen_brightness` 는 조명과 따로 논다).
      */
     fun lightOn(context: Context): Boolean {
         val cr = context.contentResolver
         return when (kind) {
-            Kind.CREMA -> lightKeys.any { key -> runCatching { Settings.System.getInt(cr, key, 0) }.getOrDefault(0) > 0 }
+            Kind.CREMA, Kind.OTHER -> lightKeys.any { key -> runCatching { Settings.System.getInt(cr, key, 0) }.getOrDefault(0) > 0 }
             Kind.MEEBOOK -> runCatching { Settings.System.getString(cr, lightKeys.single()) }.getOrNull() == "true"
-            Kind.OTHER -> false
         }
     }
 

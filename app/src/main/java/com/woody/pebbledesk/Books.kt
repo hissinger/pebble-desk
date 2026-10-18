@@ -722,7 +722,6 @@ object BookShelf {
      */
     fun findByTitle(context: Context, title: String): ShelfBook? = list(context).firstOrNull { it.hasTitle(title) }
 
-    @Throws(IOException::class)
     /**
      * 표지 그림이 없는 책: 이북 앱이 연 책 파일([filePath], KOReader·네오리더)이 EPUB 이면 그 표지를 꺼내 이 책의 표지로 둔다([BookFiles.cover]).
      * 그릴 때([cover]) 꺼내므로 책을 넣은 때와 상관없이 처음 그릴 때부터 보이고, 한 번 둔 표지는 책 파일을 지우거나 권한을 꺼도 남는다.
@@ -739,6 +738,7 @@ object BookShelf {
     /** 표지를 꺼내 봤지만 없던 책 파일(경로@수정 시각, [fileCover]) */
     private val noFileCover = mutableSetOf<String>()
 
+    @Throws(IOException::class)
     private fun saveCover(context: Context, id: String, bytes: ByteArray) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)

@@ -75,7 +75,7 @@
    - 로고 이미지는 앱에 넣지 않는다. 실행할 때 기기에 설치된 크레마 런처(`com.wetao.cremalauncher`)의 `ic_icon_crema` 리소스를 불러온다. 공개 저장소에 크레마 상표 이미지를 올리지 않기 위해서다.
    - 크레마 런처가 없거나 리소스를 못 찾으면 로고 자리를 비운다.
 1. 시계 아래 오른쪽 정렬로 **상태 줄**: `10월 3일 토요일 · 100% · 와이파이 · BT · 조명 · ⑮`. 항목 사이는 가운데 점, 점 양옆 간격은 좁게(약 4dp).
-   - 와이파이·BT·조명은 켜져 있을 때만 아이콘을 넣는다. 조명은 크레마는 백색(`screen_brightness`)이나 온색(`warm_light`) 중 하나라도 0보다 크면, 메이북은 SystemUI 의 `isLightOn` 이 `true` 면 켜진 것으로 본다(`Device.lightOn`).
+   - 와이파이·BT·조명은 켜져 있을 때만 아이콘을 넣는다. 조명은 크레마는 백색(`screen_brightness`)이나 온색(`warm_light`) 중 하나라도 0보다 크면, 메이북은 SystemUI 의 `isLightOn` 이 `true` 면, 그 밖의 기기는 조명 단계 `EinkLightStep`(iReader. 키가 없는 기기는 0 으로 읽혀 꺼짐)이 0보다 크면 켜진 것으로 본다(`Device.lightOn`. 제조사로 가르지 않는다).
    - 배터리는 숫자로 쓰고, 충전 중이면 숫자 앞에 작은 번개 아이콘을 붙인다(`⚡46%`).
    - 잔상 제거 횟수는 원문자(⑮)로 쓴다. 값은 `persist.vendor.fullmode_cnt`. 0이거나 읽지 못하면 뺀다.
    - 위 두 줄을 누르면 기기의 빠른 설정(와이파이·BT·조명·음량)을 연다. 크레마 `com.epd.drop_down`, 메이북 `com.haoqing.action.QUICK_SETTINGS` 를 둘 다 보낸다(받는 쪽이 없는 방송은 아무 일도 하지 않는다). 그 밖의 기기(Viwoods AiPaper Mini 등)는 기기 자체 제스처(화면 위에서 끌어내리기)로 연다.
