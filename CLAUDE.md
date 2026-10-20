@@ -35,6 +35,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.8-release.apk </dev/
 - `uiautomator dump`·`events` 를 돌리면 접근성 서비스가 새로 만들어져(메모리의 지금 화면·누른 칸이 지워진다) 읽는 책 자동 추가를 시험할 때는 쓰지 않는다. 화면 캡처와 좌표로 누르고, 결과는 DB(디버그 빌드 `run-as`)로 본다.
 - **사용자가 기기를 쓰는 중일 수 있다.** 자동 조작은 필요한 만큼만, 와이파이·블루투스 등 기기 설정은 건드리지 않는다. 다른 앱 화면에서 길게 누르기·탭이 엉뚱한 곳(다른 이북 앱, Play 스토어)을 누른 적이 있다.
 - **`am force-stop com.woody.pebbledesk` 를 하지 않는다**: 접근성 서비스(읽는 책 자동 추가)가 시스템 설정에서 꺼진다. 다시 켜는 것은 사용자가 한다(adb 로 켜지 않는다). 덮어 설치는 괜찮다.
+- 홈페이지 `site/`(한 쪽, 홈·독서 기록·올해 읽은 책을 페블·바형 두 대로, 영어는 `site/en/`: 모든 스크립트에 `SITE_LANG=en` 이면 영어 앱·원서·Kindle 등, 그림은 `site/img/en-*`): 그림은 에뮬 실제 화면. `tools/site/covers.py`(YES24 표지 받기, 원본은 저장소 밖) → `mock.py`(mock DB·표지) → `shoot.sh`(넣고 세 화면 찍기, 이북 앱이 깔린 에뮬에서) → `images.py`(상단 바 지우고 `site/img/*.webp`). 기기 틀은 실제 기기 사진(크레마 페블 화이트 YES24 상품 사진·BOOX 팔마 공식 사진)을 `frames.py` 로 화면 자리를 비워 만들고 그 위에 캡처를 얹는다. 지원 앱 아이콘 `site/img/apps/` 는 에뮬에서 안드로이드가 그린 아이콘(`tools/site/IconDump.java` 를 `app_process` 로, 640dpi 그림을 192px PNG 로). 네오리더는 BOOX 런처에 아이콘이 없어 목록에서 뺐다. 검색·공유 정보(제목·설명·대표 주소·hreflang·공유 카드·JSON-LD·자주 묻는 질문·robots.txt·sitemap.xml·llms.txt)는 `tools/site/seo.py` 가 두 페이지에 다시 쓴다(글은 그 파일에서 고친다, 주소는 `https://pebbledesk.github.io/`(저장소 pebbledesk/pebbledesk.github.io) 기준). 공유 그림·아이콘은 `og.py`. `site/` 는 이 저장소에 넣지 않는다(git 제외: 기기 사진·책 표지·다른 앱 아이콘이 들어 있다). 원본은 홈페이지 저장소 pebbledesk/pebbledesk.github.io 이고 main 에 push 하면 GitHub Pages 가 배포한다. 고칠 때는 그 저장소를 받아 `site/` 에 두고 고친 뒤 다시 복사해 커밋·push 한다.
 - 캡처: `adb exec-out screencap -p > x.png`. 시안·비교 이미지는 `design-review/`(git 제외)에 둔다.
 
 ## 기기 특성(크레마 페블)

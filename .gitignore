@@ -8,6 +8,8 @@ local.properties
 *.apk
 design-*.svg
 design-review/
+# 홈페이지(원본은 pebbledesk/pebbledesk.github.io)
+/site/
 
 # 서명 키(공개 저장소라 올리지 않는다)
 *.jks
