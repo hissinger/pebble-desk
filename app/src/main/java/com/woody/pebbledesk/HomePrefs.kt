@@ -91,6 +91,16 @@ class HomePrefs(context: Context) {
         get() = sp.getString("density_warn_skip", null)
         set(v) = sp.edit().putString("density_warn_skip", v).apply()
 
+    /** 홈에서 `이 버전은 알리지 않기` 를 누른 판 */
+    var updateSkip: String?
+        get() = sp.getString("update_skip", null)
+        set(v) = sp.edit().putString("update_skip", v).apply()
+
+    /** 홈의 새 판 창을 마지막으로 닫은 판과 날(`1.5.9@2026-10-20`). 같은 날에는 다시 띄우지 않는다. 설치 허용 안내로 가면 지운다. */
+    var updateShown: String?
+        get() = sp.getString("update_shown", null)
+        set(v) = sp.edit().putString("update_shown", v).apply()
+
     /** 자주 쓰는 앱을 격자(아이콘 아래 이름, 한 줄에 4개)로. false 면 목록 */
     var favGrid: Boolean
         get() = sp.getBoolean("fav_grid", false)

@@ -21,7 +21,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.8-release.apk </dev/
   - DB `databases/pebble.db`(`Db`, 안드로이드 기본 SQLite, 버전 4): 읽은 시간 `reading_day`(날·앱 `pkg`·편 책 제목 `title`·붙은 책 `book_id`(모르면 "", 저장할 때 `bookFor` 로 한 번 정하고 다시 정하지 않는다)·ms. 버전 3 에서 `패키지/제목` 한 칸을 나누고 책 id 를 더함)·`reading_meta`, 편 책 `book_open`(그 책 id 도), Libby 읽는 화면이 뜨고 닫힌 때·KOReader 책을 열고 닫은 때 `viewer_mark`(버전 3), 읽고 있는 책 `shelf`, 나간 책 `past`, 완독 `finish`(한 번에 한 줄·줄 id 와 기기를 옮겨도 그대로인 `uid`, 같은 날 두 번도(순서는 누른 때 `at`). 회차 번호는 저장하지 않고 순서로 센다. 그 회차를 다시 읽기한 날 `started`·별점·감상 `stars`·`text`. 버전 3), 진행 중인 마지막 회차의 별점·감상 `review`(버전 2), 다시 읽기한 날 `round_start`(버전 3), 파일로만 여는 이북 앱(네오리더)에서 연 책 파일 경로 `book_file`(책 id → 경로, 버전 4). 기록은 지우지 않는다. 릴리스된 DB 는 1.3.0~1.4.2 가 버전 1, 1.5.0~1.5.3 이 버전 2, 1.5.4 가 버전 3, 1.5.5~1.5.8 이 버전 4(그 전은 JSON). 버전을 올리면 이 모든 판에서 올라오는 경로(`onUpgrade`)와 새 설치(`onCreate`)를 단위 테스트(`./gradlew testDebugUnitTest`, `app/src/test`: 회차 계산·마이그레이션·JSON 옮기기·저장과 캐시, Robolectric)와 에뮬에서 시험한다. 낮은 버전으로 되돌리기는 지원하지 않는다(판 낮춘 시험 빌드는 깨끗한 에뮬에서).
   - 파일: 설정 `shared_prefs/home.xml`, 표지 `files/books/<id>.jpg`(줄인 표지 `<id>_<폭>t<대비>[c].png`, 컬러면 c. 시각은 줄일 때의 원본 시각), 앱 목록 캐시 `files/apps.json`, 아이콘 캐시 `files/icons/<앱>@<px><g|c>@<업데이트한 때>.png`.
   - 1.2.1 까지의 JSON(`reading.json`·`books/books.json`)은 이 실행에서 처음 DB를 열 때 옮기고 `.migrated`로 이름을 바꿔 둔다(읽지 못하면 `.bad`). DB 확인: `adb exec-out run-as … cat …/databases/pebble.db > x.db` 후 `sqlite3`(디버그 빌드).
-- **릴리스 설명**(GitHub 릴리스 본문): 앱의 설정 › 업데이트 창에 **18줄까지** 보이고 넘으면 끝이 `…` 로 잘린다(`SettingsActivity.NOTES_LINES`). 크레마 페블에서 한 줄은 한국어 약 28자, 절 제목은 한 줄, 두 번째 절부터 위에 반 줄이 더 든다. 그래서 `## 새로 생긴 것` / `## 고친 것` 두 절, 항목(`- `)은 한두 줄짜리로 모두 합쳐 18줄 안에 쓴다(자세한 설명은 README·문서로). `**`·`` ` `` 는 앱에서 지워지니 써도 된다. 태그는 `v<판>`, 자산은 `PebbleDesk-<판>-release.apk`(APK 의 versionName 과 같아야 앱이 받는다).
+- **릴리스 설명**(GitHub 릴리스 본문): 앱의 설정 › 업데이트 창과 홈의 새 판 창에 **18줄까지** 보이고 넘으면 끝이 `…` 로 잘린다(`UpdateSheets.NOTES_LINES`). 크레마 페블에서 한 줄은 한국어 약 28자, 절 제목은 한 줄, 두 번째 절부터 위에 반 줄이 더 든다. 그래서 `## 새로 생긴 것` / `## 고친 것` 두 절, 항목(`- `)은 한두 줄짜리로 모두 합쳐 18줄 안에 쓴다(자세한 설명은 README·문서로). `**`·`` ` `` 는 앱에서 지워지니 써도 된다. 태그는 `v<판>`, 자산은 `PebbleDesk-<판>-release.apk`(APK 의 versionName 과 같아야 앱이 받는다).
 - 릴리스는 `run-as` 가 안 된다. 앱 데이터를 직접 고쳐야 하면 같은 키로 서명된 디버그 빌드를 잠깐 깔아 `run-as` 로 넣고 다시 릴리스를 깐다.
 - 성능은 꼭 **릴리스 빌드**로 잰다(디버그는 몇 배 느리다).
 
@@ -70,7 +70,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.8-release.apk </dev/
 | EinkActivity / Sheet / Ui / TopBarView / HomePrefs | 공통 화면(밀기·언어·밀도 맞춤)·아래 메뉴(돌아왔을 때 그사이 DB 가 바뀌었으면 떠 있던 메뉴를 닫는 `Sheet.dismissStale`)·규격(`PictureView`, 완독 도장을 찍는 줄 `StampedRow`, 기준 폭 572dp 포함)·상단·설정 저장 |
 | Palette | 색(설정 › 화면 › 색): 흑백·컬러('색면의 서가'). 표지·아이콘 컬러 여부, 화면 묶음(`Area`)마다 색면·큰 제목 색, 완독(띠·도장)·큰 별 색. `Palette.current` 는 EinkActivity 가 정한다 |
 | Device / Crema | 기기 종류(크레마·메이북·기타)와 기기마다 다른 동작(빠른 설정·조명·시스템 속성·BOOX 얼린 앱 열기) / 크레마 전용 화면 보정(대비·가려지는 아래·로고) |
-| Update | 설정 › 업데이트: GitHub 최신 릴리스 확인, APK 받기·확인(크기·SHA-256·서명 이력), 설치 세션·설치 창, 설치 뒤 홈 다시 띄우기 |
+| Update / UpdateSheets | 설정 › 업데이트·홈의 새 판 알림: GitHub 최신 릴리스 확인, APK 받기·확인(크기·SHA-256·서명 이력), 설치 세션·설치 창, 설치 뒤 홈 다시 띄우기 / 두 화면이 같이 쓰는 창(바뀐 점·`설치`·허용 안내·받는 중·실패, 홈의 `새 버전이 나왔습니다`) |
 | Storage / Db | 기기 보호 저장소와 예전 저장소에서 옮기기 / 앱 데이터 DB(SQLite)와 예전 JSON 옮기기 |
 
 ## 지금까지 정한 것(요지, 자세한 건 DESIGN.md)

@@ -22,9 +22,9 @@ import java.net.URL
 import java.security.MessageDigest
 
 /**
- * 설정 › 업데이트: GitHub 의 최신 릴리스를 보고, 새 판이면 APK 를 받아 확인한 뒤 안드로이드 설치 창을 띄운다(스토어 없이 배포).
+ * 설정 › 업데이트(홈도 띄엄띄엄 확인해 새 판을 알린다): GitHub 의 최신 릴리스를 보고, 새 판이면 APK 를 받아 확인한 뒤 안드로이드 설치 창을 띄운다(스토어 없이 배포).
  * 받은 APK 는 크기·SHA-256(릴리스가 알려 주는 값, 없으면 받지 않는다)과, 지금 앱의 서명을 이어 받는지(교체 이력)를 확인한다.
- * 상태는 앱이 떠 있는 동안만 기억하고, 바뀌면 [onChange] 로 알린다(설정 화면이 그 줄만 다시 그린다).
+ * 상태는 앱이 떠 있는 동안만 기억하고, 바뀌면 [onChange] 로 알린다(앞에 있는 화면이 건다. 설정은 그 줄만 다시 그리고, 홈은 새 판 창을 띄운다).
  */
 object Update {
     private const val LATEST = "https://api.github.com/repos/hissinger/pebble-desk/releases/latest"
@@ -66,6 +66,8 @@ object Update {
     @Volatile var state: State = State.Unknown
         private set
     private var checkedAt = 0L
+    /** 마지막으로 GitHub 에 물어본 때(결과와 상관없이). 홈은 이것으로 띄엄띄엄 확인한다([checkFromHome]). */
+    private var askedAt = 0L
     /** 확인·설치를 시작할 때마다 하나씩 올린다. 그 사이 바뀌었으면 늦게 온 확인 결과는 버린다(받는 중을 덮지 않게). */
     private var generation = 0
     var onChange: (() -> Unit)? = null
@@ -135,10 +137,22 @@ object Update {
         check(context)
     }
 
+    /**
+     * 홈에 돌아올 때: 앱이 뜬 뒤 처음이거나 마지막으로 물어본 지 [RECHECK_MS] 가 지났으면 확인한다(새 판이면 홈이 알린다).
+     * 인터넷이 없으면 조용히 넘기고 다음에 돌아올 때 다시 본다. 받는 중·설치 중에는 하지 않는다.
+     */
+    fun checkFromHome(context: Context) {
+        val s = state
+        if (s is State.Checking || s is State.Downloading || s is State.Installing) return
+        if (askedAt != 0L && SystemClock.elapsedRealtime() - askedAt < RECHECK_MS) return
+        if (online(context)) check(context)
+    }
+
     fun check(context: Context) {
         val current = context.appVersion()
         val gen = ++generation
         if (!online(context)) return set(State.Offline)
+        askedAt = SystemClock.elapsedRealtime()
         set(State.Checking)
         Bg.run({ latest() }) { r ->
             if (gen != generation) return@run
