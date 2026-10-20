@@ -49,6 +49,9 @@
     <string name="update_no_response">Server not responding</string>
     <string name="update_server_title">Server not responding</string>
     <string name="update_server_desc">Tap again a little later.</string>
+    <string name="update_new_title">A new version is available</string>
+    <string name="update_new_versions">Pebble Desk %1$s · now %2$s</string>
+    <string name="update_skip">Don\'t remind me about this version</string>
     <string name="update_install">Install</string>
     <string name="update_allow_title">Allow installs</string>
     <string name="update_allow_desc">To install the new version, allow Pebble Desk to install unknown apps. Come back and tap again after allowing it.</string>

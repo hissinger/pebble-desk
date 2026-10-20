@@ -27,6 +27,7 @@ import android.view.WindowInsetsController
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import java.time.LocalDate
 
 /** ① 홈: 맨 위 두 줄 · 지금 읽는 책과 읽고 있는 앱 · 자주 쓰는 앱 · 하단 줄 */
 class HomeActivity : EinkActivity() {
@@ -132,16 +133,48 @@ class HomeActivity : EinkActivity() {
         // 읽은 시간은 다른 앱에서 돌아올 때만 바뀐다(레이아웃 때의 refresh 에서는 다시 세지 않는다).
         updateReading()
         // 시작하기를 띄웠으면 그것이 자동 추가를 설명한다. 화면 크기 안내가 먼저(뜨면 자동 추가 안내는 다음에 돌아올 때. 가운데 창이 겹치지 않게)
-        if (!OnboardingActivity.showOnce(this, prefs)) {
+        // 새 판 창이 떠 있으면 다른 안내는 다음에 돌아올 때(가운데 창이 겹치지 않게)
+        if (!OnboardingActivity.showOnce(this, prefs) && updateDialog?.isShowing != true) {
             warnDensity()
             if (densityDialog?.isShowing != true) warnAutoOff()
         }
+        Update.onChange = { updates.onChange(); offerUpdate() }
+        updates.onChange()
+        offerUpdate()
+        Update.checkFromHome(this)
         Device.keepBooxLauncher(this)
     }
 
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(stalledLater)
+        Update.onChange = null
+    }
+
+    override fun onDestroy() {
+        updates.dismiss()
+        super.onDestroy()
+    }
+
+    /** 새 판 창·받는 중 창 */
+    private val updates = UpdateSheets(this)
+    /** 떠 있는 새 판 창 */
+    private var updateDialog: Dialog? = null
+
+    /**
+     * 새 판이 나왔으면 화면 가운데에 알린다(바뀐 점과 `설치`, [UpdateSheets.notice]). 판마다 하루 한 번까지: `닫기` 면 다음 날 다시,
+     * `이 버전은 알리지 않기` 면 그 판은 다시 띄우지 않는다(설정 › 업데이트에는 그대로 보인다). 다른 가운데 창이 떠 있거나 시작하기 전이면 다음에.
+     */
+    private fun offerUpdate() {
+        val release = (Update.state as? Update.State.Available)?.release ?: return
+        fun today() = "${release.version}@${LocalDate.now()}"
+        if (!prefs.onboarded || prefs.updateSkip == release.version || prefs.updateShown == today()) return
+        if (listOf(updateDialog, densityDialog, autoOffDialog).any { it?.isShowing == true }) return
+        val maxHeight = window.decorView.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+        // 닫는 날을 띄운 날로 적는다(회전으로 사라지면 다시 띄운다). 설치 허용 안내로 갔으면 허용하고 돌아왔을 때(시스템이 앱을 다시 시작한다) 다시.
+        updateDialog = updates.notice(release, maxHeight, onSkip = { prefs.updateSkip = release.version }) { askedAllow ->
+            prefs.updateShown = if (askedAllow) null else today()
+        }
     }
 
     /** 떠 있는 '자동 추가가 꺼져 있습니다'·'멈춰 있습니다' 창(홈에 돌아올 때마다 하나만) */
@@ -152,7 +185,7 @@ class HomeActivity : EinkActivity() {
     /** 켜져 있는데 붙지 않은 채 [STALLED_WAIT_MS] 가 지났으면 '멈춰 있습니다' 창(홈이 앞에 있을 때만, onPause 에서 거둔다) */
     private val stalledLater = Runnable {
         if (ReaderWatchService.isEnabled(this) && !ReaderWatchService.bound && !(autoOffDialog?.isShowing == true && autoOffStalled) &&
-            densityDialog?.isShowing != true) warnStalled()
+            densityDialog?.isShowing != true && updateDialog?.isShowing != true) warnStalled()
     }
 
     /**
