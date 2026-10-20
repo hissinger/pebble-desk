@@ -94,6 +94,21 @@ object Device {
             .putExtra("args_user_id", Process.myUserHandle().hashCode()))
     }
 
+    /**
+     * BOOX 가 이 앱을 자동 얼리기 대상으로 두었는가. 펌웨어의 공개 함수 `android.onyx.optimization.EInkHelper.getAutoFreezeApps()`
+     * (숨은 API 표시가 SDK 라 일반 앱도 부를 수 있고, 시스템 서비스 `oec_service` 는 권한을 묻지 않는다. Palma 4.0.2 에서 확인)가
+     * 돌려주는 목록에 이 앱이 있으면 true. 대상 앱은 다른 앱으로 넘어가 30초가 지나면 작업이 지워지고 꺼져, 접근성이
+     * '멈춘 서비스'로 남는다(docs/DEVICES.md › 앱 얼리기). BOOX 펌웨어가 아니라 물을 수 없으면 null.
+     */
+    fun booxAutoFreeze(context: Context): Boolean? {
+        val apps = runCatching { getAutoFreezeApps?.invoke(null) as? List<*> }.getOrNull() ?: return null
+        return context.packageName in apps
+    }
+
+    private val getAutoFreezeApps by lazy {
+        runCatching { Class.forName("android.onyx.optimization.EInkHelper").getMethod("getAutoFreezeApps") }.getOrNull()
+    }
+
     /** BOOX 런처의 앱 얼리기 설정 화면을 열어 달라고 한다(BOOX 플로팅 버튼의 얼리기 바로가기와 같다). */
     fun openBooxFreezeSettings(context: Context) {
         context.sendBroadcast(Intent("com.onyx.app.freeze.page").setPackage(BOOX_LAUNCHER))

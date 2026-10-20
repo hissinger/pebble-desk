@@ -16,6 +16,7 @@ import android.widget.TextView
  * 1쪽 읽는 책 자동 추가, 2쪽 오늘 읽은 시간. 둘 다 이 앱의 기본 기능이라 켜져야 넘어간다(1쪽 `다음 ›`, 2쪽 `시작하기 ›`.
  * 그 전에는 흐리게, 누르지 않는다). 켤 수 없는 기기(시스템 화면이 막힌 기기 등)에서도 나갈 수 있게 하단 바 바로 위에 `나중에 하기`. 항목마다 설명 · 켜면 홈에 생기는 모습(작게) · `켜는 방법` 단계(켠 뒤에도
  * 그대로 둔다. 단계 옆 버튼이 그 시스템 화면을 연다. 돌아오면 이름 옆에 `켜짐 ✓`). 닫으면 다시 나오지 않는다.
+ * BOOX 가 이 앱을 자동 얼리기 대상으로 두었으면 자동 추가 단계 맨 앞에 얼리기에서 빼는 단계를 더한다([booxFreeze]).
  * 스크롤하지 않으므로 쓸 수 있는 높이(기기·시스템 줄마다 다르다)에 넘치면 쪽 안의 글자를 줄여 그린다([fitPage]).
  */
 class OnboardingActivity : EinkActivity() {
@@ -26,7 +27,12 @@ class OnboardingActivity : EinkActivity() {
     private lateinit var next: TextView
     /** 0 = 자동 추가, 1 = 오늘 읽은 시간 */
     private var page = 0
-    /** 지난번에 그린 상태(쪽 · 자동 추가 켜짐 · 읽은 시간 켜짐). 같으면 다시 그리지 않는다(전자잉크 갱신을 줄인다). */
+    /**
+     * BOOX 얼리기 단계를 보이는가. 이 앱이 얼리기 대상이면 켜고, 사용자가 빼고 돌아와도·화면을 돌려도 끄지 않는다(다른 단계처럼 그대로 둔다).
+     * 맨 앞에 두는 것은 얼리기 대상이면 접근성을 켜러 간 사이(30초 뒤) BOOX 가 이 화면을 지우고 앱을 꺼 버리기 때문이다.
+     */
+    private var booxFreeze = false
+    /** 지난번에 그린 상태(쪽 · 자동 추가 켜짐 · 읽은 시간 켜짐 · 얼리기 단계). 같으면 다시 그리지 않는다(전자잉크 갱신을 줄인다). */
     private var shownState: List<Any>? = null
     /** [content] 의 높이. 알기 전(처음 레이아웃 전)에는 0 이라 그리지 않는다. */
     private var available = 0
@@ -35,6 +41,7 @@ class OnboardingActivity : EinkActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         page = savedInstanceState?.getInt(KEY_PAGE) ?: 0
+        booxFreeze = savedInstanceState?.getBoolean(KEY_BOOX_FREEZE) ?: false
         val root = vbox()
         root.addView(text(getString(R.string.onboarding_title), 34f, Ui.heavy).apply {
             setPadding(dp(Ui.MARGIN), dp(24), dp(Ui.MARGIN), 0)
@@ -81,6 +88,7 @@ class OnboardingActivity : EinkActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putInt(KEY_PAGE, page)
+        outState.putBoolean(KEY_BOOX_FREEZE, booxFreeze)
     }
 
     /** 시스템 설정에서 돌아올 때마다 켜졌는지 다시 본다. */
@@ -106,7 +114,8 @@ class OnboardingActivity : EinkActivity() {
         if (available <= 0) return
         val books = ReaderWatchService.isEnabled(this)
         val time = ReadingLog.hasAccess(this)
-        val state = listOf(page, books, time, available)
+        if (page == 0 && !booxFreeze) booxFreeze = Device.booxAutoFreeze(this) == true
+        val state = listOf(page, books, time, booxFreeze, available)
         if (state == shownState) return
         shownState = state
         content.removeAllViews()
@@ -165,11 +174,14 @@ class OnboardingActivity : EinkActivity() {
 
     /**
      * 자동 추가 켜는 방법. 안드로이드 13+ 은 파일로 깐 앱을 '제한된 설정'으로 막을 수 있어(막혔는지는 알 수 없다) 푸는 단계까지.
-     * `⋮` 의 `제한된 설정 허용` 은 접근성에서 막힌 창을 한 번 본 뒤에야 생긴다.
+     * `⋮` 의 `제한된 설정 허용` 은 접근성에서 막힌 창을 한 번 본 뒤에야 생긴다. [booxFreeze] 면 맨 앞에 BOOX 얼리기에서 빼기.
      */
     private fun booksSteps(): List<Pair<String, Step?>> {
+        val freeze = if (booxFreeze) listOf(
+            getString(R.string.onboarding_books_boox) to Step(R.string.onboarding_open_freeze) { Device.openBooxFreezeSettings(this) },
+        ) else emptyList()
         val accessibility = Step(R.string.onboarding_open_accessibility) { ReaderWatchService.openSettings(this) }
-        return if (ReaderWatchService.mayBeRestricted) listOf(
+        return freeze + if (ReaderWatchService.mayBeRestricted) listOf(
             getString(R.string.onboarding_books_r1) to accessibility,
             getString(R.string.onboarding_books_r2) to null,
             getString(R.string.onboarding_books_r3) to Step(R.string.onboarding_open_app_info) { ReaderWatchService.openAppInfo(this) },
@@ -254,7 +266,8 @@ class OnboardingActivity : EinkActivity() {
         private const val PREVIEW_DP = 176
         private const val SAMPLE_COVER_DP = 52
         private const val KEY_PAGE = "page"
-        private val CIRCLED = listOf("①", "②", "③", "④")
+        private const val KEY_BOOX_FREEZE = "boox_freeze"
+        private val CIRCLED = listOf("①", "②", "③", "④", "⑤")
         /** [fitPage]: 넘칠 때 글자를 한 번에 줄이는 비율과 가장 작게 줄이는 비율 */
         private const val FIT_STEP = 0.05f
         private const val MAX_FIT_STEPS = 6

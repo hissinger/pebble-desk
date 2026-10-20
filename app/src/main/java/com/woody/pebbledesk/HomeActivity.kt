@@ -185,17 +185,23 @@ class HomeActivity : EinkActivity() {
         autoOffStalled = false
     }
 
-    /** 자동 추가 안내 창(화면 가운데, 기록이 바뀌어도 닫지 않는다)과 `접근성 설정 열기` */
-    private fun autoNotice(title: Int, desc: String): Sheet = Sheet(this).header(getString(title), desc).centered().keepOnChange()
-        .item(getString(R.string.open_accessibility), bold = true) { ReaderWatchService.openSettings(this) }
+    /** 자동 추가 안내 창(화면 가운데, 기록이 바뀌어도 닫지 않는다)과 `접근성 설정 열기`. [freeze] 면 그 위에 `얼리기 설정 열기` */
+    private fun autoNotice(title: Int, desc: String, freeze: Boolean = false): Sheet =
+        Sheet(this).header(getString(title), desc).centered().keepOnChange().apply {
+            if (freeze) item(getString(R.string.boox_freeze_settings), bold = true) { Device.openBooxFreezeSettings(this@HomeActivity) }
+        }.item(getString(R.string.open_accessibility), bold = true) { ReaderWatchService.openSettings(this) }
 
     /**
      * 접근성에서는 켜져 있는데 서비스가 붙어 있지 않다(켜진 채 강제 중지되거나 메모리 정리로 죽은 뒤 다시 켜면 시스템이 '멈춘 서비스'로 두고 붙이지 않는다.
      * 껐다 켜거나 앱을 업데이트해야 붙는다. 2026-10-16 에뮬레이터(안드로이드 11)에서 확인): 그동안은 편 책을 모르니 꺼짐과 같이 화면 가운데에 알린다.
+     * BOOX 가 얼렸다 푼 뒤에도 이렇게 된다(2026-10-20 에뮬레이터에서 `pm disable-user`·`enable` 로 확인). 이 앱이 BOOX 얼리기
+     * 대상이면([Device.booxAutoFreeze]) 얼리기에서 빼라는 말과 `얼리기 설정 열기` 를 더한다(빼지 않으면 다시 켜도 또 멈춘다).
      */
     private fun warnStalled() {
         autoOffDialog?.takeIf { it.isShowing }?.dismiss()
-        autoOffDialog = autoNotice(R.string.auto_stalled_title, getString(R.string.auto_stalled_desc)).show()
+        val freeze = Device.booxAutoFreeze(this) == true
+        val desc = getString(R.string.auto_stalled_desc) + "\n\n" + getString(if (freeze) R.string.auto_stalled_boox else R.string.auto_stalled_fix)
+        autoOffDialog = autoNotice(R.string.auto_stalled_title, desc, freeze).show()
         autoOffStalled = true
     }
 
