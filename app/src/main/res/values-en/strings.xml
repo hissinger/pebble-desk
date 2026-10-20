@@ -71,6 +71,7 @@
     <string name="device_section_keys">Last button pressed</string>
     <string name="device_key_hint">Press the page buttons and the button below the screen</string>
     <string name="device_perm_home">Default home</string>
+    <string name="device_perm_boox_freeze">BOOX freeze</string>
     <string name="device_section_recent">Recent screens of other apps (newest first)</string>
     <string name="device_section_service">Auto-add service log</string>
     <string name="device_service_life">Connected %1$s · stopped %2$s · stops %3$d</string>
@@ -233,7 +234,9 @@
     <string name="open_accessibility">Open Accessibility</string>
     <string name="auto_off_title">Auto-add is off</string>
     <string name="auto_stalled_title">Auto-add has stopped</string>
-    <string name="auto_stalled_desc">Pebble Desk is on in Accessibility but isn\'t running. Books you open won\'t be added, and reading time won\'t be tied to a book.\n\nTurn Pebble Desk off and on again in Accessibility.</string>
+    <string name="auto_stalled_desc">Pebble Desk is on in Accessibility but isn\'t running. Books you open won\'t be added, and reading time won\'t be tied to a book.</string>
+    <string name="auto_stalled_fix">Turn Pebble Desk off and on again in Accessibility.</string>
+    <string name="auto_stalled_boox">This happens when BOOX freezes and unfreezes Pebble Desk. Turn off freezing for Pebble Desk in BOOX Settings › Apps and Notifications › Freeze Settings, then turn Pebble Desk off and on again in Accessibility.</string>
     <string name="auto_off_desc">Books you open in e-book apps won\'t be added, and reading time won\'t know which book it was. Turn on Pebble Desk in Accessibility.</string>
     <string name="dont_show_again">Don\'t show again</string>
     <string name="density_changed_title">Screen looks enlarged</string>
@@ -310,6 +313,8 @@
     <string name="onboarding_open_accessibility">Accessibility  ›</string>
     <string name="onboarding_open_app_info">App info  ›</string>
     <string name="onboarding_open">Open  ›</string>
+    <string name="onboarding_open_freeze">Freeze settings  ›</string>
+    <string name="onboarding_books_boox">First turn off freezing for Pebble Desk in BOOX Settings › Apps and Notifications › Freeze Settings. Otherwise auto-add stops.</string>
     <string name="onboarding_books_r1">Tap Pebble Desk in Accessibility. If it turns on, you are done.</string>
     <string name="onboarding_books_r2">If a \'Restricted setting\' notice appears, tap OK. Android blocks apps installed from a file.</string>
     <string name="onboarding_books_r3">In App info, tap ⋮ at the top right › Allow restricted settings.</string>

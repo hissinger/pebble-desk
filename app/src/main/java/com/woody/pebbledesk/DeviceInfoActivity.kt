@@ -81,11 +81,16 @@ class DeviceInfoActivity : EinkActivity() {
         section(list, R.string.device_section_perms)
         val home = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
             ?.activityInfo?.packageName == packageName
-        list.addView(text(listOf(
-            getString(R.string.auto_books_short) to ReaderWatchService.isEnabled(this),
-            getString(R.string.reading_time) to ReadingLog.hasAccess(this),
-            getString(R.string.device_perm_home) to home,
-        ).joinToString("  ·  ") { (label, on) -> "$label ${onOff(on)}" }, 16f, lines = 2))
+        // BOOX 면 이 앱이 자동 얼리기 대상인지(켜짐이면 다른 앱으로 넘어간 30초 뒤 꺼져 자동 추가가 멈춘다). 물을 수 없으면 `?`.
+        val freeze = if (Device.hasBooxLauncher(this))
+            getString(R.string.device_perm_boox_freeze) to (Device.booxAutoFreeze(this)?.let { onOff(it) } ?: "?")
+        else null
+        list.addView(text(listOfNotNull(
+            getString(R.string.auto_books_short) to onOff(ReaderWatchService.isEnabled(this)),
+            getString(R.string.reading_time) to onOff(ReadingLog.hasAccess(this)),
+            getString(R.string.device_perm_home) to onOff(home),
+            freeze,
+        ).joinToString("  ·  ") { (label, value) -> "$label $value" }, 16f, lines = 2))
 
         // 자동 추가(접근성 서비스)가 저절로 꺼지는 기기에서 언제·왜 끊겼는지: 서비스 연결·끊김, 이 앱이 끝난 까닭(안드로이드 11+),
         // 백그라운드에서 앱을 끄는 설정들. 서비스가 받은 알림·한 일은 따로 된 화면(`기록 보기 ›`, 이 화면에 더 넣을 자리가 없다).

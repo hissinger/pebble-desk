@@ -74,6 +74,7 @@
     <string name="device_section_keys">마지막으로 누른 버튼</string>
     <string name="device_key_hint">페이지 버튼·화면 아래 버튼을 눌러 보세요</string>
     <string name="device_perm_home">기본 홈</string>
+    <string name="device_perm_boox_freeze">BOOX 얼리기(freeze)</string>
     <string name="device_section_recent">최근에 뜬 다른 화면 (새 것부터)</string>
     <string name="device_section_service">자동 추가 서비스 기록</string>
     <string name="device_service_life">연결 %1$s · 끊김 %2$s · 끊긴 횟수 %3$d</string>
@@ -236,7 +237,9 @@
     <string name="open_accessibility">접근성 설정 열기</string>
     <string name="auto_off_title">읽는 책 자동 추가가 꺼져 있습니다</string>
     <string name="auto_stalled_title">읽는 책 자동 추가가 멈춰 있습니다</string>
-    <string name="auto_stalled_desc">접근성에는 Pebble Desk 가 켜져 있지만 지금 동작하지 않습니다. 이대로 읽으면 편 책이 읽고 있는 책에 들어오지 않고, 읽은 시간도 어느 책인지 모른 채 남습니다.\n\n접근성에서 Pebble Desk 를 껐다가 다시 켜 주세요.</string>
+    <string name="auto_stalled_desc">접근성에는 Pebble Desk 가 켜져 있지만 지금 동작하지 않습니다. 이대로 읽으면 편 책이 읽고 있는 책에 들어오지 않고, 읽은 시간도 어느 책인지 모른 채 남습니다.</string>
+    <string name="auto_stalled_fix">접근성에서 Pebble Desk 를 껐다가 다시 켜 주세요.</string>
+    <string name="auto_stalled_boox">BOOX 가 Pebble Desk 를 얼렸다가 풀면 이렇게 멈춥니다. BOOX 설정 › 앱 및 알림 › 설정 잠금에서 Pebble Desk 의 얼리기(freeze)를 끄고, 접근성에서 Pebble Desk 를 껐다가 다시 켜 주세요.</string>
     <string name="auto_off_desc">이대로 읽으면 이북 앱에서 편 책이 읽고 있는 책에 들어오지 않고, 읽은 시간도 어느 책인지 모른 채 남습니다. 접근성에서 Pebble Desk 를 켜 주세요.</string>
     <string name="dont_show_again">다시 보지 않기</string>
     <string name="density_changed_title">화면이 크게 보입니다</string>
@@ -313,6 +316,8 @@
     <string name="onboarding_open_accessibility">접근성 열기  ›</string>
     <string name="onboarding_open_app_info">앱 정보 열기  ›</string>
     <string name="onboarding_open">열기  ›</string>
+    <string name="onboarding_open_freeze">얼리기 설정 열기  ›</string>
+    <string name="onboarding_books_boox">먼저 BOOX 설정 › 앱 및 알림 › 설정 잠금에서 Pebble Desk 의 얼리기(freeze)를 끕니다. 켜 두면 자동 추가가 멈춥니다.</string>
     <string name="onboarding_books_r1">접근성 화면에서 Pebble Desk 를 누릅니다. 바로 켜지면 끝입니다.</string>
     <string name="onboarding_books_r2">\'제한된 설정\' 창이 뜨면 확인을 눌러 닫습니다. 안드로이드가 파일로 깐 앱을 막은 것입니다.</string>
     <string name="onboarding_books_r3">앱 정보에서 오른쪽 위 ⋮ › 제한된 설정 허용을 누릅니다.</string>
@@ -322,6 +327,6 @@
     <string name="onboarding_time_s1">사용 기록 액세스 화면을 엽니다.</string>
     <string name="onboarding_time_s2">Pebble Desk 의 허용을 켜고 돌아옵니다.</string>
     <string name="year_books_count">%1$d권</string>
-    <string name="boox_frozen_help">BOOX 가 얼려 둔 앱이라 열지 못했어요. BOOX 얼리기 설정에서 이 앱을 빼 주세요.</string>
-    <string name="boox_freeze_settings">얼리기 설정 열기</string>
+    <string name="boox_frozen_help">BOOX 가 얼려 둔 앱이라 열지 못했어요. BOOX 얼리기(freeze) 설정에서 이 앱을 빼 주세요.</string>
+    <string name="boox_freeze_settings">얼리기(freeze) 설정 열기</string>
 </resources>
