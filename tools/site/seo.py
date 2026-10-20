@@ -32,7 +32,7 @@ PAGES = {
              "그다음 Pebble Desk 설정 › 앱 관리 › 기본 홈 앱에서 홈 앱으로 고릅니다. 새 버전은 설정 › 정보 › 업데이트에서 받습니다."),
             ("접근성 권한은 왜 필요한가요?",
              "이북 앱에서 편 책을 알아보려고 씁니다. 지원하는 이북 앱의 화면만 받고, 다른 앱의 화면은 보지 않습니다. "
-             "읽은 시간은 안드로이드의 '사용 기록 액세스'로 셉니다. 둘 다 켜지 않아도 런처로는 쓸 수 있습니다."),
+             "읽은 시간은 안드로이드의 '사용 기록 액세스'로 셉니다."),
             ("기록은 어디에 저장되나요?",
              "기기 안에만 저장되고 어디로도 보내지 않습니다. 인터넷은 표지 검색(YES24)과 새 버전 확인(GitHub)에만 씁니다. "
              "앱을 지우면 기록도 함께 지워집니다."),
@@ -56,7 +56,7 @@ PAGES = {
              "Then set Pebble Desk as your home app in its Settings › Apps › Default home app. Later versions install from Settings › About › Update."),
             ("Why does it need the accessibility permission?",
              "To recognize the book you open in a reading app. It only receives the screens of supported reading apps and doesn’t look at any other app. "
-             "Reading time comes from Android’s Usage access. You can use it as a launcher without turning either on."),
+             "Reading time comes from Android’s Usage access."),
             ("Where is my reading history stored?",
              "Only on your device; nothing is sent anywhere. The internet is used only to search covers (YES24) and to check for new versions (GitHub). "
              "Uninstalling the app deletes the history too."),
