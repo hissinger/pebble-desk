@@ -1,6 +1,8 @@
 # Pebble Desk
 
-크레마 페블 같은 6인치 전자잉크 기기를 위한 글자 중심 홈 앱(런처).
+**An E Ink launcher for Android e-readers.** Books you open in Kindle, Libby, KOReader and other reading apps appear on your home screen, and reading time is kept for every book. → [pebbledesk.github.io](https://pebbledesk.github.io/en/)
+
+크레마 페블 같은 6인치 전자잉크 기기를 위한 글자 중심 홈 앱(런처). 홈페이지: [pebbledesk.github.io](https://pebbledesk.github.io/)
 지금 읽는 책을 가장 크게 두고, 나머지는 자주 쓰는 앱과 모든 앱으로 나눈다.
 
 - 흑백·박스 없음·애니메이션 없음. 목록은 스크롤 대신 페이지로 넘긴다.
