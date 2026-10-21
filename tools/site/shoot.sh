@@ -17,3 +17,10 @@ sleep 2; cap home "$2" "$3"
 adb shell input touchscreen tap $reading </dev/null; sleep 4; cap reading "$2" "$3"
 adb shell input touchscreen tap $year </dev/null; sleep 4; cap year "$2" "$3"
 adb shell input keyevent BACK </dev/null; sleep 1; adb shell input keyevent BACK </dev/null
+# 페블만: 맨 앞 책을 길게 눌러 상세 → `완독` 을 눌러 별점·감상 메뉴(mock 의 별점·감상이 채워져 뜬다). 완독은 누르지 않고 닫는다
+if [ "$size" = 1072x1456 ]; then
+  sleep 2
+  adb shell input touchscreen swipe 215 400 215 400 900 </dev/null; sleep 3
+  adb shell input touchscreen tap 116 1045 </dev/null; sleep 3; cap review "$2" "$3"
+  adb shell input keyevent BACK </dev/null; sleep 1
+fi

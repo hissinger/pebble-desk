@@ -6,6 +6,7 @@
 하위 화면(독서 기록·올해 읽은 책)의 시스템 상단 바는 흰색으로 지운다(홈 앱으로 쓰면 홈처럼 숨는 자리라).
 폭은 2배 화면에 맞춰 줄이고 흑백 WebP 로.
 """
+import os
 import sys
 
 from PIL import Image
@@ -16,9 +17,11 @@ WIDTH = {"pebble": 760, "bar": 560}
 src, out = sys.argv[1], sys.argv[2]
 prefix = sys.argv[3] if len(sys.argv) > 3 else ""
 for dev in ("pebble", "bar"):
-    for screen in ("home", "reading", "year"):
+    for screen in ("home", "reading", "year", "review"):
+        if not os.path.exists(f"{src}/{dev}-{screen}.png"):  # 별점·감상(review)은 페블만
+            continue
         im = Image.open(f"{src}/{dev}-{screen}.png").convert("L")
-        if screen != "home":
+        if screen not in ("home", "review"):
             im.paste(255, (0, 0, im.width, STATUS_BAR))
         w = WIDTH[dev]
         im = im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)

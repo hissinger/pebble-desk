@@ -71,6 +71,8 @@ DONE_EN = [
     ("e-1984", "Nineteen Eighty-Four", "George Orwell", LIBBY, (9, 14), (9, 30), 9, "Read it in one long week."),
     ("e-demian", "Demian", "Hermann Hesse", KINDLE, (10, 1), (10, 3), 8, "The bird fights its way out of the egg."),
 ]
+REVIEW_KO = "두 번째로 읽으니 싱클레어가 훨씬 가깝게 느껴진다.\n밑줄을 긋다 그만두었다. 거의 다 그어서."
+REVIEW_EN = "Second time through, and the last pages hit harder.\nRead them slowly on the bus home."
 if EN:
     SHELF, DONE = SHELF_EN, DONE_EN
 
@@ -270,6 +272,8 @@ def main(out):
     read(TODAY - dt.timedelta(days=1), a3, t3, b3, 14)
 
     x("INSERT INTO book_open VALUES (?,?,?,?)", (ms(TODAY, 8), a0, t0, b0))
+    # 맨 앞 책에 지금 회차의 별점·감상(완독 메뉴를 열면 채워져 뜬다, 홈페이지 별점·감상 화면)
+    x("INSERT INTO review VALUES (?,?,?,?)", (b0, 9, REVIEW_EN if EN else REVIEW_KO, ms(TODAY)))
     x("INSERT INTO reading_meta VALUES ('through', ?)", ((TODAY - dt.timedelta(days=1)).isoformat(),))
     x("INSERT INTO reading_meta VALUES ('since', ?)", (dt.date(year - 1, 12, 1).isoformat(),))
     con.commit()
