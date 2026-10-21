@@ -244,9 +244,9 @@ class HomeActivity : EinkActivity() {
     private var fileDialog: Dialog? = null
 
     /**
-     * 책 파일 읽기 안내: 자동 추가 서비스가 책 파일 읽기가 꺼져 있어 책(KOReader)·표지(문리더·네오리더·이지뷰어)를 모른 앱이 있으면
+     * 책 파일 읽기 안내: 책 파일 읽기가 필요한 앱(KOReader·문리더·네오리더·이지뷰어)으로 꺼진 채 읽었으면
      * 홈으로 돌아올 때 그 앱마다 화면 가운데에 묻는다(`모든 파일에 액세스 열기` / `다시 보지 않기`). 그 앱을 쓸 때만 적히므로
-     * 깔아만 둔 앱은 묻지 않는다([HomePrefs.fileNoticeWanted]). 띄우면 그 앱은 지우고, 다시 막히면 또 묻는다(`다시 보지 않기` 를 누를 때까지).
+     * 깔아만 둔 앱은 묻지 않는다([HomePrefs.fileNoticeWanted]). 띄우면 그 앱은 지우고, 다음에 그 앱으로 읽고 돌아오면 또 묻는다(`다시 보지 않기` 를 누를 때까지).
      */
     private fun warnFileAccess() {
         if (fileDialog?.isShowing == true) return

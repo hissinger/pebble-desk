@@ -14,7 +14,7 @@ object ReaderApps {
 
     /**
      * 책 파일 읽기가 필요한 앱([ReaderSpec.needsBookFiles]). 이 가운데 깔린 앱이 있으면 시작하기에 책 파일 읽기 쪽을 더한다
-     * (홈의 안내 창은 자동 추가 서비스가 그 앱을 쓰다 막혔을 때 적는다, `ReaderWatchService.wantFiles`).
+     * (홈의 안내 창은 자동 추가 서비스가 꺼진 채 그 앱의 읽는 화면을 볼 때 적는다, `ReaderWatchService.wantFiles`).
      */
     val fileApps = ALL.filter { it.needsBookFiles }
 
