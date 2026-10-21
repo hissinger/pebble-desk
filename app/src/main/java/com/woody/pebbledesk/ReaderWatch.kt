@@ -76,7 +76,7 @@ class ReaderWatchService : AccessibilityService() {
     private val fileTitles = mutableMapOf<String, Pair<String, FileBook?>>()
     /**
      * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 서재가 멈췄을 때(모든 앱),
-     * 알라딘·리디처럼 서재를 잠깐만 보는 앱은 서재가 보이는 대로도 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
+     * 알라딘처럼 서재를 잠깐만 보는 앱은 서재가 보이는 대로도 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
      */
     private val pendingCovers = object : LinkedHashMap<String, ByteArray>() {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?) = size > PENDING_MAX
@@ -283,7 +283,7 @@ class ReaderWatchService : AccessibilityService() {
                         rememberRecent(spec, root)
                     }
                 }
-                // 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스·리디·YES24 전자도서관)은 멈추기를 기다리지 않고 표지가 보이는 대로 잘라 둔다.
+                // 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스·YES24 전자도서관)은 멈추기를 기다리지 않고 표지가 보이는 대로 잘라 둔다.
                 // 화면이 막 바뀐 때(읽는 화면에서 돌아오는 중이면 화면 캡처가 막힌 읽는 화면이 검게 찍힌다)와 아직 찍을 수 없을 때는 건너뛴다.
                 val ready = now - lastTransition >= TRANSITION_MS && now - lastShot >= SHOT_INTERVAL_MS
                 if (spec.eagerCovers && ready && (force || now - lastEagerRead >= THROTTLE_MS)) {
@@ -580,8 +580,7 @@ class ReaderWatchService : AccessibilityService() {
             val book = BookShelf.findByTitle(this, s.title)
             if (book == null) {
                 // 목록에 없는 책도 멈춘 지금 잘라 두어, 그 책을 펴면 처음부터 표지가 붙게 한다(밀리·교보도서관 등. 1.5.7 까지는
-                // 바로 자르기 앱만, 그 밖의 앱은 편 뒤 서재로 돌아와야 채웠다). 리디 서재는 다 그려진 뒤 알림이 없어
-                // 바로 자르기([readScreen])는 칸을 누른 순간에야 찍고, 그때는 화면이 넘어가는 중이라 버려진다.
+                // 바로 자르기 앱만, 그 밖의 앱은 편 뒤 서재로 돌아와야 채웠다). 리디는 바로 자르기를 하지 않아 이것으로만 자른다.
                 val thumb = s.thumb?.takeIf(::usableThumb)
                 if (thumb != null && wantsPendingCover(s.title)) targets += s.title to thumb
                 continue
@@ -613,7 +612,8 @@ class ReaderWatchService : AccessibilityService() {
                 result.hardwareBuffer.close()
                 shot ?: return
                 // 요소 이름 없이 자리로 칸을 찾는 서재(리디·휴대폰 밀리)는 화면이 움직이는 중이었을 수 있어, 찍은 뒤에도 같은 자리에 있는 칸만 자른다.
-                val still = if (!spec.cellsByPosition) wanted else {
+                // 표지 위에 받기 단추 등을 겹치는 서재(e-ink 밀리·리디 작품 화면)도 읽은 뒤 찍기 전에 겹쳤을 수 있어 다시 본다(겹친 칸은 표지 자리가 없다).
+                val still = if (!spec.cellsByPosition && spec.coverOverlays.isEmpty()) wanted else {
                     val now = root(spec)?.let { readShelf(spec, it) }.orEmpty().associate { it.title to it.thumb }
                     wanted.filter { (title, rect) -> now[title] == rect }
                 }

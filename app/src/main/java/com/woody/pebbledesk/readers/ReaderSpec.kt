@@ -20,6 +20,11 @@ open class ReaderSpec(
     val titles: List<String>,
     /** 서재 칸의 표지 그림(보기 방식·화면마다 이름이 다르면 여럿) */
     val thumbs: List<String>,
+    /**
+     * 서재 칸의 표지 위에 겹쳐 그리는 요소(받기 단추·받는 중 표시·서비스 종료 막 등). 이것이 보이는 칸은 표지를 자르지 않는다
+     * (자르면 그 표시가 표지에 박히고, 표지는 한 번 붙으면 다시 찍지 않는다).
+     */
+    val coverOverlays: List<String> = emptyList(),
     /** 서재 칸의 저자(앞에서부터 먼저 찾은 것) */
     val authors: List<String>,
     /** 서재 칸의 진행률. null 이면 서재의 진행률을 쓰지 않는다(누른 칸의 글자에 있어도). */
@@ -41,7 +46,7 @@ open class ReaderSpec(
     /** 서재 화면의 '최근 읽은 책' 제목(책 칸을 눌러도 알림이 오지 않는 앱. 읽는 화면에서 돌아오면 이것이 방금 편 책) */
     val recent: String? = null,
     /**
-     * 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스·리디): 멈추기를 기다리지 않고 표지를 잘라 둔다(멈췄을 때는 모든 앱이 자른다).
+     * 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스): 멈추기를 기다리지 않고 표지를 잘라 둔다(멈췄을 때는 모든 앱이 자른다).
      * 밀리는 앱을 다시 열 때 잠깐 칸을 다른 책으로 채우므로 쓰지 않는다.
      */
     val eagerCovers: Boolean = false,
@@ -215,18 +220,20 @@ open class ReaderSpec(
     protected open fun readCell(cell: AccessibilityNodeInfo): Cell? {
         val texts = mutableMapOf<String, String>()
         var thumb: Rect? = null
+        var covered = false
         fun walk(n: AccessibilityNodeInfo, depth: Int) {
             val id = n.viewIdResourceName?.substringAfter(":id/")
             val t = n.text?.let(::plain)
             if (id != null && !t.isNullOrEmpty()) texts.putIfAbsent(id, t)
             if (id in thumbs && thumb == null) thumb = n.bounds()
+            if (id in coverOverlays && n.isVisibleToUser) covered = true
             if (depth < WALK_DEPTH) for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1) }
         }
         walk(cell, 0)
         fun text(id: String?) = id?.let { texts[it] }.orEmpty()
         val title = titles.map(::text).firstOrNull { it.isNotEmpty() } ?: return null
         val author = authors.map(::text).firstOrNull { it.isNotEmpty() }.orEmpty()
-        return Cell(title, authorName(author), percent(text(progress)), dueDate(text(due)), thumb, cell.bounds())
+        return Cell(title, authorName(author), percent(text(progress)), dueDate(text(due)), thumb.takeUnless { covered }, cell.bounds())
     }
 
     /**

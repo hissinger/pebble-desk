@@ -5,8 +5,10 @@ import android.view.accessibility.AccessibilityNodeInfo
 
 /**
  * 리디: 책은 교보eBook처럼 읽는 화면 메뉴의 제목(26.10 부터 `reader_title_bar`, 그 전은 `title`)으로 안다. 서재(React Native, 내 서재 탭과 작품 화면)는 요소 이름이 없어
- * 칸 설명·글자로 표지만 잘라 둔다(칸을 눌러도 알림이 없다). 진행률은 뷰어 설정의 '하단 좌/우 정보 표시'를 켜면 아래 좌·우
- * (`15 / 640`, `2%`), 꺼 두면 메뉴의 쪽(`14 / 626`).
+ * 칸 설명·글자로 표지만 잘라 둔다(칸을 눌러도 알림이 없다). 받지 않은 권(작품 화면 격자 보기에서 어둡게 덮이고 받기 단추가 붙는다)은
+ * 자르지 않는다. 표지는 서재가 멈췄을 때만 자른다: 바로 자르기([eagerCovers])는 누른 순간에 찍게 되는데, 받지 않은 책의 `이어보기`·책 메뉴는
+ * 서재 위에 어두운 막을 깔고 그 막이 화면 트리에 늦게 들어와 어두운 표지가 잘렸다(2026-10-21).
+ * 진행률은 뷰어 설정의 '하단 좌/우 정보 표시'를 켜면 아래 좌·우(`15 / 640`, `2%`), 꺼 두면 메뉴의 쪽(`14 / 626`).
  * 원스토어판(`com.ridi.books.onestore`, '리디 완전판')은 패키지만 다르고 코드는 같다고 본다 **(미확인)**.
  */
 open class RidiSpec(pkg: String) : ReaderSpec(
@@ -17,9 +19,8 @@ open class RidiSpec(pkg: String) : ReaderSpec(
         "com.ridi.books.viewer.reader.pagebased.pdf.PDFReaderActivity",
         "com.ridi.books.viewer.reader.pagebased.comic.ComicBookReaderActivity",
     ),
-    titles = emptyList(), thumbs = emptyList(), authors = emptyList(), progress = null, due = null,
+    titles = emptyList(), thumbs = emptyList(), coverOverlays = listOf(DOWNLOAD), authors = emptyList(), progress = null, due = null,
     viewerProgress = listOf("reader_right_info", "reader_left_info", "reader_toolbar_page_text"), viewerTitle = "reader_title_bar",
-    eagerCovers = true,
 ) {
     override val cellsByPosition get() = true
 
@@ -61,12 +62,15 @@ open class RidiSpec(pkg: String) : ReaderSpec(
     /**
      * [cell] 안의 글자 가운데 설명 [desc] 가 그것으로 시작하는 것(제목)과 표지 모양 그림. 둘 다 있어야 책 칸.
      * 목록 보기 칸은 설명 뒤에 진행률이 있다(`정의란 무엇인가, 26.7MB, 소장, 48%`).
+     * 표지 위 요소([coverOverlays], 받기 단추)가 있는 칸(받지 않은 권)은 책 칸으로 보지 않는다: 작품 화면 격자 보기는 그 표지를 어둡게 덮고 단추를 얹어 그린다.
      */
     private fun cell(cell: AccessibilityNodeInfo, desc: String): Cell? {
         var title: String? = null
         var thumb: Rect? = null
+        var covered = false
         fun walk(n: AccessibilityNodeInfo, depth: Int) {
             if (n.isWebView()) return
+            if (n.viewIdResourceName in coverOverlays && n.isVisibleToUser) covered = true
             val t = n.text?.toString()?.trim()
             if (!t.isNullOrEmpty() && desc.startsWith(t) && t.length > (title?.length ?: 0)) title = t
             if (n.className?.endsWith("ImageView") == true && thumb == null) {
@@ -76,6 +80,7 @@ open class RidiSpec(pkg: String) : ReaderSpec(
             if (depth < WALK_DEPTH) for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1) }
         }
         walk(cell, 0)
+        if (covered) return null
         val t = title ?: return null
         return Cell(t, "", percent(desc.removePrefix(t)), -1, thumb ?: return null, cell.bounds())
     }
@@ -83,6 +88,9 @@ open class RidiSpec(pkg: String) : ReaderSpec(
 
 /** 서재 표시 요소(내 서재 머리). 이름에 `패키지:id/` 가 없어 이름으로 찾기가 안 되어 훑으면서 본다. */
 private const val SHELF_MARKER = "libraryGnbMenus"
+
+/** 받지 않은 권 칸의 받기 단추(작품 화면. 이름에 `패키지:id/` 가 없다) */
+private const val DOWNLOAD = "download"
 
 /** 표지로 쓸 그림의 최소 폭(목록 보기 표지 86px 는 받고 아래 '최근 본' 줄의 66px 는 뺀다) */
 private const val MIN_COVER_PX = 80
