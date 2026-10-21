@@ -20,6 +20,7 @@ open class MoonReaderSpec(pkg: String) : ReaderSpec(
     titles = listOf("myBookName"), thumbs = listOf("myBookImage"), authors = listOf("myBookAuthor", "myAuthor"), progress = "progresTv", due = null,
     viewerProgress = listOf("statusRight", "txtTextViewPercent"), viewerTitle = "txtTitle",
     eagerCovers = true, searchesBookFile = true,
+    needsBookFiles = true,
 ) {
     /**
      * 진행률이 없는 칸은 책이 아니다(책장의 묶음 칸은 진행률 줄을 감춘다). 보이지 않는 칸도 아니다: 한 번 연 '최근 목록' 화면이 책장 보기 뒤에

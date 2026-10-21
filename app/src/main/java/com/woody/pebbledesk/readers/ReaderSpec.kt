@@ -87,6 +87,11 @@ open class ReaderSpec(
      * 그 책의 파일로 적는다(표지는 그릴 때 그 파일에서 꺼낸다). 책 파일 읽기를 허용했을 때만([BookFiles.canRead]).
      */
     val searchesBookFile: Boolean = false,
+    /**
+     * 책 파일 읽기가 필요하다([BookFiles.canRead]): 꺼져 있으면 책(KOReader)·표지(문리더·네오리더)·표지와 책 정보(이지뷰어·채리뷰어)를 모른다.
+     * 깔려 있으면 시작하기에 책 파일 읽기 쪽을 더하고([ReaderApps.fileApps]), 그 앱을 쓰다 막히면 홈에서 묻는다. 앱을 더할 때 여기서 정한다.
+     */
+    val needsBookFiles: Boolean = false,
 ) {
     /** 서재에 보이는 책 칸들. 기본: 제목 요소마다 그것이 든 칸을 찾아 읽는다. */
     open fun shelfCells(root: AccessibilityNodeInfo): List<Cell> =

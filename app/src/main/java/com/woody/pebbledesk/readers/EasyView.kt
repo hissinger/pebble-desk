@@ -39,6 +39,7 @@ open class EasyViewSpec(pkg: String) : ReaderSpec(
     viewerProgress = listOf("txtPageInfo_TitleBar"),
     openOnViewer = true,
     opensBookFile = true,
+    needsBookFiles = true,
 ) {
     /**
      * 파일 이름 칸 → 책 파일만, 제목·저자는 EPUB 책 정보가 있으면 그것. 표지 칸은 아래에 겹친 파일 종류 띠(`EPUB`)를 빼고,
