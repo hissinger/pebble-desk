@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="language_system">System (%s)</string>
     <string name="favorites">Favorites</string>
     <string name="all_apps">All apps</string>
     <string name="all_apps_link">All apps  ›</string>

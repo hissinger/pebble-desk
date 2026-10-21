@@ -36,7 +36,7 @@ class UpdateSheets(private val activity: Activity) {
 
     /** 설정 › 업데이트: 새 판의 바뀐 점(릴리스 설명, 화면에서 [NOTES_LINES] 줄까지)과 `설치` */
     fun offer(release: Update.Release) {
-        Sheet(activity).header("Pebble Desk ${release.version}", releaseNotes(release.notes), lines = NOTES_LINES)
+        Sheet(activity).header("Pebble Desk ${release.version}", releaseNotes(activity, release.notes), lines = NOTES_LINES)
             .item(activity.getString(R.string.update_install), bold = true) { install(release) }
             .show()
     }
@@ -49,7 +49,7 @@ class UpdateSheets(private val activity: Activity) {
      */
     fun notice(release: Update.Release, maxHeight: Int, onSkip: () -> Unit, onClosed: (askedAllow: Boolean) -> Unit): Dialog {
         val versions = activity.getString(R.string.update_new_versions, release.version, activity.appVersion())
-        val notes = releaseNotes(release.notes)
+        val notes = releaseNotes(activity, release.notes)
         val desc = SpannableStringBuilder(versions)
         if (notes != null) desc.append("\n").append(" \n", RelativeSizeSpan(0.5f), 0).append(notes)
         // 닫힘 알림은 항목 동작 뒤에 온다(Dialog 가 따로 보낸다)
@@ -125,6 +125,22 @@ class UpdateSheets(private val activity: Activity) {
         /** 바뀐 점 창에 보이는 릴리스 설명 줄 수(크레마 페블에서 한 줄 한국어 약 28자). 릴리스 설명은 이 안에 맞춰 쓴다. */
         const val NOTES_LINES = 18
         private const val NOTES_SCAN_CHARS = 2_000
+
+        /**
+         * 릴리스 설명에서 앱 언어의 부분만: 한국어 아래 `## English` 제목 줄이 있으면 영어는 그 아래, 한국어는 그 위만(CLAUDE.md 릴리스 절).
+         * 그 줄이 없으면(1.5.8 까지의 한국어만 쓴 설명) 언어와 상관없이 전체.
+         */
+        internal fun notesFor(markdown: String, english: Boolean): String {
+            val lines = markdown.lines()
+            val split = lines.indexOfFirst { ENGLISH_HEADING.matches(it.trim()) }
+            if (split < 0) return markdown
+            return (if (english) lines.drop(split + 1) else lines.take(split)).joinToString("\n").trim()
+        }
+
+        private val ENGLISH_HEADING = Regex("#{1,6}\\s*English", RegexOption.IGNORE_CASE)
+
+        private fun releaseNotes(context: Context, markdown: String): CharSequence? =
+            releaseNotes(notesFor(markdown, context.resources.configuration.locales[0].language == java.util.Locale.ENGLISH.language))
 
         /**
          * 릴리스 설명(마크다운)을 창에 넣을 글로: 절 제목(`## 새로 생긴 것`)은 굵은 검정, 항목(`- `)은 `· ` 로 시작하는 회색,

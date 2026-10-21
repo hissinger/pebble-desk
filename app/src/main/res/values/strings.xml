@@ -3,6 +3,8 @@
     <string name="app_name">Pebble Desk</string>
     <!-- 설정의 언어 항목: 어느 언어에서도 찾을 수 있게 두 언어로 쓴다 -->
     <string name="language" translatable="false">언어 · Language</string>
+    <!-- 언어 설정의 기기 언어 따르기. %s 는 지금 보이는 언어(한국어 / English) -->
+    <string name="language_system">시스템(%s)</string>
     <string name="favorites">자주 쓰는 앱</string>
     <string name="all_apps">모든 앱</string>
     <string name="all_apps_link">모든 앱  ›</string>

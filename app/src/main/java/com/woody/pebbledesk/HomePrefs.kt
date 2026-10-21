@@ -81,10 +81,10 @@ class HomePrefs(context: Context) {
         get() = percent(sp, KEY_ROW_SCALE, ROW_SCALES)
         set(v) = sp.edit().putInt(KEY_ROW_SCALE, v).apply()
 
-    /** 앱 전체(시계·날짜 포함)를 영어로. false 면 한국어 */
-    var english: Boolean
-        get() = sp.getBoolean(KEY_ENGLISH, false)
-        set(v) = sp.edit().putBoolean(KEY_ENGLISH, v).apply()
+    /** 앱 언어(시계·날짜 포함): 기기 언어를 따르기([AppLanguage.SYSTEM]) · 한국어 · 영어. 처음 값은 [language] */
+    var language: AppLanguage
+        get() = language(sp)
+        set(v) = sp.edit().putString(KEY_LANGUAGE, v.key).apply()
 
     /** '화면이 크게 보입니다' 창에서 `다시 보지 않기` 를 누른 때의 밀도(`지금/맞출 값`, 예: `350/300`). 값이 바뀌면 다시 알린다. */
     var densityWarnSkip: String?
@@ -200,7 +200,9 @@ class HomePrefs(context: Context) {
 
     companion object {
         const val FILE = "home"
+        /** 1.5.8 까지의 언어(영어면 true). 처음 [language] 를 정할 때만 읽고 지운다 */
         private const val KEY_ENGLISH = "english"
+        private const val KEY_LANGUAGE = "language"
         private const val KEY_FAV_NAMES = "favorite_names"
         private const val KEY_TEXT_SCALE = "text_scale"
         private const val KEY_ROW_SCALE = "row_scale"
@@ -222,8 +224,41 @@ class HomePrefs(context: Context) {
         /** 화면을 만들기 전에(attachBaseContext) 색을 정하려고 쓴다. */
         fun palette(context: Context) = Palette.of(prefs(context).getString(KEY_PALETTE, null))
 
-        /** 화면을 만들기 전에(attachBaseContext) 언어를 정하려고 쓴다. */
-        fun isEnglish(context: Context) =
-            Storage.of(context).getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY_ENGLISH, false)
+        /** 화면을 만들기 전에(attachBaseContext) 언어를 정하려고 쓴다. 기기 언어를 따르면 지금 기기 언어로 가른다. */
+        fun isEnglish(context: Context) = language(prefs(context)).isEnglish(systemLanguage())
+
+        /** 기기(시스템) 언어. 앱이 화면마다 덮어쓴 언어가 아니라 기기 설정의 것 */
+        fun systemLanguage(): String = android.content.res.Resources.getSystem().configuration.locales[0].language
+
+        /**
+         * 앱 언어. 처음 읽을 때 한 번 정해 저장한다: 1.5.8 까지 영어로 바꿔 둔 사람은 영어, 그 밖에 이미 쓰던 사람(설정 파일에 무엇이든 있다)은
+         * 보던 그대로 한국어, 새로 깐 사람은 기기 언어를 따른다(업데이트한 뒤 기기 언어가 영어인 한국 사용자의 화면이 갑자기 바뀌지 않게).
+         */
+        internal fun language(sp: android.content.SharedPreferences): AppLanguage {
+            AppLanguage.of(sp.getString(KEY_LANGUAGE, null))?.let { return it }
+            val first = when {
+                sp.getBoolean(KEY_ENGLISH, false) -> AppLanguage.ENGLISH
+                sp.all.isNotEmpty() -> AppLanguage.KOREAN
+                else -> AppLanguage.SYSTEM
+            }
+            sp.edit().putString(KEY_LANGUAGE, first.key).remove(KEY_ENGLISH).apply()
+            return first
+        }
+    }
+}
+
+/** 앱 언어 설정. 앱 글은 한국어·영어 두 가지라, 기기 언어를 따르면 한국어 기기만 한국어이고 그 밖의 언어는 모두 영어다. */
+enum class AppLanguage(val key: String) {
+    SYSTEM("system"), KOREAN("ko"), ENGLISH("en");
+
+    /** 기기 언어가 [systemLanguage](예: `ko`, `en`, `ja`)일 때 영어로 보이는가 */
+    fun isEnglish(systemLanguage: String) = when (this) {
+        SYSTEM -> systemLanguage != "ko"
+        KOREAN -> false
+        ENGLISH -> true
+    }
+
+    companion object {
+        fun of(key: String?) = entries.firstOrNull { it.key == key }
     }
 }
