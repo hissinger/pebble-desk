@@ -284,6 +284,8 @@
     <string name="book_files">Read book files</string>
     <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For NeoReader and Moon+ Reader, covers are taken from the EPUB file of the book you open. Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
     <string name="open_file_access">Open All files access</string>
+    <string name="file_notice_title">Turn on Read\u00A0book\u00A0files to get %s book info</string>
+    <string name="file_notice_desc">Info such as book covers and titles is read from the files.</string>
     <string name="app_neoreader">NeoReader (BOOX)</string>
     <string name="guide_progress_note">For progress while reading, turn on the bottom info (page or progress) in the e-book app\'s viewer settings.</string>
     <string name="guide_cover_note">Covers are cut from the shelf screen. If a title or author is cut off, wrong or missing, long-press the book on the home screen to fix it.</string>
@@ -324,6 +326,13 @@
     <string name="onboarding_books_s2">Tap Pebble Desk, turn on Use and come back.</string>
     <string name="onboarding_time_s1">Open Usage access.</string>
     <string name="onboarding_time_s2">Allow Pebble Desk and come back.</string>
+    <string name="onboarding_intro3">Just open a book and your home fills itself. Turn on these three.</string>
+    <string name="onboarding_files_desc">Needed to get info on %s books.</string>
+    <string name="onboarding_files_note">Only titles, authors, covers and progress are read from the files, and nothing leaves the device.</string>
+    <string name="onboarding_files_s1">Open All files access.</string>
+    <string name="onboarding_files_s2">Allow Pebble Desk to manage all files and come back.</string>
+    <string name="onboarding_files_old_s1">Open the storage permission prompt.</string>
+    <string name="onboarding_files_old_s2">Tap Allow and come back.</string>
     <string name="year_books_count">%1$d</string>
     <string name="boox_frozen_help">BOOX froze this app, so it couldn\'t open. Remove it from BOOX app freeze settings.</string>
     <string name="boox_freeze_settings">Open freeze settings</string>

@@ -288,6 +288,9 @@
     <string name="book_files">책 파일 읽기</string>
     <string name="book_files_desc">KOReader 는 화면에 책 제목을 드러내지 않아, KOReader 가 남기는 기록(koreader 폴더, 책 옆 .sdr 폴더)으로 편 책과 진행률을 압니다. 네오리더·문리더는 연 책의 EPUB 파일에서 표지를 꺼냅니다. 책 파일에서는 제목·저자·표지만 꺼냅니다.\n\n안드로이드 설정의 모든 파일에 액세스에서 Pebble Desk 의 모든 파일 관리 허용을 켜 주세요. 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
     <string name="open_file_access">모든 파일에 액세스 열기</string>
+    <!-- 홈의 책 파일 읽기 안내 창(%s = 이북 앱 이름). '책 파일 읽기'는 줄에서 나뉘지 않게 붙인다 -->
+    <string name="file_notice_title">%s 책 정보를 가져오려면 책\u00A0파일\u00A0읽기를 켜 주세요</string>
+    <string name="file_notice_desc">책 표지, 책 이름 등의 정보를 파일에서 읽어 옵니다.</string>
     <string name="app_neoreader">네오리더(BOOX)</string>
     <string name="guide_progress_note">읽는 중 진행률은 이북 앱 뷰어 설정에서 화면 아래 정보(쪽·진행률) 표시를 켜 두면 들어옵니다.</string>
     <string name="guide_cover_note">표지는 서재 화면의 표지를 잘라 옵니다. 제목이 잘리거나 다르면 홈에서 책을 길게 눌러 고치세요. 저자도 같은 메뉴에서 넣거나 고칠 수 있습니다.</string>
@@ -328,6 +331,13 @@
     <string name="onboarding_books_s2">Pebble Desk 를 눌러 사용을 켜고 돌아옵니다.</string>
     <string name="onboarding_time_s1">사용 기록 액세스 화면을 엽니다.</string>
     <string name="onboarding_time_s2">Pebble Desk 의 허용을 켜고 돌아옵니다.</string>
+    <string name="onboarding_intro3">책을 펴기만 하면 홈이 알아서 채워집니다. 세 가지만 켜 주세요.</string>
+    <string name="onboarding_files_desc">%s 책 정보를 가져오는 데 필요합니다.</string>
+    <string name="onboarding_files_note">책 파일에서는 제목·저자·표지·진행률만 꺼내고, 기기 밖으로 보내지 않습니다.</string>
+    <string name="onboarding_files_s1">모든 파일에 액세스 화면을 엽니다.</string>
+    <string name="onboarding_files_s2">Pebble Desk 의 모든 파일 관리 허용을 켜고 돌아옵니다.</string>
+    <string name="onboarding_files_old_s1">저장소 권한 창을 엽니다.</string>
+    <string name="onboarding_files_old_s2">허용을 누르고 돌아옵니다.</string>
     <string name="year_books_count">%1$d권</string>
     <string name="boox_frozen_help">BOOX 가 얼려 둔 앱이라 열지 못했어요. BOOX 얼리기(freeze) 설정에서 이 앱을 빼 주세요.</string>
     <string name="boox_freeze_settings">얼리기(freeze) 설정 열기</string>
