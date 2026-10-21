@@ -115,7 +115,7 @@ DEVICES = [
 ]
 
 TERMS = {
-    "ko": ["이북리더기 런처", "이북리더 런처", "전자잉크 런처", "eink 런처", "e잉크 런처", "이잉크 런처", "이북리더 홈 앱", "크레마 런처", "독서 기록", "읽은 시간", "전자책 리더기"],
+    "ko": ["이북리더기 런처", "이북리더 런처", "토탈런처", "전자잉크 런처", "eink 런처", "e잉크 런처", "이잉크 런처", "이북리더 홈 앱", "크레마 런처", "독서 기록", "읽은 시간", "전자책 리더기"],
     "en": ["E Ink launcher", "e-reader launcher", "e-ink home screen", "Android e-reader", "reading tracker", "reading log"],
 }
 
@@ -124,6 +124,12 @@ APPS = ["킨들", "킨들 앱", "Kindle", "Kindle app", "Libby", "리비", "KORe
         "교보eBook", "Kyobo eBook", "밀리의서재", "millie", "알라딘 전자책", "Aladin eBook", "북커스", "Bookers", "리디", "RIDI",
         "YES24 전자도서관", "YES24 Library", "my YES", "YES24 eBook", "네오리더", "NeoReader"]
 
+# 다른 런처 이름(검색용, '대안·비교'로만 쓴다. 관계가 있는 것처럼 쓰지 않는다): (한글, 영어)
+LAUNCHERS = [("토탈 런처", "Total Launcher"), ("노바 런처", "Nova Launcher"), ("나이아가라 런처", "Niagara Launcher"), ("오런처", "Olauncher"), ("키스 런처", "KISS Launcher"),
+             ("론체어", "Lawnchair"), ("스마트 런처", "Smart Launcher"), ("마이크로소프트 런처", "Microsoft Launcher"), ("액션 런처", "Action Launcher"),
+             ("미니멀리스트 폰", "Minimalist Phone"), ("비포 런처", "Before Launcher"), ("미니멀 런처", "Minimal Launcher"),
+             ("이잉크 런처", "E-Ink Launcher"), ("BOOX 런처", "BOOX Launcher"), ("크레마 기본 런처", "Crema Launcher")]
+
 # 우리말로 흔히 부르는 다른 이름(BOOX = 부크·오닉스 등)
 ALIAS = ["부크 팔마", "오닉스 팔마", "부크 리프", "오닉스 리프", "부크 포크", "오닉스 포크", "오닉스 부크", "Onyx BOOX", "아이리더 Tango",
          "빅미 하이브레이크", "하이센스 A9", "비우즈 AiPaper", "모안 MIX7S", "미니멀 폰", "크레마", "Crema", "메이북", "Meebook", "아이리더", "iReader"]
@@ -131,7 +137,8 @@ ALIAS = ["부크 팔마", "오닉스 팔마", "부크 리프", "오닉스 리프
 
 def keywords(lang):
     """이 언어의 말 + 기기 이름 한글·영어 모두(겹치는 건 한 번)"""
-    words = TERMS[lang] + [k for k, _, _ in DEVICES] + [e for _, e, _ in DEVICES] + ALIAS + APPS
+    words = TERMS[lang] + [k for k, _, _ in DEVICES] + [e for _, e, _ in DEVICES] + ALIAS + APPS + \
+        [k for k, _ in LAUNCHERS] + [e for _, e in LAUNCHERS] + [f"{e} alternative" for _, e in LAUNCHERS[:6]] + [f"{k} 대안" for k, _ in LAUNCHERS[:4]]
     return ", ".join(dict.fromkeys(words))
 
 
@@ -250,6 +257,12 @@ It runs on Android 9 or later and is free with no ads (PolyForm Noncommercial 1.
 {chr(10).join("- " + f for f in en["features"])}
 - Supported reading apps (auto-add): Kindle, Libby, KOReader, Moon+ Reader, Kyobo Library, Kyobo eBook, millie (밀리의서재), Aladin, Bookers, RIDI, YES24 Library, my YES, YES24 eBook, NeoReader (BOOX)
 
+## Compared with other launchers
+
+General Android launchers such as {", ".join(e for _, e in LAUNCHERS[:11])} are designed for phones: icons, widgets, scrolling and animation.
+Pebble Desk is an alternative made for E Ink e-readers: the book you are reading sits on the home screen, lists turn page by page, nothing animates, and reading time is kept per book.
+It is an independent app and is not affiliated with any of these launchers, BOOX or Crema.
+
 ## E-readers
 
 {", ".join(f"{e} ({k})" for k, e, _ in DEVICES)}
@@ -262,6 +275,7 @@ It runs on Android 9 or later and is free with no ads (PolyForm Noncommercial 1.
 
 {ko["desc"]}
 
+- 다른 런처와 비교: {", ".join(k for k, _ in LAUNCHERS[:11])} 같은 일반 안드로이드 런처는 휴대폰용(아이콘·위젯·스크롤·애니메이션)이다. Pebble Desk 는 이북리더기용 대안으로, 읽는 책이 홈에 있고 목록은 쪽으로 넘기며 움직임이 없고 읽은 시간이 책마다 남는다. 이 런처들, BOOX, 크레마와는 관계없는 독립 앱이다.
 - 이북리더기: {", ".join(k for k, _, _ in DEVICES)}
 
 {chr(10).join(f"- **{q}** {a}" for q, a in ko["faq"])}
