@@ -208,7 +208,12 @@ object AppStore {
         if (viewer == null) {
             // 지워진 파일이면(읽을 수 있을 때만 안다) 앱을 연다
             if (spec?.opensBookFile == true) BookShelf.filePath(context, book.id)?.takeIf { !BookFiles.canRead(context) || File(it).isFile }
-                ?.let { if (openFile(context, app.component, it)) return true }
+                ?.let {
+                    if (!openFile(context, app.component, it)) return@let
+                    // 읽는 화면에 파일 이름만 보이는 앱(이지뷰어)은 그 파일이 열리면 이 책으로(KOReader 는 그 앱의 기록으로 안다)
+                    if (!spec.fileState) ReaderWatchService.bookFileOpened(app.pkg, book, it)
+                    return true
+                }
             launch(context, app)
             return true
         }

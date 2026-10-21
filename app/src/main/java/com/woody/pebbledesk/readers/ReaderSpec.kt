@@ -1,6 +1,7 @@
 package com.woody.pebbledesk.readers
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -74,7 +75,7 @@ open class ReaderSpec(
      * 한꺼번에 맞춘다([com.woody.pebbledesk.ReaderWatchService.syncFileApps]). 읽은 시간은 책이 열려 있던 동안만 센다([ReaderApps.hostsViewer]).
      */
     val fileState: Boolean = false,
-    /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([fileBooks] 로 안 경로)을 바로 여는 앱(KOReader). 파일을 모르면 앱을 연다. */
+    /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([fileBooks]·[bookFile] 로 안 경로)을 바로 여는 앱(KOReader·이지뷰어). 파일을 모르면 앱을 연다. */
     val opensBookFile: Boolean = false,
 ) {
     /** 서재에 보이는 책 칸들. 기본: 제목 요소마다 그것이 든 칸을 찾아 읽는다. */
@@ -130,6 +131,24 @@ open class ReaderSpec(
      * 기록이 없으면 빈 목록, 데이터를 읽을 수 없으면 null. 기본: null
      */
     open fun fileBooks(context: Context, since: Long): List<FileBook>? = null
+
+    /**
+     * 서재 칸의 파일([Cell.file], 화면에 보이는 위치 + 파일 이름) → 실제 경로(그 책의 파일로 적어 두어 읽는 화면의 파일 이름으로 찾고,
+     * EPUB 표지를 꺼내고, 홈에서 바로 연다). 모르면 null. 기본: null
+     */
+    open fun bookFile(context: Context, shown: String): String? = null
+
+    /**
+     * 서재 칸에서 자른 그림 [crop] 이 이북 앱이 표지 대신 그리는 기본 그림(파일 종류 아이콘 등)인가. 그러면 표지로 두지 않는다
+     * (표지는 한 번 붙으면 다시 찍지 않으므로, 진짜 표지가 보일 때 자르게). 화면 스레드가 아닌 곳에서 부른다. 기본: 아니다
+     */
+    open fun placeholderCover(context: Context, crop: Bitmap): Boolean = false
+
+    /** 책을 열기 전에 확인 창으로 그 파일을 보이는 앱(이지뷰어 ▶·다음 파일). 그 창이 뜰 때·누를 때 [openingFile] 을 읽는다 */
+    open val confirmsOpen: Boolean get() = false
+
+    /** 확인 창에 보이는 열 파일([Cell.file] 과 같은 꼴: 위치 + 파일 이름). 없으면 null */
+    open fun openingFile(windows: AppWindows): String? = null
 
     /** 읽는 화면 제목을 찾을 요소 이름들(앞에서부터, 글자가 있는 것). 기본: [viewerTitle] 하나 */
     protected open val viewerTitleIds: List<String> get() = listOfNotNull(viewerTitle)

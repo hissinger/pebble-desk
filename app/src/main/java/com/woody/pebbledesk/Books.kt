@@ -15,6 +15,8 @@ import android.util.LruCache
 import com.woody.pebbledesk.Db.rows
 import com.woody.pebbledesk.Db.tx
 import com.woody.pebbledesk.readers.BookFiles
+import com.woody.pebbledesk.readers.isImageFile
+import com.woody.pebbledesk.readers.withoutBookFile
 import org.json.JSONObject
 import java.io.File
 import java.time.Instant
@@ -628,13 +630,16 @@ object BookShelf {
 
     /**
      * 이북 앱에서 편 책을 맨 앞에 표지 그림 없이 넣는다(읽고 있는 책 자동 추가, 빈 표지로 보인다).
-     * 전에 뺀 책(나간 책, 지운 책은 빼고)이면 새로 만들지 않고 그 책을 같은 id 로 되살린다(별점·감상·표지·고친 제목이 이어지게).
+     * 전에 뺀 책(나간 책 가운데 [revive] 인 것, 기본은 같은 제목. 지운 책은 빼고)이면 새로 만들지 않고 그 책을 같은 id 로 되살린다(별점·감상·표지·고친 제목이 이어지게).
      * 완독한 책이면 `다시 읽기`처럼 새 회차가 그날 시작한다([roundStarts]. 이미 진행 중이던 회차면 그대로 이어진다).
      * 목록에 넣기와 나간 책에서 빼기는 한 트랜잭션으로. 권수 제한은 없다(빼는 것은 사용자가 목록에서).
      */
-    @Synchronized fun addOpened(context: Context, title: String, author: String, app: String?, progress: Int, due: Long, at: Long = System.currentTimeMillis()): ShelfBook {
+    @Synchronized fun addOpened(
+        context: Context, title: String, author: String, app: String?, progress: Int, due: Long, at: Long = System.currentTimeMillis(),
+        revive: (ShelfBook) -> Boolean = { it.hasTitle(title) },
+    ): ShelfBook {
         val now = System.currentTimeMillis()
-        val past = findLivePast(context, title)?.book
+        val past = history(context).lastOrNull { !it.hidden && revive(it.book) }?.book
         // 화면에서 모르는 진행률(-1)은 예전 값 그대로([updateStatus] 와 같게). 반납일은 나간 책에 남기지 않으니(writeHistory) 본 것으로
         val added = past?.copy(
             author = past.author.ifEmpty { author }, app = app ?: past.app, updatedAt = now,
@@ -803,11 +808,45 @@ object BookShelf {
         Db.get(context).rows("SELECT path FROM book_file WHERE book_id = ?", arrayOf(id)) { it.getString(0) }.firstOrNull()
 
     /** [path] 파일로 넣은 책(읽고 있는 책, 없으면 나간 책)의 제목. 없으면 null */
-    fun titleByFile(context: Context, path: String): String? {
-        val ids = Db.get(context).rows("SELECT book_id FROM book_file WHERE path = ?", arrayOf(path)) { it.getString(0) }.toSet()
-        if (ids.isEmpty()) return null
-        return list(context).firstOrNull { it.id in ids }?.title ?: history(context).lastOrNull { it.book.id in ids }?.book?.title
+    fun titleByFile(context: Context, path: String): String? = bookOf(context, idsByFile(context, path))?.title
+
+    /** [path] 파일로 넣은 책(읽고 있는 책, 없으면 나간 책)의 id. 없으면 null */
+    fun idByFile(context: Context, path: String): String? = bookOf(context, idsByFile(context, path))?.id
+
+    // 공유 저장소는 대소문자를 가리지 않아 같은 파일이 표기만 다를 수 있다(이지뷰어 목록의 '첫글자를 대문자로' 설정)
+    private fun idsByFile(context: Context, path: String): Set<String> =
+        Db.get(context).rows("SELECT book_id FROM book_file WHERE path = ? COLLATE NOCASE", arrayOf(path)) { it.getString(0) }.toSet()
+
+    /**
+     * 파일 이름이 [name] 인 책 파일로 넣은 책들의 id(다른 폴더의 같은 이름이면 여럿, 지운 책도 들어 있을 수 있다 [bookOf]).
+     * 제목 대신 파일 이름만 보이는 읽는 화면(이지뷰어)에서 어떤 책인지 찾는다. 확장자를 뺀 이름이 같아도 같은 파일로 보고(이지뷰어 설정으로
+     * 확장자를 숨길 수 있다), 대소문자는 무시한다(이지뷰어 목록의 '첫글자를 대문자로' 설정)
+     */
+    fun idsByFileName(context: Context, name: String): Set<String> {
+        val stem = withoutBookFile(name)
+        val rows = Db.get(context).rows("SELECT book_id, path FROM book_file", null) { it.getString(0) to File(it.getString(1)).name }
+        return (rows.filter { it.second.equals(name, ignoreCase = true) }.ifEmpty { rows.filter { withoutBookFile(it.second).equals(stem, ignoreCase = true) } })
+            .map { it.first }.toSet()
     }
+
+    /** [folder] 안의 그림 파일로 넣은 책(그림 폴더가 한 권, 이지뷰어. 읽고 있는 책, 없으면 나간 책)의 id. 없으면 null */
+    fun idByFolder(context: Context, folder: String): String? = bookOf(context,
+        Db.get(context).rows("SELECT book_id, path FROM book_file", null) { it.getString(0) to File(it.getString(1)) }
+            .filter { (_, f) -> isImageFile(f.name) && f.parent.equals(folder, ignoreCase = true) }.map { it.first }.toSet())?.id
+
+    /** [ids] 가운데 읽고 있는 책, 없으면 나간 책(마지막). 없으면 null */
+    fun bookOf(context: Context, ids: Set<String>): ShelfBook? {
+        if (ids.isEmpty()) return null
+        return list(context).firstOrNull { it.id in ids } ?: history(context).lastOrNull { it.book.id in ids }?.book
+    }
+
+    /** 읽고 있는 책 [id]. 없으면 null */
+    fun get(context: Context, id: String): ShelfBook? = list(context).firstOrNull { it.id == id }
+
+    /** [title] 의 책(읽고 있는 책, 없으면 지우지 않은 나간 책의 마지막) 가운데 [accept] 인 것의 id. 없으면 null */
+    fun idByTitle(context: Context, title: String, accept: (ShelfBook) -> Boolean): String? =
+        list(context).firstOrNull { it.hasTitle(title) && accept(it) }?.id
+            ?: history(context).lastOrNull { !it.hidden && it.book.hasTitle(title) && accept(it.book) }?.book?.id
 
     /** 책이 나간 책이 되어도 남긴다(다시 읽을 때 그 파일을 연다). */
     fun setFilePath(context: Context, id: String, path: String) {

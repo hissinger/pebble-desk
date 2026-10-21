@@ -13,6 +13,9 @@ import android.widget.LinearLayout
 import com.woody.pebbledesk.readers.Aladin
 import com.woody.pebbledesk.readers.BookFiles
 import com.woody.pebbledesk.readers.Bookers
+import com.woody.pebbledesk.readers.CherieViewer
+import com.woody.pebbledesk.readers.EasyView
+import com.woody.pebbledesk.readers.EasyViewFree
 import com.woody.pebbledesk.readers.KOReader
 import com.woody.pebbledesk.readers.KOReaderFdroid
 import com.woody.pebbledesk.readers.Kindle
@@ -499,7 +502,7 @@ class SettingsActivity : EinkActivity() {
         }
     }
 
-    /** 자동 추가 안내의 앱 하나: 이름, 안 되는 것(없으면 null), 그 이름이 가리키는 이북 앱들(판마다 따로: e-ink 판에만 `(e-ink)`, 문리더 유료판은 `문리더 Pro`, 리디 원스토어판은 `(원스토어)`. KOReader 의 GitHub·F-Droid 판은 함께) */
+    /** 자동 추가 안내의 앱 하나: 이름, 안 되는 것(없으면 null), 그 이름이 가리키는 이북 앱들(판마다 따로: e-ink 판에만 `(e-ink)`, 문리더 유료판은 `문리더 Pro`, 리디 원스토어판은 `(원스토어)`. 이지뷰어 무료판 둘과 KOReader 의 GitHub·F-Droid 판은 함께, 이지뷰어 유료판은 이름이 다른 채리뷰어) */
     internal class GuideApp(val name: Int, val desc: Int?, val specs: List<ReaderSpec>)
 
     companion object {
@@ -520,6 +523,8 @@ class SettingsActivity : EinkActivity() {
             GuideApp(R.string.guide_yes24ebook, null, listOf(Yes24Ebook)),
             GuideApp(R.string.guide_moon, R.string.guide_moon_desc, listOf(MoonReader)),
             GuideApp(R.string.guide_moon_pro, R.string.guide_moon_desc, listOf(MoonReaderPro)),
+            GuideApp(R.string.guide_easyview, R.string.guide_easyview_desc, listOf(EasyView, EasyViewFree)),
+            GuideApp(R.string.guide_cherie, R.string.guide_easyview_desc, listOf(CherieViewer)),
             GuideApp(R.string.guide_kindle, R.string.guide_kindle_desc, listOf(Kindle)),
             GuideApp(R.string.guide_libby, R.string.guide_libby_desc, listOf(Libby)),
             GuideApp(R.string.guide_neo, R.string.guide_neo_desc, listOf(NeoReader)),

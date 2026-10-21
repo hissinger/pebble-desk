@@ -279,10 +279,13 @@
     <string name="guide_libby_desc">Progress while reading comes in only when you open the menu. Covers come from the Shelf screen.\nReading time is counted only while auto-add is on.</string>
     <string name="guide_neo">NeoReader (BOOX)</string>
     <string name="guide_neo_desc">Covers are blank (EPUB covers come in when Read book files is on).\nTapping the book on the home screen opens its file in NeoReader.</string>
+    <string name="guide_easyview">EzViewer</string>
+    <string name="guide_cherie">CherieViewer</string>
+    <string name="guide_easyview_desc">Books are added only when you pick them on the shelf and read them.\nKeep the file name and page shown in the bar at the top of the reading screen.</string>
     <string name="guide_ko">KOReader</string>
     <string name="guide_ko_desc">Books come in only when Settings › Reading › Read book files is on. Books opened in KOReader come in when you return home.\nTapping the book on the home screen opens its file directly.</string>
     <string name="book_files">Read book files</string>
-    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
+    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). Only the title, author and cover are taken from book files (NeoReader and EzViewer: the EPUB cover and book info).\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
     <string name="open_file_access">Open All files access</string>
     <string name="app_neoreader">NeoReader (BOOX)</string>
     <string name="guide_progress_note">For progress while reading, turn on the bottom info (page or progress) in the e-book app\'s viewer settings.</string>
@@ -291,7 +294,7 @@
     <string name="add_author">Add author</string>
     <string name="edit_author">Edit author</string>
     <string name="save">Save</string>
-    <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the shelf and search screens, and the title and progress on the reading screen, of Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi, YES24 (Library, my YES, eBook), Moon+ Reader, Kindle, Libby, NeoReader and KOReader to fill your reading list. Book text and other apps are not seen, and nothing leaves the device.</string>
+    <string name="reader_watch_desc">Reads only book titles, authors, progress, due dates and covers on the shelf and search screens (for EzViewer and CherieViewer, whose shelf is a file list, also file names and locations), and the title (file name for EzViewer and CherieViewer) and progress on the reading screen, of Kyobo Library, Kyobo eBook, Millie, Aladin, Bookers, Ridi, YES24 (Library, my YES, eBook), Moon+ Reader, EzViewer, CherieViewer, Kindle, Libby, NeoReader and KOReader to fill your reading list. Book text and other apps are not seen, and nothing leaves the device.</string>
     <string name="open_app_info">Open App info</string>
     <string name="allow_hint">If you can\'t see Allow, turn on the shortcut switch below.</string>
     <string name="restricted_hint">If Pebble Desk is greyed out in Accessibility (restricted setting), tap it once and close the notice first, then open App info › ⋮ at the top right › Allow restricted settings and turn it on again.</string>
