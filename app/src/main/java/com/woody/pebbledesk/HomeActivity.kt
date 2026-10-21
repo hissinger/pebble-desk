@@ -27,6 +27,7 @@ import android.view.WindowInsetsController
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.woody.pebbledesk.readers.BookFiles
 import java.time.LocalDate
 
 /** ① 홈: 맨 위 두 줄 · 지금 읽는 책과 읽고 있는 앱 · 자주 쓰는 앱 · 하단 줄 */
@@ -132,11 +133,12 @@ class HomeActivity : EinkActivity() {
         refresh()
         // 읽은 시간은 다른 앱에서 돌아올 때만 바뀐다(레이아웃 때의 refresh 에서는 다시 세지 않는다).
         updateReading()
-        // 시작하기를 띄웠으면 그것이 자동 추가를 설명한다. 화면 크기 안내가 먼저(뜨면 자동 추가 안내는 다음에 돌아올 때. 가운데 창이 겹치지 않게)
+        // 시작하기를 띄웠으면 그것이 자동 추가를 설명한다. 화면 크기 안내 · 자동 추가 안내 · 책 파일 읽기 안내 순(앞의 것이 뜨면 뒤의 것은 다음에 돌아올 때. 가운데 창이 겹치지 않게)
         // 새 판 창이 떠 있으면 다른 안내는 다음에 돌아올 때(가운데 창이 겹치지 않게)
         if (!OnboardingActivity.showOnce(this, prefs) && updateDialog?.isShowing != true) {
             warnDensity()
             if (densityDialog?.isShowing != true) warnAutoOff()
+            if (densityDialog?.isShowing != true && autoOffDialog?.isShowing != true) warnFileAccess()
         }
         Update.onChange = { updates.onChange(); offerUpdate() }
         updates.onChange()
@@ -169,7 +171,7 @@ class HomeActivity : EinkActivity() {
         val release = (Update.state as? Update.State.Available)?.release ?: return
         fun today() = "${release.version}@${LocalDate.now()}"
         if (!prefs.onboarded || prefs.updateSkip == release.version || prefs.updateShown == today()) return
-        if (listOf(updateDialog, densityDialog, autoOffDialog).any { it?.isShowing == true }) return
+        if (listOf(updateDialog, densityDialog, autoOffDialog, fileDialog).any { it?.isShowing == true }) return
         val maxHeight = window.decorView.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
         // 닫는 날을 띄운 날로 적는다(회전으로 사라지면 다시 띄운다). 설치 허용 안내로 갔으면 허용하고 돌아왔을 때(시스템이 앱을 다시 시작한다) 다시.
         updateDialog = updates.notice(release, maxHeight, onSkip = { prefs.updateSkip = release.version }) { askedAllow ->
@@ -185,7 +187,7 @@ class HomeActivity : EinkActivity() {
     /** 켜져 있는데 붙지 않은 채 [STALLED_WAIT_MS] 가 지났으면 '멈춰 있습니다' 창(홈이 앞에 있을 때만, onPause 에서 거둔다) */
     private val stalledLater = Runnable {
         if (ReaderWatchService.isEnabled(this) && !ReaderWatchService.bound && !(autoOffDialog?.isShowing == true && autoOffStalled) &&
-            densityDialog?.isShowing != true && updateDialog?.isShowing != true) warnStalled()
+            densityDialog?.isShowing != true && updateDialog?.isShowing != true && fileDialog?.isShowing != true) warnStalled()
     }
 
     /**
@@ -236,6 +238,29 @@ class HomeActivity : EinkActivity() {
         val desc = getString(R.string.auto_stalled_desc) + "\n\n" + getString(if (freeze) R.string.auto_stalled_boox else R.string.auto_stalled_fix)
         autoOffDialog = autoNotice(R.string.auto_stalled_title, desc, freeze).show()
         autoOffStalled = true
+    }
+
+    /** 떠 있는 '책 파일 읽기를 켜 주세요' 창 */
+    private var fileDialog: Dialog? = null
+
+    /**
+     * 책 파일 읽기 안내: 자동 추가 서비스가 책 파일 읽기가 꺼져 있어 책(KOReader)·표지(문리더·네오리더)를 모른 앱이 있으면
+     * 홈으로 돌아올 때 그 앱마다 화면 가운데에 묻는다(`모든 파일에 액세스 열기` / `다시 보지 않기`). 그 앱을 쓸 때만 적히므로
+     * 깔아만 둔 앱은 묻지 않는다([HomePrefs.fileNoticeWanted]). 띄우면 그 앱은 지우고, 다시 막히면 또 묻는다(`다시 보지 않기` 를 누를 때까지).
+     */
+    private fun warnFileAccess() {
+        if (fileDialog?.isShowing == true) return
+        val wanted = prefs.fileNoticeWanted
+        if (wanted.isEmpty()) return
+        if (BookFiles.canRead(this)) { prefs.fileNoticeWanted = emptySet(); return }
+        val pkg = wanted.first()
+        prefs.fileNoticeWanted = wanted - pkg
+        if (pkg in prefs.fileNoticeSkip) return
+        val name = AppStore.readerLabel(this, pkg) ?: return
+        fileDialog = Sheet(this).header(getString(R.string.file_notice_title, name), getString(R.string.file_notice_desc)).centered().keepOnChange()
+            .item(getString(R.string.open_file_access), bold = true) { BookFiles.request(this) }
+            .item(getString(R.string.dont_show_again)) { prefs.fileNoticeSkip = prefs.fileNoticeSkip + pkg }
+            .show()
     }
 
     /** 떠 있는 '화면이 크게 보입니다' 창(홈에 돌아올 때마다 하나만) */

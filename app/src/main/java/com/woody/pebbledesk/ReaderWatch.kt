@@ -352,8 +352,12 @@ class ReaderWatchService : AccessibilityService() {
     private fun readViewer(spec: ReaderSpec) {
         viewerSpec = null
         if (screen[spec.pkg] !in spec.viewers) return
-        // 책이 열려 있는지를 데이터로 아는 앱(KOReader)은 화면을 읽지 않고 데이터로 맞춘다(앞에 온 때 한 번)
-        if (spec.fileState) return syncFiles(spec)
+        // 책이 열려 있는지를 데이터로 아는 앱(KOReader)은 화면을 읽지 않고 데이터로 맞춘다(앞에 온 때 한 번).
+        // 책 파일 읽기가 꺼져 있으면 책을 알 수 없으니 홈에서 묻게 한다(홈으로 돌아올 때 맞추는 것은 깔려 있기만 해도 하므로 여기서만)
+        if (spec.fileState) {
+            if (!BookFiles.canRead(this)) wantFiles(spec)
+            return syncFiles(spec)
+        }
         val windows = windowsOf(spec).takeIf { it.all.isNotEmpty() } ?: return logNoWindow(spec)
         val shown = spec.readViewer(windows)
         val file = fileBook(spec, shown)
@@ -421,7 +425,11 @@ class ReaderWatchService : AccessibilityService() {
                 val at = unknownOpen[spec.pkg] ?: viewerAt[spec.pkg]?.takeIf { file != null && shown.title == null } ?: fileAt
                 bookOpened(spec, Cell(title, info.author, progress, -1, null, Rect()), at, fileId)
             }
-            if (file != null) saveFile(title, file.path) else if (spec.searchesBookFile) searchFile(spec, title, info.author)
+            if (file != null) {
+                saveFile(title, file.path)
+                // 파일을 알아도 표지는 책 파일 읽기를 켜야 꺼낸다(네오리더)
+                if (!BookFiles.canRead(this) && BookShelf.findByTitle(this, title)?.let { BookShelf.hasCover(this, it.id) } == false) wantFiles(spec)
+            } else if (spec.searchesBookFile) searchFile(spec, title, info.author)
             if (opened) return
         }
         if (progress < 0) return
@@ -631,6 +639,16 @@ class ReaderWatchService : AccessibilityService() {
     /** 책 파일(EPUB, 그림 폴더는 첫 그림)에서 표지를 꺼낼 수 있다([BookShelf.cover]): 화면에서 자른 작은 표지를 두지 않는다 */
     private fun coverFromFile(path: String?) = path != null && (path.endsWith(".epub", ignoreCase = true) || isImageFile(path)) && BookFiles.canRead(this)
 
+    /**
+     * 책 파일 읽기가 꺼져 있어 [spec] 의 책(KOReader)·표지(문리더·네오리더)를 모른다: 홈으로 돌아오면 묻도록 적어 둔다
+     * ([HomeActivity.warnFileAccess]). `다시 보지 않기` 를 누른 앱은 적지 않는다.
+     */
+    private fun wantFiles(spec: ReaderSpec) {
+        val prefs = HomePrefs(this)
+        if (spec.pkg in prefs.fileNoticeSkip || spec.pkg in prefs.fileNoticeWanted) return
+        prefs.fileNoticeWanted = prefs.fileNoticeWanted + spec.pkg
+    }
+
     /** 이북 앱이 [title] 로 연 파일을 그 책에 적어 둔다(홈에서 그 파일을 바로 열고, 표지가 없으면 그릴 때 그 파일에서 꺼낸다 [BookShelf.cover]) */
     private fun saveFile(title: String, path: String) {
         BookShelf.findByTitle(this, title)?.let { BookShelf.setFilePath(this, it.id, path) }
@@ -638,13 +656,14 @@ class ReaderWatchService : AccessibilityService() {
 
     /**
      * 연 파일을 내놓지 않는 리더([ReaderSpec.searchesBookFile], 문리더)의 책 [title]: 표지도 파일도 모르면 저장소에서 그 제목의 EPUB 을 찾아
-     * 그 책의 파일로 적는다(표지는 그릴 때 꺼낸다). 저장소를 훑으므로 뒤에서, 책마다 한 번만(책 파일 읽기를 허용하기 전에는 세지 않는다).
+     * 그 책의 파일로 적는다(표지는 그릴 때 꺼낸다). 저장소를 훑으므로 뒤에서, 책마다 한 번만(책 파일 읽기를 허용하기 전에는 세지 않고 홈에서 묻게 한다).
      */
     private fun searchFile(spec: ReaderSpec, title: String, author: String) {
         val key = normTitle(title)
         if (key in fileSearched) return
         val book = BookShelf.findByTitle(this, title) ?: return
-        if (BookShelf.hasCover(this, book.id) || BookShelf.filePath(this, book.id) != null || !BookFiles.canRead(this)) return
+        if (BookShelf.hasCover(this, book.id) || BookShelf.filePath(this, book.id) != null) return
+        if (!BookFiles.canRead(this)) return wantFiles(spec)
         fileSearched += key
         Bg.run({ BookFiles.findEpub(title, author) }) { result ->
             val path = result.getOrNull() ?: return@run

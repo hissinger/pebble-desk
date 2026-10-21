@@ -197,6 +197,13 @@ object AppStore {
     fun readerKey(context: Context, pkg: String): String? =
         fileReaders(context).firstOrNull { it.pkg == pkg }?.key ?: load(context).firstOrNull { it.pkg == pkg }?.key
 
+    /** 이북 앱 [pkg] 의 이름: 앱 목록의 이름([readerKey]), 목록에 없으면 시스템의 앱 이름. 깔려 있지 않거나 꺼져 있으면 null */
+    fun readerLabel(context: Context, pkg: String): String? {
+        val pm = context.packageManager
+        val info = runCatching { pm.getApplicationInfo(pkg, 0) }.getOrNull()?.takeIf { it.enabled } ?: return null
+        return readerKey(context, pkg)?.let { find(context, it)?.label } ?: pm.getApplicationLabel(info).toString()
+    }
+
     /**
      * 책의 앱을 연다. 파일로만 여는 이북 앱이면 그 책의 파일([BookShelf.filePath])을, 파일을 모르면 그 앱의 서재 앱(BOOX 런처)을 연다.
      * 책 파일을 바로 여는 앱(KOReader, [com.woody.pebbledesk.readers.ReaderSpec.opensBookFile])은 파일을 알면 그 파일을, 모르면 앱을 연다.
