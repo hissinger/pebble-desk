@@ -407,11 +407,11 @@ class ReadingActivity : EinkActivity() {
                 perBook[id] = label to sum + ms
             }
         }
-        val books = perBook.values.filter { it.second >= 60_000 }.sortedByDescending { it.second }
+        // 이번 주 합쳐 [ReadingLog.MIN_DAY_MS](5분) 이상 읽은 책만(잠깐 펴 본 책은 올해 읽은 책처럼 뺀다)
+        val books = perBook.values.filter { it.second >= ReadingLog.MIN_DAY_MS }.sortedByDescending { it.second }
         if (books.isEmpty()) {
-            // 읽긴 했는데 어떤 책인지 모르면 자동 추가를 켜라고 알린다.
-            val read = week.sumOf { it.values.sum() } >= 60_000
-            return text(getString(if (read) R.string.books_unknown else R.string.reading_empty), 15f, color = Ui.LIGHT_GRAY, lines = 3).apply {
+            // 보일 책이 없으면(읽지 않았거나, 잠깐씩만 폈거나, 어떤 책인지 모르는 시간뿐) 한 문구로
+            return text(getString(R.string.reading_empty), 15f, color = Ui.LIGHT_GRAY, lines = 3).apply {
                 setPadding(0, dp(8), 0, 0)
             }
         }

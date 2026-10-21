@@ -216,7 +216,6 @@
     <string name="palette_mono">Black &amp; white</string>
     <string name="palette_color">Color</string>
     <string name="books_this_week">Books this week</string>
-    <string name="books_unknown">Turn on auto-add to see time by book</string>
     <string name="reading_empty">No reading this week yet</string>
     <string name="reading_no_access">Turn on Reading time in Settings and allow Pebble Desk in Usage access to see your log.</string>
     <string name="daily_goal">Daily goal</string>
