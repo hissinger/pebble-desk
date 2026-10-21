@@ -154,8 +154,8 @@ class Sheet(private val context: Context) {
             })
         }
         val names = c.vbox()
-        // 가운데 안내 창은 제목이 곧 알림이라 두 줄까지(글자를 키워도 '…꺼져 있습니다'가 잘리지 않게). 아래 메뉴는 한 줄.
-        names.addView(c.text(title, 29f, Ui.heavy, lines = if (centered) 2 else 1))
+        // 가운데 안내 창은 제목이 곧 알림이라 세 줄까지(글자를 키워도 '…꺼져 있습니다'가, 긴 앱 이름이 든 책 파일 읽기 안내가 잘리지 않게). 아래 메뉴는 한 줄.
+        names.addView(c.text(title, 29f, Ui.heavy, lines = if (centered) 3 else 1))
         subtitle?.let { names.addView(c.text(it, 18f, color = Ui.GRAY, lines = subtitleLines), lp(WRAP, WRAP).apply { topMargin = c.dp(7) }) }
         head.addView(names, lp(0, WRAP, 1f).apply {
             if (image != null) gravity = Gravity.TOP

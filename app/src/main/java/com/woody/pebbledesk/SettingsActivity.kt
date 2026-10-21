@@ -446,10 +446,6 @@ class SettingsActivity : EinkActivity() {
         return right
     }
 
-    /** [text] 를 줄바꿈 없이(한글은 글자마다 줄을 나눌 수 있어 글자 사이에 단어 이음표 U+2060. 두 칸 글자(이모지 등)는 쪼개지 않게 코드 포인트마다) */
-    private fun noBreak(text: String) =
-        text.replace(' ', '\u00A0').codePoints().toArray().joinToString("\u2060") { String(Character.toChars(it)) }
-
     private fun section(title: String) = col.addView(sectionView(title))
 
     private fun sectionView(title: String) = text(title, 16f, color = Ui.LIGHT_GRAY).apply {

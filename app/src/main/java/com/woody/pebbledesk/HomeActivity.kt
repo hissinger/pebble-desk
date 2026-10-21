@@ -257,7 +257,8 @@ class HomeActivity : EinkActivity() {
         prefs.fileNoticeWanted = wanted - pkg
         if (pkg in prefs.fileNoticeSkip) return
         val name = AppStore.readerLabel(this, pkg) ?: return
-        fileDialog = Sheet(this).header(getString(R.string.file_notice_title, name), getString(R.string.file_notice_desc)).centered().keepOnChange()
+        // 앱 이름이 길면(Moon+ Reader Pro) 낱말 가운데서 줄이 나뉘어('가 / 져오려면') 띄어쓴 곳에서만 나누게
+        fileDialog = Sheet(this).header(keepWords(getString(R.string.file_notice_title, name)), getString(R.string.file_notice_desc)).centered().keepOnChange()
             .item(getString(R.string.open_file_access), bold = true) { BookFiles.request(this) }
             .item(getString(R.string.dont_show_again)) { prefs.fileNoticeSkip = prefs.fileNoticeSkip + pkg }
             .show()
