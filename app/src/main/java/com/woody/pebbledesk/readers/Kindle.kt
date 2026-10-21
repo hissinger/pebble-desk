@@ -38,17 +38,29 @@ object Kindle : ReaderSpec(
     private val TABS = setOf("home_tab", "library_tab", "more_tab")
 
     /**
+     * 아래 탭 줄 왼쪽에 떠 있는 '이어 읽기' 표지(마지막으로 읽은 책, 그림 하나). 설명이 `Most recent book. ` 뒤에 책 칸과 같은 꼴이다.
+     * 표시 없이 깨끗해, 격자 보기·홈 탭 칸의 표지를 표시에 가려 자르지 못한 책(받은 책은 늘 ✓ 가 있다)도 읽고 돌아오면 이것으로 표지를 얻는다(목록 보기 칸보다 작다).
+     */
+    private const val RECENT = "book_in_bottom_bar"
+
+    /**
      * 서재에 보이는 책 칸: 설명이 책 칸 모양이고 표지가 든 묶음(홈 탭의 추천 줄은 설명이 `제목 by 저자` 라 빠진다).
-     * 아래 탭 줄 왼쪽에 마지막으로 읽은 책의 '이어 읽기' 표지가 탭 줄 위로 높이의 반쯤 솟아 떠 있어, 그 높이까지 내려온 표지는 자르지 않는다.
+     * 아래 탭 줄 왼쪽에 마지막으로 읽은 책의 '이어 읽기' 표지([RECENT])가 탭 줄 위로 높이의 반쯤 솟아 떠 있어, 그 높이까지 내려온 표지는 자르지 않는다
+     * (이어 읽기 표지는 그 책의 칸으로 맨 뒤에 둔다. 그 그림은 늘 세로로 긴 자리라 가로로 긴 표지는 자리 밖으로 넘쳐 그려지므로, 같은 책의 칸 표지가
+     * 표지 모양이 아니면 자르지 않는다).
      * 홈 탭 줄은 옆으로 넘기는 줄이라 화면 왼쪽·오른쪽 끝에 닿은 표지는 잘려 보이는 것이어서 자르지 않는다(잘리면 더 세로로 길어 표지 모양으로 보인다).
      */
     override fun shelfCells(root: AccessibilityNodeInfo): List<Cell> {
         val found = mutableListOf<Cell>()
         var bar: Rect? = null
+        var recent: Cell? = null
+        /** 책마다 칸의 표지 자리(표시에 가려 자르지 않는 칸도) */
+        val covers = mutableMapOf<String, Rect>()
         fun walk(n: AccessibilityNodeInfo, depth: Int) {
             if (n.isWebView()) return
             if (n.viewIdResourceName in TABS) bar = (bar ?: Rect()).apply { union(n.bounds()) }
-            descCell(n)?.let { found += it; return }
+            if (n.viewIdResourceName?.substringAfter(":id/") == RECENT) { recent = recentCell(n); return }
+            descCell(n)?.let { (c, cover) -> found += c; covers[c.title] = cover; return }
             if (depth < DEEP_WALK_DEPTH) for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1) }
         }
         walk(root, 0)
@@ -57,7 +69,16 @@ object Kindle : ReaderSpec(
         return found.map { c ->
             val t = c.thumb ?: return@map c
             if (t.bottom > cut || t.left <= screen.left || t.right >= screen.right) c.copy(thumb = null) else c
-        }
+        } + listOfNotNull(recent?.let { r -> if (covers[r.title]?.let(::usableThumb) == false) r.copy(thumb = null) else r })
+    }
+
+    /** '이어 읽기' 표지([RECENT]): 설명의 앞 문장(`Most recent book. `)을 떼면 책 칸 설명, 그림이 곧 표지 */
+    private fun recentCell(n: AccessibilityNodeInfo): Cell? {
+        val desc = n.contentDescription?.toString()?.substringAfter(". ", "") ?: return null
+        val head = desc.substringBefore(SEP, "").takeIf { it.isNotBlank() } ?: return null
+        val (name, author) = splitHead(head)
+        val r = n.bounds()
+        return Cell(name, personName(author), percent(desc.substringAfter(SEP)), -1, r, r)
     }
 
     /**
@@ -73,12 +94,12 @@ object Kindle : ReaderSpec(
     }
 
     /**
-     * 설명이 `제목, 저자, , 상태, 크기` 인 묶음 하나. 목록 보기는 제목 글자가 따로 있어 그것을 쓰고, 격자 보기는 설명에서 가른다:
+     * 설명이 `제목, 저자, , 상태, 크기` 인 묶음 하나와 그 표지 자리. 목록 보기는 제목 글자가 따로 있어 그것을 쓰고, 격자 보기는 설명에서 가른다:
      * 저자는 `성, 이름` 이라 쉼표로 나눈 끝의 둘(둘뿐이면 끝 하나), 나머지가 제목(`Moby Dick: or, the White Whale`).
      * 격자 보기·홈 탭 칸은 표지 위에 진행률 띠(`top_right_badge`)·받음 ✓(`bottom_right_badge`)·오디오 표시를 그려, 표시가 있는 칸의 표지는 자르지 않는다
      * (목록 보기 칸은 표시가 표지 밖에 있다).
      */
-    private fun descCell(n: AccessibilityNodeInfo): Cell? {
+    private fun descCell(n: AccessibilityNodeInfo): Pair<Cell, Rect>? {
         val desc = n.contentDescription?.toString() ?: return null
         val head = desc.substringBefore(SEP, "").takeIf { it.isNotBlank() } ?: return null
         var title: String? = null
@@ -95,7 +116,7 @@ object Kindle : ReaderSpec(
         walk(n, 0)
         val cover = thumb ?: return null
         val (name, author) = title?.takeIf { head.startsWith(it) }?.let { t -> t to head.removePrefix(t).removePrefix(", ") } ?: splitHead(head)
-        return Cell(name, personName(author), percent(desc.substringAfter(SEP)), -1, cover.takeUnless { badged }, n.bounds())
+        return Cell(name, personName(author), percent(desc.substringAfter(SEP)), -1, cover.takeUnless { badged }, n.bounds()) to cover
     }
 
     /** 격자 보기 설명의 `제목, 성, 이름` → 제목·`성, 이름` */

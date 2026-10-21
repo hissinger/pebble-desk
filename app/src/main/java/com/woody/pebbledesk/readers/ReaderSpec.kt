@@ -81,6 +81,11 @@ open class ReaderSpec(
     val fileState: Boolean = false,
     /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([fileBooks] 로 안 경로)을 바로 여는 앱(KOReader). 파일을 모르면 앱을 연다. */
     val opensBookFile: Boolean = false,
+    /**
+     * 내 파일을 열지만 어느 파일인지 내놓지 않는 앱(문리더): 읽는 화면 제목으로 안 책의 표지가 없으면 저장소에서 그 제목의 EPUB 을 찾아
+     * 그 책의 파일로 적는다(표지는 그릴 때 그 파일에서 꺼낸다). 책 파일 읽기를 허용했을 때만([BookFiles.canRead]).
+     */
+    val searchesBookFile: Boolean = false,
 ) {
     /** 서재에 보이는 책 칸들. 기본: 제목 요소마다 그것이 든 칸을 찾아 읽는다. */
     open fun shelfCells(root: AccessibilityNodeInfo): List<Cell> =
