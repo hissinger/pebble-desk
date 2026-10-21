@@ -13,11 +13,13 @@ import android.os.Environment
 import android.provider.Settings
 import android.util.Xml
 import com.woody.pebbledesk.Storage
+import com.woody.pebbledesk.sameTitle
 import org.xmlpull.v1.XmlPullParser
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.net.URLDecoder
+import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipFile
 
 /**
@@ -62,6 +64,42 @@ object BookFiles {
         if (!path.endsWith(".epub", ignoreCase = true)) return null
         return runCatching { ZipFile(path).use { zip -> readEpub(zip) } }.getOrNull()
     }
+
+    /**
+     * 저장소에서 책 정보의 제목이 [title] 인 EPUB 의 경로(연 파일을 내놓지 않는 리더, 문리더). 얕은 폴더부터 [SEARCH_ENTRIES] 개까지 보고
+     * 숨긴 폴더(`.`)·`Android` 는 들어가지 않는다. 같은 제목([sameTitle])이 여럿이면 제목·저자가 그대로 같은 것. 못 찾으면 null.
+     * 한 번 읽은 파일의 제목·저자는 기억해 두어 다음 찾기에서 다시 열지 않는다. 화면 스레드에서 부르지 않는다.
+     */
+    fun findEpub(title: String, author: String): String? {
+        val root = storageRoot
+        val skip = File(root, "Android")
+        val dirs = ArrayDeque<Pair<File, Int>>().apply { add(root to 0) }
+        var entries = 0
+        var match: String? = null
+        while (dirs.isNotEmpty() && entries < SEARCH_ENTRIES) {
+            val (dir, depth) = dirs.removeFirst()
+            for (f in dir.listFiles().orEmpty().sortedBy { it.name }) {
+                if (++entries > SEARCH_ENTRIES) break
+                if (f.name.startsWith('.')) continue
+                if (f.isDirectory) {
+                    if (depth < SEARCH_DEPTH && f != skip) dirs += f to depth + 1
+                    continue
+                }
+                if (!f.name.endsWith(".epub", ignoreCase = true)) continue
+                val (t, a) = epubNames.getOrPut("${f.path}@${f.lastModified()}") { epub(f.path)?.let { it.title to it.author } ?: ("" to "") }
+                if (t.isEmpty() || !sameTitle(t, title)) continue
+                if (t == title && a == author) return f.path
+                if (match == null) match = f.path
+            }
+        }
+        return match
+    }
+
+    /** 찾기에서 읽은 EPUB(경로@수정 시각)의 제목·저자([findEpub]. 못 읽은 파일은 빈 제목) */
+    private val epubNames = ConcurrentHashMap<String, Pair<String, String>>()
+
+    private const val SEARCH_ENTRIES = 5000
+    private const val SEARCH_DEPTH = 6
 
     /**
      * 책 파일의 표지(JPEG, 긴 변을 [COVER_PX] 안으로 줄임): EPUB 은 책 정보의 표지 그림, 그림 파일(그림 폴더 한 권, 이지뷰어)은 그 폴더의 첫 그림

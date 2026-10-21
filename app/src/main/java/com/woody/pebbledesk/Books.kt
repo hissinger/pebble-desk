@@ -534,8 +534,8 @@ object BookShelf {
         val ribbon = if (finishList(context)[book.id].isNullOrEmpty()) "" else context.getString(R.string.finish_book)
         val palette = Palette.current
         val original = coverFile(context, book.id)
-        // 표지 그림이 없으면 책 파일에서 꺼낼 수 있는지가 키에 든다(빈 표지를 그린 뒤 책 파일 읽기를 허용하면 다시 그리게)
-        val source = if (original.length() > 0) "o" else if (BookFiles.canRead(context)) "f" else "-"
+        // 표지 그림이 없으면 책 파일에서 꺼낼 수 있는지가 키에 든다(빈 표지를 그린 뒤 책 파일 읽기를 허용하거나, 문리더처럼 책 파일을 나중에 찾으면 다시 그리게)
+        val source = if (original.length() > 0) "o" else if (BookFiles.canRead(context) && filePath(context, book.id) != null) "f" else "-"
         val key = "${book.id}@$widthPx@${book.updatedAt}@${book.app}@$tone@$ribbon@${palette.key}@$source"
         covers.get(key)?.let { return it }
         if (source == "f") fileCover(context, book.id)

@@ -108,6 +108,7 @@
     <string name="wl_opened_full">list full</string>
     <string name="wl_opened_finished">finished book, not added</string>
     <string name="wl_recent_wait">Recent book on the shelf \'%1$s\' unchanged · waiting</string>
+    <string name="wl_file">Book file found \'%1$s\' · %2$s</string>
     <string name="wl_progress">Progress %s</string>
     <string name="device_section_system">System screen test (opened by this app)</string>
     <string name="device_system_a11y">Accessibility</string>
@@ -216,7 +217,6 @@
     <string name="palette_mono">Black &amp; white</string>
     <string name="palette_color">Color</string>
     <string name="books_this_week">Books this week</string>
-    <string name="books_unknown">Turn on auto-add to see time by book</string>
     <string name="reading_empty">No reading this week yet</string>
     <string name="reading_no_access">Turn on Reading time in Settings and allow Pebble Desk in Usage access to see your log.</string>
     <string name="daily_goal">Daily goal</string>
@@ -272,9 +272,9 @@
     <string name="guide_yes24ebook">YES24 eBook</string>
     <string name="guide_moon">Moon+ Reader</string>
     <string name="guide_moon_pro">Moon+ Reader Pro</string>
-    <string name="guide_moon_desc">Opened from a cover in the Home tab\'s recent row, open the menu while reading to add the book.</string>
+    <string name="guide_moon_desc">Opened from the Home tab\'s recent row or the bookshelf view, open the menu while reading to add the book.\nFor those books, covers come from the EPUB when Read book files is on (otherwise open the Recent list screen once).</string>
     <string name="guide_kindle">Kindle</string>
-    <string name="guide_kindle_desc">Books not yet downloaded, and progress while reading, come in only when you open the menu.\nThe grid library can\'t give covers of books you have read; open the list view once.</string>
+    <string name="guide_kindle_desc">Books not yet downloaded, and progress while reading, come in only when you open the menu.\nFor books opened from the grid library or Home tab, the cover is taken from the continue-reading cover when you return to the library (smaller than in the list view).</string>
     <string name="guide_libby">Libby</string>
     <string name="guide_libby_desc">Progress while reading comes in only when you open the menu. Covers come from the Shelf screen.\nReading time is counted only while auto-add is on.</string>
     <string name="guide_neo">NeoReader (BOOX)</string>
@@ -285,7 +285,7 @@
     <string name="guide_ko">KOReader</string>
     <string name="guide_ko_desc">Books come in only when Settings › Reading › Read book files is on. Books opened in KOReader come in when you return home.\nTapping the book on the home screen opens its file directly.</string>
     <string name="book_files">Read book files</string>
-    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). Only the title, author and cover are taken from book files (NeoReader and EzViewer: the EPUB cover and book info).\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
+    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For NeoReader and Moon+ Reader, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
     <string name="open_file_access">Open All files access</string>
     <string name="app_neoreader">NeoReader (BOOX)</string>
     <string name="guide_progress_note">For progress while reading, turn on the bottom info (page or progress) in the e-book app\'s viewer settings.</string>

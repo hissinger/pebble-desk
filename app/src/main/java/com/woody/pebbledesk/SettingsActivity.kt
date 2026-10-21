@@ -270,13 +270,11 @@ class SettingsActivity : EinkActivity() {
         row(getString(R.string.auto_books_guide), null, next = true) {
             startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, PAGE_GUIDE))
         }
-        // 책 파일 읽기 = 안드로이드 '모든 파일 액세스'(KOReader 의 기록·책 파일). 그런 이북 앱(KOReader·네오리더)이 깔려 있거나 이미 허용했을 때만 보인다.
+        // 책 파일 읽기 = 안드로이드 '모든 파일 액세스'(KOReader 의 기록, 내 파일 리더(KOReader·네오리더·문리더)의 책 파일과 표지). 늘 보인다.
         val files = BookFiles.canRead(this)
-        if (files || ReaderApps.ALL.any { (it.opensBookFile || it.fileViewer != null) && installed(it.pkg) }) {
-            row(getString(R.string.book_files), getString(if (files) R.string.on else R.string.off), on = files, next = true) {
-                Sheet(this).header(getString(R.string.book_files), getString(R.string.book_files_desc))
-                    .item(getString(R.string.open_file_access), bold = true) { BookFiles.request(this) }.show()
-            }
+        row(getString(R.string.book_files), getString(if (files) R.string.on else R.string.off), on = files, next = true) {
+            Sheet(this).header(getString(R.string.book_files), getString(R.string.book_files_desc))
+                .item(getString(R.string.open_file_access), bold = true) { BookFiles.request(this) }.show()
         }
         // 오늘 읽은 시간 = 사용 기록 액세스 허용. 켜고 끄기 모두 그 시스템 화면에서 한다.
         col = right
@@ -451,8 +449,6 @@ class SettingsActivity : EinkActivity() {
     /** [text] 를 줄바꿈 없이(한글은 글자마다 줄을 나눌 수 있어 글자 사이에 단어 이음표 U+2060. 두 칸 글자(이모지 등)는 쪼개지 않게 코드 포인트마다) */
     private fun noBreak(text: String) =
         text.replace(' ', '\u00A0').codePoints().toArray().joinToString("\u2060") { String(Character.toChars(it)) }
-
-    private fun installed(pkg: String) = runCatching { packageManager.getApplicationInfo(pkg, 0) }.isSuccess
 
     private fun section(title: String) = col.addView(sectionView(title))
 

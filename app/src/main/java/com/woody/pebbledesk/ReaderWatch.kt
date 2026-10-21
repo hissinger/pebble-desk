@@ -73,6 +73,8 @@ class ReaderWatchService : AccessibilityService() {
     private var lastWebRead = 0L
     /** 앱마다 읽는 화면이 마지막으로 앞에 온 때 */
     private val viewerAt = mutableMapOf<String, Long>()
+    /** 저장소에서 책 파일을 찾아 본 책(정리한 제목, [searchFile]). 서비스가 살아 있는 동안 한 권에 한 번만 */
+    private val fileSearched = mutableSetOf<String>()
     /** 이북 앱 데이터로 책을 아는 앱([ReaderSpec.fileBook])에 메뉴 없이 물어볼 남은 횟수(읽는 화면이 앞에 올 때마다 다시 센다) */
     private val fileTries = mutableMapOf<String, Int>()
     /** 열기 확인 창(이지뷰어 ▶·다음 파일)에 보인 파일([Cell.file] 꼴)과 그 때. 그 이름의 파일이 읽는 화면에 보이면 그 파일이다 */
@@ -89,7 +91,7 @@ class ReaderWatchService : AccessibilityService() {
     private val fileTitles = mutableMapOf<String, Pair<String, FileBook?>>()
     /**
      * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 서재가 멈췄을 때(모든 앱),
-     * 알라딘·리디처럼 서재를 잠깐만 보는 앱은 서재가 보이는 대로도 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
+     * 알라딘처럼 서재를 잠깐만 보는 앱은 서재가 보이는 대로도 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
      */
     private val pendingCovers = object : LinkedHashMap<String, ByteArray>() {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?) = size > PENDING_MAX
@@ -316,7 +318,7 @@ class ReaderWatchService : AccessibilityService() {
                         rememberRecent(spec, root)
                     }
                 }
-                // 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스·리디·YES24 전자도서관)은 멈추기를 기다리지 않고 표지가 보이는 대로 잘라 둔다.
+                // 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스·YES24 전자도서관)은 멈추기를 기다리지 않고 표지가 보이는 대로 잘라 둔다.
                 // 화면이 막 바뀐 때(읽는 화면에서 돌아오는 중이면 화면 캡처가 막힌 읽는 화면이 검게 찍힌다)와 아직 찍을 수 없을 때는 건너뛴다.
                 val ready = now - lastTransition >= TRANSITION_MS && now - lastShot >= SHOT_INTERVAL_MS
                 if (spec.eagerCovers && ready && (force || now - lastEagerRead >= THROTTLE_MS)) {
@@ -413,14 +415,14 @@ class ReaderWatchService : AccessibilityService() {
             val first = spec.pkg in readSince && readKnown.add(spec.pkg)
             // 편 책 기록의 책이 이 제목의 읽고 있는 책이면 그 책을 읽는 중이다(같은 제목의 책이 여럿이어도 목록 순서로 다른 책으로 바꾸지 않는다).
             // 아니면(서비스가 꺼졌다 켜져 '책 모름'·다른 책·책 id 없는 옛 줄·그 책이 목록에 없음) 이 제목의 책을 편 것으로 다시 적는다(그래야 그 뒤 시간이 이 책에)
-            if (first || recordedBook(spec)?.let { if (fileId != null) it.id == fileId else it.hasTitle(title) } != true) {
+            val opened = first || recordedBook(spec)?.let { if (fileId != null) it.id == fileId else it.hasTitle(title) } != true
+            if (opened) {
                 // 메뉴 없이 이북 앱 데이터로 방금 연 책을 알았으면 읽는 화면이 열린 때부터 그 책으로 센다.
                 val at = unknownOpen[spec.pkg] ?: viewerAt[spec.pkg]?.takeIf { file != null && shown.title == null } ?: fileAt
                 bookOpened(spec, Cell(title, info.author, progress, -1, null, Rect()), at, fileId)
-                file?.let { saveFile(title, it.path) }
-                return
             }
-            file?.let { saveFile(title, it.path) }
+            if (file != null) saveFile(title, file.path) else if (spec.searchesBookFile) searchFile(spec, title, info.author)
+            if (opened) return
         }
         if (progress < 0) return
         // 진행률은 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다)
@@ -635,6 +637,23 @@ class ReaderWatchService : AccessibilityService() {
     }
 
     /**
+     * 연 파일을 내놓지 않는 리더([ReaderSpec.searchesBookFile], 문리더)의 책 [title]: 표지도 파일도 모르면 저장소에서 그 제목의 EPUB 을 찾아
+     * 그 책의 파일로 적는다(표지는 그릴 때 꺼낸다). 저장소를 훑으므로 뒤에서, 책마다 한 번만(책 파일 읽기를 허용하기 전에는 세지 않는다).
+     */
+    private fun searchFile(spec: ReaderSpec, title: String, author: String) {
+        val key = normTitle(title)
+        if (key in fileSearched) return
+        val book = BookShelf.findByTitle(this, title) ?: return
+        if (BookShelf.hasCover(this, book.id) || BookShelf.filePath(this, book.id) != null || !BookFiles.canRead(this)) return
+        fileSearched += key
+        Bg.run({ BookFiles.findEpub(title, author) }) { result ->
+            val path = result.getOrNull() ?: return@run
+            WatchLog.add(this, WatchLog.Kind.FILE, spec.pkg, title, File(path).name)
+            saveFile(title, path)
+        }
+    }
+
+    /**
      * 책 칸이 아닌 것을 눌렀다: 검색 화면의 `바로 읽기`일 수 있으니 지금 보이는 책 상세를 기억하고 표지를 찍어 둔다
      * (웹 화면은 다 그려진 뒤 알림이 없을 때가 있어, 1초마다 기억해 둔 것이 비어 있을 수 있다).
      */
@@ -791,8 +810,7 @@ class ReaderWatchService : AccessibilityService() {
                 else BookShelf.findByTitle(this, s.title)
             if (book == null) {
                 // 목록에 없는 책도 멈춘 지금 잘라 두어, 그 책을 펴면 처음부터 표지가 붙게 한다(밀리·교보도서관 등. 1.5.7 까지는
-                // 바로 자르기 앱만, 그 밖의 앱은 편 뒤 서재로 돌아와야 채웠다). 리디 서재는 다 그려진 뒤 알림이 없어
-                // 바로 자르기([readScreen])는 칸을 누른 순간에야 찍고, 그때는 화면이 넘어가는 중이라 버려진다.
+                // 바로 자르기 앱만, 그 밖의 앱은 편 뒤 서재로 돌아와야 채웠다). 리디는 바로 자르기를 하지 않아 이것으로만 자른다.
                 val thumb = s.thumb?.takeIf(::usableThumb)
                 if (thumb != null && (s.file?.let { fileCoverKey(it) !in pendingCovers } ?: wantsPendingCover(s.title))) targets += CoverSpot(s.title, thumb, file = s.file)
                 continue
@@ -827,8 +845,10 @@ class ReaderWatchService : AccessibilityService() {
                 result.hardwareBuffer.close()
                 shot ?: return
                 // 요소 이름 없이 자리로 칸을 찾는 서재(리디·휴대폰 밀리)는 화면이 움직이는 중이었을 수 있어, 찍은 뒤에도 같은 자리에 있는 칸만 자른다.
-                val still = if (!spec.cellsByPosition) wanted else {
-                    val now = root(spec)?.let { readShelf(spec, it) }.orEmpty().associate { it.title to it.thumb }
+                // 표지 위에 받기 단추 등을 겹치는 서재(e-ink 밀리·리디 작품 화면)도 읽은 뒤 찍기 전에 겹쳤을 수 있어 다시 본다(겹친 칸은 표지 자리가 없다).
+                // 같은 책 칸이 둘이면(킨들 '이어 읽기' 표지와 표시에 가려 자르지 않는 칸) 표지 자리가 있는 칸으로 본다.
+                val still = if (!spec.cellsByPosition && spec.coverOverlays.isEmpty()) wanted else {
+                    val now = root(spec)?.let { readShelf(spec, it) }.orEmpty().filter { it.thumb != null }.associate { it.title to it.thumb }
                     wanted.filter { now[it.title] == it.rect }
                 }
                 Bg.run({

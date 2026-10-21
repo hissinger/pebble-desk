@@ -10,6 +10,8 @@ import kotlin.math.abs
  * 읽는 화면은 아래 오른쪽 진행률(불러오는 동안의 `0%` 는 뺀다). 가운데를 누르면 뜨는 위 막대 `epub_navibar` 가운데에 제목(`팩트풀니스`)이
  * 이름 없는 글자로 있다(2026-10-16 페블에서 확인. 몇 초 뒤 저절로 닫힌다).
  * 전체도서 탭·책장 안의 받지 않은 책 칸은 누르면 내려받기만 해서, 누른 칸은 읽는 화면이 열릴 때 편 것으로 본다([openOnViewer]).
+ * 받지 않은 칸은 표지 가운데에 받기 단추(받는 중에는 진행 원·취소 단추)를, 서비스가 끝난 책은 흰 막을 겹쳐 그려 그런 칸의 표지는 자르지 않는다
+ * ([COVER_OVERLAYS], 칸 레이아웃 `view_bookshelf_cell`, 2026-10-21 페블에서 확인).
  */
 object Millie : ReaderSpec(
     pkg = "kr.co.millie.eink", classPrefix = "kr.co.millie",
@@ -19,7 +21,8 @@ object Millie : ReaderSpec(
         "kr.co.millie.eink.pdf.PDFViewActivity",
         "kr.co.millie.eink.epub.StoryViewActivity",
     ),
-    titles = listOf("tv_book_title"), thumbs = listOf("iv_thumbnail"), authors = emptyList(), progress = "bookshelf_cell_reading", due = null,
+    titles = listOf("tv_book_title"), thumbs = listOf("iv_thumbnail"), coverOverlays = COVER_OVERLAYS,
+    authors = emptyList(), progress = "bookshelf_cell_reading", due = null,
     viewerProgress = listOf("tv_viewer_add_on_right"), viewerLoading = "epub_loading_message",
     openOnViewer = true,
 ) {
@@ -69,3 +72,12 @@ object Millie : ReaderSpec(
         return Cell(title, author, -1, -1, cover, Rect())
     }
 }
+
+/**
+ * 표지 위에 겹치는 요소: 받기 단추, 받는 중 진행 원(앱의 철자 그대로)·취소 단추, 서비스 종료 막·배지, 공개 예정 막, 편집 중 고르기 표시.
+ * 칸에 이름 없는 배지도 있지만 이름이 없어 가리지 못한다.
+ */
+private val COVER_OVERLAYS = listOf(
+    "download_start", "dowload_progressBar", "download_cancel", "container_not_service", "v_badge_not_service",
+    "container_coming_soon", "bookshelf_cell_cover_dim_none", "bookshelf_cell_cover_dim_selected",
+)
