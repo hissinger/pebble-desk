@@ -134,12 +134,19 @@ class SettingsActivity : EinkActivity() {
 
         // 화면(글자 · 간격 · 색 · 앱 아이콘 · 시계)은 하위 화면에 모아 첫 화면을 짧게 둔다(줄 간격을 키워도 잘리지 않게).
         row(getString(R.string.section_display), null, next = true) { open(PAGE_DISPLAY) }
-        // 언어는 첫 화면에 둔다(다른 언어 화면에서도 바로 찾게). 언어 이름은 바꾸지 않는다(어느 언어에서도 알아볼 수 있게). 바꾸면 이 화면부터 다시 만든다.
-        val languages = listOf("한국어", "English")
-        row(getString(R.string.language), languages[if (prefs.english) 1 else 0], next = true) {
-            choose(getString(R.string.language), languages, if (prefs.english) 1 else 0) {
-                if ((it == 1) != prefs.english) {
-                    prefs.english = it == 1
+        // 언어는 첫 화면에 둔다(다른 언어 화면에서도 바로 찾게). 언어 이름은 바꾸지 않는다(어느 언어에서도 알아볼 수 있게).
+        // 기기 언어 따르기는 지금 보이는 언어를 괄호로(`시스템(한국어)`). 바꾸면 이 화면부터 다시 만든다(onResume).
+        val choices = listOf(AppLanguage.SYSTEM, AppLanguage.KOREAN, AppLanguage.ENGLISH)
+        fun languageName(l: AppLanguage): String = when (l) {
+            AppLanguage.SYSTEM ->
+                getString(R.string.language_system, languageName(if (l.isEnglish(HomePrefs.systemLanguage())) AppLanguage.ENGLISH else AppLanguage.KOREAN))
+            AppLanguage.KOREAN -> "한국어"
+            AppLanguage.ENGLISH -> "English"
+        }
+        row(getString(R.string.language), languageName(prefs.language), next = true) {
+            choose(getString(R.string.language), choices.map(::languageName), choices.indexOf(prefs.language)) {
+                if (choices[it] != prefs.language) {
+                    prefs.language = choices[it]
                     recreate()
                 }
             }

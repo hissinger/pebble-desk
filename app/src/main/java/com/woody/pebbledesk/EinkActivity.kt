@@ -37,7 +37,7 @@ abstract class EinkActivity : Activity() {
     protected open val fixedTextSize: Boolean get() = false
 
     /**
-     * 설정의 언어(한국어/영어)로 화면 글자와 날짜 형식을 정하고, 화면 폭이 [Ui.DESIGN_WIDTH_DP] 가 되도록 밀도를 다시 정한다.
+     * 설정의 언어(기기 언어 따르기/한국어/영어)로 화면 글자와 날짜 형식을 정하고, 화면 폭이 [Ui.DESIGN_WIDTH_DP] 가 되도록 밀도를 다시 정한다.
      * 모든 dp·sp 값이 페블 기준이라, 픽셀 수는 거의 같은데 밀도만 다르게 선언한 기기(메이북 E6: 320dpi → 536dp)에서도
      * 같은 물리 크기로 그려진다. 페블(1072px, 300dpi)은 그대로 300 이 나온다.
      */
@@ -85,7 +85,8 @@ abstract class EinkActivity : Activity() {
         Ui.textScale = textScale
         Ui.rowScale = rowScale
         Palette.current = createdPalette
-        if (prefs.english != createdEnglish || prefs.textScalePercent != createdTextScale ||
+        // 언어는 기기 언어를 따르면 떠나 있는 사이 기기 언어가 바뀌었을 수도 있어 지금 값으로 다시 가른다
+        if (HomePrefs.isEnglish(this) != createdEnglish || prefs.textScalePercent != createdTextScale ||
             prefs.rowScalePercent != createdRowScale || prefs.palette != createdPalette) {
             recreating = true
             recreate()

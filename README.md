@@ -114,7 +114,7 @@
 |---|---|
 | 독서 | 읽고 있는 책, 읽는 책 자동 추가, 자동 추가 안내, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 |
 | 화면 | 글자 · 간격(글자 크기 70~150%(기기 글꼴 크기에 곱한다), 줄 간격 80~150%를 10%씩 슬라이더로, 미리 보기), 색(흑백 · 컬러. 컬러 전자잉크용, 화면마다 색면), 앱 아이콘, 시계(24시간/12시간), 기기 상단 바(홈에서도 보이기. 교보 sam 7 처럼 상단 바 버튼이 곧 빠른 설정인 기기용) |
-| 언어 | 한국어/English (첫 화면) |
+| 언어 | 시스템(기기 언어를 따름)/한국어/English (첫 화면) |
 | 앱 관리 | 자주 쓰는 앱 관리(맨 위에서 보기 목록/격자, 이름을 누르면 이름 바꾸기), 숨긴 앱, 기본 홈 앱, 기기 설정 열기 |
 | 정보 | 기기 정보(모델·화면·권한·자동 추가 서비스 기록·누른 버튼·시스템 화면 시험을 한 화면에 모은 진단 화면), 업데이트 |
 
@@ -140,7 +140,7 @@ Android Studio의 JDK로 빌드한다(minSdk 28, targetSdk 34).
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ./gradlew assembleRelease
-adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.8-release.apk
+adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.9-release.apk
 ```
 
 ## 문서
