@@ -233,8 +233,9 @@ def week(db):
     # B6: 제목을 고친 책(읽은 시간은 그 책 id, 편 책 제목은 고치기 전 제목)
     s.shelf("b-edit", "헤세의 소설", seen="고치기 전 제목")
     s.read(TODAY, "고치기 전 제목", 7, "b-edit")
-    s.read(TODAY, "1분 책", 1)
-    s.read(TODAY, "59초 책", 0, seconds=59)
+    # B10: 이번 주 5분 경계
+    s.read(TODAY, "5분 책", 5)
+    s.read(TODAY, "4분 59초 책", 4, seconds=59)
 
 
 def streak(db):
