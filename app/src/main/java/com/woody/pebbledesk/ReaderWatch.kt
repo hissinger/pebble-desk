@@ -640,7 +640,7 @@ class ReaderWatchService : AccessibilityService() {
     private fun coverFromFile(path: String?) = path != null && (path.endsWith(".epub", ignoreCase = true) || isImageFile(path)) && BookFiles.canRead(this)
 
     /**
-     * 책 파일 읽기가 꺼져 있어 [spec] 의 책(KOReader)·표지(문리더·네오리더)를 모른다: 홈으로 돌아오면 묻도록 적어 둔다
+     * 책 파일 읽기가 꺼져 있어 [spec] 의 책(KOReader)·표지(문리더·네오리더)·표지와 책 정보(이지뷰어·채리뷰어)를 모른다: 홈으로 돌아오면 묻도록 적어 둔다
      * ([HomeActivity.warnFileAccess]). `다시 보지 않기` 를 누른 앱은 적지 않는다.
      */
     private fun wantFiles(spec: ReaderSpec) {
@@ -751,6 +751,8 @@ class ReaderWatchService : AccessibilityService() {
         // 파일 이름이 제목이던 책(책 정보가 보이기 전에 넣음)은 이제 칸에 보이는 책 정보의 제목·저자로
         if (fileId != null && name != null) retitle(book, name, cell)
         seen.file?.let { rememberShelfFile(spec, it, path, book) }
+        // 파일 칸으로 편 EPUB·그림 책(이지뷰어)은 책 파일 읽기를 켜야 표지·책 정보를 꺼내니 홈에서 묻게 한다
+        if (name != null && (name.endsWith(".epub", ignoreCase = true) || isImageFile(name)) && !BookFiles.canRead(this)) wantFiles(spec)
         WatchLog.add(this, WatchLog.Kind.OPENED, spec.pkg, seen.title, result.name)
         // 편 책 기록에는 앱이 보여 준 제목을 적는다(제목을 고친 책이어도. 지운 뒤 그 시간을 다시 정할 때 같은 제목의 새 책을 찾게)
         ReadingLog.bookOpened(this, spec.pkg, seen.title, book.id, openedAt)

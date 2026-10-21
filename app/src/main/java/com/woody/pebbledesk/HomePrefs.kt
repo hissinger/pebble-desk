@@ -92,7 +92,7 @@ class HomePrefs(context: Context) {
         set(v) = sp.edit().putString("density_warn_skip", v).apply()
 
     /**
-     * 책 파일 읽기가 꺼져 있어 자동 추가 서비스가 책(KOReader)·표지(문리더·네오리더)를 모른 이북 앱(패키지). 홈으로 돌아오면 그 앱마다
+     * 책 파일 읽기가 꺼져 있어 자동 추가 서비스가 책(KOReader)·표지(문리더·네오리더·이지뷰어)를 모른 이북 앱(패키지). 홈으로 돌아오면 그 앱마다
      * 안내 창을 띄우고 지운다([HomeActivity.warnFileAccess]). 그 앱을 쓸 때만 적히므로 깔아만 둔 앱은 묻지 않는다.
      */
     var fileNoticeWanted: Set<String>

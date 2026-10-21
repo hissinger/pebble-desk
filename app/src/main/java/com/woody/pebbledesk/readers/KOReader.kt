@@ -30,6 +30,7 @@ open class KOReaderSpec(pkg: String) : ReaderSpec(
     viewerProgress = emptyList(),
     fileState = true,
     opensBookFile = true,
+    needsBookFiles = true,
 ) {
     override fun fileBooks(context: Context, since: Long): List<FileBook>? {
         if (!BookFiles.canRead(context)) return null

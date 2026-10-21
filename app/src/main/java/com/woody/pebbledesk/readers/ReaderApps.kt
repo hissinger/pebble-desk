@@ -13,11 +13,10 @@ object ReaderApps {
     val byPackage = ALL.associateBy { it.pkg }
 
     /**
-     * 책 파일 읽기([BookFiles])를 켜야 책(KOReader, [ReaderSpec.fileState])이나 표지(문리더 [ReaderSpec.searchesBookFile]·
-     * 네오리더 [ReaderSpec.fileViewer])를 아는 앱. 이 가운데 깔린 앱이 있으면 시작하기에 책 파일 읽기 쪽을 더한다(홈의 안내 창은
-     * 자동 추가 서비스가 그 앱을 쓰다 막혔을 때 적는다, `ReaderWatchService.wantFiles`).
+     * 책 파일 읽기가 필요한 앱([ReaderSpec.needsBookFiles]). 이 가운데 깔린 앱이 있으면 시작하기에 책 파일 읽기 쪽을 더한다
+     * (홈의 안내 창은 자동 추가 서비스가 그 앱을 쓰다 막혔을 때 적는다, `ReaderWatchService.wantFiles`).
      */
-    val fileApps = ALL.filter { it.fileState || it.searchesBookFile || it.fileViewer != null }
+    val fileApps = ALL.filter { it.needsBookFiles }
 
     /** 이북 앱 패키지(읽고 있는 앱 고르기에서 먼저 보이고, 오늘 읽은 시간을 센다) */
     val packages = byPackage.keys

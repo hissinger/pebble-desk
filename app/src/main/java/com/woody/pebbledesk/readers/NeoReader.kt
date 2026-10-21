@@ -25,6 +25,7 @@ object NeoReader : ReaderSpec(
     viewerProgress = listOf("page_name", "page_num"), viewerTitle = "tv_book_title",
     fileViewer = FileViewer("com.onyx.kreader.ui.ReaderHomeActivity", R.string.app_neoreader, shelfPkg = "com.onyx"),
     viewerTabs = true,
+    needsBookFiles = true,
 ) {
     override fun splitTitle(text: String): Pair<String, String> = withoutBookFile(text) to ""
 
