@@ -153,6 +153,16 @@ fun TextView.setSp(sp: Float) =
     if (Ui.baseText) setTextSize(TypedValue.COMPLEX_UNIT_DIP, sp) else setTextSize(TypedValue.COMPLEX_UNIT_SP, sp * Ui.textScale)
 
 /**
+ * 낱말 안에서는 줄을 나누지 않는다: 한글은 글자마다 줄을 나눌 수 있어 낱말의 글자 사이에 단어 이음표 U+2060(두 칸 글자(이모지 등)는
+ * 쪼개지 않게 코드 포인트마다). 줄은 띄어쓴 곳에서만 나뉜다(한 줄보다 긴 낱말은 그래도 나뉜다).
+ */
+fun keepWords(text: String): String =
+    text.split(' ').joinToString(" ") { word -> word.codePoints().toArray().joinToString("\u2060") { String(Character.toChars(it)) } }
+
+/** [text] 를 줄바꿈 없이(띄어쓴 곳도 붙인다, [keepWords]) */
+fun noBreak(text: String) = keepWords(text.replace(' ', '\u00A0'))
+
+/**
  * 키운 글자([Ui.textScale])가 폭 [widthPx] 에서 [TextView.getMaxLines] 줄을 넘으면 1dp 씩 줄인다. 배율 100% 크기 아래로는 줄이지 않는다
  * (그래도 넘치면 줄임표). 홈 큰 제목처럼 줄 수를 늘릴 자리가 없는 글자에 쓴다.
  */
