@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """홈페이지의 검색·공유 정보를 채운다: <head> 의 제목·설명·대표 주소·언어판·공유 카드·아이콘, 구조화 데이터(JSON-LD),
-화면에 보이는 '자주 묻는 질문'(같은 글로 FAQPage), robots.txt · sitemap.xml · llms.txt.
+화면에 보이는 '자주 묻는 질문'(같은 글로 FAQPage), 방문 통계(Cloudflare Web Analytics), robots.txt · sitemap.xml · llms.txt.
 
     python3 tools/site/seo.py      # site/index.html · site/en/index.html 을 고쳐 쓴다(다시 돌려도 같다)
 
@@ -12,6 +12,8 @@ import re
 
 BASE = "https://pebbledesk.github.io/"
 REPO = "https://github.com/hissinger/pebble-desk"
+# Cloudflare Web Analytics(쿠키 없음): 방문 수·페이지·들어온 곳·나라·기기 종류. 토큰은 공개 값(페이지에 그대로 실린다)
+CF_BEACON = "1896b35940664abaa335017941fc327d"
 RELEASES = REPO + "/releases/latest"
 LICENSE = REPO + "/blob/main/LICENSE"
 
@@ -204,6 +206,8 @@ def head(lang, p):
 <script type="application/ld+json">
 {json.dumps(data, ensure_ascii=False, indent=1)}
 </script>
+<!-- Cloudflare Web Analytics -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{{"token": "{CF_BEACON}"}}'></script>
 '''
 
 
