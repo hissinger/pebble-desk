@@ -201,6 +201,8 @@ class ReaderWatchService : AccessibilityService() {
         val again = screen[spec.pkg] == name
         screen[spec.pkg] = name
         if (spec.viewerHolder != null) ReadingLog.viewerShown(this, spec.pkg, name in spec.viewers, now)
+        // 책 파일 읽기가 필요한 앱으로 책을 읽는데 꺼져 있으면 홈에서 묻게 한다(깔아만 둔 앱은 읽는 화면이 뜨지 않아 묻지 않는다)
+        if (spec.needsBookFiles && name in spec.viewers && !BookFiles.canRead(this)) wantFiles(spec)
         if (ReadingLog.isReaderScreen(name)) {
             viewerAt[spec.pkg] = now
             // 같은 읽는 화면의 알림이 한 번 더 온 것이면 이 읽는 화면에서 본 파일·누른 칸을 그대로 둔다
@@ -352,12 +354,8 @@ class ReaderWatchService : AccessibilityService() {
     private fun readViewer(spec: ReaderSpec) {
         viewerSpec = null
         if (screen[spec.pkg] !in spec.viewers) return
-        // 책이 열려 있는지를 데이터로 아는 앱(KOReader)은 화면을 읽지 않고 데이터로 맞춘다(앞에 온 때 한 번).
-        // 책 파일 읽기가 꺼져 있으면 책을 알 수 없으니 홈에서 묻게 한다(홈으로 돌아올 때 맞추는 것은 깔려 있기만 해도 하므로 여기서만)
-        if (spec.fileState) {
-            if (!BookFiles.canRead(this)) wantFiles(spec)
-            return syncFiles(spec)
-        }
+        // 책이 열려 있는지를 데이터로 아는 앱(KOReader)은 화면을 읽지 않고 데이터로 맞춘다(앞에 온 때 한 번)
+        if (spec.fileState) return syncFiles(spec)
         val windows = windowsOf(spec).takeIf { it.all.isNotEmpty() } ?: return logNoWindow(spec)
         val shown = spec.readViewer(windows)
         val file = fileBook(spec, shown)
@@ -425,11 +423,7 @@ class ReaderWatchService : AccessibilityService() {
                 val at = unknownOpen[spec.pkg] ?: viewerAt[spec.pkg]?.takeIf { file != null && shown.title == null } ?: fileAt
                 bookOpened(spec, Cell(title, info.author, progress, -1, null, Rect()), at, fileId)
             }
-            if (file != null) {
-                saveFile(title, file.path)
-                // 파일을 알아도 표지는 책 파일 읽기를 켜야 꺼낸다(네오리더)
-                if (!BookFiles.canRead(this) && BookShelf.findByTitle(this, title)?.let { BookShelf.hasCover(this, it.id) } == false) wantFiles(spec)
-            } else if (spec.searchesBookFile) searchFile(spec, title, info.author)
+            if (file != null) saveFile(title, file.path) else if (spec.searchesBookFile) searchFile(spec, title, info.author)
             if (opened) return
         }
         if (progress < 0) return
@@ -640,7 +634,7 @@ class ReaderWatchService : AccessibilityService() {
     private fun coverFromFile(path: String?) = path != null && (path.endsWith(".epub", ignoreCase = true) || isImageFile(path)) && BookFiles.canRead(this)
 
     /**
-     * 책 파일 읽기가 꺼져 있어 [spec] 의 책(KOReader)·표지(문리더·네오리더)·표지와 책 정보(이지뷰어·채리뷰어)를 모른다: 홈으로 돌아오면 묻도록 적어 둔다
+     * 책 파일 읽기가 필요한 앱([ReaderSpec.needsBookFiles])의 읽는 화면이 떴는데 책 파일 읽기가 꺼져 있다: 홈으로 돌아오면 묻도록 적어 둔다
      * ([HomeActivity.warnFileAccess]). `다시 보지 않기` 를 누른 앱은 적지 않는다.
      */
     private fun wantFiles(spec: ReaderSpec) {
@@ -656,14 +650,13 @@ class ReaderWatchService : AccessibilityService() {
 
     /**
      * 연 파일을 내놓지 않는 리더([ReaderSpec.searchesBookFile], 문리더)의 책 [title]: 표지도 파일도 모르면 저장소에서 그 제목의 EPUB 을 찾아
-     * 그 책의 파일로 적는다(표지는 그릴 때 꺼낸다). 저장소를 훑으므로 뒤에서, 책마다 한 번만(책 파일 읽기를 허용하기 전에는 세지 않고 홈에서 묻게 한다).
+     * 그 책의 파일로 적는다(표지는 그릴 때 꺼낸다). 저장소를 훑으므로 뒤에서, 책마다 한 번만(책 파일 읽기를 허용하기 전에는 세지 않는다).
      */
     private fun searchFile(spec: ReaderSpec, title: String, author: String) {
         val key = normTitle(title)
         if (key in fileSearched) return
         val book = BookShelf.findByTitle(this, title) ?: return
-        if (BookShelf.hasCover(this, book.id) || BookShelf.filePath(this, book.id) != null) return
-        if (!BookFiles.canRead(this)) return wantFiles(spec)
+        if (BookShelf.hasCover(this, book.id) || BookShelf.filePath(this, book.id) != null || !BookFiles.canRead(this)) return
         fileSearched += key
         Bg.run({ BookFiles.findEpub(title, author) }) { result ->
             val path = result.getOrNull() ?: return@run
@@ -751,8 +744,6 @@ class ReaderWatchService : AccessibilityService() {
         // 파일 이름이 제목이던 책(책 정보가 보이기 전에 넣음)은 이제 칸에 보이는 책 정보의 제목·저자로
         if (fileId != null && name != null) retitle(book, name, cell)
         seen.file?.let { rememberShelfFile(spec, it, path, book) }
-        // 파일 칸으로 편 EPUB·그림 책(이지뷰어)은 책 파일 읽기를 켜야 표지·책 정보를 꺼내니 홈에서 묻게 한다
-        if (name != null && (name.endsWith(".epub", ignoreCase = true) || isImageFile(name)) && !BookFiles.canRead(this)) wantFiles(spec)
         WatchLog.add(this, WatchLog.Kind.OPENED, spec.pkg, seen.title, result.name)
         // 편 책 기록에는 앱이 보여 준 제목을 적는다(제목을 고친 책이어도. 지운 뒤 그 시간을 다시 정할 때 같은 제목의 새 책을 찾게)
         ReadingLog.bookOpened(this, spec.pkg, seen.title, book.id, openedAt)
