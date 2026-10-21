@@ -283,10 +283,13 @@
     <string name="guide_libby_desc">읽는 중 진행률은 메뉴를 띄워야 들어옵니다. 표지는 서가 화면에서 가져옵니다.\n오늘 읽은 시간은 자동 추가를 켜 둬야 셉니다.</string>
     <string name="guide_neo">네오리더(BOOX)</string>
     <string name="guide_neo_desc">표지는 빈 표지입니다(책 파일 읽기를 켜면 EPUB 표지를 넣습니다).\n홈에서 책을 누르면 그 파일을 네오리더로 바로 엽니다.</string>
+    <string name="guide_easyview">이지뷰어</string>
+    <string name="guide_cherie">채리뷰어</string>
+    <string name="guide_easyview_desc">서재에서 책을 선택해서 읽어야 자동 추가됩니다.\n읽는 화면 위 줄에 파일 이름과 쪽이 보여야 합니다.</string>
     <string name="guide_ko">KOReader</string>
     <string name="guide_ko_desc">설정 › 독서 › 책 파일 읽기를 켜야 책이 들어옵니다. KOReader 에서 연 책은 홈으로 돌아오면 들어옵니다.\n홈에서 책을 누르면 그 파일을 바로 엽니다.</string>
     <string name="book_files">책 파일 읽기</string>
-    <string name="book_files_desc">KOReader 는 화면에 책 제목을 드러내지 않아, KOReader 가 남기는 기록(koreader 폴더, 책 옆 .sdr 폴더)으로 편 책과 진행률을 압니다. 네오리더·문리더는 연 책의 EPUB 파일에서 표지를 꺼냅니다. 책 파일에서는 제목·저자·표지만 꺼냅니다.\n\n안드로이드 설정의 모든 파일에 액세스에서 Pebble Desk 의 모든 파일 관리 허용을 켜 주세요. 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
+    <string name="book_files_desc">KOReader 는 화면에 책 제목을 드러내지 않아, KOReader 가 남기는 기록(koreader 폴더, 책 옆 .sdr 폴더)으로 편 책과 진행률을 압니다. 네오리더·문리더는 연 책의 EPUB 파일에서 표지를 꺼냅니다(이지뷰어는 표지와 책 정보). 책 파일에서는 제목·저자·표지만 꺼냅니다.\n\n안드로이드 설정의 모든 파일에 액세스에서 Pebble Desk 의 모든 파일 관리 허용을 켜 주세요. 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
     <string name="open_file_access">모든 파일에 액세스 열기</string>
     <string name="app_neoreader">네오리더(BOOX)</string>
     <string name="guide_progress_note">읽는 중 진행률은 이북 앱 뷰어 설정에서 화면 아래 정보(쪽·진행률) 표시를 켜 두면 들어옵니다.</string>
@@ -295,7 +298,7 @@
     <string name="add_author">저자 입력</string>
     <string name="edit_author">저자 고치기</string>
     <string name="save">저장</string>
-    <string name="reader_watch_desc">교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES·eBook)·문리더·킨들·Libby·네오리더·KOReader 서재·검색 화면의 책 제목·저자·진행률·반납일과 표지, 읽는 화면의 책 제목·진행률만 읽어 읽고 있는 책 목록에 넣습니다. 본문과 다른 앱 화면은 받지 않고, 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
+    <string name="reader_watch_desc">교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES·eBook)·문리더·이지뷰어·채리뷰어·킨들·Libby·네오리더·KOReader 서재·검색 화면의 책 제목·저자·진행률·반납일과 표지(파일 목록인 이지뷰어·채리뷰어는 파일 이름·위치도), 읽는 화면의 책 제목(이지뷰어·채리뷰어는 파일 이름)·진행률만 읽어 읽고 있는 책 목록에 넣습니다. 본문과 다른 앱 화면은 받지 않고, 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
     <string name="open_app_info">앱 정보 열기</string>
     <string name="allow_hint">허용(allow)이 보이지 않으면 아래 단축키·바로가기(shortcut) 스위치를 켜세요.</string>
     <string name="restricted_hint">접근성에서 Pebble Desk 가 흐리게 막혀 있으면(제한된 설정) 먼저 그것을 한 번 눌러 안내 창을 닫은 뒤, 앱 정보 › 오른쪽 위 ⋮ › 제한된 설정 허용을 하고 다시 켜 주세요.</string>

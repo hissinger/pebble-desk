@@ -7,14 +7,18 @@ import java.time.LocalDate
 /**
  * 서재 칸 한 권에서 읽은 것. [cell] 은 칸의 화면 위치, [thumb] 는 표지 그림 자리(모르면 null).
  * [stale] 은 방금 읽어 둔 서재 칸을 누른 글자로 맞춘 것(그 뒤 읽는 화면에서 진행률이 바뀌었을 수 있다).
+ * [file] 은 파일 목록인 서재(이지뷰어)에서 칸의 파일: 화면에 보이는 위치 + 파일 이름(`#휴대폰/Books/a.epub`, 실제 경로는 [ReaderSpec.bookFile]).
  */
 data class Cell(
     val title: String, val author: String, val progress: Int, val due: Long, val thumb: Rect?, val cell: Rect,
-    val stale: Boolean = false,
+    val stale: Boolean = false, val file: String? = null,
 )
 
-/** 읽는 화면에서 읽은 것. [title]·[author] 는 메뉴에 제목이 보일 때만(모르면 null), [progress] 는 모르면 -1 */
-class ViewerInfo(val title: String?, val author: String, val progress: Int)
+/**
+ * 읽는 화면에서 읽은 것. [title]·[author] 는 메뉴에 제목이 보일 때만(모르면 null), [progress] 는 모르면 -1.
+ * [file] 은 제목 대신 파일 이름만 보이는 읽는 화면(이지뷰어)의 파일 이름(그 파일로 넣은 책을 찾는다, 모르면 null)
+ */
+class ViewerInfo(val title: String?, val author: String, val progress: Int, val file: String? = null)
 
 /**
  * 실행 화면이 없어 파일로만 여는 이북 앱(네오리더). [activity] 는 파일(`ACTION_VIEW`)을 받는 화면, [label] 은 읽고 있는 앱 고르기에 보일 이름,
@@ -81,11 +85,20 @@ internal fun authorName(text: String): String {
 /** 지은이 뒤의 `지음`·`저`(뒤에 옮긴이·출판사가 이어질 수 있다) */
 private val AUTHOR_ROLE = Regex("""\s+(지음|저)(?=\s*($|/|,))""")
 
-/** 파일로 연 책의 확장자(읽는 화면 제목이 파일 이름일 때 뗀다. 문리더·네오리더) */
-private val BOOK_FILE = Regex("""\.(txt|html?|xhtml|mht|mhtml|md|rtf|docx?|odt|fb2(\.zip)?|chm|epub|mobi|prc|azw3?|pdf|djvu|cbz|cbr|zip|caj)$""", RegexOption.IGNORE_CASE)
+/** 파일로 연 책의 확장자(읽는 화면 제목이 파일 이름일 때 뗀다. 문리더·네오리더. 이지뷰어는 파일 목록 칸 중 이것만 책으로 본다) */
+private val BOOK_FILE = Regex("""\.(txt|html?|xhtml|mht|mhtml|md|rtf|docx?|odt|fb2(\.zip)?|chm|epub|mobi|prc|azw3?|pdf|djvu|cbz|cbr|zip|rar|cb7|7z|caj)$""", RegexOption.IGNORE_CASE)
+
+/** 그림 파일(이지뷰어는 그림 폴더를 한 권으로 본다) */
+private val IMAGE_FILE = Regex("""\.(jpe?g|png|gif|webp|bmp|heic|avif)$""", RegexOption.IGNORE_CASE)
+
+internal fun isImageFile(name: String) = IMAGE_FILE.containsMatchIn(name)
 
 /** `이름.epub` → `이름`(책 파일 확장자만 뗀다) */
 internal fun withoutBookFile(text: String): String = text.replace(BOOK_FILE, "")
+
+/** 같은 파일 이름인가(대소문자 무시, 한쪽이 확장자를 숨긴 이름이어도. 이지뷰어 목록의 '첫글자를 대문자로'·읽는 화면의 확장자 숨김 설정) */
+internal fun sameFileName(a: String, b: String) =
+    a.equals(b, ignoreCase = true) || withoutBookFile(a).equals(withoutBookFile(b), ignoreCase = true)
 
 /** `47%` → 47, 소수(문리더 `30.9%`)는 버림. 없으면 -1 */
 internal fun percent(text: CharSequence): Int =

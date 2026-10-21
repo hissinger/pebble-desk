@@ -102,26 +102,47 @@ object BookFiles {
     private const val SEARCH_DEPTH = 6
 
     /**
-     * 책 파일의 표지(JPEG, 긴 변을 [COVER_PX] 안으로 줄임). EPUB 만(책 정보의 표지 그림), 없거나 못 읽으면 null.
-     * 큰 그림을 다루므로 화면 스레드에서 부르지 않는다.
+     * 책 파일의 표지(JPEG, 긴 변을 [COVER_PX] 안으로 줄임): EPUB 은 책 정보의 표지 그림, 그림 파일(그림 폴더 한 권, 이지뷰어)은 그 폴더의 첫 그림
+     * (이름 순, 숫자는 크기 순). 없거나 못 읽으면 null. 큰 그림을 다루므로 화면 스레드에서 부르지 않는다.
      */
     fun cover(path: String): ByteArray? = runCatching {
+        if (isImageFile(path)) {
+            val first = File(path).parentFile?.listFiles { f -> f.isFile && isImageFile(f.name) }?.minWithOrNull(compareBy(NATURAL) { it.name }) ?: return null
+            return scaledJpeg { first.inputStream() }
+        }
         ZipFile(path).use { zip ->
             val href = readEpub(zip)?.cover ?: return null
             val entry = zip.getEntry(href) ?: return null
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            zip.getInputStream(entry).use { BitmapFactory.decodeStream(it, null, bounds) }
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-            var sample = 1
-            while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= COVER_PX) sample *= 2
-            val decoded = zip.getInputStream(entry).use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
-                ?: return null
-            val scale = COVER_PX.toFloat() / maxOf(decoded.width, decoded.height)
-            val bitmap = if (scale < 1f) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true)
-                .also { decoded.recycle() } else decoded
-            ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it); bitmap.recycle() }.toByteArray()
+            scaledJpeg { zip.getInputStream(entry) }
         }
     }.getOrNull()
+
+    /** [open] 이 여는 그림을 긴 변 [COVER_PX] 안으로 줄인 JPEG(그림이 아니면 null). 두 번 연다(크기 보기·줄여 읽기) */
+    private fun scaledJpeg(open: () -> InputStream): ByteArray? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        open().use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= COVER_PX) sample *= 2
+        val decoded = open().use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) } ?: return null
+        val scale = COVER_PX.toFloat() / maxOf(decoded.width, decoded.height)
+        val bitmap = if (scale < 1f) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true)
+            .also { decoded.recycle() } else decoded
+        return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it); bitmap.recycle() }.toByteArray()
+    }
+
+    /** 파일 이름 순서(대소문자 무시, 숫자는 크기 순: `p2` 가 `p10` 앞) */
+    private val NATURAL = Comparator<String> { a, b ->
+        val x = DIGITS.findAll(a.lowercase()).map { it.value }.toList()
+        val y = DIGITS.findAll(b.lowercase()).map { it.value }.toList()
+        for (i in 0 until minOf(x.size, y.size)) {
+            val (p, q) = x[i] to y[i]
+            val c = if (p[0].isDigit() && q[0].isDigit()) compareValuesBy(p, q, { it.trimStart('0').length }, { it.trimStart('0') }) else p.compareTo(q)
+            if (c != 0) return@Comparator c
+        }
+        x.size - y.size
+    }
+    private val DIGITS = Regex("""\d+|\D+""")
 
     /** EPUB 묶음: `META-INF/container.xml` 이 가리키는 OPF 의 제목·저자·표지 */
     private fun readEpub(zip: ZipFile): Epub? {
