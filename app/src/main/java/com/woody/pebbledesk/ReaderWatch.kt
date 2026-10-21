@@ -19,6 +19,7 @@ import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.woody.pebbledesk.readers.AppWindows
+import com.woody.pebbledesk.readers.BookFiles
 import com.woody.pebbledesk.readers.Cell
 import com.woody.pebbledesk.readers.FileBook
 import com.woody.pebbledesk.readers.ReaderApps
@@ -70,6 +71,8 @@ class ReaderWatchService : AccessibilityService() {
     private var lastWebRead = 0L
     /** 앱마다 읽는 화면이 마지막으로 앞에 온 때 */
     private val viewerAt = mutableMapOf<String, Long>()
+    /** 저장소에서 책 파일을 찾아 본 책(정리한 제목, [searchFile]). 서비스가 살아 있는 동안 한 권에 한 번만 */
+    private val fileSearched = mutableSetOf<String>()
     /** 이북 앱 데이터로 책을 아는 앱([ReaderSpec.fileBook])에 메뉴 없이 물어볼 남은 횟수(읽는 화면이 앞에 올 때마다 다시 센다) */
     private val fileTries = mutableMapOf<String, Int>()
     /** 그 앱에서 마지막으로 메뉴 제목으로 물어본 결과(못 찾았으면 null. 메뉴를 띄워 둔 동안 다시 묻지 않게, 읽는 화면이 앞에 올 때마다 비운다) */
@@ -335,14 +338,14 @@ class ReaderWatchService : AccessibilityService() {
             val first = spec.pkg in readSince && readKnown.add(spec.pkg)
             // 편 책 기록의 책이 이 제목의 읽고 있는 책이면 그 책을 읽는 중이다(같은 제목의 책이 여럿이어도 목록 순서로 다른 책으로 바꾸지 않는다).
             // 아니면(서비스가 꺼졌다 켜져 '책 모름'·다른 책·책 id 없는 옛 줄·그 책이 목록에 없음) 이 제목의 책을 편 것으로 다시 적는다(그래야 그 뒤 시간이 이 책에)
-            if (first || recordedBook(spec)?.hasTitle(title) != true) {
+            val opened = first || recordedBook(spec)?.hasTitle(title) != true
+            if (opened) {
                 // 메뉴 없이 이북 앱 데이터로 방금 연 책을 알았으면 읽는 화면이 열린 때부터 그 책으로 센다.
                 val at = unknownOpen[spec.pkg] ?: viewerAt[spec.pkg]?.takeIf { file != null && shown.title == null }
                 bookOpened(spec, Cell(title, info.author, progress, -1, null, Rect()), at)
-                file?.let { saveFile(title, it.path) }
-                return
             }
-            file?.let { saveFile(title, it.path) }
+            if (file != null) saveFile(title, file.path) else if (spec.searchesBookFile) searchFile(spec, title, info.author)
+            if (opened) return
         }
         if (progress < 0) return
         // 진행률은 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다)
@@ -454,6 +457,23 @@ class ReaderWatchService : AccessibilityService() {
     /** 이북 앱이 [title] 로 연 파일을 그 책에 적어 둔다(홈에서 그 파일을 바로 열고, 표지가 없으면 그릴 때 그 파일에서 꺼낸다 [BookShelf.cover]) */
     private fun saveFile(title: String, path: String) {
         BookShelf.findByTitle(this, title)?.let { BookShelf.setFilePath(this, it.id, path) }
+    }
+
+    /**
+     * 연 파일을 내놓지 않는 리더([ReaderSpec.searchesBookFile], 문리더)의 책 [title]: 표지도 파일도 모르면 저장소에서 그 제목의 EPUB 을 찾아
+     * 그 책의 파일로 적는다(표지는 그릴 때 꺼낸다). 저장소를 훑으므로 뒤에서, 책마다 한 번만(책 파일 읽기를 허용하기 전에는 세지 않는다).
+     */
+    private fun searchFile(spec: ReaderSpec, title: String, author: String) {
+        val key = normTitle(title)
+        if (key in fileSearched) return
+        val book = BookShelf.findByTitle(this, title) ?: return
+        if (BookShelf.hasCover(this, book.id) || BookShelf.filePath(this, book.id) != null || !BookFiles.canRead(this)) return
+        fileSearched += key
+        Bg.run({ BookFiles.findEpub(title, author) }) { result ->
+            val path = result.getOrNull() ?: return@run
+            WatchLog.add(this, WatchLog.Kind.FILE, spec.pkg, title, File(path).name)
+            saveFile(title, path)
+        }
     }
 
     /**
@@ -613,8 +633,9 @@ class ReaderWatchService : AccessibilityService() {
                 shot ?: return
                 // 요소 이름 없이 자리로 칸을 찾는 서재(리디·휴대폰 밀리)는 화면이 움직이는 중이었을 수 있어, 찍은 뒤에도 같은 자리에 있는 칸만 자른다.
                 // 표지 위에 받기 단추 등을 겹치는 서재(e-ink 밀리·리디 작품 화면)도 읽은 뒤 찍기 전에 겹쳤을 수 있어 다시 본다(겹친 칸은 표지 자리가 없다).
+                // 같은 책 칸이 둘이면(킨들 '이어 읽기' 표지와 표시에 가려 자르지 않는 칸) 표지 자리가 있는 칸으로 본다.
                 val still = if (!spec.cellsByPosition && spec.coverOverlays.isEmpty()) wanted else {
-                    val now = root(spec)?.let { readShelf(spec, it) }.orEmpty().associate { it.title to it.thumb }
+                    val now = root(spec)?.let { readShelf(spec, it) }.orEmpty().filter { it.thumb != null }.associate { it.title to it.thumb }
                     wanted.filter { (title, rect) -> now[title] == rect }
                 }
                 Bg.run({
