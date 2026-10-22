@@ -105,7 +105,7 @@ class BooksActivity : EinkActivity() {
             setOnClickListener {
                 startActivity(AppListActivity.intent(this@BooksActivity, AppListActivity.Mode.PICK_READER, book.id))
             }
-            // 길게 누르면 표지를 인터넷(YES24)에서 다시 찾아 바꾼다(자동으로 넣은 책도).
+            // 길게 누르면 표지를 인터넷([BookSearch])에서 다시 찾아 바꾼다(자동으로 넣은 책도).
             setOnLongClickListener { startActivity(BookSearchActivity.intent(this@BooksActivity, replace = book)); true }
         }
     }

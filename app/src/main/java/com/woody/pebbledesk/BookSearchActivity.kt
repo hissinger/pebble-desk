@@ -15,12 +15,9 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 
 /**
- * 읽는 책 추가: 제목으로 YES24 표지를 찾아 고르면 책 목록 맨 앞에 넣고, 이어서 그 책을 읽는 앱을 고른다.
+ * 읽는 책 추가: 제목으로 표지를 찾아([BookSearch]: 한국어는 YES24, 그 밖은 Apple Books·Open Library) 고르면 책 목록 맨 앞에 넣고, 이어서 그 책을 읽는 앱을 고른다.
  * 결과는 표지 4열 그리드(한 페이지 두 줄)로 보여 주고 페이지로 넘긴다.
  */
 class BookSearchActivity : EinkActivity() {
@@ -118,7 +115,8 @@ class BookSearchActivity : EinkActivity() {
         getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(input.windowToken, 0)
         val id = ++searchId
         status.setText(R.string.searching)
-        Bg.run({ BookSearch.search(query) }) { result ->
+        val korean = !HomePrefs.isEnglish(this)
+        Bg.run({ BookSearch.search(query, korean) }) { result ->
             if (id != searchId || isFinishing || isDestroyed) return@run
             result.onSuccess { books ->
                 status.text = if (books.isEmpty()) getString(R.string.book_none) else getString(R.string.book_results, books.size)
@@ -197,10 +195,8 @@ class BookSearchActivity : EinkActivity() {
     }
 
     /** 연결 문제면 와이파이를 확인하라고, 그 밖에는 [res] 에 오류 내용을 넣어 보여 준다. */
-    private fun errorText(res: Int, e: Throwable): String = when (e) {
-        is UnknownHostException, is ConnectException, is SocketTimeoutException -> getString(R.string.no_network)
-        else -> getString(res, e.message ?: e.javaClass.simpleName)
-    }
+    private fun errorText(res: Int, e: Throwable): String =
+        if (BookSearch.isConnectionError(e)) getString(R.string.no_network) else getString(res, e.message ?: e.javaClass.simpleName)
 
     companion object {
         private const val COLUMNS = 4

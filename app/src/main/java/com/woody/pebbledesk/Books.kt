@@ -24,12 +24,15 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.io.IOException
 import java.util.UUID
+import java.net.ConnectException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.net.URL
 import java.net.URLEncoder
 import java.util.concurrent.Executors
 
-/** YES24 검색 결과 한 권 */
+/** 표지 검색 결과 한 권. [id] 는 검색처 안에서 같은 책을 가르는 것(YES24 상품 번호, Apple `a<번호>`, Open Library `o<표지 번호>`) */
 data class BookResult(
     val id: String,
     val title: String,
@@ -38,7 +41,12 @@ data class BookResult(
     val coverUrl: String,
 )
 
-/** YES24 검색 페이지에서 책 표지를 찾는다. 크레마와 같은 YES24 표지라 eBook 표지와도 대부분 일치한다. */
+/**
+ * 책 표지 검색. 한국어 책(앱 언어가 한국어이거나 검색어에 한글이 있음)은 YES24 검색 페이지에서 찾는다(크레마와 같은 YES24 표지라 eBook 표지와도
+ * 대부분 일치한다). 그 밖은 Apple Books(기기 지역의 스토어, 결과가 한 쪽이 안 되면 미국 스토어도)에서 찾고, 그래도 한 쪽이 안 되면
+ * Open Library 를 뒤에 붙인다(원서는 YES24 에 한국어판·음반이 섞이고 덜 알려진 책은 없다). Google Books 는 키 없이 부르면 하루 한도로
+ * 실패해 쓰지 않는다. 앱 언어가 한국어인지는 부르는 쪽이 준다([search] 의 `korean`).
+ */
 object BookSearch {
     // YES24 는 오래된 Chrome UA 를 메인 페이지로 리다이렉트하므로 Safari UA 를 쓴다.
     private const val USER_AGENT =
@@ -51,10 +59,42 @@ object BookSearch {
     private val HREF = Regex("""href="([^"]*)"""")
     private val AUTHORS = Regex("""<span[^>]*\binfo_auth\b[^>]*>(.*?)</span>""", RegexOption.DOT_MATCHES_ALL)
     private val LINK = Regex("""<a\b[^>]*>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
+    /** Apple 표지 주소의 크기(`100x100bb`, 비율을 지키는 상자) */
+    private val APPLE_SIZE = Regex("""\d+x\d+bb""")
+    /** 이보다 적으면(검색 화면 한 쪽, 4열 × 2줄) 다음 검색처를 뒤에 붙인다 */
+    private const val FEW = 8
 
-    /** 네트워크를 쓰므로 백그라운드에서 부른다. */
+    /** [korean] 은 앱 언어가 한국어인가. 네트워크를 쓰므로 백그라운드에서 부른다. */
     @Throws(IOException::class)
-    fun search(query: String): List<BookResult> {
+    fun search(query: String, korean: Boolean): List<BookResult> {
+        if (korean || hasHangul(query)) return yes24(query)
+        val found = mutableListOf<BookResult>()
+        var error: Throwable? = null
+        fun add(from: () -> List<BookResult>) {
+            if (found.size >= FEW) return
+            runCatching(from).onSuccess { found += it }.onFailure { if (error == null) error = it }
+        }
+        // Apple Books 가 없는 나라(한국 등)의 스토어는 eBook 이 0권이라 미국 스토어를 뒤에 본다. 같은 서버라 연결 문제로 실패했으면 건너뛴다
+        // (잘못된 지역 코드의 HTTP 400 이면 본다).
+        val country = country()
+        add { apple(query, country) }
+        if (country != "us" && !isConnectionError(error)) add { apple(query, "us") }
+        add { openLibrary(query) }
+        if (found.isEmpty()) error?.let { throw it }
+        return found.distinctBy { it.id }
+    }
+
+    /** 연결 문제(주소 못 찾음·연결 실패·시간 초과)인가. 검색 화면의 와이파이 확인 안내도 이것으로 가른다 */
+    internal fun isConnectionError(e: Throwable?) = e is UnknownHostException || e is ConnectException || e is SocketTimeoutException
+
+    internal fun hasHangul(text: String) = text.any { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HANGUL }
+
+    /** 기기 지역(앱이 화면마다 덮어쓴 언어가 아니라 기기 설정의 것). 모르면 미국 */
+    private fun country(): String =
+        android.content.res.Resources.getSystem().configuration.locales[0].country.lowercase().ifEmpty { "us" }
+
+    @Throws(IOException::class)
+    private fun yes24(query: String): List<BookResult> {
         val url = "https://www.yes24.com/Product/Search?domain=ALL&query=" + URLEncoder.encode(query, "UTF-8")
         val html = String(get(url, readTimeout = 15_000) { conn ->
             // 검색 페이지가 아닌 곳(메인)으로 넘겨졌으면 결과가 아니다.
@@ -77,12 +117,68 @@ object BookSearch {
         }.distinctBy { it.id }
     }
 
+    /** iTunes Search API 의 eBook(키 없음, 분당 약 20번). 표지 주소의 크기를 바꿔 큰 표지(긴 변 1000)를 받는다. */
+    @Throws(IOException::class)
+    private fun apple(query: String, country: String): List<BookResult> {
+        val url = "https://itunes.apple.com/search?media=ebook&entity=ebook&limit=24&country=$country&term=" + URLEncoder.encode(query, "UTF-8")
+        return parseApple(String(get(url, readTimeout = 15_000), Charsets.UTF_8))
+    }
+
+    internal fun parseApple(json: String): List<BookResult> {
+        val items = JSONObject(json).optJSONArray("results") ?: return emptyList()
+        return (0 until items.length()).mapNotNull { i ->
+            val item = items.getJSONObject(i)
+            val art = item.optString("artworkUrl100").takeIf { APPLE_SIZE.containsMatchIn(it) } ?: return@mapNotNull null
+            val title = item.optString("trackName").trim().ifEmpty { return@mapNotNull null }
+            BookResult(
+                id = "a" + (item.optLong("trackId").takeIf { it > 0 } ?: return@mapNotNull null),
+                title = title,
+                author = item.optString("artistName").trim(),
+                thumbUrl = art.replace(APPLE_SIZE, "400x400bb"),
+                coverUrl = art.replace(APPLE_SIZE, "1000x1000bb"),
+            )
+        }.distinctBy { it.id }
+    }
+
+    /** Open Library 검색(키 없음). 표지 없는 결과는 뺀다. 큰 표지(`-L`, 검색 칸에도 이것. `-M` 은 폭 180 이라 칸보다 작다)도 폭이 300 남짓이라 Apple 뒤에 붙인다. */
+    @Throws(IOException::class)
+    private fun openLibrary(query: String): List<BookResult> {
+        val url = "https://openlibrary.org/search.json?fields=title,author_name,cover_i&limit=24&q=" + URLEncoder.encode(query, "UTF-8")
+        return parseOpenLibrary(String(get(url, readTimeout = 20_000), Charsets.UTF_8), query)
+    }
+
+    /**
+     * Open Library 의 검색어(`q`)는 느슨하게 맞춰 상관없는 책(셰익스피어 등)이 뒤에 붙으므로, 검색어의 낱말이 제목·저자에 모두 든 것만 둔다
+     * (제목 검색 `title` 은 `표지 다시 찾기` 처럼 저자를 붙인 검색어를 못 찾는다).
+     */
+    internal fun parseOpenLibrary(json: String, query: String): List<BookResult> {
+        val words = query.lowercase().split(Regex("""[^\p{L}\p{N}]+""")).filter { it.isNotEmpty() }
+        val docs = JSONObject(json).optJSONArray("docs") ?: return emptyList()
+        return (0 until docs.length()).mapNotNull { i ->
+            val doc = docs.getJSONObject(i)
+            val cover = doc.optLong("cover_i").takeIf { it > 0 } ?: return@mapNotNull null
+            val title = doc.optString("title").trim().ifEmpty { return@mapNotNull null }
+            val authors = doc.optJSONArray("author_name")
+            val author = (0 until (authors?.length() ?: 0)).joinToString(", ") { authors!!.getString(it) }
+            val text = "$title $author".lowercase()
+            if (words.any { it !in text }) return@mapNotNull null
+            BookResult(
+                id = "o$cover",
+                title = title,
+                author = author,
+                thumbUrl = "https://covers.openlibrary.org/b/id/$cover-L.jpg",
+                coverUrl = "https://covers.openlibrary.org/b/id/$cover-L.jpg",
+            )
+        }.distinctBy { it.id }
+    }
+
     /** HTML 조각의 글자만(태그를 빼고 `&#39;` 같은 것을 풀어서) */
     private fun plain(html: String) = Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY).toString().trim()
 
     /** 네트워크를 쓰므로 백그라운드에서 부른다. */
     @Throws(IOException::class)
-    fun download(url: String): ByteArray = get(url, readTimeout = 20_000, referer = "https://www.yes24.com/")
+    fun download(url: String): ByteArray =
+        get(url, readTimeout = 20_000, referer = "https://www.yes24.com/".takeIf { URL(url).host.endsWith("yes24.com") })
 
     /** [url] 을 받아 온다(200 이 아니거나 [verify] 가 던지면 IOException). */
     @Throws(IOException::class)
