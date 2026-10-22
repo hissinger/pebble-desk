@@ -573,12 +573,30 @@ class HomeActivity : EinkActivity() {
         if (readingText.text.toString() != line) readingText.text = line
     }
 
-    /** 그 책의 앱을 연다(파일로만 여는 이북 앱은 그 책의 파일). 앱을 아직 안 정했거나 지워졌으면 고르러 간다. */
+    /** 파일을 다시 찾고 있는 책([openBook]. 그동안 같은 책을 또 누르면 무시한다) */
+    private var findingFile: String? = null
+
+    /**
+     * 그 책의 앱을 연다(파일로만 여는 이북 앱은 그 책의 파일). 앱을 아직 안 정했거나 지워졌으면 고르러 간다.
+     * 파일로만 여는 앱의 책인데 그 파일을 모르거나 없으면 뒤에서 다시 찾아 열고([AppStore.findBookFile]), 그래도 없으면(지워짐·옮겨짐)
+     * 그 앱에서 한 번 열어 달라고 알린다.
+     */
     private fun openBook(book: ShelfBook) {
         val app = book.app?.let(::findApp)
-        if (app == null || !AppStore.openBook(this, book, app)) {
-            startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, book.id))
+        if (app == null) return startActivity(AppListActivity.intent(this, AppListActivity.Mode.PICK_READER, book.id))
+        if (AppStore.openBook(this, book, app) || findingFile == book.id) return
+        findingFile = book.id
+        Bg.run({ AppStore.findBookFile(this, book, app) }) { result ->
+            findingFile = null
+            if (isDestroyed) return@run
+            val path = result.getOrNull()
+            if (path == null || !AppStore.openFoundFile(this, book, app, path)) fileMissing(app)
         }
+    }
+
+    /** 파일로만 여는 이북 앱 [app] 의 책인데 그 파일을 찾지 못했다 */
+    private fun fileMissing(app: AppEntry) {
+        Sheet(this).header(getString(R.string.book_file_missing_title), getString(R.string.book_file_missing_desc, app.label)).centered().show()
     }
 
     /**

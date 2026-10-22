@@ -294,6 +294,8 @@
     <!-- 홈의 책 파일 읽기 안내 창(%s = 이북 앱 이름). '책 파일 읽기'는 줄에서 나뉘지 않게 붙인다 -->
     <string name="file_notice_title">%s 책 정보를 가져오려면 책\u00A0파일\u00A0읽기를 켜 주세요</string>
     <string name="file_notice_desc">책 표지, 책 이름 등의 정보를 파일에서 읽어 옵니다.</string>
+    <string name="book_file_missing_title">이 책의 파일을 찾지 못했습니다</string>
+    <string name="book_file_missing_desc">파일이 지워졌거나 옮겨졌을 수 있습니다. %s에서 이 책을 한 번 열면 다음부터 여기서 바로 열립니다.</string>
     <string name="app_neoreader">네오리더(BOOX)</string>
     <string name="guide_progress_note">읽는 중 진행률은 이북 앱 뷰어 설정에서 화면 아래 정보(쪽·진행률) 표시를 켜 두면 들어옵니다.</string>
     <string name="guide_cover_note">표지는 서재 화면의 표지를 잘라 옵니다. 제목이 잘리거나 다르면 홈에서 책을 길게 눌러 고치세요. 저자도 같은 메뉴에서 넣거나 고칠 수 있습니다.</string>

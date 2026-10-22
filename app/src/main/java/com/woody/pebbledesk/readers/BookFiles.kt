@@ -71,11 +71,30 @@ object BookFiles {
      * 한 번 읽은 파일의 제목·저자는 기억해 두어 다음 찾기에서 다시 열지 않는다. 화면 스레드에서 부르지 않는다.
      */
     fun findEpub(title: String, author: String): String? {
+        var match: String? = null
+        for (f in storageFiles()) {
+            if (!f.name.endsWith(".epub", ignoreCase = true)) continue
+            val (t, a) = epubNames.getOrPut("${f.path}@${f.lastModified()}") { epub(f.path)?.let { it.title to it.author } ?: ("" to "") }
+            if (t.isEmpty() || !sameTitle(t, title)) continue
+            if (t == title && a == author) return f.path
+            if (match == null) match = f.path
+        }
+        return match
+    }
+
+    /**
+     * 저장소에서 파일 이름(확장자 뗌, 대소문자 무시)이 [stems] 중 하나인 첫 책 파일의 경로(파일로만 여는 이북 앱의 책인데 그 파일을 모를 때, 네오리더).
+     * 찾는 범위는 [findEpub] 과 같다. 못 찾으면 null. 화면 스레드에서 부르지 않는다.
+     */
+    fun findByName(stems: Collection<String>): String? =
+        storageFiles().firstOrNull { f -> isBookFile(f.name) && stems.any { sameFileName(it, f.name) } }?.path
+
+    /** 저장소의 파일들: 얕은 폴더부터 [SEARCH_ENTRIES] 개까지(폴더 포함), [SEARCH_DEPTH] 단계까지, 숨긴 폴더(`.`)·`Android` 는 들어가지 않는다 */
+    private fun storageFiles(): Sequence<File> = sequence {
         val root = storageRoot
         val skip = File(root, "Android")
         val dirs = ArrayDeque<Pair<File, Int>>().apply { add(root to 0) }
         var entries = 0
-        var match: String? = null
         while (dirs.isNotEmpty() && entries < SEARCH_ENTRIES) {
             val (dir, depth) = dirs.removeFirst()
             for (f in dir.listFiles().orEmpty().sortedBy { it.name }) {
@@ -85,14 +104,9 @@ object BookFiles {
                     if (depth < SEARCH_DEPTH && f != skip) dirs += f to depth + 1
                     continue
                 }
-                if (!f.name.endsWith(".epub", ignoreCase = true)) continue
-                val (t, a) = epubNames.getOrPut("${f.path}@${f.lastModified()}") { epub(f.path)?.let { it.title to it.author } ?: ("" to "") }
-                if (t.isEmpty() || !sameTitle(t, title)) continue
-                if (t == title && a == author) return f.path
-                if (match == null) match = f.path
+                yield(f)
             }
         }
-        return match
     }
 
     /** 찾기에서 읽은 EPUB(경로@수정 시각)의 제목·저자([findEpub]. 못 읽은 파일은 빈 제목) */

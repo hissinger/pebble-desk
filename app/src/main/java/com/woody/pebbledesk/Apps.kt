@@ -205,9 +205,9 @@ object AppStore {
     }
 
     /**
-     * 책의 앱을 연다. 파일로만 여는 이북 앱이면 그 책의 파일([BookShelf.filePath])을, 파일을 모르면 그 앱의 서재 앱(BOOX 런처)을 연다.
+     * 책의 앱을 연다. 파일로만 여는 이북 앱이면 그 책의 파일([BookShelf.filePath])을 연다. 파일을 모르거나 그 파일이 없으면(읽을 수 있을 때만 안다)
+     * false: 부르는 쪽이 뒤에서 다시 찾아([findBookFile]) 연다([openFoundFile]).
      * 책 파일을 바로 여는 앱(KOReader, [com.woody.pebbledesk.readers.ReaderSpec.opensBookFile])은 파일을 알면 그 파일을, 모르면 앱을 연다.
-     * 열 것이 없으면 false(고르러 간다).
      */
     fun openBook(context: Context, book: ShelfBook, app: AppEntry): Boolean {
         val spec = ReaderApps.byPackage[app.pkg]
@@ -224,10 +224,30 @@ object AppStore {
             launch(context, app)
             return true
         }
-        BookShelf.filePath(context, book.id)?.let { if (openFile(context, app.component, it)) return true }
-        val shelf = viewer.shelfPkg?.let { pkg -> load(context).firstOrNull { it.pkg == pkg } } ?: return false
-        launch(context, shelf)
-        return true
+        val path = BookShelf.filePath(context, book.id)?.takeIf { !BookFiles.canRead(context) || File(it).isFile } ?: return false
+        return openFile(context, app.component, path)
+    }
+
+    /**
+     * 파일로만 여는 이북 앱 [app] 의 책 [book] 인데 그 파일을 모를 때 다시 찾는다: 그 앱 데이터([com.woody.pebbledesk.readers.ReaderSpec.bookFiles]),
+     * 없으면 저장소에서 같은 파일 이름(확장자 뗌)의 첫 책 파일([BookFiles.findByName], 책 파일 읽기가 켜져 있을 때만). 찾을 이름은 제목과
+     * 이북 앱이 보여 준 제목(파일 이름이거나 파일 안의 제목). 그 앱 데이터에 같은 이름의 파일이 여럿이면(파일 안의 제목이 같은 PDF 등) 다른 책으로
+     * 넣지 않은 파일이 먼저. 못 찾으면 null. 다른 앱을 깨우고 저장소를 훑으므로 화면 스레드에서 부르지 않는다.
+     */
+    fun findBookFile(context: Context, book: ShelfBook, app: AppEntry): String? {
+        val titles = listOf(book.title, book.seenTitle).filter { it.isNotEmpty() }.distinct()
+        val found = ReaderApps.byPackage[app.pkg]?.bookFiles(context, titles).orEmpty()
+        return found.firstOrNull { BookShelf.idByFile(context, it).let { id -> id == null || id == book.id } } ?: found.firstOrNull()
+            ?: titles.takeIf { BookFiles.canRead(context) }?.let(BookFiles::findByName)
+    }
+
+    /**
+     * 다시 찾은 파일 [path] 를 [book] 의 파일로 적고 [app] 으로 연다. 그 파일로 넣은 다른 책이 있으면(같은 파일이 두 권으로 들어간 1.5.11 까지의 책)
+     * 적지 않고 열기만 한다(한 파일에는 한 권만: 읽으면 그 책으로 들어간다).
+     */
+    fun openFoundFile(context: Context, book: ShelfBook, app: AppEntry, path: String): Boolean {
+        if (BookShelf.idByFile(context, path).let { it == null || it == book.id }) BookShelf.setFilePath(context, book.id, path)
+        return openFile(context, app.component, path)
     }
 
     /**
