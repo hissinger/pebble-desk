@@ -289,6 +289,8 @@
     <string name="open_file_access">Open All files access</string>
     <string name="file_notice_title">Turn on Read\u00A0book\u00A0files to get %s book info</string>
     <string name="file_notice_desc">Info such as book covers and titles is read from the files.</string>
+    <string name="book_file_missing_title">Couldn\'t find this book\'s file</string>
+    <string name="book_file_missing_desc">The file may have been deleted or moved. Open this book once in %s, and it will open from here next time.</string>
     <string name="app_neoreader">NeoReader (BOOX)</string>
     <string name="guide_progress_note">For progress while reading, turn on the bottom info (page or progress) in the e-book app\'s viewer settings.</string>
     <string name="guide_cover_note">Covers are cut from the shelf screen. If a title or author is cut off, wrong or missing, long-press the book on the home screen to fix it.</string>

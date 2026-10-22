@@ -142,6 +142,12 @@ open class ReaderSpec(
     open fun fileBook(context: Context, info: ViewerInfo, since: Long): FileBook? = null
 
     /**
+     * 파일로만 여는 앱([fileViewer])의 책 파일을 그 앱 데이터에서 다시 찾는다: 제목이나 파일 이름(확장자 뗌)이 [titles] 중 하나인 책 파일들의 경로
+     * (그 앱이 최근에 다룬 것부터. 파일이 옮겨졌거나 예전 판에서 파일 없이 넣은 책을 홈에서 누를 때). 모르면 빈 목록. 기본: 빈 목록
+     */
+    open fun bookFiles(context: Context, titles: Collection<String>): List<String> = emptyList()
+
+    /**
      * 책이 열려 있는지를 데이터로 아는 앱([fileState]): [since](ms) 뒤에 열었거나 닫은 책들과 지금 책(마지막), 오래된 것부터.
      * 기록이 없으면 빈 목록, 데이터를 읽을 수 없으면 null. 기본: null
      */

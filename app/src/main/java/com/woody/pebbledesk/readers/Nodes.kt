@@ -21,10 +21,10 @@ data class Cell(
 class ViewerInfo(val title: String?, val author: String, val progress: Int, val file: String? = null)
 
 /**
- * 실행 화면이 없어 파일로만 여는 이북 앱(네오리더). [activity] 는 파일(`ACTION_VIEW`)을 받는 화면, [label] 은 읽고 있는 앱 고르기에 보일 이름,
- * [shelfPkg] 는 책의 파일을 모를 때 대신 열 서재 앱(BOOX 런처)
+ * 실행 화면이 없어 파일로만 여는 이북 앱(네오리더). [activity] 는 파일(`ACTION_VIEW`)을 받는 화면, [label] 은 책의 앱 이름.
+ * 이 앱의 책은 파일을 알 때만 넣는다(홈에서 그 파일을 연다)
  */
-class FileViewer(val activity: String, val label: Int, val shelfPkg: String?)
+class FileViewer(val activity: String, val label: Int)
 
 /**
  * 이북 앱 데이터에서 찾은 책([ReaderSpec.fileBook]·[ReaderSpec.fileBooks]). [progress] 는 데이터에 진행률이 있으면(KOReader, 모르면 -1).
@@ -95,6 +95,9 @@ internal fun isImageFile(name: String) = IMAGE_FILE.containsMatchIn(name)
 
 /** `이름.epub` → `이름`(책 파일 확장자만 뗀다) */
 internal fun withoutBookFile(text: String): String = text.replace(BOOK_FILE, "")
+
+/** 책 파일 이름인가(확장자가 [BOOK_FILE]) */
+internal fun isBookFile(name: String) = BOOK_FILE.containsMatchIn(name)
 
 /** 같은 파일 이름인가(대소문자 무시, 한쪽이 확장자를 숨긴 이름이어도. 이지뷰어 목록의 '첫글자를 대문자로'·읽는 화면의 확장자 숨김 설정) */
 internal fun sameFileName(a: String, b: String) =

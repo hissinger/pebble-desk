@@ -45,10 +45,13 @@ class ReaderWatchService : AccessibilityService() {
      * [ReadingLog.openBook])이 그 일을 하고 옛 값은 그 기록이 비어 있을 때만 읽는다([ReadingLog]).
      */
     private val openedPrefs by lazy { Storage.of(this).getSharedPreferences("reader_watch", MODE_PRIVATE) }
-    /** 탭마다 책이 다른 앱([ReaderSpec.viewerTabs])에서 읽는 화면 [cls](탭)로 마지막으로 편 책의 제목(서비스가 다시 시작돼도 남긴다) */
-    private fun tabBook(cls: String) = openedPrefs.getString("tab_$cls", null)
-    private fun setTabBook(cls: String, title: String) {
-        if (tabBook(cls) != title) openedPrefs.edit().putString("tab_$cls", title).apply()
+    /**
+     * 탭마다 책이 다른 앱([ReaderSpec.viewerTabs])에서 읽는 화면 [cls](탭)로 마지막으로 편 책의 id(서비스가 다시 시작돼도 남긴다).
+     * 1.5.11 까지는 제목(`tab_<탭>`)을 두어 파일 안의 제목이 같은 다른 책과 헷갈렸다. 옛 값은 쓰지 않는다(그 탭은 처음 보는 탭으로).
+     */
+    private fun tabBook(cls: String) = openedPrefs.getString("tab_book_$cls", null)
+    private fun setTabBook(cls: String, id: String) {
+        if (tabBook(cls) != id) openedPrefs.edit().putString("tab_book_$cls", id).remove("tab_$cls").apply()
     }
     /** 읽으러 가기 전에 본 서재의 '최근 읽은 책'([ReaderSpec.recent]) */
     private fun recentBefore(pkg: String) = openedPrefs.getString("recent_$pkg", null)
@@ -77,6 +80,8 @@ class ReaderWatchService : AccessibilityService() {
     private val fileSearched = mutableSetOf<String>()
     /** 이북 앱 데이터로 책을 아는 앱([ReaderSpec.fileBook])에 메뉴 없이 물어볼 남은 횟수(읽는 화면이 앞에 올 때마다 다시 센다) */
     private val fileTries = mutableMapOf<String, Int>()
+    /** 파일로만 여는 앱([ReaderSpec.fileViewer])의 읽는 화면에서 그 책의 파일을 아직 모를 때 다시 읽어 볼 남은 횟수(읽는 화면이 앞에 올 때마다 다시 센다) */
+    private val fileRetries = mutableMapOf<String, Int>()
     /** 열기 확인 창(이지뷰어 ▶·다음 파일)에 보인 파일([Cell.file] 꼴)과 그 때. 그 이름의 파일이 읽는 화면에 보이면 그 파일이다 */
     private val openingFiles = mutableMapOf<String, Pair<String, Long>>()
     /** 이 읽는 화면에서 파일 이름마다 정한 책 id(모르면 null. 같은 파일을 보는 동안 판단을 바꾸지 않게, 읽는 화면이 앞에 올 때마다 비운다) */
@@ -87,8 +92,8 @@ class ReaderWatchService : AccessibilityService() {
     private val lastOpenedAt = mutableMapOf<String, Long>()
     /** 파일 이름만 보이는 읽는 화면(이지뷰어)에서 이번에 본 파일 이름(읽는 화면이 앞에 올 때마다 비운다. 바뀌면 다른 책을 연 것) */
     private val viewerFiles = mutableMapOf<String, String>()
-    /** 그 앱에서 마지막으로 메뉴 제목으로 물어본 결과(못 찾았으면 null. 메뉴를 띄워 둔 동안 다시 묻지 않게, 읽는 화면이 앞에 올 때마다 비운다) */
-    private val fileTitles = mutableMapOf<String, Pair<String, FileBook?>>()
+    /** 그 앱에서 마지막으로 메뉴 제목으로 찾은 책(메뉴를 띄워 둔 동안 다시 묻지 않게, 읽는 화면이 앞에 올 때마다 비운다. 못 찾으면 두지 않고 다시 묻는다) */
+    private val fileTitles = mutableMapOf<String, Pair<String, FileBook>>()
     /**
      * 아직 목록에 없는 책의 잘라 둔 표지(정리한 제목 → JPEG). 검색 화면에서 `바로 읽기`를 누를 때, 서재가 멈췄을 때(모든 앱),
      * 알라딘처럼 서재를 잠깐만 보는 앱은 서재가 보이는 대로도 찍어 두었다가 그 책이 들어오면 붙인다. 최근 [PENDING_MAX]권만.
@@ -212,6 +217,7 @@ class ReaderWatchService : AccessibilityService() {
                 clickedFiles -= spec.pkg
             }
             fileTries[spec.pkg] = FILE_TRIES
+            fileRetries[spec.pkg] = FILE_RETRIES
             fileTitles -= spec.pkg
             // 서재를 떠나 처음 연 읽는 화면의 때만 적는다(읽는 중 목차 같은 다른 화면에 갔다 와도 처음부터 그 책으로 세게).
             // 줄이 바뀌기를 기다리다 서재에서 다시 읽으러 갔으면 이번 책의 때로 다시 적는다.
@@ -244,15 +250,16 @@ class ReaderWatchService : AccessibilityService() {
      * 방금 연 책으로 바로잡고, 아니면 메뉴를 띄울 때까지는 알 수 없다.
      */
     private fun enterTab(spec: ReaderSpec, cls: String, now: Long) {
-        val title = tabBook(cls)
-        if (title == null) {
+        // 그 탭의 책이 읽고 있는 책 목록에 있을 때만(빼거나 지운 책을 되살리지 않게. 그 책은 메뉴·이북 앱 데이터로 다시 안다)
+        val book = tabBook(cls)?.let { BookShelf.get(this, it) }
+        if (book == null) {
             // 같은 모르는 탭에 다시 오면(네오리더 설정 화면에 갔다 옴 등) 처음 열린 때를 둔다.
             if (unknownTab[spec.pkg] != cls || spec.pkg !in unknownOpen) {
                 unknownOpen[spec.pkg] = now
                 unknownTab[spec.pkg] = cls
                 ReadingLog.bookOpened(this, spec.pkg, "", "", now)
             }
-        } else if (recordedBook(spec)?.hasTitle(title) != true) bookOpened(spec, Cell(title, "", -1, -1, null, Rect()), now)
+        } else if (recordedBook(spec)?.id != book.id) bookOpened(spec, Cell(book.title, "", -1, -1, null, Rect()), now, book.id)
     }
 
     /**
@@ -387,10 +394,14 @@ class ReaderWatchService : AccessibilityService() {
         if (fileAt != null && fileId != null) BookShelf.get(this, fileId)?.takeIf { BookShelf.filePath(this, it.id) == null }?.let { book ->
             shelfFileOf(spec, book.id)?.let { spec.bookFile(this, it) }?.let { BookShelf.setFilePath(this, book.id, it); fileInfo(book, it) }
         }
-        val info = file?.let { ViewerInfo(knownTitle(it), it.author, shown.progress) } ?: fileTitle?.let { ViewerInfo(it, "", shown.progress) } ?: shown
+        // 파일로만 여는 앱(네오리더)은 그 책의 파일을 알 때만 넣는다(메뉴 제목만으로 넣으면 홈에서 열 수 없다)
+        val info = file?.let { ViewerInfo(knownTitle(it), it.author, shown.progress) } ?: fileTitle?.let { ViewerInfo(it, "", shown.progress) }
+            ?: if (spec.fileViewer != null) ViewerInfo(null, "", shown.progress) else shown
         val progress = info.progress
         if (progress >= 0 || info.title != null || shownFile != null) WatchLog.add(this, WatchLog.Kind.PROGRESS, spec.pkg, "$progress", info.title ?: shownFile.orEmpty())
-        if (progress < 0 && viewerRetries-- > 0) {
+        // 그 앱 데이터에 아직 안 적혔을 수 있어(책을 여는 동안 적는다) 조금 뒤 다시 본다
+        val retryFile = spec.fileViewer != null && file == null && (fileRetries[spec.pkg] ?: 0).also { fileRetries[spec.pkg] = it - 1 } > 0
+        if ((progress < 0 && viewerRetries-- > 0) || retryFile) {
             viewerSpec = spec
             handler.postDelayed(viewerLater, VIEWER_RETRY_MS)
         }
@@ -411,19 +422,26 @@ class ReaderWatchService : AccessibilityService() {
         if (fileAt != null && fileId != null && isImageFile(shownFile.orEmpty())) BookShelf.filePath(this, fileId)?.takeIf(::isImageFile)?.let { cur ->
             File(File(cur).parentFile, shownFile.orEmpty()).takeIf { it.path != cur && it.isFile }?.let { BookShelf.setFilePath(this, fileId, it.path) }
         }
+        // 이북 앱 데이터로 파일을 안 책(네오리더)도 제목이 아니라 그 파일로 가른다(파일 안의 제목이 같은 다른 파일과 섞지 않게): 그 파일로 넣은 책,
+        // 없으면 파일 없이 넣은 같은 제목의 책(1.5.11 까지 메뉴 제목만으로 넣은 책), 둘 다 없으면 새 책
+        val byFile = fileId != null || file != null
+        val bookId = fileId ?: file?.let { f ->
+            BookShelf.idByFile(this, f.path) ?: idWithoutFile(info.title.orEmpty())
+        }
         info.title?.let { title ->
             // '최근 읽은 책' 줄로 아는 앱은 서재를 떠난 뒤 메뉴로 처음 안 책은 앞서 편 책과 같아도 편 것으로 본다(맨 앞으로).
             // 같은 책을 다시 읽으면 그 줄이 그대로라 서재로 돌아와서는 알 수 없다.
             val first = spec.pkg in readSince && readKnown.add(spec.pkg)
             // 편 책 기록의 책이 이 제목의 읽고 있는 책이면 그 책을 읽는 중이다(같은 제목의 책이 여럿이어도 목록 순서로 다른 책으로 바꾸지 않는다).
             // 아니면(서비스가 꺼졌다 켜져 '책 모름'·다른 책·책 id 없는 옛 줄·그 책이 목록에 없음) 이 제목의 책을 편 것으로 다시 적는다(그래야 그 뒤 시간이 이 책에)
-            val opened = first || recordedBook(spec)?.let { if (fileId != null) it.id == fileId else it.hasTitle(title) } != true
+            val opened = first || recordedBook(spec)?.let { if (byFile) it.id == bookId else it.hasTitle(title) } != true
             if (opened) {
                 // 메뉴 없이 이북 앱 데이터로 방금 연 책을 알았으면 읽는 화면이 열린 때부터 그 책으로 센다.
                 val at = unknownOpen[spec.pkg] ?: viewerAt[spec.pkg]?.takeIf { file != null && shown.title == null } ?: fileAt
-                bookOpened(spec, Cell(title, info.author, progress, -1, null, Rect()), at, fileId)
+                bookOpened(spec, Cell(title, info.author, progress, -1, null, Rect()), at, bookId, byFile)
             }
-            if (file != null) saveFile(title, file.path) else if (spec.searchesBookFile) searchFile(spec, title, info.author)
+            if (file != null) recordedBook(spec)?.let { BookShelf.setFilePath(this, it.id, file.path) }
+            else if (spec.searchesBookFile) searchFile(spec, title, info.author)
             if (opened) return
         }
         if (progress < 0) return
@@ -514,7 +532,7 @@ class ReaderWatchService : AccessibilityService() {
         val title = shown.title
         if (title != null) {
             fileTitles[spec.pkg]?.let { (t, book) -> if (t == title) return book }
-            return spec.fileBook(this, shown, 0).also { fileTitles[spec.pkg] = title to it }
+            return spec.fileBook(this, shown, 0)?.also { fileTitles[spec.pkg] = title to it }
         }
         val tries = fileTries[spec.pkg] ?: 0
         if (tries <= 0) return null
@@ -524,13 +542,14 @@ class ReaderWatchService : AccessibilityService() {
     }
 
     /**
-     * 이북 앱 데이터로 찾은 책이 이미 있으면 그 책의 제목: 그 파일로 넣은 책, 없으면 파일 이름(확장자 뗌)으로 넣은 책(메뉴 제목이 파일 이름이던
-     * 1.5.4 에서 넣은 책. 읽고 있는 책·지우지 않은 나간 책). 그래야 같은 책이 책 정보의 제목으로 한 번 더 들어가지 않고, 나간 책은 그 책으로 되살아난다.
+     * 이북 앱 데이터로 찾은 책이 이미 있으면 그 책의 제목: 그 파일로 넣은 책, 없으면 파일 없이 파일 이름(확장자 뗌)으로 넣은 책(메뉴 제목이
+     * 파일 이름이던 1.5.4 에서, 1.5.11 까지 메뉴 제목만으로 넣은 책. 읽고 있는 책·지우지 않은 나간 책). 그래야 같은 책이 책 정보의 제목으로
+     * 한 번 더 들어가지 않고, 나간 책은 그 책으로 되살아난다. 다른 파일로 넣은 책은 제목이 같아도 아니다.
      */
     private fun knownTitle(file: FileBook): String {
         BookShelf.titleByFile(this, file.path)?.let { return it }
         val fileTitle = withoutBookFile(File(file.path).name)
-        return BookShelf.findByTitle(this, fileTitle)?.title ?: BookShelf.findLivePast(this, fileTitle)?.book?.title ?: file.title
+        return idWithoutFile(fileTitle)?.let { BookShelf.bookOf(this, setOf(it))?.title } ?: file.title
     }
 
     /**
@@ -713,11 +732,11 @@ class ReaderWatchService : AccessibilityService() {
      * 표지는 이북 앱 서재에 보이는 그 책의 표지 칸을 화면에서 잘라 온다(안 되면 빈 표지).
      * [at] 은 그 책을 편 때(서재로 돌아와서야 알면 읽는 화면이 열린 때). 읽은 시간을 이때부터 이 책으로 센다.
      * 파일 칸([Cell.file], 이지뷰어)과 읽는 화면의 파일 이름으로 정한 책 [id] 는 제목이 아니라 파일로 책을 가른다([fileBookId]).
+     * 이북 앱 데이터로 파일을 안 책(네오리더)은 [byFile]: [id] 의 책, 없으면(null) 같은 제목의 책이 있어도 새 책.
      */
-    private fun bookOpened(spec: ReaderSpec, cell: Cell, at: Long? = null, id: String? = null) {
+    private fun bookOpened(spec: ReaderSpec, cell: Cell, at: Long? = null, id: String? = null, byFile: Boolean = id != null || cell.file != null) {
         val path = cell.file?.let { spec.bookFile(this, it) }
         val name = cell.file?.substringAfterLast('/')
-        val byFile = id != null || cell.file != null
         val fileId = id ?: cell.file?.let { fileBookId(spec, it, cell.title, path) }
         // 칸의 제목은 보기 방식·받기 전후로 파일 이름이기도 책 정보이기도 해서, 같은 파일로 넣은 책이면 그 책의 제목으로
         val seen = fileId?.let { BookShelf.bookOf(this, setOf(it)) }?.let { cell.copy(title = it.title) } ?: cell
@@ -747,7 +766,7 @@ class ReaderWatchService : AccessibilityService() {
         WatchLog.add(this, WatchLog.Kind.OPENED, spec.pkg, seen.title, result.name)
         // 편 책 기록에는 앱이 보여 준 제목을 적는다(제목을 고친 책이어도. 지운 뒤 그 시간을 다시 정할 때 같은 제목의 새 책을 찾게)
         ReadingLog.bookOpened(this, spec.pkg, seen.title, book.id, openedAt)
-        if (spec.viewerTabs) screen[spec.pkg]?.takeIf { it in spec.viewers }?.let { setTabBook(it, seen.title) }
+        if (spec.viewerTabs) screen[spec.pkg]?.takeIf { it in spec.viewers }?.let { setTabBook(it, book.id) }
         // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 서재. 파일로 가르는 책은 그 파일 칸의 것만)
         (if (byFile) cell.file?.let(::fileCoverKey)?.takeIf { it in pendingCovers } else pendingFor(book.title))?.let { key ->
             val bytes = pendingCovers.remove(key) ?: return@let
@@ -765,9 +784,12 @@ class ReaderWatchService : AccessibilityService() {
      */
     private fun fileBookId(spec: ReaderSpec, shown: String, title: String, path: String?): String? {
         path?.let(::idByPath)?.let { return it }
-        return BookShelf.idByTitle(this, title) { BookShelf.filePath(this, it.id) == null }
+        return idWithoutFile(title)
             ?: if (path == null) lastShelfBook(spec) { it.equals(shown, ignoreCase = true) } else null
     }
+
+    /** 파일을 모르는 [title] 의 책(읽고 있는 책, 없으면 지우지 않은 나간 책)의 id */
+    private fun idWithoutFile(title: String): String? = BookShelf.idByTitle(this, title) { BookShelf.filePath(this, it.id) == null }
 
     /** 실제 경로 [path] 로 넣은 책. 그림 파일이면 그 폴더의 그림으로 넣은 책(그림 폴더가 한 권, 이지뷰어) */
     private fun idByPath(path: String): String? =
@@ -986,7 +1008,9 @@ class ReaderWatchService : AccessibilityService() {
         private const val VIEWER_RETRY_MS = 1000L
         private const val VIEWER_RETRIES = 3
         /** 읽는 화면이 앞에 온 뒤 메뉴 없이 이북 앱 데이터에 물어볼 횟수(책을 여는 동안 연 때가 늦게 적힐 수 있다) */
-        private const val FILE_TRIES = 3
+        private const val FILE_TRIES = 6
+        /** 파일로만 여는 앱에서 책의 파일을 모를 때 [VIEWER_RETRY_MS] 간격으로 더 읽어 볼 횟수 */
+        private const val FILE_RETRIES = 5
         private const val SHOT_INTERVAL_MS = 1100L
         /** 서재 화면이 이만큼 그대로여야 표지를 찍는다 */
         private const val SETTLE_MS = 1500L
