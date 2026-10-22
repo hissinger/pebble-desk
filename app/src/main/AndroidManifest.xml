@@ -4,7 +4,7 @@
 
     <!-- 런처라서 설치된 앱 전체와 크레마 런처(로고)를 봐야 한다. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-    <!-- 지금 읽는 책: YES24 에서 책 표지 검색 -->
+    <!-- 지금 읽는 책: 책 표지 검색(YES24·Apple Books·Open Library) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 설정 › 업데이트: 인터넷에 연결돼 있는지 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
