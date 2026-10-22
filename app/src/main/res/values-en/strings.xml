@@ -272,6 +272,7 @@
     <string name="guide_easyview">EzViewer</string>
     <string name="guide_cherie">CherieViewer</string>
     <string name="guide_ko">KOReader</string>
+    <string name="guide_readest">Readest</string>
     <string name="guide_permissions">Permissions</string>
     <string name="guide_todo">In the app</string>
     <string name="guide_todo_none">Nothing to change.</string>
@@ -330,8 +331,16 @@
     <string name="guide_note_ez">Tapping the book on the home screen opens its file. A folder of pictures counts as one book.</string>
     <string name="guide_note_neo">Tapping the book on the home screen opens its file in NeoReader.</string>
     <string name="guide_note_ko">Books opened in KOReader come in when you return home. Tapping the book on the home screen opens its file.</string>
+    <string name="guide_files_readest">covers, author, progress</string>
+    <string name="guide_n_readest_cover">If you haven\'t moved the data, it comes in when you view the library</string>
+    <string name="guide_n_readest_title">If you haven\'t moved the data, only books opened from the library come in right away</string>
+    <string name="guide_n_readest_author">If you haven\'t moved the data, it comes in when you open the table of contents</string>
+    <string name="guide_n_readest_progress">If you haven\'t moved the data, it comes in once you open the Reading Progress panel</string>
+    <string name="guide_t_readest_data">Choose \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601) in Readest › Advanced Settings › Change Data Location › Choose New Folder. The cover, author and progress then come from Readest\'s data.</string>
+    <string name="guide_t_readest_shelf">If you haven\'t moved the data, open books from the library. Books opened another way come in once you open the table of contents.</string>
+    <string name="guide_note_readest">Tapping the book on the home screen opens it in Readest directly.</string>
     <string name="book_files">Read book files</string>
-    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For NeoReader and Moon+ Reader, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
+    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For Readest, the cover, author and progress are read from its data folder (Readest/Books) once you move its data location to \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601). For NeoReader and Moon+ Reader, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
     <string name="open_file_access">Open All files access</string>
     <string name="file_notice_title">Turn on Read\u00A0book\u00A0files to get %s book info</string>
     <string name="file_notice_desc">Info such as book covers and titles is read from the files.</string>

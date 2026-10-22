@@ -1,6 +1,7 @@
 package com.woody.pebbledesk.readers
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
@@ -65,6 +66,7 @@ open class ReaderSpec(
     /**
      * 읽는 화면이 따로 액티비티가 아니라 서재 액티비티 안에 뜨는 앱(Libby): 그 묶음의 요소 이름. 이것이 보이는 동안을
      * 읽는 화면 `<서재 액티비티>#<이름>`([viewers] 에 적는다)으로 보고, 읽은 시간도 그 동안만 센다([com.woody.pebbledesk.ReadingLog.viewerShown]).
+     * 요소 이름이 아니라 웹 화면 안의 HTML id 로 가르는 앱(Readest, [showsViewer] 를 바꾼다)은 읽는 화면의 이름일 뿐이다.
      */
     val viewerHolder: String? = null,
     /** 실행 화면이 없어 파일로만 여는 앱(네오리더): 파일을 받는 화면과 고르기에 보일 이름, 파일을 모를 때 열 서재 앱 */
@@ -106,6 +108,12 @@ open class ReaderSpec(
 
     /** 요소 이름 없이 자리로 칸을 찾는 서재(화면이 움직이는 중이면 어긋나, 표지를 찍은 뒤에도 칸이 그 자리에 있을 때만 자른다) */
     open val cellsByPosition: Boolean get() = false
+
+    /**
+     * 찍은 뒤 다시 읽은 서재 칸들 [now](표지 자리가 있는 것만)에 [title] 의 표지 자리가 아직 [rect] 그대로인가([cellsByPosition]·[coverOverlays] 인 앱).
+     * 기본: 그 제목의 (마지막) 칸이 그 자리다
+     */
+    open fun coverStill(now: List<Cell>, title: String, rect: Rect): Boolean = now.associate { it.title to it.thumb }[title] == rect
 
     /** 메뉴를 띄웠을 때 읽는 화면에 제목이 보이는가(보이면 표지만 눌러 연 책도 알 수 있다) */
     open val tellsTitle: Boolean get() = viewerTitle != null
@@ -179,6 +187,33 @@ open class ReaderSpec(
 
     /** 읽는 화면 제목 글자 → 제목·저자. 기본: 글자 그대로가 제목 */
     protected open fun splitTitle(text: String): Pair<String, String> = text to ""
+
+    /**
+     * 서재 액티비티 안에 읽는 화면([viewerHolder])이 떠 있는가. 기본: 그 이름의 요소가 있다(안드로이드 요소 이름으로만 찾는다.
+     * 웹 화면 안의 HTML id 로 가르는 앱(Readest)은 바꾼다)
+     */
+    open fun showsViewer(root: AccessibilityNodeInfo): Boolean = viewerHolder?.let { root.byId(pkg, it).isNotEmpty() } == true
+
+    /**
+     * 읽는 화면에 지금 열린 책을 가리키는 그 앱의 열쇠가 늘 보이는 앱(Readest 책 해시)인가. 그러면 열쇠로 책을 가른다
+     * ([viewerKey]·[keyBook]·[keyCover]·[keyIntent], `ReaderWatchService.readKeyed`).
+     */
+    open val viewerKeys: Boolean get() = false
+
+    /** 읽는 화면의 지금 책 열쇠([viewerKeys]). 모르면 null */
+    open fun viewerKey(windows: AppWindows): String? = null
+
+    /** 열쇠 [key] 의 책을 그 앱 데이터에서(제목·저자·진행률). 읽을 수 없거나 모르면 null. 기본: null */
+    open fun keyBook(context: Context, key: String): FileBook? = null
+
+    /** 열쇠 [key] 의 책 표지(JPEG). 모르면 null. 그림을 다루므로 화면 스레드에서 부르지 않는다. 기본: null */
+    open fun keyCover(context: Context, key: String): ByteArray? = null
+
+    /** 홈에서 열쇠 [key] 의 책을 바로 여는 인텐트. 없으면 null(앱을 연다). 기본: null */
+    open fun keyIntent(key: String): Intent? = null
+
+    /** 그 앱 데이터에서 표지를 가져올 수 있다([keyCover]): 서재 화면에서 표지를 자르지 않는다. 기본: 아니다 */
+    open fun dataCovers(context: Context): Boolean = false
 
     /** 서재 편집 중인가([shelfEditing]) */
     fun editing(root: AccessibilityNodeInfo): Boolean = shelfEditing?.let { root.byId(pkg, it).isNotEmpty() } == true

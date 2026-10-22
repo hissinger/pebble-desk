@@ -208,11 +208,16 @@ object AppStore {
      * 책의 앱을 연다. 파일로만 여는 이북 앱이면 그 책의 파일([BookShelf.filePath])을 연다. 파일을 모르거나 그 파일이 없으면(읽을 수 있을 때만 안다)
      * false: 부르는 쪽이 뒤에서 다시 찾아([findBookFile]) 연다([openFoundFile]).
      * 책 파일을 바로 여는 앱(KOReader, [com.woody.pebbledesk.readers.ReaderSpec.opensBookFile])은 파일을 알면 그 파일을, 모르면 앱을 연다.
+     * 읽는 화면의 책 열쇠로 책을 아는 앱(Readest)은 그 열쇠를 알면 그 앱의 링크로 책을 바로 연다([com.woody.pebbledesk.readers.ReaderSpec.keyIntent]).
      */
     fun openBook(context: Context, book: ShelfBook, app: AppEntry): Boolean {
         val spec = ReaderApps.byPackage[app.pkg]
         val viewer = spec?.fileViewer?.takeIf { it.activity == app.component.className }
         if (viewer == null) {
+            // BOOX 가 얼린 앱은 런처로 풀어야 해서 앱을 연다([launch])
+            spec?.let { s -> ReaderWatchService.bookKey(context, s.pkg, book.id)?.let(s::keyIntent) }
+                ?.takeIf { !(Device.hasBooxLauncher(context) && Device.isFrozen(context.packageManager, app.pkg)) }
+                ?.let { if (start(context, it)) return true }
             // 지워진 파일이면(읽을 수 있을 때만 안다) 앱을 연다
             if (spec?.opensBookFile == true) BookShelf.filePath(context, book.id)?.takeIf { !BookFiles.canRead(context) || File(it).isFile }
                 ?.let {
@@ -249,6 +254,11 @@ object AppStore {
         if (BookShelf.idByFile(context, path).let { it == null || it == book.id }) BookShelf.setFilePath(context, book.id, path)
         return openFile(context, app.component, path)
     }
+
+    /** [intent] 로 연다(새 작업, 화면 전환 애니메이션 없이). 열 수 없으면 false */
+    private fun start(context: Context, intent: Intent): Boolean = runCatching {
+        context.startActivity(Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle())
+    }.isSuccess
 
     /**
      * [path] 를 [component] 로 연다(`file://`). 받는 앱(네오리더·KOReader)은 저장소 전체를 읽는 앱이라 경로를 그대로 넘긴다.

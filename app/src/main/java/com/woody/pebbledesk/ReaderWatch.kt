@@ -44,7 +44,7 @@ class ReaderWatchService : AccessibilityService() {
      * 서재의 '최근 읽은 책' 줄을 둔다. 예전에는 앱마다 마지막으로 편 책 제목(`opened_<앱>`)도 두어 진행률을 붙였는데, 지금은 편 책 기록(DB `book_open`,
      * [ReadingLog.openBook])이 그 일을 하고 옛 값은 그 기록이 비어 있을 때만 읽는다([ReadingLog]).
      */
-    private val openedPrefs by lazy { Storage.of(this).getSharedPreferences("reader_watch", MODE_PRIVATE) }
+    private val openedPrefs by lazy { Storage.of(this).getSharedPreferences(WATCH_PREFS, MODE_PRIVATE) }
     /**
      * 탭마다 책이 다른 앱([ReaderSpec.viewerTabs])에서 읽는 화면 [cls](탭)로 마지막으로 편 책의 id(서비스가 다시 시작돼도 남긴다).
      * 1.5.11 까지는 제목(`tab_<탭>`)을 두어 파일 안의 제목이 같은 다른 책과 헷갈렸다. 옛 값은 쓰지 않는다(그 탭은 처음 보는 탭으로).
@@ -73,6 +73,10 @@ class ReaderWatchService : AccessibilityService() {
     private val unknownOpen = mutableMapOf<String, Long>()
     /** 탭마다 책이 다른 앱([ReaderSpec.viewerTabs])에서 [unknownOpen] 을 적은 탭(같은 모르는 탭에 다시 와도 처음 열린 때를 둔다) */
     private val unknownTab = mutableMapOf<String, String>()
+    /** 책 열쇠로 가르는 앱([ReaderSpec.viewerKeys])에서 제목을 아직 몰라 책 모름으로 둔 열쇠 */
+    private val unknownKeys = mutableMapOf<String, String>()
+    /** 그 앱 데이터에서 표지를 가져오는 중이거나 가져온 열쇠([keyCover]) */
+    private val keyCovers = mutableSetOf<String>()
     private var lastWebRead = 0L
     /** 앱마다 읽는 화면이 마지막으로 앞에 온 때 */
     private val viewerAt = mutableMapOf<String, Long>()
@@ -233,7 +237,8 @@ class ReaderWatchService : AccessibilityService() {
                 unknownOpen -= spec.pkg
             }
             webBook.remove(spec.pkg)?.let { book -> bookOpened(spec, book) }
-            clicked.remove(spec.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.let { (cell, _) ->
+            // 책 열쇠로 가르는 앱(Readest)은 누른 칸을 읽는 화면의 열쇠를 볼 때 쓴다([readKeyed]. 열쇠로 이미 아는 책이면 그 책)
+            if (!spec.viewerKeys) clicked.remove(spec.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.let { (cell, _) ->
                 // 파일 칸은 읽는 화면에 그 파일 이름이 보일 때 편 것으로 본다(누른 뒤 다른 앱으로 다른 파일을 열었을 수 있다)
                 if (cell.file != null) clickedFiles[spec.pkg] = cell else bookOpened(spec, cell)
             }
@@ -270,7 +275,7 @@ class ReaderWatchService : AccessibilityService() {
         val holder = spec.viewerHolder ?: return cls
         if (cls !in spec.shelves) return cls
         val root = root(spec) ?: return screen[spec.pkg]?.takeIf { it.substringBefore('#') == cls } ?: cls
-        return if (root.byId(spec.pkg, holder).isNotEmpty()) "$cls#$holder" else cls
+        return if (spec.showsViewer(root)) "$cls#$holder" else cls
     }
 
     /**
@@ -365,6 +370,12 @@ class ReaderWatchService : AccessibilityService() {
         if (spec.fileState) return syncFiles(spec)
         val windows = windowsOf(spec).takeIf { it.all.isNotEmpty() } ?: return logNoWindow(spec)
         val shown = spec.readViewer(windows)
+        if (spec.viewerKeys) {
+            spec.viewerKey(windows)?.let { return readKeyed(spec, it, shown) }
+            // 웹 화면이 안쪽 요소를 늦게 내놓는다: 조금 뒤 다시 본다
+            if (viewerRetries-- > 0) { viewerSpec = spec; handler.postDelayed(viewerLater, VIEWER_RETRY_MS) }
+            return
+        }
         val file = fileBook(spec, shown)
         // 파일 이름만 보이는 읽는 화면(이지뷰어): 그 파일로 넣은 책. 처음 보는(바뀐) 파일이면 그때(처음이면 읽는 화면이 열린 때)부터 그 책
         val shownFile = shown.file?.takeIf { file == null && shown.title == null }
@@ -450,8 +461,9 @@ class ReaderWatchService : AccessibilityService() {
         BookShelf.updateStatus(this, book.id, progress, -1)
     }
 
-    /** 책이 열려 있는지를 데이터로 아는 앱(KOReader)을 모두 맞춘다(홈으로 돌아올 때, [syncFileApps]). 깔려 있는 앱만 */
+    /** 책이 열려 있는지를 데이터로 아는 앱(KOReader)을 모두 맞춘다(홈으로 돌아올 때, [syncFileApps]). 깔려 있는 앱만. 책 열쇠로 가르는 앱(Readest)도 */
     private fun syncFiles() {
+        syncKeys()
         for (spec in ReaderApps.ALL) if (spec.fileState && runCatching { packageManager.getApplicationInfo(spec.pkg, 0) }.isSuccess) syncFiles(spec)
     }
 
@@ -519,6 +531,77 @@ class ReaderWatchService : AccessibilityService() {
         openedPrefs.edit().putString(key, path).apply()
         return true
     }
+
+    /**
+     * 읽는 화면에 지금 책의 열쇠가 늘 보이는 앱(Readest 책 해시, [ReaderSpec.viewerKeys]): 열쇠로 책을 가른다. 한 번 안 열쇠는 그 책으로 적어 두어
+     * (서비스가 다시 시작돼도) 서재를 거치지 않고 연 책(Readest '시작 시 마지막 책 열기'·파일 관리자·홈에서 바로 열기)도 알아본다.
+     * 처음 보는 열쇠는 그 앱 데이터의 제목([ReaderSpec.keyBook]), 없으면 이 읽는 화면을 열기 전에 서재에서 누른 칸, 없으면 읽는 화면의 제목(목차 창)으로 안다.
+     * 그때까지는 책 모름(앞서 편 책에 붙이지 않는다). 진행률은 그 앱 데이터, 없으면 화면에서 읽은 것. 표지가 없으면 그 앱 데이터의 표지를 붙인다.
+     */
+    private fun readKeyed(spec: ReaderSpec, key: String, shown: ViewerInfo) {
+        val opened = viewerAt[spec.pkg] ?: System.currentTimeMillis()
+        val data = spec.keyBook(this, key)
+        val progress = data?.progress?.takeIf { it >= 0 } ?: shown.progress
+        WatchLog.add(this, WatchLog.Kind.PROGRESS, spec.pkg, "$progress", data?.title ?: shown.title.orEmpty())
+        if (openedPrefs.getString(lastKeyPref(spec), null) != key) openedPrefs.edit().putString(lastKeyPref(spec), key).apply()
+        // 해시로 이어 둔 책은 제목이 달라도 그 책(Readest 에서 메타데이터 편집으로 제목을 바꿔도 같은 책)
+        val book = keyedBook(spec, key)?.also { b ->
+            clicked -= spec.pkg
+            if (recordedBook(spec)?.id != b.id) bookOpened(spec, Cell(b.title, "", -1, -1, null, Rect()), opened, b.id)
+        } ?: newKeyed(spec, key, data, shown, progress, opened)
+        if (book != null) {
+            if (progress >= 0 || !data?.author.isNullOrEmpty()) BookShelf.updateStatus(this, book.id, progress, -1, data?.author.orEmpty())
+            if (!BookShelf.hasCover(this, book.id)) keyCover(spec, key, book.id)
+        }
+        // 진행률은 늦게 채워질 수 있다(웹 화면이 안쪽 요소를 늦게 내놓는다)
+        if (progress < 0 && viewerRetries-- > 0) { viewerSpec = spec; handler.postDelayed(viewerLater, VIEWER_RETRY_MS) }
+    }
+
+    /** 처음 보는(또는 그 책을 빼고 다시 연) 열쇠 [key] 의 책을 넣는다([readKeyed]). 제목을 아직 모르면 책 모름으로 두고 null */
+    private fun newKeyed(spec: ReaderSpec, key: String, data: FileBook?, shown: ViewerInfo, progress: Int, opened: Long): ShelfBook? {
+        val click = clicked[spec.pkg]?.takeIf { System.currentTimeMillis() - it.second < CLICK_OPEN_MS }?.first
+        val title = data?.title?.ifEmpty { null } ?: click?.title ?: shown.title
+        if (title == null) {
+            // 책 모름: 그 앞에 편 책에 이 시간을 붙이지 않게(같은 열쇠에 한 번만)
+            if (unknownKeys.put(spec.pkg, key) != key && ReadingLog.openBook(this, spec.pkg) != null) ReadingLog.bookOpened(this, spec.pkg, "", "", opened)
+            return null
+        }
+        val author = data?.author?.ifEmpty { null } ?: shown.author.takeIf { shown.title == title }.orEmpty()
+        bookOpened(spec, Cell(title, author, progress, -1, null, Rect()), opened)
+        return recordedBook(spec)?.also { setKeyBook(spec, key, it.id) }
+    }
+
+    /** 열쇠 [key] 로 적어 둔 책(읽고 있는 책일 때만. 빼거나 지운 책은 다시 알아본다) */
+    private fun keyedBook(spec: ReaderSpec, key: String): ShelfBook? =
+        openedPrefs.getString(keyPref(spec.pkg, key), null)?.let { BookShelf.get(this, it) }
+
+    private fun setKeyBook(spec: ReaderSpec, key: String, id: String) {
+        openedPrefs.edit().putString(keyPref(spec.pkg, key), id).putString(bookKeyPref(spec.pkg, id), key).apply()
+    }
+
+    /** 책 [id] 에 열쇠 [key] 의 표지를 그 앱 데이터에서 붙인다(뒤에서. 가져오는 중이면 다시 하지 않고, 못 가져오면 다음에 다시) */
+    private fun keyCover(spec: ReaderSpec, key: String, id: String) {
+        if (!keyCovers.add(key)) return
+        Bg.run({ spec.keyCover(this, key) }) done@{ result ->
+            val bytes = result.getOrNull()
+            if (bytes == null) { keyCovers -= key; return@done }
+            if (!BookShelf.hasCover(this, id)) runCatching { BookShelf.setCover(this, id, bytes) }
+        }
+    }
+
+    /** 책 열쇠로 가르는 앱(Readest)의 마지막 책을 그 앱 데이터로 맞춘다(홈으로 돌아올 때: 읽는 화면을 닫을 때 적힌 마지막 진행률, [syncFileApps]) */
+    private fun syncKeys() {
+        for (spec in ReaderApps.ALL) {
+            if (!spec.viewerKeys) continue
+            val key = openedPrefs.getString(lastKeyPref(spec), null) ?: continue
+            val data = spec.keyBook(this, key) ?: continue
+            val book = keyedBook(spec, key) ?: continue
+            if (data.progress >= 0 || data.author.isNotEmpty()) BookShelf.updateStatus(this, book.id, data.progress, -1, data.author)
+            if (!BookShelf.hasCover(this, book.id)) keyCover(spec, key, book.id)
+        }
+    }
+
+    private fun lastKeyPref(spec: ReaderSpec) = "last_key_${spec.pkg}"
 
     /** 편 책 기록([ReadingLog.openBook])이 가리키는 읽고 있는 책(책 모름·목록에 없으면 null) */
     private fun recordedBook(spec: ReaderSpec): ShelfBook? =
@@ -745,6 +828,7 @@ class ReaderWatchService : AccessibilityService() {
         clicked -= spec.pkg
         unknownClick -= spec.pkg
         unknownOpen -= spec.pkg
+        unknownKeys -= spec.pkg
         // 편 때는 한 번만 정해 회차 시작일과 편 책 기록에 같이 쓴다(자정에 걸쳐도 같은 날)
         val openedAt = (at ?: System.currentTimeMillis()).also { lastOpenedAt[spec.pkg] = System.currentTimeMillis() }
         var result = WatchLog.Opened.FRONT
@@ -866,7 +950,8 @@ class ReaderWatchService : AccessibilityService() {
      * 1초에 한 번만 찍을 수 있으므로 너무 이르면 조금 뒤에 다시 한다. 한 가지 색뿐인 칸(그림을 불러오기 전)은 버린다.
      */
     private fun captureCovers(spec: ReaderSpec, targets: List<CoverSpot>, retry: Boolean = true) {
-        if (targets.isEmpty() || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        // 그 앱 데이터에서 표지를 가져오는 앱(Readest 데이터 폴더를 읽을 수 있을 때)은 화면에서 자르지 않는다
+        if (targets.isEmpty() || Build.VERSION.SDK_INT < Build.VERSION_CODES.R || spec.dataCovers(this)) return
         val now = System.currentTimeMillis()
         if (now - lastShot < SHOT_INTERVAL_MS) { if (retry) scheduleSettle(spec); return }
         lastShot = now
@@ -880,10 +965,10 @@ class ReaderWatchService : AccessibilityService() {
                 shot ?: return
                 // 요소 이름 없이 자리로 칸을 찾는 서재(리디·휴대폰 밀리)는 화면이 움직이는 중이었을 수 있어, 찍은 뒤에도 같은 자리에 있는 칸만 자른다.
                 // 표지 위에 받기 단추 등을 겹치는 서재(e-ink 밀리·리디 작품 화면)도 읽은 뒤 찍기 전에 겹쳤을 수 있어 다시 본다(겹친 칸은 표지 자리가 없다).
-                // 같은 책 칸이 둘이면(킨들 '이어 읽기' 표지와 표시에 가려 자르지 않는 칸) 표지 자리가 있는 칸으로 본다.
+                // 같은 책 칸이 둘이면(킨들 '이어 읽기' 표지와 표시에 가려 자르지 않는 칸) 표지 자리가 있는 칸으로 본다([ReaderSpec.coverStill]).
                 val still = if (!spec.cellsByPosition && spec.coverOverlays.isEmpty()) wanted else {
-                    val now = root(spec)?.let { readShelf(spec, it) }.orEmpty().filter { it.thumb != null }.associate { it.title to it.thumb }
-                    wanted.filter { now[it.title] == it.rect }
+                    val now = root(spec)?.let { readShelf(spec, it) }.orEmpty().filter { it.thumb != null }
+                    wanted.filter { spec.coverStill(now, it.title, it.rect) }
                 }
                 Bg.run({
                     try {
@@ -1000,6 +1085,17 @@ class ReaderWatchService : AccessibilityService() {
         fun bookFileOpened(pkg: String, book: ShelfBook, path: String) {
             homeOpened[pkg] = Cell(book.title, book.author, -1, -1, null, Rect(), file = path) to System.currentTimeMillis()
         }
+
+        /** 책 [id] 를 [pkg] 에서 연 열쇠(Readest 책 해시, 홈에서 그 책을 바로 연다 [com.woody.pebbledesk.readers.ReaderSpec.keyIntent]). 모르면 null */
+        fun bookKey(context: Context, pkg: String, id: String): String? =
+            Storage.of(context).getSharedPreferences(WATCH_PREFS, Context.MODE_PRIVATE).getString(bookKeyPref(pkg, id), null)
+
+        /** 서비스가 남기는 값([openedPrefs]: 최근 읽은 책 줄·탭의 책·책 열쇠 등) */
+        private const val WATCH_PREFS = "reader_watch"
+
+        /** 열쇠 → 책 id, 책 id → 열쇠(앱마다) */
+        private fun keyPref(pkg: String, key: String) = "key_${pkg}_$key"
+        private fun bookKeyPref(pkg: String, id: String) = "book_key_${pkg}_$id"
 
         private const val THROTTLE_MS = 1000L
         /** 읽는 화면이 이만큼 잠잠하면 진행률·제목을 읽는다 */
@@ -1137,7 +1233,8 @@ class ReaderWatchService : AccessibilityService() {
 
         /**
          * 책이 열려 있는지를 데이터로 아는 앱(KOReader)을 맞춘다: 홈으로 돌아올 때(읽은 시간·책을 그리기 전에) 부른다. 그 앱을 지켜보지 않으므로
-         * 앱 안에서 책을 바꾸거나 닫은 것은 이때 데이터에 적힌 때로 적힌다. 자동 추가 서비스가 붙어 있을 때만.
+         * 앱 안에서 책을 바꾸거나 닫은 것은 이때 데이터에 적힌 때로 적힌다. 책 열쇠로 가르는 앱(Readest)의 마지막 책 진행률도 그 앱 데이터로.
+         * 자동 추가 서비스가 붙어 있을 때만.
          */
         fun syncFileApps() {
             instance?.syncFiles()
