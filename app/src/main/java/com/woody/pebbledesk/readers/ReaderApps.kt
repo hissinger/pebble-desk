@@ -2,7 +2,7 @@ package com.woody.pebbledesk.readers
 
 /**
  * 읽는 책 자동 추가가 받는 이북 앱들(앱마다 파일 하나). 앱을 더하면 여기와
- * `res/xml/reader_watch.xml` 의 packageNames(시스템이 이 앱들의 화면만 보낸다), 설정 › 독서 › 자동 추가 안내의 앱(`SettingsActivity.GUIDE_APPS`,
+ * `res/xml/reader_watch.xml` 의 packageNames(시스템이 이 앱들의 화면만 보낸다), 설정 › 독서 › 자동 추가 안내의 앱(`ReaderGuide.APPS`,
  * 빠지면 단위 테스트가 알린다)을 함께 고친다.
  */
 object ReaderApps {

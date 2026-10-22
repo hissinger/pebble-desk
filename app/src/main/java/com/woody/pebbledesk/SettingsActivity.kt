@@ -10,32 +10,7 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
-import com.woody.pebbledesk.readers.Aladin
 import com.woody.pebbledesk.readers.BookFiles
-import com.woody.pebbledesk.readers.Bookers
-import com.woody.pebbledesk.readers.CherieViewer
-import com.woody.pebbledesk.readers.EasyView
-import com.woody.pebbledesk.readers.EasyViewFree
-import com.woody.pebbledesk.readers.KOReader
-import com.woody.pebbledesk.readers.KOReaderFdroid
-import com.woody.pebbledesk.readers.Kindle
-import com.woody.pebbledesk.readers.KyoboEbook
-import com.woody.pebbledesk.readers.KyoboEbookMobile
-import com.woody.pebbledesk.readers.KyoboLibrary
-import com.woody.pebbledesk.readers.Libby
-import com.woody.pebbledesk.readers.Millie
-import com.woody.pebbledesk.readers.MillieMobile
-import com.woody.pebbledesk.readers.MoonReader
-import com.woody.pebbledesk.readers.MoonReaderPro
-import com.woody.pebbledesk.readers.MyYes
-import com.woody.pebbledesk.readers.NeoReader
-import com.woody.pebbledesk.readers.ReaderApps
-import com.woody.pebbledesk.readers.ReaderSpec
-import com.woody.pebbledesk.readers.Ridi
-import com.woody.pebbledesk.readers.RidiOneStore
-import com.woody.pebbledesk.readers.Yes24Ebook
-import com.woody.pebbledesk.readers.Yes24Library
-import com.woody.pebbledesk.readers.Yes24LibraryMobile
 import java.text.Collator
 import java.time.DayOfWeek
 import java.time.format.TextStyle
@@ -52,25 +27,33 @@ class SettingsActivity : EinkActivity() {
     private var announceLatest = false
     /** 바뀐 점·설치·받는 중 창 */
     private val updates = UpdateSheets(this)
-    /** 자동 추가 안내의 쪽들(그 화면에서만) */
+    /** 자동 추가 안내·앱 안내의 쪽들(그 화면에서만) */
     private lateinit var guide: PagedBlocks
-    /** 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]), 화면([PAGE_DISPLAY]), 글자 · 간격([PAGE_TEXT]) */
+    /**
+     * 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]), 그 앱 하나의 안내([PAGE_GUIDE_APP]),
+     * 화면([PAGE_DISPLAY]), 글자 · 간격([PAGE_TEXT])
+     */
     private val page by lazy { intent.getStringExtra(EXTRA_PAGE) }
+    /** 앱 안내 화면의 앱 */
+    private val guideApp by lazy { ReaderGuide.APPS.getOrNull(intent.getIntExtra(EXTRA_APP, -1)) }
+    private val paged get() = page == PAGE_GUIDE || page == PAGE_GUIDE_APP
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (page == PAGE_GUIDE_APP && guideApp == null) return finish()
         val root = vbox()
         val title = when (page) {
-            PAGE_GUIDE -> R.string.auto_books_guide
-            PAGE_READING -> R.string.reading_settings
-            PAGE_DISPLAY -> R.string.section_display
-            PAGE_TEXT -> R.string.text_spacing
-            else -> R.string.settings
+            PAGE_GUIDE -> getString(R.string.auto_books_guide)
+            PAGE_GUIDE_APP -> guideApp!!.label(this)
+            PAGE_READING -> getString(R.string.reading_settings)
+            PAGE_DISPLAY -> getString(R.string.section_display)
+            PAGE_TEXT -> getString(R.string.text_spacing)
+            else -> getString(R.string.settings)
         }
-        val titleRow = titleRow(getString(title)) { finish() }
+        val titleRow = titleRow(title) { finish() }
         root.addView(titleRow)
         root.addView(hline(2))
-        if (page == PAGE_GUIDE) {
+        if (paged) {
             // 한 화면에 다 들어가지 않아 쪽으로 나눈다. 쪽 표시 `‹ 1 / 2 ›` 는 제목 줄 오른쪽 끝(아래 줄이 없는 화면).
             // 제목 줄은 누르면 뒤로 가므로, 쪽 표시가 줄 높이·오른쪽 끝까지 받아 그 근처를 눌러도 뒤로 가지 않게 한다(한 쪽뿐이면 숨긴다).
             guide = PagedBlocks(this)
@@ -103,6 +86,7 @@ class SettingsActivity : EinkActivity() {
         super.onResume()
         when (page) {
             PAGE_GUIDE -> renderGuide()
+            PAGE_GUIDE_APP -> renderGuideApp()
             PAGE_READING -> renderReading()
             PAGE_DISPLAY -> renderDisplay()
             PAGE_TEXT -> renderText()
@@ -272,10 +256,7 @@ class SettingsActivity : EinkActivity() {
         }
         // 책 파일 읽기 = 안드로이드 '모든 파일 액세스'(KOReader 의 기록, 내 파일 리더(KOReader·네오리더·문리더)의 책 파일과 표지). 늘 보인다.
         val files = BookFiles.canRead(this)
-        row(getString(R.string.book_files), getString(if (files) R.string.on else R.string.off), on = files, next = true) {
-            Sheet(this).header(getString(R.string.book_files), getString(R.string.book_files_desc))
-                .item(getString(R.string.open_file_access), bold = true) { BookFiles.request(this) }.show()
-        }
+        row(getString(R.string.book_files), getString(if (files) R.string.on else R.string.off), on = files, next = true) { bookFilesSheet() }
         // 오늘 읽은 시간 = 사용 기록 액세스 허용. 켜고 끄기 모두 그 시스템 화면에서 한다.
         col = right
         val access = ReadingLog.hasAccess(this)
@@ -362,53 +343,111 @@ class SettingsActivity : EinkActivity() {
     }
 
     /**
-     * 자동 추가 안내(두 쪽): 1쪽은 앱마다 공통인 안내(읽는 방식, 진행률, 표지·제목)와 지원하는 앱 이름(판마다 따로, 이름 순),
-     * 2쪽은 안 되는 게 있는 앱만 이름과 설명(판이 여럿인 앱은 한 묶음). 2쪽에 다 들어가지 않으면 다음 쪽으로 이어진다.
+     * 자동 추가 안내: 맨 위 회색 한 줄(앱을 누르면 자세한 안내가 나온다는 것), 그 아래 `지원하는 앱` 을 한 줄씩(안내가 같은 판은 한 줄에 `리디 · 리디(원스토어)`, 지금 언어의 이름 순.
+     * 깔린 앱으로 나누지 않는다: 기기마다 순서가 달라지지 않게). 줄을 누르면 그 앱의 안내([renderGuideApp]). 넘치면 쪽으로 나눈다.
      */
     private fun renderGuide() {
-        fun para(res: Int, top: Int, bottom: Int) = text(getString(res), 17f, color = Ui.BLACK, lines = 6).apply {
-            setLineSpacing(0f, 1.2f)
-            setPadding(dp(Ui.MARGIN), dp(top), dp(Ui.MARGIN), dp(bottom))
-        }
-        val apps = GUIDE_APPS.map { it.name to it.desc }.let { list ->
-            // 앱 이름 순(지금 언어의 사전 순)
-            val collator = Collator.getInstance(resources.configuration.locales[0])
-            list.sortedWith(compareBy(collator) { getString(it.first) })
-        }
-        val blocks = mutableListOf(
-            PagedBlocks.Block(listOf(para(R.string.guide_intro, 12, 4))),
-            PagedBlocks.Block(listOf(para(R.string.guide_progress_note, 4, 4))),
-            PagedBlocks.Block(listOf(para(R.string.guide_cover_note, 4, 12))),
-            PagedBlocks.Block(listOf(
-                sectionView(getString(R.string.guide_apps)),
-                // 이름 하나는 줄을 나누지 않고(글자 사이 단어 이음표, 공백은 줄바꿈 없는 공백), 가운뎃점은 앞 이름에 붙여 줄 앞에 오지 않게
-                text(apps.joinToString("\u00A0\u00A0·  ") { noBreak(getString(it.first)) }, 18f, Ui.bold, lines = 6).apply {
-                    setLineSpacing(0f, 1.2f)
-                    setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(10))
-                },
-            )),
-        )
-        // 안 되는 게 있는 앱: 앱 하나가 한 묶음(위 선·이름·설명). 소제목은 첫 앱과 함께 새 쪽에서, 마지막 앱 아래에 선.
-        // 판이 여럿인 앱(설명이 같다)은 한 묶음으로, 이름은 이름 순으로 이어서
-        val limited = apps.filter { it.second != null }.groupBy { it.second!! }.map { (desc, list) ->
-            list.joinToString("\u00A0\u00A0·  ") { noBreak(getString(it.first)) } to desc
-        }
-        limited.forEachIndexed { i, (names, desc) ->
-            val views = mutableListOf<View>()
-            if (i == 0) views += sectionView(getString(R.string.guide_limits))
-            views += hline(1, Ui.DIVIDER)
-            views += text(names, 19f, Ui.bold, lines = 2).apply { setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), 0) }
-            views += text(getString(desc), 17f, color = Ui.GRAY, lines = 5).apply {
-                setPadding(dp(Ui.MARGIN), dp(2), dp(Ui.MARGIN), dp(8))
+        val collator = Collator.getInstance(resources.configuration.locales[0])
+        val apps = ReaderGuide.APPS.mapIndexed { i, app -> i to app.label(this) }.sortedWith(compareBy(collator) { it.second })
+        val blocks = mutableListOf(PagedBlocks.Block(listOf(guidePara(getString(R.string.guide_tap_hint), Ui.GRAY).apply {
+            setPadding(paddingLeft, dp(12), paddingRight, dp(2))
+        })))
+        // 소제목은 첫 줄과 한 묶음
+        apps.forEachIndexed { i, (index, label) ->
+            val box = vbox()
+            if (i == 0) { box.addView(sectionView(getString(R.string.guide_apps))); box.addView(hline(1, Ui.DIVIDER)) }
+            row(label, null, next = true, last = i == apps.lastIndex, into = box) {
+                startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, PAGE_GUIDE_APP).putExtra(EXTRA_APP, index))
             }
-            if (i == limited.lastIndex) views += hline(1, Ui.DIVIDER)
-            blocks += PagedBlocks.Block(views, newPage = i == 0)
+            blocks += PagedBlocks.Block(listOf(box))
         }
         guide.setBlocks(blocks)
     }
 
+    /**
+     * 앱 하나의 안내: 필요한 권한(지금 켜짐/꺼짐, 누르면 그 설정. 책 파일 읽기는 그 앱이 쓸 때만), 앱에서 할 것(점 목록, 없으면 한 줄),
+     * 자동으로 들어오는 책 정보 다섯 가지(표지·제목·저자·진행률·반납일: 들어오는지만, 조건·이유는 아래 작은 회색), 알아 둘 것(있을 때만). 넘치면 쪽으로 나눈다.
+     * 권한을 켜고 돌아오면 다시 그린다(onResume).
+     */
+    private fun renderGuideApp() {
+        val info = guideApp?.info ?: return
+        val blocks = mutableListOf<PagedBlocks.Block>()
+        fun onOff(on: Boolean) = getString(if (on) R.string.on else R.string.off)
+
+        val perms = vbox().apply { addView(sectionView(getString(R.string.guide_permissions))); addView(hline(1, Ui.DIVIDER)) }
+        val watching = ReaderWatchService.isEnabled(this)
+        row(getString(R.string.auto_books), onOff(watching), on = watching, next = true, into = perms) { autoBooksSheet(watching) }
+        info.bookFiles?.let { hint ->
+            val files = BookFiles.canRead(this)
+            row(getString(R.string.book_files), onOff(files), on = files, next = true, hint = getString(hint), into = perms) { bookFilesSheet() }
+        }
+        val access = ReadingLog.hasAccess(this)
+        row(getString(R.string.reading_time), onOff(access), on = access, next = true, hint = getString(R.string.guide_usage_hint), into = perms) {
+            ReadingLog.openAccessSettings(this)
+        }
+        blocks += PagedBlocks.Block(listOf(perms))
+
+        // 할 것: 점 하나에 한 묶음, 소제목은 첫 점과 함께
+        val todo = info.todo.ifEmpty { null }
+        (todo ?: listOf(R.string.guide_todo_none)).forEachIndexed { i, res ->
+            val box = vbox()
+            if (i == 0) box.addView(sectionView(getString(R.string.guide_todo)))
+            box.addView(if (todo == null) guidePara(getString(res), Ui.BLACK) else bullet(getString(res)))
+            blocks += PagedBlocks.Block(listOf(box))
+        }
+
+        info.fields.forEachIndexed { i, (label, field) ->
+            val box = vbox()
+            if (i == 0) { box.addView(sectionView(getString(R.string.guide_fields))); box.addView(hline(1, Ui.DIVIDER)) }
+            box.addView(fieldRow(getString(label), field))
+            box.addView(hline(1, Ui.DIVIDER))
+            blocks += PagedBlocks.Block(listOf(box))
+        }
+
+        info.note?.let { note ->
+            blocks += PagedBlocks.Block(listOf(vbox().apply {
+                addView(sectionView(getString(R.string.guide_notes)))
+                addView(guidePara(getString(note), Ui.GRAY))
+            }))
+        }
+        guide.setBlocks(blocks)
+    }
+
+    /** 안내의 한 단락(17sp). 줄 수는 글자를 키운 영어 안내도 다 들어가게 넉넉히(쪽은 잰 높이로 나눈다) */
+    private fun guidePara(value: String, color: Int) = text(value, 17f, color = color, lines = GUIDE_LINES).apply {
+        setLineSpacing(0f, 1.2f)
+        setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(6))
+    }
+
+    /** 앱에서 할 것 한 줄: 왼쪽 `·`, 오른쪽 여러 줄 글 */
+    private fun bullet(value: String) = hbox().apply {
+        gravity = Gravity.TOP
+        setPadding(dp(Ui.MARGIN), dp(4), dp(Ui.MARGIN), dp(4))
+        addView(text("·", 17f, Ui.bold), lp(dp(18), WRAP))
+        addView(text(value, 17f, lines = GUIDE_LINES).apply { setLineSpacing(0f, 1.2f) }, lp(0, WRAP, 1f))
+    }
+
+    /** 책 정보 한 줄: 왼쪽 굵은 이름(폭 고정, 글자 크기를 따라 넓힌다), 오른쪽 `들어옵니다`(안 들어오면 흐리게)와 그 아래 작은 회색 조건·이유 */
+    private fun fieldRow(label: String, field: ReaderGuide.Field) = hbox().apply {
+        gravity = Gravity.TOP
+        setPadding(dp(Ui.MARGIN), dp(9), dp(Ui.MARGIN), dp(9))
+        addView(text(label, 18f, Ui.bold), lp(dp(FIELD_LABEL_DP * Ui.textScale), WRAP))
+        addView(vbox().apply {
+            addView(text(getString(field.main), 18f, color = if (field.added) Ui.BLACK else Ui.LIGHT_GRAY, lines = FIELD_LINES))
+            field.note?.let { note ->
+                addView(text(getString(note), 15f, color = Ui.GRAY, lines = FIELD_LINES).apply { setPadding(0, dp(3), 0, 0) })
+            }
+        }, lp(0, WRAP, 1f))
+    }
+
+    /** 책 파일 읽기 창: 무엇을 읽는지 + `모든 파일에 액세스 열기` */
+    private fun bookFilesSheet() {
+        Sheet(this).header(getString(R.string.book_files), getString(R.string.book_files_desc))
+            .item(getString(R.string.open_file_access), bold = true) { BookFiles.request(this) }.show()
+    }
+
     override fun onSwipe(toLeft: Boolean): Boolean {
-        if (page != PAGE_GUIDE || guide.pageCount <= 1) return false
+        if (!paged || guide.pageCount <= 1) return false
         if (toLeft) guide.next() else guide.prev()
         return true
     }
@@ -494,35 +533,7 @@ class SettingsActivity : EinkActivity() {
         }
     }
 
-    /** 자동 추가 안내의 앱 하나: 이름, 안 되는 것(없으면 null), 그 이름이 가리키는 이북 앱들(판마다 따로: e-ink 판에만 `(e-ink)`, 문리더 유료판은 `문리더 Pro`, 리디 원스토어판은 `(원스토어)`. 이지뷰어 무료판 둘과 KOReader 의 GitHub·F-Droid 판은 함께, 이지뷰어 유료판은 이름이 다른 채리뷰어) */
-    internal class GuideApp(val name: Int, val desc: Int?, val specs: List<ReaderSpec>)
-
     companion object {
-        /** 자동 추가 안내의 앱들. [ReaderApps.ALL] 을 빠짐없이 덮어야 한다(단위 테스트, 앱을 더하면 여기도) */
-        internal val GUIDE_APPS = listOf(
-            GuideApp(R.string.guide_kel, R.string.guide_kel_desc, listOf(KyoboLibrary)),
-            GuideApp(R.string.guide_kyobo, R.string.guide_kyobo_desc, listOf(KyoboEbook)),
-            GuideApp(R.string.guide_kyobo_mobile, R.string.guide_kyobo_desc, listOf(KyoboEbookMobile)),
-            GuideApp(R.string.guide_millie, null, listOf(Millie)),
-            GuideApp(R.string.guide_millie_mobile, null, listOf(MillieMobile)),
-            GuideApp(R.string.guide_aladin, R.string.guide_aladin_desc, listOf(Aladin)),
-            GuideApp(R.string.guide_bookers, null, listOf(Bookers)),
-            GuideApp(R.string.guide_ridi, R.string.guide_ridi_desc, listOf(Ridi)),
-            GuideApp(R.string.guide_ridi_onestore, R.string.guide_ridi_desc, listOf(RidiOneStore)),
-            GuideApp(R.string.guide_yes24lib, null, listOf(Yes24Library)),
-            GuideApp(R.string.guide_yes24lib_mobile, null, listOf(Yes24LibraryMobile)),
-            GuideApp(R.string.guide_myyes, R.string.guide_myyes_desc, listOf(MyYes)),
-            GuideApp(R.string.guide_yes24ebook, null, listOf(Yes24Ebook)),
-            GuideApp(R.string.guide_moon, R.string.guide_moon_desc, listOf(MoonReader)),
-            GuideApp(R.string.guide_moon_pro, R.string.guide_moon_desc, listOf(MoonReaderPro)),
-            GuideApp(R.string.guide_easyview, R.string.guide_easyview_desc, listOf(EasyView, EasyViewFree)),
-            GuideApp(R.string.guide_cherie, R.string.guide_easyview_desc, listOf(CherieViewer)),
-            GuideApp(R.string.guide_kindle, R.string.guide_kindle_desc, listOf(Kindle)),
-            GuideApp(R.string.guide_libby, R.string.guide_libby_desc, listOf(Libby)),
-            GuideApp(R.string.guide_neo, R.string.guide_neo_desc, listOf(NeoReader)),
-            GuideApp(R.string.guide_ko, R.string.guide_ko_desc, listOf(KOReader, KOReaderFdroid)),
-        )
-
         private const val EXTRA_PAGE = "page"
         private const val PAGE_TEXT = "text"
         private const val PAGE_DISPLAY = "display"
@@ -530,6 +541,14 @@ class SettingsActivity : EinkActivity() {
         private const val ROW_LABEL_SP = 22f
         private const val PAGE_READING = "reading"
         private const val PAGE_GUIDE = "guide"
+        private const val PAGE_GUIDE_APP = "guide_app"
+        /** 자동 추가 안내의 앱([ReaderGuide.APPS] 의 몇 번째) */
+        private const val EXTRA_APP = "app"
+        /** 책 정보의 이름 칸 폭(dp, 글자 크기 100% 기준) */
+        private const val FIELD_LABEL_DP = 96
+        /** 안내 단락·할 것 한 줄, 책 정보의 글·조건이 넘을 수 없는 줄 수(글자 150% 영어도 들어가게) */
+        private const val GUIDE_LINES = 10
+        private const val FIELD_LINES = 5
         private const val GOAL_MIN = 1L
         private const val GOAL_MAX = 300L
         /** 글자 · 간격 미리 보기 줄 수 */
