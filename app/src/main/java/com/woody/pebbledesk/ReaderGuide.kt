@@ -21,6 +21,7 @@ import com.woody.pebbledesk.readers.MyYes
 import com.woody.pebbledesk.readers.NeoReader
 import com.woody.pebbledesk.readers.ReaderApps
 import com.woody.pebbledesk.readers.ReaderSpec
+import com.woody.pebbledesk.readers.Readest
 import com.woody.pebbledesk.readers.Ridi
 import com.woody.pebbledesk.readers.RidiOneStore
 import com.woody.pebbledesk.readers.Yes24Ebook
@@ -145,6 +146,12 @@ internal object ReaderGuide {
             listOf(R.string.guide_t_ko_files),
             cover = Field(R.string.guide_added_epub), title = YES, author = YES, progress = YES, due = OWN_FILE,
             bookFiles = R.string.guide_files_required, note = R.string.guide_note_ko,
+        )),
+        App(listOf(R.string.guide_readest), listOf(Readest), Info(
+            listOf(R.string.guide_t_readest_data, R.string.guide_t_readest_shelf),
+            cover = yes(R.string.guide_n_readest_cover), title = yes(R.string.guide_n_readest_title), author = yes(R.string.guide_n_readest_author),
+            progress = yes(R.string.guide_n_readest_progress), due = OWN_FILE,
+            bookFiles = R.string.guide_files_readest, note = R.string.guide_note_readest,
         )),
     )
 }

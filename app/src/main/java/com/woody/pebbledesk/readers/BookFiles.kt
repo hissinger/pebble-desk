@@ -131,6 +131,9 @@ object BookFiles {
         }
     }.getOrNull()
 
+    /** 그림 파일 [file] 하나를 표지로(이북 앱이 따로 둔 표지 그림, Readest `cover.png`). 못 읽으면 null. 화면 스레드에서 부르지 않는다. */
+    fun imageCover(file: File): ByteArray? = runCatching { scaledJpeg { file.inputStream() } }.getOrNull()
+
     /** [open] 이 여는 그림을 긴 변 [COVER_PX] 안으로 줄인 JPEG(그림이 아니면 null). 두 번 연다(크기 보기·줄여 읽기) */
     private fun scaledJpeg(open: () -> InputStream): ByteArray? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
