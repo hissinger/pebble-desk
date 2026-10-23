@@ -3,6 +3,7 @@ package com.woody.pebbledesk
 import android.content.Context
 import android.os.Build
 import com.woody.pebbledesk.readers.Aladin
+import com.woody.pebbledesk.readers.BookFusion
 import com.woody.pebbledesk.readers.Bookers
 import com.woody.pebbledesk.readers.CherieViewer
 import com.woody.pebbledesk.readers.EasyView
@@ -163,6 +164,10 @@ internal object ReaderGuide {
             progress = yes(R.string.guide_n_readest_progress), due = OWN_FILE,
             bookFiles = R.string.guide_files_readest, note = R.string.guide_note_readest,
             coverBefore11 = Field(R.string.guide_added_readest_data),
+        )),
+        App(listOf(R.string.guide_bookfusion), listOf(BookFusion), Info(
+            listOf(R.string.guide_t_bookfusion_shelf, R.string.guide_t_progress_menu),
+            cover = YES, title = yes(R.string.guide_n_bookfusion_title), author = YES, progress = READING_MENU, due = NO,
         )),
     )
 }

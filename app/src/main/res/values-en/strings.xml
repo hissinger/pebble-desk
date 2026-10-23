@@ -273,6 +273,7 @@
     <string name="guide_cherie">CherieViewer</string>
     <string name="guide_ko">KOReader</string>
     <string name="guide_readest">Readest</string>
+    <string name="guide_bookfusion">BookFusion</string>
     <string name="guide_permissions">Permissions</string>
     <string name="guide_todo">In the app</string>
     <string name="guide_todo_none">Nothing to change.</string>
@@ -343,6 +344,8 @@
     <string name="guide_t_readest_data">Choose \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601) in Readest › Advanced Settings › Change Data Location › Choose New Folder. The cover, author and progress then come from Readest\'s data.</string>
     <string name="guide_t_readest_shelf">If you haven\'t moved the data, open books from the library. Books opened another way come in once you open the table of contents.</string>
     <string name="guide_note_readest">Tapping the book on the home screen opens it in Readest directly.</string>
+    <string name="guide_n_bookfusion_title">Only for books opened from Bookshelf</string>
+    <string name="guide_t_bookfusion_shelf">Open books from the Bookshelf screen. The reading screen shows no title, so books opened another way can\'t be recognized.</string>
     <string name="book_files">Read book files</string>
     <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For Readest, the cover, author and progress are read from its data folder (Readest/Books) once you move its data location to \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601). For NeoReader and Moon+ Reader, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
     <string name="open_file_access">Open All files access</string>

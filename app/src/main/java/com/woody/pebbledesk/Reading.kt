@@ -62,8 +62,8 @@ object ReadingLog {
             "Viewer(Epub|Pdf|Comic)MainActivity|(EPUB|Epub|PDF|CPUB|TXT)Activity)$"
     )
 
-    /** [cls](액티비티 전체 이름)가 이북 앱의 읽는 화면인가 */
-    fun isReaderScreen(cls: String) = ReaderApps.isViewer(cls) || READER.matches(cls.substringAfterLast('.'))
+    /** [pkg] 앱의 [cls](액티비티 전체 이름)가 이북 앱의 읽는 화면인가 */
+    fun isReaderScreen(context: Context, pkg: String, cls: String) = ReaderApps.isViewer(context, pkg, cls) || READER.matches(cls.substringAfterLast('.'))
 
     /**
      * 읽은 날로 셀 하루 최소 시간(연속일·목표 없는 날의 링·올해 읽은 책에 넣을지·회차). 이북 앱을 잠깐 열어 확인한 것은 읽은 것으로 보지 않는다.
@@ -457,7 +457,7 @@ object ReadingLog {
                         if (openAt >= 0) add(openPkg, openAt, e.timeStamp)
                         val cls = e.className
                         val hosted = cls != null && ReaderApps.hostsViewer(cls)
-                        val reading = e.packageName in packages && cls != null && (isReaderScreen(cls) || hosted)
+                        val reading = e.packageName in packages && cls != null && (isReaderScreen(context, e.packageName, cls) || hosted)
                         openAt = if (reading) e.timeStamp else -1
                         openPkg = e.packageName
                         openClass = if (reading) cls else null

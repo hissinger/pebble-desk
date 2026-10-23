@@ -61,6 +61,11 @@ class ReaderWatchService : AccessibilityService() {
     }
     /** 검색(웹 화면)에서 보고 있는 책 상세. 여기서 읽는 화면으로 넘어가면 이 책을 편 것으로 본다(`바로 읽기` 클릭에는 글자가 없다). */
     private val webBook = mutableMapOf<String, Cell>()
+    /**
+     * [webBook] 의 책 상세가 화면에서 사라진 때. 누른 단추에 알림이 없는 앱(BookFusion `Read`)은 단추를 누르면 상세가 먼저 사라지고 조금 뒤 읽는 화면이 떠,
+     * 사라진 뒤 [WEB_KEEP_MS] 동안은 기억을 둔다
+     */
+    private val webGone = mutableMapOf<String, Long>()
     /** 눌렀지만 아직 읽는 화면이 열리지 않은 책 칸과 누른 때([ReaderSpec.openOnViewer] 인 앱) */
     private val clicked = mutableMapOf<String, Pair<Cell, Long>>()
     /** 서재에서 책 칸으로 알아보지 못한 것을 누른 때(문리더 홈 탭·교보도서관 표지 보기의 표지만 있는 칸은 눌러도 제목이 오지 않는다) */
@@ -192,9 +197,9 @@ class ReaderWatchService : AccessibilityService() {
 
     private fun logScreen(spec: ReaderSpec, name: String, isScreen: Boolean) {
         WatchLog.add(this, if (isScreen) WatchLog.Kind.SCREEN else WatchLog.Kind.OTHER_WINDOW, spec.pkg, name.substringAfterLast('.'),
-            if (!isScreen) "" else when (name) {
-                in spec.shelves -> WatchLog.Role.SHELF.name
-                in spec.viewers -> WatchLog.Role.VIEWER.name
+            if (!isScreen) "" else when {
+                name in spec.shelves -> WatchLog.Role.SHELF.name
+                spec.isViewer(this, name) -> WatchLog.Role.VIEWER.name
                 else -> WatchLog.Role.OTHER.name
             })
     }
@@ -206,13 +211,14 @@ class ReaderWatchService : AccessibilityService() {
     private fun enterScreen(spec: ReaderSpec, name: String) {
         val now = System.currentTimeMillis()
         lastTransition = now
+        val from = screen[spec.pkg]
         // 같은 화면의 알림이 한 번 더 온 것(새로 들어온 것이 아니다)
-        val again = screen[spec.pkg] == name
+        val again = from == name
         screen[spec.pkg] = name
-        if (spec.viewerHolder != null) ReadingLog.viewerShown(this, spec.pkg, name in spec.viewers, now)
+        if (spec.viewerHolder != null) ReadingLog.viewerShown(this, spec.pkg, spec.isViewer(this, name), now)
         // 책 파일 읽기가 필요한 앱으로 책을 읽는데 꺼져 있으면 홈에서 묻게 한다(깔아만 둔 앱은 읽는 화면이 뜨지 않아 묻지 않는다)
-        if (spec.needsBookFiles && name in spec.viewers && !BookFiles.canRead(this)) wantFiles(spec)
-        if (ReadingLog.isReaderScreen(name)) {
+        if (spec.needsBookFiles && spec.isViewer(this, name) && !BookFiles.canRead(this)) wantFiles(spec)
+        if (ReadingLog.isReaderScreen(this, spec.pkg, name)) {
             viewerAt[spec.pkg] = now
             // 같은 읽는 화면의 알림이 한 번 더 온 것이면 이 읽는 화면에서 본 파일·누른 칸을 그대로 둔다
             if (!again) {
@@ -236,15 +242,19 @@ class ReaderWatchService : AccessibilityService() {
                 // 같은 읽는 화면의 알림이 한 번 더 온 것이면 그대로 둔다. 탭마다 책이 다른 앱은 탭마다 따로 둔다([enterTab]).
                 unknownOpen -= spec.pkg
             }
-            webBook.remove(spec.pkg)?.let { book -> bookOpened(spec, book) }
+            // 사라진 책 상세는 잠깐만, 그리고 사라진 뒤 다른 칸을 누르지 않았을 때만 쓴다
+            val gone = webGone.remove(spec.pkg)
+            val clickedLater = gone != null && (clicked[spec.pkg]?.second ?: 0L) > gone
+            val web = webBook.remove(spec.pkg)?.takeIf { gone == null || (now - gone < WEB_KEEP_MS && !clickedLater) }?.also { book -> bookOpened(spec, book) }
             // 책 열쇠로 가르는 앱(Readest)은 누른 칸을 읽는 화면의 열쇠를 볼 때 쓴다([readKeyed]. 열쇠로 이미 아는 책이면 그 책)
-            if (!spec.viewerKeys) clicked.remove(spec.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.let { (cell, _) ->
-                // 파일 칸은 읽는 화면에 그 파일 이름이 보일 때 편 것으로 본다(누른 뒤 다른 앱으로 다른 파일을 열었을 수 있다)
-                if (cell.file != null) clickedFiles[spec.pkg] = cell else bookOpened(spec, cell)
-            }
+            val clickedCell = if (spec.viewerKeys) null else clicked.remove(spec.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.first
+            // 파일 칸은 읽는 화면에 그 파일 이름이 보일 때 편 것으로 본다(누른 뒤 다른 앱으로 다른 파일을 열었을 수 있다)
+            clickedCell?.let { cell -> if (cell.file != null) clickedFiles[spec.pkg] = cell else bookOpened(spec, cell) }
+            // 누른 칸으로만 책을 아는 앱(BookFusion)이 누른 칸을 모른 채 서재에서 넘어왔다(누름 알림이 없는 칸, 책 상세도 아님): 여기부터 책 모름(앞서 편 책에 붙이지 않게)
+            if (spec.clickOnly && web == null && clickedCell == null && from in spec.shelves) ReadingLog.bookOpened(this, spec.pkg, "", "", now)
             // 홈에서 바로 연 책의 파일도 그렇게
             homeOpened.remove(spec.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.let { (cell, _) -> clickedFiles.putIfAbsent(spec.pkg, cell) }
-            if (spec.viewerTabs && name in spec.viewers) enterTab(spec, name, now)
+            if (spec.viewerTabs && spec.isViewer(this, name)) enterTab(spec, name, now)
         }
     }
 
@@ -318,8 +328,9 @@ class ReaderWatchService : AccessibilityService() {
 
     /** 서재 화면이면 멈춘 뒤에 보이는 책들을 읽고([settleShelf]), 읽는 화면이면 잠잠해진 뒤 진행률·제목을 읽는다([readViewer]). 그 밖의 화면은 읽지 않는다. */
     private fun readScreen(spec: ReaderSpec, force: Boolean) {
-        when (screen[spec.pkg]) {
-            in spec.shelves -> {
+        val name = screen[spec.pkg] ?: return
+        when {
+            name in spec.shelves -> {
                 // 검색 화면의 책 상세는 `바로 읽기`를 누르자마자 사라지므로 멈추기를 기다리지 않고 1초마다 기억해 둔다.
                 val now = System.currentTimeMillis()
                 // 아래 둘이 같이 쓴다(그 앱의 화면 트리는 필요할 때 한 번만 가져온다).
@@ -327,7 +338,9 @@ class ReaderWatchService : AccessibilityService() {
                 if (force || now - lastWebRead >= THROTTLE_MS) {
                     lastWebRead = now
                     shelfRoot?.let { root ->
-                        spec.webBook(root)?.let { webBook[spec.pkg] = it } ?: webBook.remove(spec.pkg)
+                        val web = spec.webBook(root)
+                        if (web != null) { webBook[spec.pkg] = web; webGone -= spec.pkg }
+                        else if (spec.pkg in webBook && now - webGone.getOrPut(spec.pkg) { now } >= WEB_KEEP_MS) { webBook -= spec.pkg; webGone -= spec.pkg }
                         // 서재를 잠깐만 보고 책으로 넘어가도 읽으러 가기 전의 '최근 읽은 책' 줄을 알도록 멈추기를 기다리지 않는다.
                         rememberRecent(spec, root)
                     }
@@ -349,7 +362,7 @@ class ReaderWatchService : AccessibilityService() {
                 }
                 scheduleSettle(spec)
             }
-            in spec.viewers -> {
+            spec.isViewer(this, name) -> {
                 viewerSpec = spec
                 viewerRetries = VIEWER_RETRIES
                 handler.removeCallbacks(viewerLater)
@@ -365,7 +378,7 @@ class ReaderWatchService : AccessibilityService() {
      */
     private fun readViewer(spec: ReaderSpec) {
         viewerSpec = null
-        if (screen[spec.pkg] !in spec.viewers) return
+        if (screen[spec.pkg]?.let { spec.isViewer(this, it) } != true) return
         // 책이 열려 있는지를 데이터로 아는 앱(KOReader)은 화면을 읽지 않고 데이터로 맞춘다(앞에 온 때 한 번)
         if (spec.fileState) return syncFiles(spec)
         val windows = windowsOf(spec).takeIf { it.all.isNotEmpty() } ?: return logNoWindow(spec)
@@ -775,6 +788,7 @@ class ReaderWatchService : AccessibilityService() {
         val root = root(spec) ?: return
         val web = spec.webBook(root) ?: return
         webBook[spec.pkg] = web
+        webGone -= spec.pkg
         val book = BookShelf.findByTitle(this, web.title)
         if (web.thumb != null && (book == null || !BookShelf.hasCover(this, book.id))) captureCovers(spec, listOf(CoverSpot(web.title, web.thumb)))
     }
@@ -823,7 +837,8 @@ class ReaderWatchService : AccessibilityService() {
         val fileId = id ?: cell.file?.let { fileBookId(spec, it, cell.title, path) }
         // 칸의 제목은 보기 방식·받기 전후로 파일 이름이기도 책 정보이기도 해서, 같은 파일로 넣은 책이면 그 책의 제목으로
         val seen = fileId?.let { BookShelf.bookOf(this, setOf(it)) }?.let { cell.copy(title = it.title) } ?: cell
-        webBook.remove(spec.pkg)
+        webBook -= spec.pkg
+        webGone -= spec.pkg
         // 앞서 눌러 내려받기만 한 칸이 그 뒤 연 다른 책 대신 들어가지 않게
         clicked -= spec.pkg
         unknownClick -= spec.pkg
@@ -850,7 +865,7 @@ class ReaderWatchService : AccessibilityService() {
         WatchLog.add(this, WatchLog.Kind.OPENED, spec.pkg, seen.title, result.name)
         // 편 책 기록에는 앱이 보여 준 제목을 적는다(제목을 고친 책이어도. 지운 뒤 그 시간을 다시 정할 때 같은 제목의 새 책을 찾게)
         ReadingLog.bookOpened(this, spec.pkg, seen.title, book.id, openedAt)
-        if (spec.viewerTabs) screen[spec.pkg]?.takeIf { it in spec.viewers }?.let { setTabBook(it, book.id) }
+        if (spec.viewerTabs) screen[spec.pkg]?.takeIf { spec.isViewer(this, it) }?.let { setTabBook(it, book.id) }
         // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 서재. 파일로 가르는 책은 그 파일 칸의 것만)
         (if (byFile) cell.file?.let(::fileCoverKey)?.takeIf { it in pendingCovers } else pendingFor(book.title))?.let { key ->
             val bytes = pendingCovers.remove(key) ?: return@let
@@ -919,6 +934,7 @@ class ReaderWatchService : AccessibilityService() {
         // 검색 화면의 책 상세에 보이는 표지(목록에 있는데 표지가 없으면)
         spec.webBook(root)?.let { web ->
             webBook[spec.pkg] = web
+            webGone -= spec.pkg
             val book = BookShelf.findByTitle(this, web.title)
             if (book != null && web.thumb != null && !BookShelf.hasCover(this, book.id)) targets += CoverSpot(web.title, web.thumb)
         }
@@ -1098,6 +1114,8 @@ class ReaderWatchService : AccessibilityService() {
         private fun bookKeyPref(pkg: String, id: String) = "book_key_${pkg}_$id"
 
         private const val THROTTLE_MS = 1000L
+        /** 책 상세가 사라진 뒤 그 책을 기억해 두는 때([webGone]) */
+        private const val WEB_KEEP_MS = 3000L
         /** 읽는 화면이 이만큼 잠잠하면 진행률·제목을 읽는다 */
         private const val VIEWER_SETTLE_MS = 700L
         /** 진행률이 비어 있으면 이 간격으로 이만큼 더 읽어 본다 */

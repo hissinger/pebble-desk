@@ -277,6 +277,7 @@
     <string name="guide_cherie">채리뷰어</string>
     <string name="guide_ko">KOReader</string>
     <string name="guide_readest">Readest</string>
+    <string name="guide_bookfusion">BookFusion</string>
     <string name="guide_permissions">필요한 권한</string>
     <string name="guide_todo">앱에서 할 것</string>
     <string name="guide_todo_none">따로 바꿀 것은 없습니다.</string>
@@ -348,6 +349,8 @@
     <string name="guide_t_readest_data">Readest › 고급 설정 › 데이터 위치 변경 › 새 폴더 선택에서 \u200B/\u2060sdcard\u2060/\u20600(SD 카드는 \u200B/\u2060sdcard\u2060/\u20601)을 고르세요. 그러면 표지·저자·진행률을 Readest 데이터에서 가져옵니다.</string>
     <string name="guide_t_readest_shelf">옮기지 않았으면 서재에서 책을 눌러 여세요. 다른 길로 연 책은 목차를 한 번 열어야 들어옵니다.</string>
     <string name="guide_note_readest">홈에서 책을 누르면 그 책을 Readest 로 바로 엽니다.</string>
+    <string name="guide_n_bookfusion_title">Bookshelf 에서 연 책만 들어옵니다</string>
+    <string name="guide_t_bookfusion_shelf">책은 Bookshelf 화면에서 눌러 여세요. 읽는 화면에 제목이 없어 다른 길로 연 책은 알 수 없습니다.</string>
     <string name="book_files">책 파일 읽기</string>
     <string name="book_files_desc">KOReader 는 화면에 책 제목을 드러내지 않아, KOReader 가 남기는 기록(koreader 폴더, 책 옆 .sdr 폴더)으로 편 책과 진행률을 압니다. Readest 는 데이터 위치를 \u200B/\u2060sdcard\u2060/\u20600(SD 카드는 \u200B/\u2060sdcard\u2060/\u20601)으로 옮겼을 때 그 폴더(Readest/Books)에서 표지·저자·진행률을 읽습니다. 네오리더·문리더는 연 책의 EPUB 파일에서 표지를 꺼냅니다(이지뷰어는 표지와 책 정보). 책 파일에서는 제목·저자·표지만 꺼냅니다.\n\n안드로이드 설정의 모든 파일에 액세스에서 Pebble Desk 의 모든 파일 관리 허용을 켜 주세요. 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
     <string name="open_file_access">모든 파일에 액세스 열기</string>
