@@ -17,7 +17,7 @@ import java.io.File
 
 /**
  * 옮기는 동안만 쓰는 어댑터(docs/reader-adapter-plan.md 3단계 `Legacy`): 아직 그 앱 파일로 옮기지 않은 특수 앱의 처리를
- * 예전 서비스 코드 그대로, [ReaderApp] 의 표시(`fileState`·`viewerTabs`·`confirmsOpen`·`clickOnly`·`recent`·
+ * 예전 서비스 코드 그대로, [ReaderApp] 의 표시(`viewerTabs`·`confirmsOpen`·`clickOnly`·`recent`·
  * `searchesBookFile`·`fileBook`)로 갈라 둔다. 표시가 없는 앱에는 바탕 [ScreenReader] 와 같다.
  * 특수 앱을 하나씩 옮기며(4단계) 그 앱의 갈래·기억을 여기서 지운다.
  */
@@ -254,8 +254,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
     // ── 읽는 화면 ──
 
     override fun onViewer(ctx: AppContext) {
-        // 책이 열려 있는지를 데이터로 아는 앱(KOReader)은 화면을 읽지 않고 데이터로 맞춘다(앞에 온 때 한 번)
-        if (app.fileState) return syncFiles(ctx)
         val windows = ctx.windows().takeIf { it.all.isNotEmpty() } ?: return ctx.noWindow()
         val shown = app.readViewer(windows)
         val recorder = ctx.recorder
@@ -505,79 +503,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
     /** 이북 앱이 [title] 로 연 파일을 그 책에 적어 둔다(홈에서 그 파일을 바로 열고, 표지가 없으면 그릴 때 그 파일에서 꺼낸다) */
     private fun saveFile(ctx: AppContext, title: String, path: String) {
         ctx.recorder.lookup.byTitle(title)?.let { ctx.recorder.setFile(it.id, path) }
-    }
-
-    // ── 데이터로 아는 앱 ──
-
-    override fun onHome(ctx: AppContext) {
-        if (app.fileState && runCatching { ctx.context.packageManager.getApplicationInfo(ctx.pkg, 0) }.isSuccess) syncFiles(ctx)
-    }
-
-    /**
-     * 책이 열려 있는지를 데이터로 아는 앱(KOReader, [ReaderApp.fileState])을 그 앱의 데이터로 맞춘다. 그 앱이 앞에 올 때와 홈으로 돌아올 때만
-     * 부르고(지켜보지 않는다), 지난번에 맞춘 뒤([since])의 일을 데이터에 적힌 때로 한꺼번에 적는다:
-     * - 그 사이 열었다 닫은 앞 책들(앱 안에서 책을 바꿈): 오래된 것부터 연 때에 편 것으로(목록에 없으면 넣는다), 열려 있던 동안만 읽은 시간으로.
-     * - 지금 책: 그 사이 열었으면(지금 닫혀 있어도) 연 때에 편 것으로. 그 전부터 열려 있던 책은 편 책 기록이 다르면(서비스가 다시 시작됨 등)
-     *   다시 적되, 목록에 없는 책은 처음 보는 파일일 때만 넣는다(완독·빼기 한 책이 그 앱에 열려 있어도 되살아나지 않게). 진행률을 그 책에.
-     * 처음 맞출 때는 지금 책만 본다(그 앱의 지난 기록을 모두 넣지 않게). 데이터를 읽을 수 없으면 앞에 있던 동안을 다 센다.
-     */
-    private fun syncFiles(ctx: AppContext) {
-        val recorder = ctx.recorder
-        val now = System.currentTimeMillis()
-        val key = "sync_${ctx.pkg}"
-        // 그 앱은 때를 초로 버려 적으므로 지난번에 맞춘 그 초에 일어난 일도 다시 본다(같은 것은 다시 적히지 않는다)
-        val since = ctx.prefs.getLong(key, 0L).let { if (it > 0) it / 1000 * 1000 - 1000 else 0L }
-        // 처음 맞출 때는 지금 책만 묻는다(지난 기록의 책들을 읽지 않게)
-        val books = app.fileBooks(ctx.context, if (since > 0) since else Long.MAX_VALUE)
-            ?: return recorder.viewerShown(ctx.pkg, shown = true, at = now)
-        ctx.prefs.edit().putLong(key, now).apply()
-        val current = books.lastOrNull() ?: return
-        if (since > 0) for (b in books.dropLast(1)) {
-            if (b.openedAt > since) {
-                fileOpened(ctx, b, b.openedAt)
-                recorder.viewerShown(ctx.pkg, shown = true, at = b.openedAt, current = false)
-            }
-            if (b.closedAt > since) recorder.viewerShown(ctx.pkg, shown = false, at = b.closedAt, current = false)
-        }
-        markFileViewer(ctx, current)
-        val title = recorder.lookup.knownTitle(current.path, current.title)
-        val newFile = newFile(ctx, current.path)
-        if (recorder.recordedBook(ctx.pkg)?.hasTitle(title) != true) when {
-            since > 0 && current.openedAt > since -> return fileOpened(ctx, current, current.openedAt)
-            current.closedAt == 0L && (newFile || recorder.lookup.byTitle(title) != null) ->
-                return fileOpened(ctx, current, ctx.viewerOpenedAt ?: now)
-        }
-        saveFile(ctx, title, current.path)
-        if (current.progress < 0) return
-        val book = recorder.recordedBook(ctx.pkg)?.takeIf { it.hasTitle(title) } ?: return
-        recorder.status(book.id, current.progress)
-    }
-
-    /** 데이터로 안 책 [b] 를 [at] 에 편 것으로 적는다(목록에 없으면 넣고 맨 앞으로, 그 파일을 적어 둔다) */
-    private fun fileOpened(ctx: AppContext, b: FileBook, at: Long) {
-        val title = ctx.recorder.lookup.knownTitle(b.path, b.title)
-        openBook(ctx, Cell(title, b.author, b.progress, -1, null, Rect()), at)
-        saveFile(ctx, title, b.path)
-    }
-
-    /**
-     * 지금 책의 열림·닫힘을 적는다(읽은 시간은 열려 있던 동안만): 닫혔으면 열려 있던 동안을 지난 일로 적고 지금은 닫힘,
-     * 열려 있으면 연 때부터 열림, 모르면(다른 앱이 접근 시각을 바꿈) 열림(앞에 있던 동안을 다 센다). 지금 상태가 앞서 적은 것보다 앞의 때면 앞서 적은 때부터.
-     */
-    private fun markFileViewer(ctx: AppContext, file: FileBook) {
-        val recorder = ctx.recorder
-        if (file.closedAt > 0) {
-            if (file.openedAt > 0) recorder.viewerShown(ctx.pkg, shown = true, at = file.openedAt, current = false)
-            recorder.viewerShown(ctx.pkg, shown = false, at = file.closedAt)
-        } else recorder.viewerShown(ctx.pkg, shown = true, at = file.openedAt.takeIf { it > 0 } ?: System.currentTimeMillis())
-    }
-
-    /** 그 앱 데이터의 지금 책 파일이 지난번에 본 것과 다른가(처음 보면 참). 지금 것을 적어 둔다(서비스가 다시 시작돼도 남긴다) */
-    private fun newFile(ctx: AppContext, path: String): Boolean {
-        val key = "file_${ctx.pkg}"
-        if (ctx.prefs.getString(key, null) == path) return false
-        ctx.prefs.edit().putString(key, path).apply()
-        return true
     }
 
     companion object {

@@ -24,7 +24,7 @@ class GuideAppsTest {
     }
 
     @Test fun `책 파일로 책·표지를 아는 앱은 책 파일 읽기가 필요하다고 적혀 있다`() {
-        val usesFiles = ReaderApps.ALL.filter { it.fileState || it.searchesBookFile || it.fileViewer != null || it.opensBookFile }
+        val usesFiles = ReaderApps.ALL.filter { it.searchesBookFile || it.fileViewer != null || it.opensBookFile }
         assertEquals(emptyList<String>(), usesFiles.filterNot { it.needsBookFiles }.map { it.pkg })
     }
 

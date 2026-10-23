@@ -82,13 +82,7 @@ open class ReaderApp(
      * 따로 기억해 두고, 다른 탭으로 넘어가면 그 탭의 책을 편 것으로 본다. 모르는 탭이면 메뉴로 알 때까지 진행률을 적지 않는다.
      */
     val viewerTabs: Boolean = false,
-    /**
-     * 책이 열려 있는지를 화면이 아니라 이북 앱 데이터([fileBooks] 의 [FileBook.openedAt]·[FileBook.closedAt])로 아는 앱(KOReader):
-     * 화면이 직접 그려져 앱 안에서 책을 열고 닫아도 알림이 없지만 그 때가 데이터에 남아, 그 앱이 앞에 올 때와 홈으로 돌아올 때 지난번 뒤의 일을
-     * 한꺼번에 맞춘다([com.woody.pebbledesk.ReaderWatchService.syncFileApps]). 읽은 시간은 책이 열려 있던 동안만 센다([ReaderApps.hostsViewer]).
-     */
-    val fileState: Boolean = false,
-    /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([fileBooks]·[bookFile] 으로 안 경로)을 바로 여는 앱(KOReader·이지뷰어). 파일을 모르면 앱을 연다. */
+    /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([bookFile] 으로 안 경로)을 바로 여는 앱(이지뷰어). 파일을 모르면 앱을 연다. */
     val opensBookFile: Boolean = false,
     /**
      * 내 파일을 열지만 어느 파일인지 내놓지 않는 앱(문리더): 읽는 화면 제목으로 안 책의 표지가 없으면 저장소에서 그 제목의 EPUB 을 찾아
@@ -168,12 +162,6 @@ open class ReaderApp(
     open fun bookFiles(context: Context, titles: Collection<String>): List<String> = emptyList()
 
     /**
-     * 책이 열려 있는지를 데이터로 아는 앱([fileState]): [since](ms) 뒤에 열었거나 닫은 책들과 지금 책(마지막), 오래된 것부터.
-     * 기록이 없으면 빈 목록, 데이터를 읽을 수 없으면 null. 기본: null
-     */
-    open fun fileBooks(context: Context, since: Long): List<FileBook>? = null
-
-    /**
      * 서재 칸의 파일([Cell.file], 화면에 보이는 위치 + 파일 이름) → 실제 경로(그 책의 파일로 적어 두어 읽는 화면의 파일 이름으로 찾고,
      * EPUB 표지를 꺼내고, 홈에서 바로 연다). 모르면 null. 기본: null
      */
@@ -209,12 +197,8 @@ open class ReaderApp(
     /** 서비스가 붙을 때마다 새로 만드는 이 앱의 어댑터(판단과 기억). 옮기는 동안 기본은 예전 서비스 코드 그대로인 [LegacyReader] */
     open fun newAdapter(): ReaderAdapter = LegacyReader(this)
 
-    /** 읽은 시간을 세는 방식: 서재 안에 뜨는 읽는 화면([viewerHolder])은 표시가 없으면 안 셈, 데이터로 아는 앱([fileState])은 표시가 없으면 다 셈 */
-    open val viewerTime: ViewerTime get() = when {
-        viewerHolder != null -> ViewerTime.MARKS_CLOSED
-        fileState -> ViewerTime.MARKS_OPEN
-        else -> ViewerTime.SCREEN
-    }
+    /** 읽은 시간을 세는 방식: 기본은 읽는 화면이 앞에 있던 동안. 서재 안에 뜨는 읽는 화면([viewerHolder])은 표시로 자르고 표시가 없으면 안 셈 */
+    open val viewerTime: ViewerTime get() = if (viewerHolder != null) ViewerTime.MARKS_CLOSED else ViewerTime.SCREEN
 
     /** 표시로 읽은 시간을 자르는 액티비티(서재 안에 읽는 화면이 뜨는 앱은 서재 액티비티, 데이터로 아는 앱은 읽는 화면 액티비티) */
     open val markedScreens: Set<String> get() = when (viewerTime) {
@@ -223,8 +207,8 @@ open class ReaderApp(
         ViewerTime.SCREEN -> emptySet()
     }
 
-    /** 내용 바뀜 알림으로 화면을 읽는다. 앞에 올 때만 데이터로 맞추는 앱(KOReader)은 아니다 */
-    open val readsContent: Boolean get() = !fileState
+    /** 내용 바뀜 알림으로 화면을 읽는다(앞에 올 때만 데이터로 맞추는 앱은 아니다) */
+    open val readsContent: Boolean get() = true
 
     /** 읽는 화면이 서재 액티비티 안의 요소라 화면 이름이 알림 없이 바뀐다(내용 바뀜마다 화면 이름을 다시 정한다) */
     open val screenInsideActivity: Boolean get() = viewerHolder != null
@@ -236,7 +220,7 @@ open class ReaderApp(
     open val fileEntry: FileViewer? get() = fileViewer
 
     /** 시작하기의 책 파일 읽기 앱 순서(켜야 책이 들어오는 앱(KOReader)이 앞에) */
-    open val fileOrder: Int get() = if (fileState) 0 else 1
+    open val fileOrder: Int get() = 1
 
     /**
      * 홈에서 이 책을 연다. 파일로만 여는 앱은 그 파일(모르면 다시 찾기), 책 파일을 바로 여는 앱은 그 파일,
@@ -249,9 +233,8 @@ open class ReaderApp(
         }
         // 지워진 파일이면(읽을 수 있을 때만 안다) 앱을 연다
         if (opensBookFile) ctx.bookFile(book)?.let { path ->
-            // 읽는 화면에 파일 이름만 보이는 앱(이지뷰어)은 그 파일이 열리면 이 책으로(KOReader 는 그 앱의 기록으로 안다)
-            val started = if (!fileState) ({ HomeSignals.fileOpened(pkg, book, path) }) else null
-            return OpenResult.File(ctx.component, path, started)
+            // 읽는 화면에 파일 이름만 보이는 앱(이지뷰어)은 그 파일이 열리면 이 책으로
+            return OpenResult.File(ctx.component, path, started = { HomeSignals.fileOpened(pkg, book, path) })
         }
         return OpenResult.Launch
     }
