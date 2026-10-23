@@ -24,7 +24,7 @@ import com.woody.pebbledesk.Storage
  * 그 칸의 표지는 자르지 않는다. 그런 책은 '지금 읽는 책' 줄에서 눌러도 책 상세(`Download (157KB)`)가 먼저 뜨고, 받으면 `Read` 로 바뀐다(표지는 상세에서 자른다).
  * 책 바로 열기는 없다(읽는 화면은 앱 안에서만 열리고 받는 링크는 로그인 `bookfusion://auth` 뿐).
  */
-object BookFusion : ReaderSpec(
+object BookFusion : ReaderApp(
     pkg = "com.bookfusion.android.reader", classPrefix = "",
     shelves = setOf("com.bookfusion.android.reader.activities.HomeActivity"),
     viewers = emptySet(),

@@ -25,7 +25,7 @@ import kotlin.concurrent.thread
  * 홈에서 책을 누르면 Readest 위젯처럼 `readest://book/<해시>` 로 그 책을 바로 연다([keyIntent]).
  * (Readest 0.12.16, 2026-10-22 에뮬레이터 `CremaPebble_A11_Play` WebView 155 에서 확인)
  */
-object Readest : ReaderSpec(
+object Readest : ReaderApp(
     pkg = "com.bilingify.readest", classPrefix = "com.bilingify.readest",
     shelves = setOf(MAIN),
     viewers = setOf("$MAIN#$HOLDER"),

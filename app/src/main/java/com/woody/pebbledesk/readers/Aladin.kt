@@ -7,7 +7,7 @@ package com.woody.pebbledesk.readers
  * 메뉴의 제목 이름은 같고 쪽 표시만 `viewermenu_text_page_info`(`6 / 368`)다.
  * 서재 편집(`편집` → 전체·이동·삭제)에서는 격자 보기 칸을 눌러도 알림이 오고 칸에 고르기 동그라미가 그려진다.
  */
-object Aladin : ReaderSpec(
+object Aladin : ReaderApp(
     pkg = "kr.co.aladin.ebook", classPrefix = "kr.co.aladin",
     shelves = setOf("kr.co.aladin.ebook.MainActivity"),
     viewers = setOf(

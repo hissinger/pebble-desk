@@ -7,7 +7,7 @@ import java.time.LocalDate
 /**
  * 서재 칸 한 권에서 읽은 것. [cell] 은 칸의 화면 위치, [thumb] 는 표지 그림 자리(모르면 null).
  * [stale] 은 방금 읽어 둔 서재 칸을 누른 글자로 맞춘 것(그 뒤 읽는 화면에서 진행률이 바뀌었을 수 있다).
- * [file] 은 파일 목록인 서재(이지뷰어)에서 칸의 파일: 화면에 보이는 위치 + 파일 이름(`#휴대폰/Books/a.epub`, 실제 경로는 [ReaderSpec.bookFile]).
+ * [file] 은 파일 목록인 서재(이지뷰어)에서 칸의 파일: 화면에 보이는 위치 + 파일 이름(`#휴대폰/Books/a.epub`, 실제 경로는 [ReaderApp.bookFile]).
  */
 data class Cell(
     val title: String, val author: String, val progress: Int, val due: Long, val thumb: Rect?, val cell: Rect,
@@ -27,7 +27,7 @@ class ViewerInfo(val title: String?, val author: String, val progress: Int, val 
 class FileViewer(val activity: String, val label: Int)
 
 /**
- * 이북 앱 데이터에서 찾은 책([ReaderSpec.fileBook]·[ReaderSpec.fileBooks]). [progress] 는 데이터에 진행률이 있으면(KOReader, 모르면 -1).
+ * 이북 앱 데이터에서 찾은 책([ReaderApp.fileBook]·[ReaderApp.fileBooks]). [progress] 는 데이터에 진행률이 있으면(KOReader, 모르면 -1).
  * 열고 닫은 때를 아는 앱(KOReader): [openedAt] 은 이 책을 연 때, [closedAt] 은 닫았으면 닫은 때(열려 있으면 0. ms, 모르면 0)
  */
 class FileBook(

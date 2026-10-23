@@ -13,7 +13,7 @@ import kotlin.math.abs
  * 서재(`서가` 탭)의 대출한 책 칸에서 진행률·반납일·표지를 읽는다([shelfCells]). 누른 칸은 대개 알 수 없어(칸 안의 `책 열기`·`대출 관리`를
  * 가리려면 앱 언어의 글자를 봐야 한다. 제목 글자를 누른 것만 칸으로 맞춘다) 편 책은 읽는 화면의 제목으로 안다.
  */
-object Libby : ReaderSpec(
+object Libby : ReaderApp(
     pkg = "com.overdrive.mobile.android.libby", classPrefix = "com.overdrive",
     shelves = setOf(MAIN),
     viewers = setOf("$MAIN#$HOLDER"),

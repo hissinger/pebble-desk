@@ -6,7 +6,7 @@ package com.woody.pebbledesk.readers
  * 칸의 진행률(`tv_read_percent`)은 읽는 화면보다 늦게 바뀌어(읽는 화면 1% 인데 0%) 쓰지 않는다. 읽는 화면(도서관과 같은 뷰어)의
  * 하단 정보는 기본이 '모두 표시 안함'이라, 켜면 아래 줄 `ll_page_area`(`1%` 또는 쪽)·`tv_toc_title`. 메뉴에 제목 `tv_title`·쪽 `ll_menu_page_area`(`1 / 519`).
  */
-object Yes24Ebook : ReaderSpec(
+object Yes24Ebook : ReaderApp(
     pkg = "com.yes24.ebook.fourth", classPrefix = "com.yes24",
     shelves = setOf("com.yes24.ebook.fourth.ui.purchase.PurchaseActivity"),
     viewers = setOf(

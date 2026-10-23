@@ -22,7 +22,7 @@ import com.woody.pebbledesk.readers.MoonReaderPro
 import com.woody.pebbledesk.readers.MyYes
 import com.woody.pebbledesk.readers.NeoReader
 import com.woody.pebbledesk.readers.ReaderApps
-import com.woody.pebbledesk.readers.ReaderSpec
+import com.woody.pebbledesk.readers.ReaderApp
 import com.woody.pebbledesk.readers.Readest
 import com.woody.pebbledesk.readers.Ridi
 import com.woody.pebbledesk.readers.RidiOneStore
@@ -68,7 +68,7 @@ internal object ReaderGuide {
      * 그 이북 앱들. 같은 코드라 안내가 같은 판은 한 줄로 묶고 이름을 ` · ` 로 잇는다(밀리의서재 e-ink·휴대폰 판은 다른 앱이라 따로).
      * 이지뷰어 무료판 둘과 KOReader 의 GitHub·F-Droid 판은 사용자가 고르는 차이가 아니라 이름 하나로.
      */
-    class App(val names: List<Int>, val specs: List<ReaderSpec>, val info: Info) {
+    class App(val names: List<Int>, val specs: List<ReaderApp>, val info: Info) {
         fun label(context: Context) = names.joinToString(" · ") { context.getString(it) }
     }
 

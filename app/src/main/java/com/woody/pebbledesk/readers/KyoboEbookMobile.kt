@@ -5,7 +5,7 @@ package com.woody.pebbledesk.readers
  * 서재(`MainV3Activity`, Compose)에는 요소 이름이 없어 읽지 않고, 읽는 화면(크레마 판과 같은 화면 이름)의
  * 진행률 줄과 메뉴의 제목으로 안다.
  */
-object KyoboEbookMobile : ReaderSpec(
+object KyoboEbookMobile : ReaderApp(
     pkg = "com.kyobo.ebook.common.b2c", classPrefix = "com.kyobo",
     shelves = emptySet(),
     viewers = setOf(

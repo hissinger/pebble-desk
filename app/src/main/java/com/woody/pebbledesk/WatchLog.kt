@@ -39,6 +39,8 @@ object WatchLog {
         RECENT_WAIT,
         /** 연 파일을 내놓지 않는 리더의 책([Entry.arg])을 저장소에서 찾았다. [Entry.detail] 은 그 파일 이름 */
         FILE,
+        /** 이북 앱 알림을 처리하다 난 오류(그 알림만 건너뛴다). [Entry.arg] 는 오류 종류, [Entry.detail] 은 내용 */
+        ERROR,
     }
 
     enum class Role { SHELF, VIEWER, OTHER }

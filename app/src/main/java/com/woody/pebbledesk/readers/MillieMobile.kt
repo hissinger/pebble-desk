@@ -10,7 +10,7 @@ import android.view.accessibility.AccessibilityNodeInfo
  * 읽는 화면(`MillieViewerActivity`, 화면 캡처 막힘)은 가운데를 눌러 메뉴를 띄우면 위 막대(`viewer_top_bar`)에 제목 `tv_title`,
  * 아래에 진행률 `tv_per`(`0%`)·쪽 `tv_current_page`/`tv_total_page`. 책을 열 때 뜨는 '읽던 페이지' 안내 창도 제목이 `tv_title`(`안내`)이다.
  */
-object MillieMobile : ReaderSpec(
+object MillieMobile : ReaderApp(
     pkg = "kr.co.millie.millieshelf", classPrefix = "kr.co.millie.millieshelf",
     shelves = setOf("kr.co.millie.millieshelf.kotlin.ui.MainTabActivity"),
     viewers = setOf(

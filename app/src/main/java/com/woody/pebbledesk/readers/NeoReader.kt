@@ -21,7 +21,7 @@ import java.io.File
  * (BOOX Palma2 펌웨어 4.2(2026-08)의 네오리더 38994. 에뮬레이터에서 요소 이름과 자동 추가를 확인했고, 2026-10-17 BOOX 실기기(사용자, Page 또는 Go6)에서도 됐다.
  * `updatedAt` 은 Go6 펌웨어 4.2(2026-05)의 네오리더 코드와 에뮬레이터에서 확인(docs/READER_APPS.md))
  */
-object NeoReader : ReaderSpec(
+object NeoReader : ReaderApp(
     pkg = "com.onyx.kreader", classPrefix = "com.onyx.kreader",
     shelves = emptySet(),
     viewers = (1..4).map { "com.onyx.kreader.ui.ReaderTab${it}Activity" }.toSet(),

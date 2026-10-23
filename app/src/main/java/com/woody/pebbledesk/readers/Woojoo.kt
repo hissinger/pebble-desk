@@ -23,7 +23,7 @@ import java.io.File
  * 늦어 홈으로 돌아올 때 맞추지 않는다(서재 칸의 진행률·메뉴의 `%`·다음에 열 때 적힌 것으로 안다).
  * (우주 1.0.22, 2026-10-23 에뮬레이터에서 확인)
  */
-object Woojoo : ReaderSpec(
+object Woojoo : ReaderApp(
     // 읽는 화면이 두 패키지 아래에 있어 이름 앞부분으로 가리지 않는다(액티비티인지는 따로 본다)
     pkg = "com.inno.woojoo", classPrefix = "",
     shelves = setOf("com.inno.ui2.MainTabs2"),

@@ -11,7 +11,7 @@ import android.view.accessibility.AccessibilityNodeInfo
  * 받지 않은 책(누르면 Library 탭은 내려받기만, 홈 탭은 받은 뒤 바로 연다)은 읽는 화면 메뉴의 제목으로 안다. 읽는 화면의 본문·위 제목·아래 `12%` 는 직접 그리는 뷰라 드러나지 않고, 메뉴를 띄우면
  * 제목 `command_bar_title_bottom`·진행률 `nln_text_secondary`(`Location 1 of 4559  •  0%`)가 보인다.
  */
-object Kindle : ReaderSpec(
+object Kindle : ReaderApp(
     pkg = "com.amazon.kindle", classPrefix = "com.amazon",
     shelves = setOf("com.amazon.kcp.oob.MainActivity"),
     viewers = setOf(

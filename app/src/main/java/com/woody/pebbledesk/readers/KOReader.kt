@@ -22,7 +22,7 @@ import java.security.MessageDigest
  * 앱 안에서 책을 바꿔도 알림이 없지만, 연 때·닫은 때가 파일에 남아 지켜보지 않고 KOReader 가 앞에 올 때와 홈으로 돌아올 때만 읽는다([fileState]).
  * (KOReader v2026.07.1, 2026-10-18 에뮬레이터에서 확인)
  */
-open class KOReaderSpec(pkg: String) : ReaderSpec(
+open class KOReaderApp(pkg: String) : ReaderApp(
     pkg = pkg, classPrefix = "org.koreader.launcher",
     shelves = emptySet(),
     viewers = setOf("org.koreader.launcher.MainActivity"),
@@ -39,10 +39,10 @@ open class KOReaderSpec(pkg: String) : ReaderSpec(
 }
 
 /** GitHub 판 */
-object KOReader : KOReaderSpec("org.koreader.launcher")
+object KOReader : KOReaderApp("org.koreader.launcher")
 
 /** F-Droid 판 */
-object KOReaderFdroid : KOReaderSpec("org.koreader.launcher.fdroid")
+object KOReaderFdroid : KOReaderApp("org.koreader.launcher.fdroid")
 
 /** KOReader 의 저장소 폴더 [dir](`/storage/emulated/0/koreader`)에서 읽는다. 같은 파일은 바뀌었을 때만 다시 읽는다. */
 internal class KOReaderData(private val dir: File) {

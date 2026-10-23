@@ -13,7 +13,7 @@ import android.view.accessibility.AccessibilityNodeInfo
  * 유료판(`com.flyersoft.moonreaderp`)은 같은 코드로 만든 앱이라 요소 이름은 같고, 화면 클래스도 그 패키지 아래에 있다
  * (`com.flyersoft.moonreaderp.ActivityMain`·`ActivityTxt`, 10.7).
  */
-open class MoonReaderSpec(pkg: String) : ReaderSpec(
+open class MoonReaderApp(pkg: String) : ReaderApp(
     pkg = pkg, classPrefix = pkg,
     shelves = setOf("$pkg.ActivityMain"),
     viewers = setOf("$pkg.ActivityTxt"),
@@ -41,7 +41,7 @@ open class MoonReaderSpec(pkg: String) : ReaderSpec(
 }
 
 /** 무료판 */
-object MoonReader : MoonReaderSpec("com.flyersoft.moonreader")
+object MoonReader : MoonReaderApp("com.flyersoft.moonreader")
 
 /** 유료판(Moon+ Reader Pro) */
-object MoonReaderPro : MoonReaderSpec("com.flyersoft.moonreaderp")
+object MoonReaderPro : MoonReaderApp("com.flyersoft.moonreaderp")

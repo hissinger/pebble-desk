@@ -31,7 +31,7 @@ import kotlin.math.abs
  * `APP_PERM_PRO`)로 켠다. 채리뷰어는 받아 보지 못해 그 패키지 아래 이름(`com.ezne.easyview.pro.actMain`)도 같이 받는다
  * (문리더 유료판은 화면 클래스가 패키지마다 달라 1.5.3 에서 알아보지 못했다).
  */
-open class EasyViewSpec(pkg: String) : ReaderSpec(
+open class EasyViewSpec(pkg: String) : ReaderApp(
     pkg = pkg, classPrefix = BASE,
     shelves = screens(pkg, "actMain"),
     viewers = screens(pkg, "actViewText") + screens(pkg, "actViewImage"),

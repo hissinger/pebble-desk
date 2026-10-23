@@ -13,7 +13,7 @@ import kotlin.math.abs
  * 받지 않은 칸은 표지 가운데에 받기 단추(받는 중에는 진행 원·취소 단추)를, 서비스가 끝난 책은 흰 막을 겹쳐 그려 그런 칸의 표지는 자르지 않는다
  * ([COVER_OVERLAYS], 칸 레이아웃 `view_bookshelf_cell`, 2026-10-21 페블에서 확인).
  */
-object Millie : ReaderSpec(
+object Millie : ReaderApp(
     pkg = "kr.co.millie.eink", classPrefix = "kr.co.millie",
     shelves = setOf("kr.co.millie.eink.bookshelf.BookshelfActivity", "kr.co.millie.eink.bookshelf.BookShelfDetailActivity"),
     viewers = setOf(
