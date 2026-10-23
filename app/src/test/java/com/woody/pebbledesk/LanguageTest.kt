@@ -31,6 +31,14 @@ class LanguageTest {
         assertEquals(AppLanguage.KOREAN, HomePrefs.language(sp))
     }
 
+    @Test fun `새로 깔면 자주 쓰는 앱은 격자, 쓰던 사람은 목록 그대로`() {
+        HomePrefs.language(sp)
+        assertTrue(sp.getBoolean("fav_grid", false))
+        sp.edit().clear().putBoolean("onboarded", true).commit()
+        HomePrefs.language(sp)
+        assertFalse(sp.contains("fav_grid"))
+    }
+
     @Test fun `1_5_8 까지 영어로 바꿔 둔 사람은 영어, 옛 값은 지운다`() {
         sp.edit().putBoolean("onboarded", true).putBoolean("english", true).commit()
         assertEquals(AppLanguage.ENGLISH, HomePrefs.language(sp))
