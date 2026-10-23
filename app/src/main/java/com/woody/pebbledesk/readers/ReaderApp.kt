@@ -1,12 +1,10 @@
 package com.woody.pebbledesk.readers
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import com.woody.pebbledesk.HomeSignals
-import com.woody.pebbledesk.ReaderWatchService
 import com.woody.pebbledesk.ShelfBook
 
 /**
@@ -208,27 +206,6 @@ open class ReaderApp(
      */
     open fun showsViewer(root: AccessibilityNodeInfo): Boolean = viewerHolder?.let { root.byId(pkg, it).isNotEmpty() } == true
 
-    /**
-     * 읽는 화면에 지금 열린 책을 가리키는 그 앱의 열쇠가 늘 보이는 앱(Readest 책 해시)인가. 그러면 열쇠로 책을 가른다
-     * ([viewerKey]·[keyBook]·[keyCover]·[keyIntent], `ReaderWatchService.readKeyed`).
-     */
-    open val viewerKeys: Boolean get() = false
-
-    /** 읽는 화면의 지금 책 열쇠([viewerKeys]). 모르면 null */
-    open fun viewerKey(windows: AppWindows): String? = null
-
-    /** 열쇠 [key] 의 책을 그 앱 데이터에서(제목·저자·진행률). 읽을 수 없거나 모르면 null. 기본: null */
-    open fun keyBook(context: Context, key: String): FileBook? = null
-
-    /** 열쇠 [key] 의 책 표지(JPEG). 모르면 null. 그림을 다루므로 화면 스레드에서 부르지 않는다. 기본: null */
-    open fun keyCover(context: Context, key: String): ByteArray? = null
-
-    /** 홈에서 열쇠 [key] 의 책을 바로 여는 인텐트. 없으면 null(앱을 연다). 기본: null */
-    open fun keyIntent(key: String): Intent? = null
-
-    /** 그 앱 데이터에서 표지를 가져올 수 있다([keyCover]): 서재 화면에서 표지를 자르지 않는다. 기본: 아니다 */
-    open fun dataCovers(context: Context): Boolean = false
-
     /** 서비스가 붙을 때마다 새로 만드는 이 앱의 어댑터(판단과 기억). 옮기는 동안 기본은 예전 서비스 코드 그대로인 [LegacyReader] */
     open fun newAdapter(): ReaderAdapter = LegacyReader(this)
 
@@ -262,7 +239,7 @@ open class ReaderApp(
     open val fileOrder: Int get() = if (fileState) 0 else 1
 
     /**
-     * 홈에서 이 책을 연다. 파일로만 여는 앱은 그 파일(모르면 다시 찾기), 열쇠로 아는 앱은 그 앱 링크, 책 파일을 바로 여는 앱은 그 파일,
+     * 홈에서 이 책을 연다. 파일로만 여는 앱은 그 파일(모르면 다시 찾기), 책 파일을 바로 여는 앱은 그 파일,
      * 그 밖은 앱. 옮기는 동안 기본은 예전 `AppStore.openBook` 의 갈래 그대로
      */
     open fun open(ctx: HomeContext, book: ShelfBook): OpenResult {
@@ -270,8 +247,6 @@ open class ReaderApp(
             // 실행 화면이 없어 열기에 실패해도 앱을 열지 않고 다시 찾는다
             return ctx.bookFile(book)?.let { OpenResult.File(ctx.component, it, onFail = Fallback.FIND_FILE) } ?: OpenResult.FindFile
         }
-        // BOOX 가 얼린 앱은 런처로 풀어야 해서 앱을 연다
-        ReaderWatchService.bookKey(ctx.context, pkg, book.id)?.let(::keyIntent)?.takeIf { !ctx.frozen }?.let { return OpenResult.Start(it) }
         // 지워진 파일이면(읽을 수 있을 때만 안다) 앱을 연다
         if (opensBookFile) ctx.bookFile(book)?.let { path ->
             // 읽는 화면에 파일 이름만 보이는 앱(이지뷰어)은 그 파일이 열리면 이 책으로(KOReader 는 그 앱의 기록으로 안다)

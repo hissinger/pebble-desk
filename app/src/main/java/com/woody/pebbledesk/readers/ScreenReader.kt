@@ -54,6 +54,18 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
         onEnterViewer(ctx, from, again)
     }
 
+    /**
+     * 서재 액티비티 [activity] 안에 읽는 화면([ReaderApp.viewerHolder])이 떠 있으면 `activity#요소`, 아니면 activity.
+     * 맨 앞 창이 그 앱이 아니면(알림 창 등) 알 수 없어 null. 액티비티를 모르면(서비스가 그 앱이 떠 있는 동안 다시 시작됨) 서재 액티비티가 하나뿐일 때 그것으로 본다.
+     */
+    override fun screenName(ctx: AppContext, activity: String?): String? {
+        val holder = app.viewerHolder ?: return activity
+        val act = activity ?: app.shelves.singleOrNull()?.takeIf { ctx.root != null } ?: return null
+        if (act !in app.shelves) return act
+        val root = ctx.root ?: return null
+        return if (app.showsViewer(root)) "$act#$holder" else act
+    }
+
     /** 바탕: 서재에서 누른 칸이 있으면 그 책을 편 것으로 */
     override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {
         takeClicked(ctx)?.let { openCell(ctx, it) }

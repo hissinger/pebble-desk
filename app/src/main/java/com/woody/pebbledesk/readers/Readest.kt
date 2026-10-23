@@ -6,6 +6,12 @@ import android.graphics.Rect
 import android.net.Uri
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
+import com.woody.pebbledesk.Seen
+import com.woody.pebbledesk.ShelfBook
+import com.woody.pebbledesk.Storage
+import com.woody.pebbledesk.Target
+import com.woody.pebbledesk.WatchCore
+import com.woody.pebbledesk.WatchLog
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -22,7 +28,7 @@ import kotlin.concurrent.thread
  *   칸 자리로 셈해 자른다([coverOf]).
  * - 읽는 화면: 제목·저자는 목차 창(`NavigationView`)을 열었을 때만, 진행률은 `읽기 진행 상황` 창의 `3 / 81` 을 볼 때만 안다. 그 뒤로는 쪽을 넘길 때마다
  *   바뀌는 숨은 안내 글자(`3 페이지`)를 그 책의 전체 쪽으로 나눠 센다. 화면 아래 쪽 표시(`24 / 81`)는 `aria-hidden` 이라 나오지 않는다.
- * 홈에서 책을 누르면 Readest 위젯처럼 `readest://book/<해시>` 로 그 책을 바로 연다([keyIntent]).
+ * 홈에서 책을 누르면 Readest 위젯처럼 `readest://book/<해시>` 로 그 책을 바로 연다([open]). 판단과 기억은 [ReadestReader].
  * (Readest 0.12.16, 2026-10-22 에뮬레이터 `CremaPebble_A11_Play` WebView 155 에서 확인)
  */
 object Readest : ReaderApp(
@@ -39,7 +45,11 @@ object Readest : ReaderApp(
     /** 서재 칸의 표지 자리는 셈한 것이라 찍은 뒤에도 같은 자리에 있을 때만 자른다 */
     override val cellsByPosition get() = true
 
-    override val viewerKeys get() = true
+    override fun newAdapter(): ReaderAdapter = ReadestReader()
+
+    /** 열쇠를 아는 책은 그 앱 링크로 바로 연다(BOOX 가 얼린 앱은 런처로 풀어야 해서 앱을 연다) */
+    override fun open(ctx: HomeContext, book: ShelfBook): OpenResult =
+        ReadestReader.bookKey(ctx.context, book.id)?.let(::keyIntent)?.takeIf { !ctx.frozen }?.let { OpenResult.Start(it) } ?: OpenResult.Launch
 
     /** 책장 줄(캐러셀)을 켜면 같은 책 칸이 위아래로 두 번 보여, 그 제목의 칸 가운데 하나라도 그 자리면 그대로다 */
     override fun coverStill(now: List<Cell>, title: String, rect: Rect): Boolean = now.any { it.title == title && it.thumb == rect }
@@ -48,7 +58,8 @@ object Readest : ReaderApp(
     override fun showsViewer(root: AccessibilityNodeInfo): Boolean =
         find(root) { val id = it.viewIdResourceName; id == CLOSE || id?.startsWith(GRID) == true } != null
 
-    override fun viewerKey(windows: AppWindows): String? = windows.all.firstNotNullOfOrNull { root ->
+    /** 읽는 화면의 지금 책 열쇠(책 해시). 모르면 null */
+    fun viewerKey(windows: AppWindows): String? = windows.all.firstNotNullOfOrNull { root ->
         find(root) { it.viewIdResourceName?.startsWith(GRID) == true }?.viewIdResourceName?.let { GRID_ID.find(it)?.groupValues?.get(1) }
     }
 
@@ -137,14 +148,18 @@ object Readest : ReaderApp(
         return Rect(r.left, r.top, r.right, minOf(r.bottom, r.top + r.width() * 41 / 28 + r.width() * GRID_GAP_PCT / 100))
     }
 
-    override fun keyBook(context: Context, key: String): FileBook? = data(context)?.book(key)
+    /** 열쇠 [key] 의 책을 데이터 폴더에서(제목·저자·진행률). 읽을 수 없거나 모르면 null */
+    fun keyBook(context: Context, key: String): FileBook? = data(context)?.book(key)
 
-    override fun keyCover(context: Context, key: String): ByteArray? = data(context)?.cover(key)?.let(BookFiles::imageCover)
+    /** 열쇠 [key] 의 책 표지(JPEG). 모르면 null. 그림을 다루므로 화면 스레드에서 부르지 않는다 */
+    fun keyCover(context: Context, key: String): ByteArray? = data(context)?.cover(key)?.let(BookFiles::imageCover)
 
-    override fun keyIntent(key: String): Intent? =
+    /** 홈에서 열쇠 [key] 의 책을 바로 여는 인텐트 */
+    fun keyIntent(key: String): Intent =
         Intent(Intent.ACTION_VIEW, Uri.parse("readest://book/$key")).setClassName(pkg, MAIN)
 
-    override fun dataCovers(context: Context): Boolean = data(context) != null
+    /** 데이터 폴더에서 표지를 가져올 수 있다: 서재 화면에서 표지를 자르지 않는다 */
+    fun dataCovers(context: Context): Boolean = data(context) != null
 
     /** 데이터 폴더를 읽을 수 있으면 그것(책 파일 읽기를 허용했고 데이터를 공유 저장소로 옮겼을 때) */
     private fun data(context: Context): ReadestData? {
@@ -223,6 +238,117 @@ object Readest : ReaderApp(
     private const val SEARCH_DEPTH = 2
     private const val LOOK_MS = 60_000L
     private const val SEARCH_MS = 30 * 60_000L
+}
+
+/**
+ * Readest 의 판단과 기억: 읽는 화면에 늘 보이는 책 열쇠(해시)로 책을 가른다. 한 번 안 열쇠는 그 책으로 적어 두어(서비스가 다시 시작돼도)
+ * 서재를 거치지 않고 연 책(Readest '시작 시 마지막 책 열기'·파일 관리자·홈에서 바로 열기)도 알아본다. 서재에서 누른 칸은 읽는 화면에 들어올 때
+ * 기록하지 않고 처음 보는 열쇠의 제목으로 쓴다. 데이터 폴더를 읽을 수 있으면 진행률·저자·표지는 데이터에서, 서재에서 표지를 자르지 않는다.
+ */
+class ReadestReader : ScreenReader(Readest) {
+    /** 제목을 아직 몰라 책 모름으로 둔 열쇠 */
+    private var unknownKey: String? = null
+    /** 데이터에서 표지를 가져오는 중이거나 가져온 열쇠([keyCover]) */
+    private val keyCovers = mutableSetOf<String>()
+
+    /** 누른 칸은 읽는 화면의 열쇠를 볼 때 쓴다([readKeyed]. 열쇠로 이미 아는 책이면 그 책) */
+    override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {}
+
+    override fun onViewer(ctx: AppContext) {
+        val windows = ctx.windows().takeIf { it.all.isNotEmpty() } ?: return ctx.noWindow()
+        val shown = app.readViewer(windows)
+        Readest.viewerKey(windows)?.let { return readKeyed(ctx, it, shown) }
+        // 웹 화면이 안쪽 요소를 늦게 내놓는다: 조금 뒤 다시 본다
+        if (ctx.viewerRetry()) ctx.viewerAgain(VIEWER_RETRY_MS)
+    }
+
+    /** 홈으로 돌아올 때 마지막 책을 데이터로 맞춘다(읽는 화면을 닫을 때 적힌 마지막 진행률) */
+    override fun onHome(ctx: AppContext) {
+        val key = ctx.prefs.getString(lastKeyPref(), null) ?: return
+        val data = Readest.keyBook(ctx.context, key) ?: return
+        val book = keyedBook(ctx, key) ?: return
+        if (data.progress >= 0 || data.author.isNotEmpty()) ctx.recorder.status(book.id, data.progress, -1, data.author)
+        if (!ctx.recorder.lookup.hasCover(book.id)) keyCover(ctx, key, book.id)
+    }
+
+    override fun beforeOpened(ctx: AppContext) {
+        super.beforeOpened(ctx)
+        unknownKey = null
+    }
+
+    /** 데이터 폴더에서 표지를 가져오는 동안은 화면에서 자르지 않는다 */
+    override fun capturesCovers(ctx: AppContext) = !Readest.dataCovers(ctx.context)
+
+    /**
+     * 열쇠 [key] 의 책: 적어 둔 책이면 그 책(제목을 고쳐도), 처음 보는 열쇠는 데이터의 제목, 없으면 이 읽는 화면을 열기 전에 서재에서 누른 칸,
+     * 없으면 읽는 화면의 제목(목차 창). 그때까지는 책 모름(앞서 편 책에 붙이지 않는다). 진행률은 데이터, 없으면 화면에서 읽은 것.
+     */
+    private fun readKeyed(ctx: AppContext, key: String, shown: ViewerInfo) {
+        val recorder = ctx.recorder
+        val opened = ctx.viewerOpenedAt ?: ctx.now
+        val data = Readest.keyBook(ctx.context, key)
+        val progress = data?.progress?.takeIf { it >= 0 } ?: shown.progress
+        ctx.log(WatchLog.Kind.PROGRESS, "$progress", data?.title ?: shown.title.orEmpty())
+        if (ctx.prefs.getString(lastKeyPref(), null) != key) ctx.prefs.edit().putString(lastKeyPref(), key).apply()
+        // 해시로 이어 둔 책은 제목이 달라도 그 책(Readest 에서 메타데이터 편집으로 제목을 바꿔도 같은 책)
+        val book = keyedBook(ctx, key)?.also { b ->
+            clicked = null
+            if (recorder.recordedBook(ctx.pkg)?.id != b.id) ctx.opened(Seen(b.title), opened, Target.Exact(b.id))
+        } ?: newKeyed(ctx, key, data, shown, progress, opened)
+        if (book != null) {
+            if (progress >= 0 || !data?.author.isNullOrEmpty()) recorder.status(book.id, progress, -1, data?.author.orEmpty())
+            if (!recorder.lookup.hasCover(book.id)) keyCover(ctx, key, book.id)
+        }
+        // 진행률은 늦게 채워질 수 있다(웹 화면이 안쪽 요소를 늦게 내놓는다)
+        if (progress < 0 && ctx.viewerRetry()) ctx.viewerAgain(VIEWER_RETRY_MS)
+    }
+
+    /**
+     * 처음 보는(또는 그 책을 빼고 다시 연) 열쇠 [key] 의 책을 제목으로 넣고, 편 책 기록의 책을 다시 읽어 열쇠 ↔ 책으로 적는다
+     * (편 책 저장이 조용히 실패했으면 앞서 편 책이나 null). 제목을 아직 모르면 책 모름으로 두고 null
+     */
+    private fun newKeyed(ctx: AppContext, key: String, data: FileBook?, shown: ViewerInfo, progress: Int, opened: Long): ShelfBook? {
+        val click = clicked?.takeIf { ctx.now - it.second < CLICK_OPEN_MS }?.first
+        val title = data?.title?.ifEmpty { null } ?: click?.title ?: shown.title
+        if (title == null) {
+            // 책 모름: 그 앞에 편 책에 이 시간을 붙이지 않게(같은 열쇠에 한 번만)
+            if ((unknownKey != key).also { unknownKey = key } && ctx.recorder.openedId(ctx.pkg) != null) ctx.unknown(opened)
+            return null
+        }
+        val author = data?.author?.ifEmpty { null } ?: shown.author.takeIf { shown.title == title }.orEmpty()
+        ctx.opened(Seen(title, author, progress), opened)
+        return ctx.recorder.recordedBook(ctx.pkg)?.also { setKeyBook(ctx, key, it.id) }
+    }
+
+    /** 열쇠 [key] 로 적어 둔 책(읽고 있는 책일 때만. 빼거나 지운 책은 다시 알아본다) */
+    private fun keyedBook(ctx: AppContext, key: String): ShelfBook? =
+        ctx.prefs.getString(keyPref(key), null)?.let { ctx.recorder.lookup.get(it) }
+
+    private fun setKeyBook(ctx: AppContext, key: String, id: String) {
+        ctx.prefs.edit().putString(keyPref(key), id).putString(bookKeyPref(id), key).apply()
+    }
+
+    /** 책 [id] 에 열쇠 [key] 의 표지를 데이터에서 붙인다(뒤에서. 가져오는 중이면 다시 하지 않고, 못 가져오면 다음에 다시) */
+    private fun keyCover(ctx: AppContext, key: String, id: String) {
+        if (!keyCovers.add(key)) return
+        ctx.inBackground({ Readest.keyCover(ctx.context, key) }) done@{ result ->
+            val bytes = result.getOrNull()
+            if (bytes == null) { keyCovers -= key; return@done }
+            ctx.recorder.cover(id, bytes)
+        }
+    }
+
+    companion object {
+        private val PKG = Readest.pkg
+        private fun lastKeyPref() = "last_key_$PKG"
+        /** 열쇠 → 책 id, 책 id → 열쇠 */
+        private fun keyPref(key: String) = "key_${PKG}_$key"
+        private fun bookKeyPref(id: String) = "book_key_${PKG}_$id"
+
+        /** 책 [id] 를 연 열쇠(홈에서 그 책을 바로 연다). 모르면 null */
+        fun bookKey(context: Context, id: String): String? =
+            Storage.of(context).getSharedPreferences(WatchCore.WATCH_PREFS, Context.MODE_PRIVATE).getString(bookKeyPref(id), null)
+    }
 }
 
 /** 지금 쪽 ÷ 전체 쪽을 반올림한 %(Readest 서재·진행 창과 같게: 24/81 → 30%) */

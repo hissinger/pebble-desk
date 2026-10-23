@@ -17,7 +17,7 @@ import java.io.File
 
 /**
  * 옮기는 동안만 쓰는 어댑터(docs/reader-adapter-plan.md 3단계 `Legacy`): 아직 그 앱 파일로 옮기지 않은 특수 앱의 처리를
- * 예전 서비스 코드 그대로, [ReaderApp] 의 표시(`fileState`·`viewerKeys`·`viewerTabs`·`confirmsOpen`·`clickOnly`·`recent`·`viewerHolder`·
+ * 예전 서비스 코드 그대로, [ReaderApp] 의 표시(`fileState`·`viewerTabs`·`confirmsOpen`·`clickOnly`·`recent`·
  * `searchesBookFile`·`fileBook`)로 갈라 둔다. 표시가 없는 앱에는 바탕 [ScreenReader] 와 같다.
  * 특수 앱을 하나씩 옮기며(4단계) 그 앱의 갈래·기억을 여기서 지운다.
  */
@@ -32,10 +32,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
     private var lastWebRead = 0L
     /** 탭마다 책이 다른 앱([ReaderApp.viewerTabs])에서 책 모름 시각을 적은 탭(같은 모르는 탭에 다시 와도 처음 열린 때를 둔다) */
     private var unknownTab: String? = null
-    /** 책 열쇠로 가르는 앱([ReaderApp.viewerKeys])에서 제목을 아직 몰라 책 모름으로 둔 열쇠 */
-    private var unknownKeys: String? = null
-    /** 그 앱 데이터에서 표지를 가져오는 중이거나 가져온 열쇠([keyCover]) */
-    private val keyCovers = mutableSetOf<String>()
     /** 저장소에서 책 파일을 찾아 본 책(정리한 제목, [searchFile]). 서비스가 살아 있는 동안 한 권에 한 번만 */
     private val fileSearched = mutableSetOf<String>()
     /** 이북 앱 데이터로 책을 아는 앱([ReaderApp.fileBook])에 메뉴 없이 물어볼 남은 횟수(읽는 화면이 앞에 올 때마다 다시 센다) */
@@ -63,18 +59,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
 
     // ── 화면 ──
 
-    /**
-     * 서재 액티비티 [activity] 안에 읽는 화면([ReaderApp.viewerHolder])이 떠 있으면 `activity#요소`, 아니면 activity.
-     * 맨 앞 창이 그 앱이 아니면(알림 창 등) 알 수 없어 null. 액티비티를 모르면(서비스가 그 앱이 떠 있는 동안 다시 시작됨) 서재 액티비티가 하나뿐일 때 그것으로 본다.
-     */
-    override fun screenName(ctx: AppContext, activity: String?): String? {
-        val holder = app.viewerHolder ?: return activity
-        val act = activity ?: app.shelves.singleOrNull()?.takeIf { ctx.root != null } ?: return null
-        if (act !in app.shelves) return act
-        val root = ctx.root ?: return null
-        return if (app.showsViewer(root)) "$act#$holder" else act
-    }
-
     override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {
         val now = ctx.now
         // 같은 읽는 화면의 알림이 한 번 더 온 것이면 이 읽는 화면에서 본 파일·누른 칸을 그대로 둔다
@@ -93,8 +77,7 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
         val gone = webGone.also { webGone = null }
         val clickedLater = gone != null && (clicked?.second ?: 0L) > gone
         val web = webBook.also { webBook = null }?.takeIf { gone == null || (now - gone < WEB_KEEP_MS && !clickedLater) }?.also { openBook(ctx, it) }
-        // 책 열쇠로 가르는 앱(Readest)은 누른 칸을 읽는 화면의 열쇠를 볼 때 쓴다([readKeyed]. 열쇠로 이미 아는 책이면 그 책)
-        val clickedCell = if (app.viewerKeys) null else takeClicked(ctx)
+        val clickedCell = takeClicked(ctx)
         // 파일 칸은 읽는 화면에 그 파일 이름이 보일 때 편 것으로 본다(누른 뒤 다른 앱으로 다른 파일을 열었을 수 있다)
         clickedCell?.let { cell -> if (cell.file != null) clickedFiles = cell else openBook(ctx, cell) }
         // 누른 칸으로만 책을 아는 앱(BookFusion)이 누른 칸을 모른 채 서재에서 넘어왔다(누름 알림이 없는 칸, 책 상세도 아님): 여기부터 책 모름
@@ -175,11 +158,7 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
         super.beforeOpened(ctx)
         webBook = null
         webGone = null
-        unknownKeys = null
     }
-
-    /** 그 앱 데이터에서 표지를 가져오는 앱(Readest 데이터 폴더를 읽을 수 있을 때)은 화면에서 자르지 않는다 */
-    override fun capturesCovers(ctx: AppContext) = !app.dataCovers(ctx.context)
 
     // ── 서재 ──
 
@@ -279,12 +258,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
         if (app.fileState) return syncFiles(ctx)
         val windows = ctx.windows().takeIf { it.all.isNotEmpty() } ?: return ctx.noWindow()
         val shown = app.readViewer(windows)
-        if (app.viewerKeys) {
-            app.viewerKey(windows)?.let { return readKeyed(ctx, it, shown) }
-            // 웹 화면이 안쪽 요소를 늦게 내놓는다: 조금 뒤 다시 본다
-            if (ctx.viewerRetry()) ctx.viewerAgain(VIEWER_RETRY_MS)
-            return
-        }
         val recorder = ctx.recorder
         val lookup = recorder.lookup
         val file = fileBook(ctx, shown)
@@ -537,7 +510,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
     // ── 데이터로 아는 앱 ──
 
     override fun onHome(ctx: AppContext) {
-        if (app.viewerKeys) syncKeys(ctx)
         if (app.fileState && runCatching { ctx.context.packageManager.getApplicationInfo(ctx.pkg, 0) }.isSuccess) syncFiles(ctx)
     }
 
@@ -608,73 +580,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
         return true
     }
 
-    /**
-     * 읽는 화면에 지금 책의 열쇠가 늘 보이는 앱(Readest 책 해시, [ReaderApp.viewerKeys]): 열쇠로 책을 가른다. 한 번 안 열쇠는 그 책으로 적어 두어
-     * (서비스가 다시 시작돼도) 서재를 거치지 않고 연 책(Readest '시작 시 마지막 책 열기'·파일 관리자·홈에서 바로 열기)도 알아본다.
-     * 처음 보는 열쇠는 그 앱 데이터의 제목([ReaderApp.keyBook]), 없으면 이 읽는 화면을 열기 전에 서재에서 누른 칸, 없으면 읽는 화면의 제목(목차 창)으로 안다.
-     * 그때까지는 책 모름(앞서 편 책에 붙이지 않는다). 진행률은 그 앱 데이터, 없으면 화면에서 읽은 것. 표지가 없으면 그 앱 데이터의 표지를 붙인다.
-     */
-    private fun readKeyed(ctx: AppContext, key: String, shown: ViewerInfo) {
-        val recorder = ctx.recorder
-        val opened = ctx.viewerOpenedAt ?: ctx.now
-        val data = app.keyBook(ctx.context, key)
-        val progress = data?.progress?.takeIf { it >= 0 } ?: shown.progress
-        ctx.log(WatchLog.Kind.PROGRESS, "$progress", data?.title ?: shown.title.orEmpty())
-        if (ctx.prefs.getString(lastKeyPref(ctx.pkg), null) != key) ctx.prefs.edit().putString(lastKeyPref(ctx.pkg), key).apply()
-        // 해시로 이어 둔 책은 제목이 달라도 그 책(Readest 에서 메타데이터 편집으로 제목을 바꿔도 같은 책)
-        val book = keyedBook(ctx, key)?.also { b ->
-            clicked = null
-            if (recorder.recordedBook(ctx.pkg)?.id != b.id) openBook(ctx, Cell(b.title, "", -1, -1, null, Rect()), opened, b.id)
-        } ?: newKeyed(ctx, key, data, shown, progress, opened)
-        if (book != null) {
-            if (progress >= 0 || !data?.author.isNullOrEmpty()) recorder.status(book.id, progress, -1, data?.author.orEmpty())
-            if (!recorder.lookup.hasCover(book.id)) keyCover(ctx, key, book.id)
-        }
-        // 진행률은 늦게 채워질 수 있다(웹 화면이 안쪽 요소를 늦게 내놓는다)
-        if (progress < 0 && ctx.viewerRetry()) ctx.viewerAgain(VIEWER_RETRY_MS)
-    }
-
-    /** 처음 보는(또는 그 책을 빼고 다시 연) 열쇠 [key] 의 책을 넣는다([readKeyed]). 제목을 아직 모르면 책 모름으로 두고 null */
-    private fun newKeyed(ctx: AppContext, key: String, data: FileBook?, shown: ViewerInfo, progress: Int, opened: Long): ShelfBook? {
-        val click = clicked?.takeIf { ctx.now - it.second < CLICK_OPEN_MS }?.first
-        val title = data?.title?.ifEmpty { null } ?: click?.title ?: shown.title
-        if (title == null) {
-            // 책 모름: 그 앞에 편 책에 이 시간을 붙이지 않게(같은 열쇠에 한 번만)
-            if ((unknownKeys != key).also { unknownKeys = key } && ctx.recorder.openedId(ctx.pkg) != null) ctx.unknown(opened)
-            return null
-        }
-        val author = data?.author?.ifEmpty { null } ?: shown.author.takeIf { shown.title == title }.orEmpty()
-        openBook(ctx, Cell(title, author, progress, -1, null, Rect()), opened)
-        return ctx.recorder.recordedBook(ctx.pkg)?.also { setKeyBook(ctx, key, it.id) }
-    }
-
-    /** 열쇠 [key] 로 적어 둔 책(읽고 있는 책일 때만. 빼거나 지운 책은 다시 알아본다) */
-    private fun keyedBook(ctx: AppContext, key: String): ShelfBook? =
-        ctx.prefs.getString(keyPref(ctx.pkg, key), null)?.let { ctx.recorder.lookup.get(it) }
-
-    private fun setKeyBook(ctx: AppContext, key: String, id: String) {
-        ctx.prefs.edit().putString(keyPref(ctx.pkg, key), id).putString(bookKeyPref(ctx.pkg, id), key).apply()
-    }
-
-    /** 책 [id] 에 열쇠 [key] 의 표지를 그 앱 데이터에서 붙인다(뒤에서. 가져오는 중이면 다시 하지 않고, 못 가져오면 다음에 다시) */
-    private fun keyCover(ctx: AppContext, key: String, id: String) {
-        if (!keyCovers.add(key)) return
-        ctx.inBackground({ app.keyCover(ctx.context, key) }) done@{ result ->
-            val bytes = result.getOrNull()
-            if (bytes == null) { keyCovers -= key; return@done }
-            ctx.recorder.cover(id, bytes)
-        }
-    }
-
-    /** 책 열쇠로 가르는 앱(Readest)의 마지막 책을 그 앱 데이터로 맞춘다(홈으로 돌아올 때: 읽는 화면을 닫을 때 적힌 마지막 진행률) */
-    private fun syncKeys(ctx: AppContext) {
-        val key = ctx.prefs.getString(lastKeyPref(ctx.pkg), null) ?: return
-        val data = app.keyBook(ctx.context, key) ?: return
-        val book = keyedBook(ctx, key) ?: return
-        if (data.progress >= 0 || data.author.isNotEmpty()) ctx.recorder.status(book.id, data.progress, -1, data.author)
-        if (!ctx.recorder.lookup.hasCover(book.id)) keyCover(ctx, key, book.id)
-    }
-
     companion object {
         /** 책 상세가 사라진 뒤 그 책을 기억해 두는 때([webGone]) */
         private const val WEB_KEEP_MS = 3000L
@@ -688,10 +593,5 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
         private const val VIEWER_SWAP_MS = 5_000L
         /** 서재에서 눌러 연 책은 읽는 화면이 열리기 조금 전에 편 것으로 적힐 수 있다 */
         private const val OPENED_SLACK_MS = 5_000L
-
-        private fun lastKeyPref(pkg: String) = "last_key_$pkg"
-        /** 열쇠 → 책 id, 책 id → 열쇠(앱마다) */
-        private fun keyPref(pkg: String, key: String) = "key_${pkg}_$key"
-        fun bookKeyPref(pkg: String, id: String) = "book_key_${pkg}_$id"
     }
 }

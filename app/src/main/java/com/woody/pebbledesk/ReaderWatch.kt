@@ -17,7 +17,6 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.woody.pebbledesk.readers.AppWindows
 import com.woody.pebbledesk.readers.Click
-import com.woody.pebbledesk.readers.LegacyReader
 import com.woody.pebbledesk.readers.ReaderApps
 
 /**
@@ -130,10 +129,6 @@ class ReaderWatchService : AccessibilityService(), WatchHost {
          * 그 책을 편 것으로 본다(열리지 않거나 다른 파일이 열리면 버린다)
          */
         fun bookFileOpened(pkg: String, book: ShelfBook, path: String) = HomeSignals.fileOpened(pkg, book, path)
-
-        /** 책 [id] 를 [pkg] 에서 연 열쇠(Readest 책 해시, 홈에서 그 책을 바로 연다 [com.woody.pebbledesk.readers.ReaderApp.keyIntent]). 모르면 null */
-        fun bookKey(context: Context, pkg: String, id: String): String? =
-            Storage.of(context).getSharedPreferences(WatchCore.WATCH_PREFS, Context.MODE_PRIVATE).getString(LegacyReader.bookKeyPref(pkg, id), null)
 
         /**
          * 서비스가 연결·끊긴 때와 끊긴 횟수(기기 정보에서 본다). 켜 둔 서비스가 저절로 꺼지는 기기(Moaan MIX7S)에서
