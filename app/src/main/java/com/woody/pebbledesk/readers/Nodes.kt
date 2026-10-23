@@ -27,7 +27,7 @@ class ViewerInfo(val title: String?, val author: String, val progress: Int, val 
 class FileViewer(val activity: String, val label: Int)
 
 /**
- * 이북 앱 데이터에서 찾은 책([ReaderApp.fileBook]·[ReaderApp.fileBooks]). [progress] 는 데이터에 진행률이 있으면(KOReader, 모르면 -1).
+ * 이북 앱 데이터에서 찾은 책(네오리더·우주의 데이터, KOReader 기록). [progress] 는 데이터에 진행률이 있으면(KOReader, 모르면 -1).
  * 열고 닫은 때를 아는 앱(KOReader): [openedAt] 은 이 책을 연 때, [closedAt] 은 닫았으면 닫은 때(열려 있으면 0. ms, 모르면 0)
  */
 class FileBook(

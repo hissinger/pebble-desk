@@ -111,10 +111,9 @@ def main():
     print("# 서비스 prefs" + (" — 바뀐 것" if before else ""))
     for k in sorted(cur["prefs"]):
         v = cur["prefs"][k]
-        if before and before["prefs"].get(k) == v:
+        # 데이터로 맞춘 때(KOReader)는 홈에 올 때마다 바뀌어 빼고 바뀐 것만 본다
+        if k.startswith("sync_") or before and before["prefs"].get(k) == v:
             continue
-        if k.startswith("sync_"):
-            v = "(때)"
         elif k.startswith(("tab_book_", "book_key_", "shelf_book_", "key_")) and v in cur["titles"]:
             v = "책 " + cur["titles"][v]
         print(f"- {k} = {v}")

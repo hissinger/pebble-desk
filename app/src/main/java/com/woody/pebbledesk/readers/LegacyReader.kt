@@ -17,8 +17,7 @@ import java.io.File
 
 /**
  * 옮기는 동안만 쓰는 어댑터(docs/reader-adapter-plan.md 3단계 `Legacy`): 아직 그 앱 파일로 옮기지 않은 특수 앱의 처리를
- * 예전 서비스 코드 그대로, [ReaderApp] 의 표시(`viewerTabs`·`confirmsOpen`·`clickOnly`·`recent`·
- * `searchesBookFile`·`fileBook`)로 갈라 둔다. 표시가 없는 앱에는 바탕 [ScreenReader] 와 같다.
+ * 예전 서비스 코드 그대로, [ReaderApp] 의 표시(`confirmsOpen`·`clickOnly`·`recent`·`searchesBookFile`)로 갈라 둔다. 표시가 없는 앱에는 바탕 [ScreenReader] 와 같다.
  * 특수 앱을 하나씩 옮기며(4단계) 그 앱의 갈래·기억을 여기서 지운다.
  */
 open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
@@ -30,16 +29,8 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
      */
     private var webGone: Long? = null
     private var lastWebRead = 0L
-    /** 탭마다 책이 다른 앱([ReaderApp.viewerTabs])에서 책 모름 시각을 적은 탭(같은 모르는 탭에 다시 와도 처음 열린 때를 둔다) */
-    private var unknownTab: String? = null
     /** 저장소에서 책 파일을 찾아 본 책(정리한 제목, [searchFile]). 서비스가 살아 있는 동안 한 권에 한 번만 */
     private val fileSearched = mutableSetOf<String>()
-    /** 이북 앱 데이터로 책을 아는 앱([ReaderApp.fileBook])에 메뉴 없이 물어볼 남은 횟수(읽는 화면이 앞에 올 때마다 다시 센다) */
-    private var fileTries = 0
-    /** 파일로만 여는 앱([ReaderApp.fileViewer])의 읽는 화면에서 그 책의 파일을 아직 모를 때 다시 읽어 볼 남은 횟수 */
-    private var fileRetries = 0
-    /** 마지막으로 메뉴 제목으로 찾은 책(메뉴를 띄워 둔 동안 다시 묻지 않게, 읽는 화면이 앞에 올 때마다 비운다) */
-    private var fileTitles: Pair<String, FileBook>? = null
     /** 열기 확인 창(이지뷰어 ▶·다음 파일)에 보인 파일([Cell.file] 꼴)과 그 때 */
     private var openingFiles: Pair<String, Long>? = null
     /** 이 읽는 화면에서 파일 이름마다 정한 책 id(모르면 null. 같은 파일을 보는 동안 판단을 바꾸지 않게) */
@@ -67,9 +58,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
             viewerFileBooks = null
             clickedFiles = null
         }
-        fileTries = FILE_TRIES
-        fileRetries = FILE_RETRIES
-        fileTitles = null
         // 서재를 떠나 처음 연 읽는 화면의 때만 적는다(읽는 중 목차 같은 다른 화면에 갔다 와도 처음부터 그 책으로 세게).
         // 줄이 바뀌기를 기다리다 서재에서 다시 읽으러 갔으면 이번 책의 때로 다시 적는다.
         if (app.recent != null && ((!readSince).also { readSince = true } || recentWait.also { recentWait = false })) readerAt = now
@@ -84,25 +72,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
         if (app.clickOnly && web == null && clickedCell == null && from in app.shelves) ctx.unknown(now)
         // 홈에서 바로 연 책의 파일도 그렇게
         HomeSignals.take(ctx.pkg)?.takeIf { now - it.second < CLICK_OPEN_MS }?.let { (cell, _) -> if (clickedFiles == null) clickedFiles = cell }
-        val name = ctx.screen
-        if (app.viewerTabs && name != null && app.isViewer(ctx.context, name)) enterTab(ctx, name, now)
-    }
-
-    /**
-     * 탭마다 책이 다른 앱([ReaderApp.viewerTabs])에서 읽는 화면 탭 [cls] 가 앞에 왔다. 그 탭으로 마지막으로 안 책이 지금 편 책과
-     * 다르면 그 책을 편 것으로 본다. 모르는 탭이면 앞서 편 책과 다를 수 있어 '책 모름'을 적고, 메뉴나 이북 앱 데이터로 알면 탭이 열린 때부터 그 책으로 센다.
-     */
-    private fun enterTab(ctx: AppContext, cls: String, now: Long) {
-        // 그 탭의 책이 읽고 있는 책 목록에 있을 때만(빼거나 지운 책을 되살리지 않게)
-        val book = tabBook(ctx, cls)?.let { ctx.recorder.lookup.get(it) }
-        if (book == null) {
-            // 같은 모르는 탭에 다시 오면(네오리더 설정 화면에 갔다 옴 등) 처음 열린 때를 둔다.
-            if (unknownTab != cls || ctx.unknownOpenAt == null) {
-                ctx.unknownOpenAt = now
-                unknownTab = cls
-                ctx.unknown(now)
-            }
-        } else if (ctx.recorder.recordedBook(ctx.pkg)?.id != book.id) openBook(ctx, Cell(book.title, "", -1, -1, null, Rect()), now, book.id)
     }
 
     override fun onWindow(ctx: AppContext) {
@@ -147,9 +116,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
                     cell.file?.let { rememberShelfFile(ctx, it, path, book) }
                 }
 
-                override fun logged(book: ShelfBook) {
-                    if (app.viewerTabs) ctx.screen?.takeIf { app.isViewer(ctx.context, it) }?.let { setTabBook(ctx, it, book.id) }
-                }
             })
         // 그 밖의 표지는 지금(누른 칸이 반전돼 있거나 화면이 넘어가는 중) 찍지 않고, 서재로 돌아와 화면이 멈췄을 때 잘라 온다.
     }
@@ -258,9 +224,8 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
         val shown = app.readViewer(windows)
         val recorder = ctx.recorder
         val lookup = recorder.lookup
-        val file = fileBook(ctx, shown)
         // 파일 이름만 보이는 읽는 화면(이지뷰어): 그 파일로 넣은 책. 처음 보는(바뀐) 파일이면 그때(처음이면 읽는 화면이 열린 때)부터 그 책
-        val shownFile = shown.file?.takeIf { file == null && shown.title == null }
+        val shownFile = shown.file?.takeIf { shown.title == null }
         val fileAt = shownFile?.let { viewerFileAt(ctx, it) }
         // 서재에서 누른 파일 칸: 그 파일 이름이 보이면 편 것으로 적는다. 열린 직후 앞 파일 이름이 남아 보이는 동안([VIEWER_SWAP_MS])은 기다리고(그때 다시 읽는다),
         // 그 뒤에도 파일 이름이 한 번도 보이지 않으면(이지뷰어 설정으로 위 줄·파일명을 끔) 누른 칸을 편 것으로, 다른 파일이 보이면 버린다
@@ -287,15 +252,10 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
         if (fileAt != null && fileId != null) lookup.get(fileId)?.takeIf { lookup.filePath(it.id) == null }?.let { book ->
             shelfFileOf(ctx, book.id)?.let { app.bookFile(ctx.context, it) }?.let { recorder.setFile(book.id, it); fileInfo(ctx, book, it) }
         }
-        // 파일로만 여는 앱(네오리더)은 그 책의 파일을 알 때만 넣는다(메뉴 제목만으로 넣으면 홈에서 열 수 없다).
-        val info = file?.let { ViewerInfo(lookup.knownTitle(it.path, it.title), it.author, shown.progress) }
-            ?: fileTitle?.let { ViewerInfo(it, "", shown.progress) }
-            ?: if (app.fileViewer != null) ViewerInfo(null, "", shown.progress) else shown
+        val info = fileTitle?.let { ViewerInfo(it, "", shown.progress) } ?: shown
         val progress = info.progress
         if (progress >= 0 || info.title != null || shownFile != null) ctx.log(WatchLog.Kind.PROGRESS, "$progress", info.title ?: shownFile.orEmpty())
-        // 그 앱 데이터에 아직 안 적혔을 수 있어(책을 여는 동안 적는다) 조금 뒤 다시 본다
-        val retryFile = app.fileViewer != null && file == null && fileRetries.also { fileRetries = it - 1 } > 0
-        if ((progress < 0 && ctx.viewerRetry()) || retryFile) ctx.viewerAgain(VIEWER_RETRY_MS)
+        if (progress < 0 && ctx.viewerRetry()) ctx.viewerAgain(VIEWER_RETRY_MS)
         if (shownFile != null && fileId == null) {
             // 넣은 적 없는 파일을 ▶·다음 파일로 열었다: 확인 창으로 그 파일을 알면 서재에서 연 것처럼 넣는다
             // (실제 경로를 모르면(원격) 확인 창에 보인 위치로. 제목은 파일 이름·그림은 폴더 이름, 읽히는 EPUB 이면 책 정보 [fileInfo])
@@ -313,10 +273,8 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
         if (fileAt != null && fileId != null && isImageFile(shownFile.orEmpty())) lookup.filePath(fileId)?.takeIf(::isImageFile)?.let { cur ->
             File(File(cur).parentFile, shownFile.orEmpty()).takeIf { it.path != cur && it.isFile }?.let { recorder.setFile(fileId, it.path) }
         }
-        // 이북 앱 데이터로 파일을 안 책(네오리더)도 제목이 아니라 그 파일로 가른다(파일 안의 제목이 같은 다른 파일과 섞지 않게): 그 파일로 넣은 책,
-        // 없으면 파일 없이 넣은 같은 제목의 책(1.5.11 까지 메뉴 제목만으로 넣은 책), 둘 다 없으면 새 책
-        val byFile = fileId != null || file != null
-        val bookId = fileId ?: file?.let { f -> lookup.byFile(f.path) ?: lookup.withoutFile(info.title.orEmpty()) }
+        val byFile = fileId != null
+        val bookId = fileId
         info.title?.let { title ->
             // '최근 읽은 책' 줄로 아는 앱은 서재를 떠난 뒤 메뉴로 처음 안 책은 앞서 편 책과 같아도 편 것으로 본다(맨 앞으로).
             // 같은 책을 다시 읽으면 그 줄이 그대로라 서재로 돌아와서는 알 수 없다.
@@ -325,35 +283,16 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
             // 아니면(서비스가 꺼졌다 켜져 '책 모름'·다른 책·책 id 없는 옛 줄·그 책이 목록에 없음) 이 제목의 책을 편 것으로 다시 적는다(그래야 그 뒤 시간이 이 책에)
             val opened = first || recorder.recordedBook(ctx.pkg)?.let { if (byFile) it.id == bookId else it.hasTitle(title) } != true
             if (opened) {
-                // 메뉴 없이 이북 앱 데이터로 방금 연 책을 알았으면 읽는 화면이 열린 때부터 그 책으로 센다.
-                val at = ctx.unknownOpenAt ?: ctx.viewerOpenedAt?.takeIf { file != null && shown.title == null } ?: fileAt
+                val at = ctx.unknownOpenAt ?: fileAt
                 openBook(ctx, Cell(title, info.author, progress, -1, null, Rect()), at, bookId, byFile)
             }
-            if (file != null) recorder.recordedBook(ctx.pkg)?.let { recorder.setFile(it.id, file.path) }
-            else if (app.searchesBookFile) searchFile(ctx, title, info.author)
+            if (app.searchesBookFile) searchFile(ctx, title, info.author)
             if (opened) return
         }
         // 진행률은 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다).
         if (progress < 0) return
         val book = recorder.recordedBook(ctx.pkg) ?: return
         recorder.status(book.id, progress)
-    }
-
-    /**
-     * 이북 앱 데이터로 책을 아는 앱([ReaderApp.fileBook], 네오리더). 쪽을 넘길 때마다 그 앱을 깨우지 않도록 메뉴 제목이 새로 보일 때(결과는 기억)와
-     * 읽는 화면이 앞에 온 뒤 메뉴 없이 [FILE_TRIES]번까지만 묻는다(방금 연 책을 찾으면 그만 묻는다).
-     */
-    private fun fileBook(ctx: AppContext, shown: ViewerInfo): FileBook? {
-        val title = shown.title
-        if (title != null) {
-            fileTitles?.let { (t, book) -> if (t == title) return book }
-            return app.fileBook(ctx.context, shown, 0)?.also { fileTitles = title to it }
-        }
-        val tries = fileTries
-        if (tries <= 0) return null
-        fileTries = tries - 1
-        val since = ctx.viewerOpenedAt ?: return null
-        return app.fileBook(ctx.context, shown, since)?.also { fileTries = 0 }
     }
 
     /**
@@ -473,16 +412,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
     private fun fileCoverKey(shown: String) = "file:" + shown.lowercase()
 
     /**
-     * 탭마다 책이 다른 앱([ReaderApp.viewerTabs])에서 읽는 화면 [cls](탭)로 마지막으로 편 책의 id(서비스가 다시 시작돼도 남긴다).
-     * 1.5.11 까지는 제목(`tab_<탭>`)을 두어 파일 안의 제목이 같은 다른 책과 헷갈렸다. 옛 값은 쓰지 않는다(그 탭은 처음 보는 탭으로).
-     */
-    private fun tabBook(ctx: AppContext, cls: String) = ctx.prefs.getString("tab_book_$cls", null)
-
-    private fun setTabBook(ctx: AppContext, cls: String, id: String) {
-        if (tabBook(ctx, cls) != id) ctx.prefs.edit().putString("tab_book_$cls", id).remove("tab_$cls").apply()
-    }
-
-    /**
      * 연 파일을 내놓지 않는 리더([ReaderApp.searchesBookFile], 문리더)의 책 [title]: 표지도 파일도 모르면 저장소에서 그 제목의 EPUB 을 찾아
      * 그 책의 파일로 적는다(표지는 그릴 때 꺼낸다). 저장소를 훑으므로 뒤에서, 책마다 한 번만(책 파일 읽기를 허용하기 전에는 세지 않는다).
      */
@@ -508,10 +437,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
     companion object {
         /** 책 상세가 사라진 뒤 그 책을 기억해 두는 때([webGone]) */
         private const val WEB_KEEP_MS = 3000L
-        /** 읽는 화면이 앞에 온 뒤 메뉴 없이 이북 앱 데이터에 물어볼 횟수(책을 여는 동안 연 때가 늦게 적힐 수 있다) */
-        private const val FILE_TRIES = 6
-        /** 파일로만 여는 앱에서 책의 파일을 모를 때 다시 읽어 볼 횟수 */
-        private const val FILE_RETRIES = 5
         /** 열기 확인 창을 본 뒤 이만큼 안에 열린 읽는 화면만 그 창의 파일로 본다 */
         private const val OPENING_MS = 30_000L
         /** 읽는 화면이 열린 뒤 위 줄의 파일 이름이 이만큼 안에 바뀌면 앞 파일 이름이 남아 있던 것(이지뷰어) */

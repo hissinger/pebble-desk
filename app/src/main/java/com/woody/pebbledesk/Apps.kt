@@ -179,7 +179,7 @@ object AppStore {
     }
 
     /**
-     * 실행 화면이 없어 런처 조회에 나오지 않고 파일로만 여는 이북 앱(네오리더, [com.woody.pebbledesk.readers.ReaderApp.fileViewer])의 항목.
+     * 실행 화면이 없어 런처 조회에 나오지 않고 파일로만 여는 이북 앱(네오리더, [com.woody.pebbledesk.readers.ReaderApp.fileEntry])의 항목.
      * 깔려 있고 켜져 있을 때만. 자동 추가로 그 앱의 책에 붙고, 책의 앱 이름과 그 책 열기에만 쓴다(모든 앱·자주 쓰는 앱·읽고 있는 앱 고르기에는
      * 넣지 않는다. 그냥 띄우면 아무것도 하지 않고, 고를 파일이 없다).
      */

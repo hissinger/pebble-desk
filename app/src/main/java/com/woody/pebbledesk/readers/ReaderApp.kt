@@ -75,13 +75,6 @@ open class ReaderApp(
      * 요소 이름이 아니라 웹 화면 안의 HTML id 로 가르는 앱(Readest, [showsViewer] 를 바꾼다)은 읽는 화면의 이름일 뿐이다.
      */
     val viewerHolder: String? = null,
-    /** 실행 화면이 없어 파일로만 여는 앱(네오리더): 파일을 받는 화면과 고르기에 보일 이름, 파일을 모를 때 열 서재 앱 */
-    val fileViewer: FileViewer? = null,
-    /**
-     * 읽는 화면 액티비티가 여럿이고 하나가 책 한 권(탭)인 앱(네오리더 `ReaderTab1~4Activity`): 탭마다 메뉴로 마지막으로 안 책을
-     * 따로 기억해 두고, 다른 탭으로 넘어가면 그 탭의 책을 편 것으로 본다. 모르는 탭이면 메뉴로 알 때까지 진행률을 적지 않는다.
-     */
-    val viewerTabs: Boolean = false,
     /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([bookFile] 으로 안 경로)을 바로 여는 앱(이지뷰어). 파일을 모르면 앱을 연다. */
     val opensBookFile: Boolean = false,
     /**
@@ -149,14 +142,7 @@ open class ReaderApp(
     }
 
     /**
-     * 읽는 화면만으로는 어떤 책인지 모르거나 제목이 파일 이름일 때, 그 앱이 내놓은 데이터에서 책(제목·저자·파일 경로)을 찾는다.
-     * [info] 는 읽는 화면에서 읽은 것(메뉴 제목이 보이면 그 책을), [since] 는 이 읽는 화면이 열린 때(제목을 모르면 그 뒤에 연 책만 믿는다).
-     * 기본: 없음(null)
-     */
-    open fun fileBook(context: Context, info: ViewerInfo, since: Long): FileBook? = null
-
-    /**
-     * 파일로만 여는 앱([fileViewer])의 책 파일을 그 앱 데이터에서 다시 찾는다: 제목이나 파일 이름(확장자 뗌)이 [titles] 중 하나인 책 파일들의 경로
+     * 파일로만 여는 앱([fileEntry])의 책 파일을 그 앱 데이터에서 다시 찾는다: 제목이나 파일 이름(확장자 뗌)이 [titles] 중 하나인 책 파일들의 경로
      * (그 앱이 최근에 다룬 것부터. 파일이 옮겨졌거나 예전 판에서 파일 없이 넣은 책을 홈에서 누를 때). 모르면 빈 목록. 기본: 빈 목록
      */
     open fun bookFiles(context: Context, titles: Collection<String>): List<String> = emptyList()
@@ -214,23 +200,18 @@ open class ReaderApp(
     open val screenInsideActivity: Boolean get() = viewerHolder != null
 
     /** 읽는 화면에 다시 들어와도 책 모름이 된 때를 지우지 않는다(탭마다 책이 다른 앱: 같은 모르는 탭에 다시 오면 처음 열린 때를 둔다) */
-    open val keepsUnknownOnReenter: Boolean get() = viewerTabs
+    open val keepsUnknownOnReenter: Boolean get() = false
 
     /** 실행 화면이 없어 앱 목록 항목을 따로 두는 앱(네오리더): 파일을 받는 화면과 이름 */
-    open val fileEntry: FileViewer? get() = fileViewer
+    open val fileEntry: FileViewer? get() = null
 
     /** 시작하기의 책 파일 읽기 앱 순서(켜야 책이 들어오는 앱(KOReader)이 앞에) */
     open val fileOrder: Int get() = 1
 
     /**
-     * 홈에서 이 책을 연다. 파일로만 여는 앱은 그 파일(모르면 다시 찾기), 책 파일을 바로 여는 앱은 그 파일,
-     * 그 밖은 앱. 옮기는 동안 기본은 예전 `AppStore.openBook` 의 갈래 그대로
+     * 홈에서 이 책을 연다. 책 파일을 바로 여는 앱은 그 파일, 그 밖은 앱. 옮기는 동안 기본은 예전 `AppStore.openBook` 의 갈래 그대로
      */
     open fun open(ctx: HomeContext, book: ShelfBook): OpenResult {
-        if (fileViewer?.activity == ctx.component.className) {
-            // 실행 화면이 없어 열기에 실패해도 앱을 열지 않고 다시 찾는다
-            return ctx.bookFile(book)?.let { OpenResult.File(ctx.component, it, onFail = Fallback.FIND_FILE) } ?: OpenResult.FindFile
-        }
         // 지워진 파일이면(읽을 수 있을 때만 안다) 앱을 연다
         if (opensBookFile) ctx.bookFile(book)?.let { path ->
             // 읽는 화면에 파일 이름만 보이는 앱(이지뷰어)은 그 파일이 열리면 이 책으로
