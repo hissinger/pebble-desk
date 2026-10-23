@@ -15,7 +15,7 @@ import java.security.MessageDigest
 /**
  * KOReader(내 파일을 여는 오픈소스 리더, GitHub 판 `org.koreader.launcher`·F-Droid 판 `org.koreader.launcher.fdroid`): 서재와 읽는 화면이 모두
  * 액티비티 하나(`MainActivity`, NativeActivity)이고 화면 전체를 직접 그려 접근성에는 빈 뷰 하나만 보인다(글자·요소 이름 없음, 화면 바뀜 알림도
- * 앱이 앞에 올 때만). 그래서 어떤 책인지는 KOReader 가 저장소에 남기는 기록으로 안다([fileBook], '모든 파일 액세스'가 있어야 한다, [BookFiles]):
+ * 앱이 앞에 올 때만). 그래서 어떤 책인지는 KOReader 가 저장소에 남기는 기록으로 안다([KOReaderApp.fileBooks], '모든 파일 액세스'가 있어야 한다, [BookFiles]):
  * - `koreader/history.lua`: 연 책 목록(최근 것이 [1], 파일 경로·때). 책을 열 때 바로 쓰고, 닫을 때 그 책의 때를 다시 쓴다.
  * - 책 옆 `<이름>.sdr/metadata.<확장자>.lua`(설정에 따라 `koreader/docsettings/…`·`koreader/hashdocsettings/…`): 책 정보(`doc_props` 제목·저자),
  *   진행률(`percent_finished` 0~1), 고친 책 정보는 같은 폴더 `custom_metadata.lua`(`custom_props`). 책을 닫거나 KOReader 가 뒤로 갈 때 쓴다.
