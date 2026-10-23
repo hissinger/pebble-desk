@@ -26,6 +26,8 @@ object Millie : ReaderApp(
     viewerProgress = listOf("tv_viewer_add_on_right"), viewerLoading = "epub_loading_message",
     openOnViewer = true,
 ) {
+    override fun newAdapter(): ReaderAdapter = DetailReader(this, clickOnly = false, ::webBook)
+
     /** 읽는 화면 메뉴(위 막대)에 제목이 보인다(이름 없는 글자라 [viewerTitle] 대신 [readViewer] 에서 읽는다) */
     override val tellsTitle: Boolean get() = true
 
@@ -53,7 +55,7 @@ object Millie : ReaderApp(
      * 검색(웹 화면)의 책 상세: `바로 읽기` 단추와 같은 줄 맨 왼쪽 단추에 왼쪽을 맞춘, 단추 위의 글자들이 제목·저자다.
      * 표지는 그 왼쪽의 그림. 요소 이름이 없는 웹 화면이라 위치로 찾는다(`바로 읽기` 클릭에는 글자가 없다).
      */
-    override fun webBook(root: AccessibilityNodeInfo): Cell? {
+    fun webBook(root: AccessibilityNodeInfo): Cell? {
         val texts = mutableListOf<Pair<String, Rect>>()
         val images = mutableListOf<Rect>()
         fun walk(n: AccessibilityNodeInfo, depth: Int) {

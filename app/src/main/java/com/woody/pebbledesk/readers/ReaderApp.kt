@@ -55,11 +55,6 @@ open class ReaderApp(
     /** 칸을 눌러도 읽는 화면이 열려야 편 것으로 본다(my YES: 누르면 내려받기·기간 만료 안내가 먼저 뜬다. 밀리: 받지 않은 책은 누르면 받기만 한다. YES24 도서관: 칸 안의 받기·반납 단추도 칸 클릭으로 온다) */
     val openOnViewer: Boolean = false,
     /**
-     * 책을 서재에서 누른 칸으로만 아는 앱(BookFusion: 읽는 화면에 제목이 없다). 서재에서 읽는 화면으로 넘어왔는데 누른 칸을 모르면
-     * (누름 알림이 오지 않는 칸) 책 모름으로 적는다(앞서 편 책에 읽은 시간·진행률을 붙이지 않게)
-     */
-    val clickOnly: Boolean = false,
-    /**
      * 누른 요소가 든 칸을 못 찾았을 때 누른 곳 자리의 칸으로 본다. 끄는 앱: my YES(구매목록 창이 책장 위에 겹쳐 뒤 창의 칸을 고를 수 있다),
      * Libby(칸 안의 `책 열기`·`대출 관리` 단추도 칸 자리에 든다)
      */
@@ -202,9 +197,6 @@ open class ReaderApp(
     /** 서재의 '최근 읽은 책' 제목([recent], 없으면 null) */
     fun recentTitle(root: AccessibilityNodeInfo): String? =
         recent?.let { id -> root.byId(pkg, id).firstOrNull()?.text?.let(::plain)?.takeIf { it.isNotEmpty() } }
-
-    /** 서재 화면 안 웹 화면의 책 상세(여기서 읽는 화면으로 넘어가면 그 책을 편 것). 기본: 없음 */
-    open fun webBook(root: AccessibilityNodeInfo): Cell? = null
 
     /**
      * 누른 책 칸. 이벤트로 받은 요소는 위(부모)로 올라갈 수 없어서, 그 앱의 창(맨 앞 창부터)을 한 번 훑어 누른 요소를 찾고
