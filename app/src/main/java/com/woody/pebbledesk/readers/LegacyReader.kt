@@ -18,7 +18,7 @@ import java.io.File
 /**
  * 옮기는 동안만 쓰는 어댑터(docs/reader-adapter-plan.md 3단계 `Legacy`): 아직 그 앱 파일로 옮기지 않은 특수 앱의 처리를
  * 예전 서비스 코드 그대로, [ReaderApp] 의 표시(`fileState`·`viewerKeys`·`viewerTabs`·`confirmsOpen`·`clickOnly`·`recent`·`viewerHolder`·
- * `searchesBookFile`·`fileBook`·`fileData`)로 갈라 둔다. 표시가 없는 앱에는 바탕 [ScreenReader] 와 같다.
+ * `searchesBookFile`·`fileBook`)로 갈라 둔다. 표시가 없는 앱에는 바탕 [ScreenReader] 와 같다.
  * 특수 앱을 하나씩 옮기며(4단계) 그 앱의 갈래·기억을 여기서 지운다.
  */
 open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
@@ -60,8 +60,6 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
     private var readKnown = false
     /** 서재로 돌아왔는데 '최근 읽은 책' 줄이 아직 읽으러 가기 전 그대로다(바뀌기를 기다린다) */
     private var recentWait = false
-    /** [dataCover] 를 뒤에서 꺼내는 중인 책 파일들 */
-    private val dataCovers = mutableSetOf<String>()
 
     // ── 화면 ──
 
@@ -319,8 +317,7 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
             shelfFileOf(ctx, book.id)?.let { app.bookFile(ctx.context, it) }?.let { recorder.setFile(book.id, it); fileInfo(ctx, book, it) }
         }
         // 파일로만 여는 앱(네오리더)은 그 책의 파일을 알 때만 넣는다(메뉴 제목만으로 넣으면 홈에서 열 수 없다).
-        // 진행률이 화면에 안 보이면 그 앱 데이터의 것(우주 [ReaderApp.fileData]: 책을 열 때 적는다)
-        val info = file?.let { ViewerInfo(lookup.knownTitle(it.path, it.title), it.author, shown.progress.takeIf { p -> p >= 0 || !app.fileData } ?: it.progress) }
+        val info = file?.let { ViewerInfo(lookup.knownTitle(it.path, it.title), it.author, shown.progress) }
             ?: fileTitle?.let { ViewerInfo(it, "", shown.progress) }
             ?: if (app.fileViewer != null) ViewerInfo(null, "", shown.progress) else shown
         val progress = info.progress
@@ -366,32 +363,13 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
             if (opened) return
         }
         // 진행률은 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다).
-        // 화면에 진행률이 없으면 그 책 파일의 것을 그 앱 데이터에서(우주: 메뉴·상태 줄 없이 읽는 동안, [ReaderApp.fileData]). 표지가 없으면 그것도
-        if (progress < 0 && !app.fileData) return
+        if (progress < 0) return
         val book = recorder.recordedBook(ctx.pkg) ?: return
-        val path = if (app.fileData) lookup.filePath(book.id) else null
-        path?.let { dataCover(ctx, book.id, it) }
-        if (progress >= 0) return recorder.status(book.id, progress)
-        val p = path?.let { app.fileProgress(ctx.context, it) }?.takeIf { it >= 0 } ?: return
-        ctx.log(WatchLog.Kind.PROGRESS, "$p", book.title)
-        recorder.status(book.id, p)
+        recorder.status(book.id, progress)
     }
 
     /**
-     * 표지가 없는 책 [id] 에 그 앱이 남긴 책 파일 [path] 의 표지를 붙인다([ReaderApp.fileCover], 우주의 PDF 등). EPUB·그림은 그릴 때 책 파일에서 꺼내므로 하지 않는다.
-     * 아직 없으면(그 앱이 책을 연 뒤 그림을 늦게 남긴다) 다음에 읽는 화면을 읽을 때 다시 본다.
-     */
-    private fun dataCover(ctx: AppContext, id: String, path: String) {
-        if (ShelfRecorder.coverFromFile(ctx.context, path) || ctx.recorder.lookup.hasCover(id) || !dataCovers.add(path)) return
-        ctx.inBackground({ app.fileCover(ctx.context, path) }) done@{ result ->
-            dataCovers -= path
-            val bytes = result.getOrNull() ?: return@done
-            ctx.recorder.cover(id, bytes)
-        }
-    }
-
-    /**
-     * 이북 앱 데이터로 책을 아는 앱([ReaderApp.fileBook], 네오리더·우주). 쪽을 넘길 때마다 그 앱을 깨우지 않도록 메뉴 제목이 새로 보일 때(결과는 기억)와
+     * 이북 앱 데이터로 책을 아는 앱([ReaderApp.fileBook], 네오리더). 쪽을 넘길 때마다 그 앱을 깨우지 않도록 메뉴 제목이 새로 보일 때(결과는 기억)와
      * 읽는 화면이 앞에 온 뒤 메뉴 없이 [FILE_TRIES]번까지만 묻는다(방금 연 책을 찾으면 그만 묻는다).
      */
     private fun fileBook(ctx: AppContext, shown: ViewerInfo): FileBook? {

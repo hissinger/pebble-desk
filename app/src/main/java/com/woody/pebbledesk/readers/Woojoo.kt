@@ -1,7 +1,14 @@
 package com.woody.pebbledesk.readers
 
+import android.content.ComponentName
 import android.content.Context
 import android.view.accessibility.AccessibilityNodeInfo
+import com.woody.pebbledesk.Seen
+import com.woody.pebbledesk.ShelfBook
+import com.woody.pebbledesk.ShelfRecorder
+import com.woody.pebbledesk.Target
+import com.woody.pebbledesk.WatchLog
+import com.woody.pebbledesk.hasTitle
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -13,13 +20,13 @@ import java.io.File
  * 읽는 화면은 `pdf.search.activity.HorizontalViewActivity`(책 넘김, 기본)와 `org.ebookdroid.ui.viewer.VerticalViewActivity`(스크롤)이고
  * 본문은 직접 그려 글자가 드러나지 않는다. 가운데를 눌러 메뉴를 띄우면 위에 제목 `title`(스크롤은 `bookName`), 아래에 쪽 `currentPage`·`maxPage`·`(1%)` `pagePercent`.
  * 메뉴가 없을 때는 우주 설정의 상태 표시줄을 켰을 때만 아래에 쪽 `pagesCountIndicator`(`13 / 96`)가 보인다(기본은 꺼짐). 그래서 읽는 동안의 진행률은
- * 우주가 쪽을 넘길 때마다 적는 `Woojoo/profile.<프로필>/device.<기기>/app-Progress.json`(파일 이름 → 비율 `p`)에서도 읽는다([fileProgress]).
+ * 우주가 쪽을 넘길 때마다 적는 `Woojoo/profile.<프로필>/device.<기기>/app-Progress.json`(파일 이름 → 비율 `p`)에서도 읽는다([dataProgress]).
  * 제목은 우주가 책 정보의 제목을 읽는 형식(EPUB·FB2·MOBI·TXT 등)만 책 정보의 제목이고, PDF·DjVu·만화 압축 파일 등([NO_TITLE])은 파일 이름(확장자 포함)이다.
  * 서재 칸은 그런 파일도 PDF 속 제목을 보여 읽는 화면과 제목이 달라, 그 칸은 책으로 보지 않는다(파일 이름으로 들어온다). 그 책의 표지는 서재에서 자를 수 없고
- * 책 파일에서도 꺼낼 수 없어(EPUB 만) 우주 기록의 표지 그림으로 붙인다([fileCover]).
+ * 책 파일에서도 꺼낼 수 없어(EPUB 만) 우주 기록의 표지 그림으로 붙인다([dataCover]).
  * 우주는 책을 열 때와 닫을 때 저장소의 `Woojoo/RecentBooks/RecentBooks.json` 에 그 책(메뉴의 제목·저자·진행률·파일 경로·때, 최근 10권)을 적는다
  * (`SpaceUtils.saveCurrentBookToRecentBooks`, 닫을 때는 `onStop`). 그래서 책 파일 읽기를 허용했으면 메뉴 없이도 방금 연 책과 그 파일·진행률(지난번에 닫은 곳)을 알고
- * ([fileBook]), 홈에서 그 파일을 바로 연다(실행 화면은 파일 보기를 받지 않아 `OpenerActivity` 로, [fileOpener]). 닫을 때 적는 진행률은 홈의 `onResume` 보다
+ * ([dataBook]), 홈에서 그 파일을 바로 연다(실행 화면은 파일 보기를 받지 않아 `OpenerActivity` 로, [open]). 판단과 기억은 [WoojooReader]. 닫을 때 적는 진행률은 홈의 `onResume` 보다
  * 늦어 홈으로 돌아올 때 맞추지 않는다(서재 칸의 진행률·메뉴의 `%`·다음에 열 때 적힌 것으로 안다).
  * (우주 1.0.22, 2026-10-23 에뮬레이터에서 확인)
  */
@@ -30,9 +37,14 @@ object Woojoo : ReaderApp(
     viewers = setOf("com.inno.pdf.search.activity.HorizontalViewActivity", "org.ebookdroid.ui.viewer.VerticalViewActivity"),
     titles = listOf("title1"), thumbs = listOf("browserItemIcon"), authors = listOf("title2"), progress = "idPercentText", due = null,
     viewerProgress = listOf("pagePercent", "pagesCountIndicator"), viewerTitle = "title", viewerPages = "currentPage" to "maxPage",
-    opensBookFile = true, fileOpener = "com.inno.OpenerActivity", fileData = true,
     needsBookFiles = true,
 ) {
+    override fun newAdapter(): ReaderAdapter = WoojooReader()
+
+    /** 홈에서 그 책의 파일을 연다(실행 화면은 파일 보기를 받지 않아 `OpenerActivity` 로). 파일을 모르거나 지워졌으면 앱을 연다 */
+    override fun open(ctx: HomeContext, book: ShelfBook): OpenResult =
+        ctx.bookFile(book)?.let { OpenResult.File(ComponentName(pkg, OPENER), it) } ?: OpenResult.Launch
+
     override val viewerTitleIds = listOf("title", "bookName")
 
     /** PDF 등은 메뉴 제목이 파일 이름이라 확장자를 뗀다 */
@@ -72,7 +84,7 @@ object Woojoo : ReaderApp(
      * RecentBooks.json 에서: 메뉴 제목이 보이면 그 제목의 책(가장 최근 것), 안 보이면 이 읽는 화면이 열린 뒤([since])에 적힌 가장 최근 책.
      * 책 파일 읽기를 허용하지 않았으면 null
      */
-    override fun fileBook(context: Context, info: ViewerInfo, since: Long): FileBook? {
+    fun dataBook(context: Context, info: ViewerInfo, since: Long): FileBook? {
         if (!BookFiles.canRead(context)) return null
         val list = WoojooData.recent(recentFile()) ?: return null
         val e = if (info.title != null) list.firstOrNull { withoutBookFile(it.title) == info.title }
@@ -81,7 +93,7 @@ object Woojoo : ReaderApp(
     }
 
     /** 읽는 동안 쪽을 넘길 때마다 적는 진행 비율(서재 칸처럼 반올림한 %) */
-    override fun fileProgress(context: Context, path: String): Int {
+    fun dataProgress(context: Context, path: String): Int {
         if (!BookFiles.canRead(context)) return -1
         return WoojooData.progress(progressFile() ?: return -1, File(path).name)
     }
@@ -90,7 +102,7 @@ object Woojoo : ReaderApp(
      * 우주 기록의 그 책 표지 그림(`thumb_path`, 우주가 첫 쪽을 300×450 으로 그려 둔 PNG. 책을 열 때마다 새로 그리고 앞 그림은 지운다).
      * PDF·만화처럼 책 파일에서 표지를 꺼낼 수 없는 책에 쓴다
      */
-    override fun fileCover(context: Context, path: String): ByteArray? {
+    fun dataCover(context: Context, path: String): ByteArray? {
         if (!BookFiles.canRead(context)) return null
         val thumb = WoojooData.recent(recentFile())?.firstOrNull { it.path == path }?.thumb?.takeIf { it.isNotEmpty() } ?: return null
         return File(thumb).takeIf { it.isFile }?.let(BookFiles::imageCover)
@@ -114,12 +126,75 @@ object Woojoo : ReaderApp(
         return body.substringAfter(' ', "").trim()
     }
 
+    /** 파일을 받는 화면(실행 화면 `MainTabs2` 는 파일 보기를 받지 않는다) */
+    private const val OPENER = "com.inno.OpenerActivity"
     /** 책 칸(설명 `도서 저자 제목 확장자` 가 붙는 요소) */
     private const val CARD = "card_view"
     /** 우주가 책 정보의 제목을 읽지 않고 파일 이름을 제목으로 쓰는 형식(Librera `BookType.hasTitle` 이 거짓) */
     private val NO_TITLE = setOf("pdf", "xps", "tiff", "tif", "cbz", "cbr", "djvu")
     /** 읽는 화면이 열렸다는 알림보다 적힌 때가 조금 앞설 수 있어 봐준다 */
     private const val OPEN_SLACK_MS = 3_000L
+}
+
+/**
+ * 우주의 판단과 기억: 서재는 바탕 그대로([Woojoo.readCell]), 읽는 화면은 우주 기록(RecentBooks)으로 안 책이 먼저 — 그 파일로 넣은 책,
+ * 없으면 파일 없이 넣은 같은 제목의 책, 둘 다 없으면 새 책(파일 안의 제목이 같은 다른 파일과 섞지 않게) — 없으면 메뉴 제목.
+ * 화면에 진행률이 없으면 우주 기록의 진행률, 표지가 없으면 우주 기록의 표지 그림.
+ */
+class WoojooReader : ScreenReader(Woojoo) {
+    private val ask = DataAsk(Woojoo::dataBook)
+    /** 표지 그림을 뒤에서 꺼내는 중인 책 파일들(같은 파일을 겹쳐 꺼내지 않게) */
+    private val dataCovers = mutableSetOf<String>()
+
+    override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {
+        ask.reset()
+        super.onEnterViewer(ctx, from, again)
+    }
+
+    /**
+     * 읽는 화면: 우주 기록으로 안 책이면 그 파일로 책을 가르고, 메뉴 없이 기록으로 방금 연 책을 알았으면 읽는 화면이 열린 때부터 그 책으로 센다
+     * (메뉴를 띄운 뒤에야 알아본 책은 그때부터. 제목 못 읽은 칸으로 들어왔으면 그 때부터). 편 책 기록의 책이 그 책이면 다시 적지 않는다.
+     * 그 파일은 편 책 기록의 책에 적는다. 진행률은 화면의 것, 없으면 우주 기록의 것(메뉴·상태 줄 없이 읽는 동안).
+     */
+    override fun onViewer(ctx: AppContext) {
+        val shown = readShown(ctx) ?: return
+        val recorder = ctx.recorder
+        val lookup = recorder.lookup
+        val file = ask.ask(ctx, shown)
+        val info = file?.let { ViewerInfo(lookup.knownTitle(it.path, it.title), it.author, shown.progress.takeIf { p -> p >= 0 } ?: it.progress) } ?: shown
+        val progress = info.progress
+        logShown(ctx, info)
+        retryProgress(ctx, progress)
+        val bookId = file?.let { f -> lookup.byFile(f.path) ?: lookup.withoutFile(info.title.orEmpty()) }
+        info.title?.let { title ->
+            val opened = recorder.recordedBook(ctx.pkg)?.let { if (file != null) it.id == bookId else it.hasTitle(title) } != true
+            if (opened) {
+                val at = ctx.unknownOpenAt ?: ctx.viewerOpenedAt?.takeIf { file != null && shown.title == null }
+                ctx.opened(Seen(title, info.author, progress), at, if (file != null) Target.Exact(bookId) else Target.ByTitle)
+            }
+            if (file != null) recorder.recordedBook(ctx.pkg)?.let { recorder.setFile(it.id, file.path) }
+            if (opened) return
+        }
+        val book = recorder.recordedBook(ctx.pkg) ?: return
+        val path = lookup.filePath(book.id)
+        path?.let { dataCover(ctx, book.id, it) }
+        if (progress >= 0) return recorder.status(book.id, progress)
+        val p = path?.let { Woojoo.dataProgress(ctx.context, it) }?.takeIf { it >= 0 } ?: return
+        ctx.log(WatchLog.Kind.PROGRESS, "$p", book.title)
+        recorder.status(book.id, p)
+    }
+
+    /**
+     * 표지가 없는 책 [id] 에 우주가 남긴 책 파일 [path] 의 표지 그림을 붙인다(PDF 등). EPUB·그림은 그릴 때 책 파일에서 꺼내므로 하지 않는다.
+     * 아직 없으면(우주가 책을 연 뒤 그림을 늦게 남긴다) 다음에 읽는 화면을 읽을 때 다시 본다.
+     */
+    private fun dataCover(ctx: AppContext, id: String, path: String) {
+        if (ShelfRecorder.coverFromFile(ctx.context, path) || ctx.recorder.lookup.hasCover(id) || !dataCovers.add(path)) return
+        ctx.inBackground({ Woojoo.dataCover(ctx.context, path) }) done@{ result ->
+            dataCovers -= path
+            ctx.recorder.cover(id, result.getOrNull() ?: return@done)
+        }
+    }
 }
 
 /** 우주의 `RecentBooks.json`·`app-Progress.json`. 같은 파일은 바뀌었을 때만 다시 읽는다 */

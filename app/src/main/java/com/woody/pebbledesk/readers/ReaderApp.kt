@@ -1,6 +1,5 @@
 package com.woody.pebbledesk.readers
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -91,15 +90,8 @@ open class ReaderApp(
      * 한꺼번에 맞춘다([com.woody.pebbledesk.ReaderWatchService.syncFileApps]). 읽은 시간은 책이 열려 있던 동안만 센다([ReaderApps.hostsViewer]).
      */
     val fileState: Boolean = false,
-    /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([fileBooks]·[bookFile]·[fileBook] 으로 안 경로)을 바로 여는 앱(KOReader·이지뷰어·우주). 파일을 모르면 앱을 연다. */
+    /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([fileBooks]·[bookFile] 으로 안 경로)을 바로 여는 앱(KOReader·이지뷰어). 파일을 모르면 앱을 연다. */
     val opensBookFile: Boolean = false,
-    /** 홈에서 책 파일을 바로 열 때([opensBookFile]) 그 파일을 받는 화면. null 이면 실행 화면(실행 화면이 파일 보기를 받지 않는 앱만, 우주 `OpenerActivity`) */
-    val fileOpener: String? = null,
-    /**
-     * 그 앱 데이터에 책 파일마다 진행률·표지가 있는 앱(우주): 읽는 화면에 진행률이 없거나 표지가 없을 때 [fileBook]·[fileProgress]·[fileCover] 로 채운다.
-     * 연 파일을 그 데이터로 알므로 홈에서 바로 연 파일을 따로 기억하지 않는다. 이 값이 꺼진 앱은 이 동작들을 거치지 않는다
-     */
-    val fileData: Boolean = false,
     /**
      * 내 파일을 열지만 어느 파일인지 내놓지 않는 앱(문리더): 읽는 화면 제목으로 안 책의 표지가 없으면 저장소에서 그 제목의 EPUB 을 찾아
      * 그 책의 파일로 적는다(표지는 그릴 때 그 파일에서 꺼낸다). 책 파일 읽기를 허용했을 때만([BookFiles.canRead]).
@@ -170,18 +162,6 @@ open class ReaderApp(
      * 기본: 없음(null)
      */
     open fun fileBook(context: Context, info: ViewerInfo, since: Long): FileBook? = null
-
-    /**
-     * 그 앱 데이터에 적힌 [path] 책의 지금 진행률(%, [fileData]): 읽는 화면에 진행률이 보이지 않을 때 편 책(그 파일을 아는 책)의 진행률로 쓴다
-     * (우주: 쪽을 넘길 때마다 적는다). 모르면 -1. 기본: -1
-     */
-    open fun fileProgress(context: Context, path: String): Int = -1
-
-    /**
-     * 그 앱이 남긴 [path] 책의 표지 그림([fileData], 책 파일에서 표지를 꺼낼 수 없는 PDF 등, 우주가 그려 둔 첫 쪽). 모르면 null. 그림을 다루므로 화면 스레드에서 부르지 않는다.
-     * 기본: null
-     */
-    open fun fileCover(context: Context, path: String): ByteArray? = null
 
     /**
      * 파일로만 여는 앱([fileViewer])의 책 파일을 그 앱 데이터에서 다시 찾는다: 제목이나 파일 이름(확장자 뗌)이 [titles] 중 하나인 책 파일들의 경로
@@ -294,10 +274,9 @@ open class ReaderApp(
         ReaderWatchService.bookKey(ctx.context, pkg, book.id)?.let(::keyIntent)?.takeIf { !ctx.frozen }?.let { return OpenResult.Start(it) }
         // 지워진 파일이면(읽을 수 있을 때만 안다) 앱을 연다
         if (opensBookFile) ctx.bookFile(book)?.let { path ->
-            val opener = fileOpener?.let { ComponentName(pkg, it) } ?: ctx.component
-            // 읽는 화면에 파일 이름만 보이는 앱(이지뷰어)은 그 파일이 열리면 이 책으로(KOReader·우주는 그 앱의 기록으로 안다)
-            val started = if (!fileState && !fileData) ({ HomeSignals.fileOpened(pkg, book, path) }) else null
-            return OpenResult.File(opener, path, started)
+            // 읽는 화면에 파일 이름만 보이는 앱(이지뷰어)은 그 파일이 열리면 이 책으로(KOReader 는 그 앱의 기록으로 안다)
+            val started = if (!fileState) ({ HomeSignals.fileOpened(pkg, book, path) }) else null
+            return OpenResult.File(ctx.component, path, started)
         }
         return OpenResult.Launch
     }
