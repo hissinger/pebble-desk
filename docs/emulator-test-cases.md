@@ -360,7 +360,12 @@ ANDROID_SERIAL=emulator-5554 tools/emu/watch-cycle.sh <결과 폴더> [<비교�
 - 결과는 앞 상태에 달려(이미 맨 앞인 책은 다시 적지 않는다) 한 바퀴를 돈 뒤의 바퀴끼리 비교한다. 같은 판에서 두 바퀴가 같은 것을 확인했다(1단계 기준).
 - 새 빌드를 깐 뒤 첫 바퀴는 버린다: 서비스가 다시 붙으며 '책 모름'을 적어, 같은 책을 다시 열어도 편 책 기록이 한 줄씩 더 생긴다.
 - 대화상자 창 알림(`OTHER_WINDOW`)은 앱을 띄울 때 순서가 섞여 비교에서 뺀다.
-- 로그인·대출이 필요한 앱(교보도서관·밀리·알라딘·Libby 등)은 이 에뮬에 책이 없어 단위 테스트와 실기기로 본다. KOReader·문리더는 모든 파일 액세스를 허락하면 더할 수 있다.
+- 한 바퀴 밖의 순서(`tools/emu/watch-e2e.sh <순서> <결과 폴더>`, 바꾸기 전 빌드와 같은 상태에서 한 번씩 돌려 비교):
+  - `libby`(대출한 책 열고 닫기: 열림·닫힘 표시), `bookfusion2`(지금 읽는 책 `Continue`), `koreader`(책 둘 번갈아), `kohome`(`KO_FILE` 새 책 → 홈에서 파일로 열기),
+    `moonreader`(책 둘 번갈아), `moonsearch`(`MN_FILE`·`MN_PKG` 새 책 → 저장소 EPUB 찾기), `easyview2`(`EV_FILE` 을 다른 앱처럼 열기 → 책 모름, ▶ 마지막 파일): `CremaPebble_A11_Play`.
+  - `readest`: `CremaPebble_A11_Play_Readest`. `kindle`(서재 칸 두 권 번갈아·메뉴 진행률)·문리더 유료판(`MN_PKG=com.flyersoft.moonreaderp`): `CremaPebble_A11`(킨들 로그인, 홈은 `cmd package set-home-activity` 로 이 앱).
+  - 새 책 순서(`kohome`·`moonsearch`)는 한 번만 되므로 빌드마다 다른 파일(`ko-a`/`ko-b`…, 제목만 다른 EPUB)로 돌리고 제목을 바꿔 비교한다. 이지뷰어 서재는 위 도구 줄이 보였다 안 보였다 해 `easyview2` 의 ▶ 자리가 칸에 걸리기도 한다.
+- 로그인이 필요한 한국 이북 앱(교보도서관·교보eBook·밀리·알라딘·북커스·리디·YES24)은 어느 에뮬에도 로그인돼 있지 않아 단위 테스트와 실기기로 본다.
 
 ## 코드별 덮는 곳
 
