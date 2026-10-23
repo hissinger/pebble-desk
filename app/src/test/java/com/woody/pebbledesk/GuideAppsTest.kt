@@ -33,6 +33,13 @@ class GuideAppsTest {
         assertEquals(emptyList<String>(), wrong.flatMap { app -> app.specs.map { it.pkg } })
     }
 
+    /** 안드로이드 9·10 은 화면 캡처가 없어 서재에서 자르는 표지가 들어오지 않는다. 표지가 들어오는 것은 책 파일·앱 데이터를 읽는 앱뿐 */
+    @Config(sdk = [29])
+    @Test fun `안드로이드 10 에서는 책 파일을 읽는 앱만 표지가 들어온다`() {
+        val wrong = ReaderGuide.APPS.filter { app -> app.info.cover.added != (app.info.bookFiles != null) }
+        assertEquals(emptyList<String>(), wrong.flatMap { app -> app.specs.map { it.pkg } })
+    }
+
     @Test fun `접근성 서비스가 모든 이북 앱 화면을 받는다`() {
         val xml = File("src/main/res/xml/reader_watch.xml")
         val p = XmlPullParserFactory.newInstance().newPullParser().apply { setInput(xml.reader()) }

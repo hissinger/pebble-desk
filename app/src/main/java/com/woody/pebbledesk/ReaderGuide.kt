@@ -1,6 +1,7 @@
 package com.woody.pebbledesk
 
 import android.content.Context
+import android.os.Build
 import com.woody.pebbledesk.readers.Aladin
 import com.woody.pebbledesk.readers.Bookers
 import com.woody.pebbledesk.readers.CherieViewer
@@ -42,13 +43,18 @@ internal object ReaderGuide {
     /**
      * 앱 하나의 안내. [bookFiles] 는 책 파일 읽기 줄의 보조 글(꼭 필요·표지 등, null 이면 그 줄을 두지 않는다), [todo] 는 앱에서 할 것(비면 `따로 바꿀 것은 없습니다`),
      * [note] 는 알아 둘 것(없으면 그 묶음을 두지 않는다).
+     * 표지는 안드로이드 9·10 이면 [coverBefore11]: 서재 화면에서 자르는 표지는 화면 캡처가 안드로이드 11 부터라 들어오지 않는다
+     * (기본. 책 파일 읽기 줄이 있는 앱은 표지를 책 파일·앱 데이터에서 꺼내 그대로이고, 그 길만 남는 앱만 따로 준다).
      */
     class Info(
         val todo: List<Int>,
-        val cover: Field, val title: Field, val author: Field, val progress: Field, val due: Field,
+        cover: Field, val title: Field, val author: Field, val progress: Field, val due: Field,
         val bookFiles: Int? = null,
         val note: Int? = null,
+        coverBefore11: Field = if (cover.added && bookFiles == null) BEFORE_11 else cover,
     ) {
+        val cover = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) coverBefore11 else cover
+
         val fields get() = listOf(
             R.string.guide_cover to cover, R.string.guide_title to title, R.string.guide_author to author,
             R.string.guide_progress to progress, R.string.guide_due to due,
@@ -74,6 +80,8 @@ internal object ReaderGuide {
     private val OWN_FILE = no(R.string.guide_r_own_file)
     private val MENU = Field(R.string.guide_added_menu)
     private val READING_MENU = yes(R.string.guide_n_reading_menu)
+    /** 안드로이드 9·10 에서 서재 화면에서 자르는 표지(`ReaderWatchService.captureCovers`) */
+    private val BEFORE_11 = no(R.string.guide_r_android11)
 
     /** 자동 추가 안내의 앱들. [ReaderApps.ALL] 을 빠짐없이 덮어야 한다(단위 테스트, 앱을 더하면 여기도) */
     val APPS = listOf(
@@ -123,11 +131,13 @@ internal object ReaderGuide {
             listOf(R.string.guide_t_moon_open),
             cover = yes(R.string.guide_n_moon_cover), title = yes(R.string.guide_n_moon_title), author = YES, progress = YES, due = OWN_FILE,
             bookFiles = R.string.guide_files_cover,
+            coverBefore11 = Field(R.string.guide_added_book_files, R.string.guide_n_moon_cover_before11),
         )),
         App(listOf(R.string.guide_easyview, R.string.guide_cherie), listOf(EasyView, EasyViewFree, CherieViewer), Info(
             listOf(R.string.guide_t_ez_open, R.string.guide_t_ez_bar),
             cover = YES, title = YES, author = Field(R.string.guide_added_epub), progress = YES, due = OWN_FILE,
             bookFiles = R.string.guide_files_cover_info, note = R.string.guide_note_ez,
+            coverBefore11 = Field(R.string.guide_added_book_files, R.string.guide_n_ez_files),
         )),
         App(listOf(R.string.guide_kindle), listOf(Kindle), Info(
             listOf(R.string.guide_t_kindle_menu),
@@ -152,6 +162,7 @@ internal object ReaderGuide {
             cover = yes(R.string.guide_n_readest_cover), title = yes(R.string.guide_n_readest_title), author = yes(R.string.guide_n_readest_author),
             progress = yes(R.string.guide_n_readest_progress), due = OWN_FILE,
             bookFiles = R.string.guide_files_readest, note = R.string.guide_note_readest,
+            coverBefore11 = Field(R.string.guide_added_readest_data),
         )),
     )
 }
