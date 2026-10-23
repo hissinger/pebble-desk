@@ -24,6 +24,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 네오리더 `com.onyx.kreader`(BOOX 기본 리더, 시스템 앱. 내 파일) | `ReaderTab1~4Activity`(책 하나에 탭 하나) | 파일 위치를 알면 `ACTION_VIEW` (미확인) | X (서재는 BOOX 런처 `com.onyx`) | X | 사용자가 둔 곳(공유 저장소) |
 | KOReader `org.koreader.launcher`(F-Droid 판 `org.koreader.launcher.fdroid`. 오픈소스, 내 파일) | X (파일 목록·읽는 화면이 `MainActivity` 하나. 열림·닫힘은 KOReader 가 남기는 파일로) | O (파일 위치를 알면 `ACTION_VIEW` `file://`, 읽던 쪽으로) | X (그냥 열면 마지막 화면) | X | 사용자가 둔 곳(공유 저장소) |
 | Readest `com.bilingify.readest`(Bilingify, 오픈소스 Tauri 앱. 내 파일을 가져와 앱 데이터에 복사) | X (액티비티 하나. 읽는 화면은 웹 화면 안 HTML id `titlebar-close`·`gridcell-<해시>`) | O `readest://book/<해시>`(위젯과 같다, 이어 읽던 쪽으로) | O (그냥 열면 서재) | ? | 기본은 앱 전용 저장소. `데이터 위치 변경` 으로 공유 저장소에 둘 수 있다 |
+| BookFusion `com.bookfusion.android.reader`(내 EPUB·PDF 를 올리거나 스토어에서. 계정 없이도 올려 읽을 수 있다) | `o.getLayoutResId`(EPUB)·`o.writePhotoListTofacebook_common_release`(PDF). 난독화 이름이라 판마다 바뀐다(2.24.0·2.23.15 확인) | X (읽는 화면은 앱 안에서만 열리고, 받는 링크는 로그인 `bookfusion://auth` 뿐) | 그냥 열면 Bookshelf(읽던 책이 떠 있었으면 그 책) | X | 앱 전용 저장소 (미확인) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
 - 사용 기록에는 **앱·화면 이름과 시각만** 남는다. 어떤 책인지는 알 수 없다.
@@ -75,6 +76,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 네오리더(BOOX) | 파일 | 파일 | 파일 | 읽는 화면 | X |
 | KOReader | 파일 | 파일 | 파일 | 파일 | X |
 | Readest | 파일·서재 | 파일·서재·메뉴(목차) | 파일·메뉴(목차) | 파일·메뉴(진행 창)·읽는 화면 | X |
+| BookFusion | 서재·책 상세 | 서재·책 상세 | 서재·책 상세 | 메뉴 | X |
 
 ### 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -258,6 +260,16 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **진행률**: 데이터의 진행률(쪽을 넘길 때마다 바뀐다). 옮기지 않았으면 `읽기 진행 상황` 창을 열 때, 그 뒤로는 쪽을 넘길 때마다 쪽 안내 글자 ÷ 그 창에서 본 전체 쪽. 화면 아래 쪽 표시는 접근성에서 숨겨져 있다.
 - **반납일**: 없다(내 파일).
 - **제약**: 홈에서 책을 누르면 `readest://book/<해시>` 로 그 책을 바로 연다.
+
+### BookFusion `com.bookfusion.android.reader`
+
+- **권한**: 공통.
+- **할 것**: 책은 Bookshelf 화면에서 눌러 연다(`You're currently reading` 줄·격자 보기 칸, 목록 보기 칸은 책 상세의 `Read`). 읽는 중 진행률은 가운데를 눌러 메뉴를 띄워야 들어온다.
+- **표지**: 서재 칸(격자 보기, `You're currently reading` 줄)·책 상세에서 잘라 온다(목록 보기 칸은 읽지 않는다. 그 칸을 누르면 뜨는 상세에서).
+- **제목·저자**: 서재에서 누른 칸, 목록 보기는 그 칸을 누르면 뜨는 책 상세. 읽는 화면에는 제목이 없어 다른 길로 연 책(앱을 다시 열어 이어진 읽는 화면은 앞서 연 책으로 본다)은 알 수 없고, 서재에서 넘어왔는데 누른 칸을 모르면 '책 모름'으로 둔다.
+- **진행률**: 메뉴 아래 줄 오른쪽 끝(`14.5%`). 서재에는 없다.
+- **반납일**: 없다.
+- **제약**: 홈에서 책을 누르면 BookFusion 을 연다(특정 책 바로 열기는 없다). 계정 책 가운데 받지 않은 책은 서재에서 누르면 책 상세의 `Download` → `Read` 로 열고, 그렇게 연 책도 들어온다(표지는 받기 전 상세에서 자른다).
 
 ## 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -619,3 +631,22 @@ Bilingify 의 오픈소스 리더(https://github.com/readest/readest, Tauri). �
   - 책장(≡ 옆 보기 메뉴의 `책장` › `최근 읽은 책` 켬): 서재 위에 캐러셀 줄이 생겨 같은 책 칸이 두 번 보인다. 찍은 뒤 다시 볼 때 제목마다 칸 하나만 맞춰 보아 표지를 자르지 못했던 것을 고쳤다(Readest 만: 그 제목의 칸 가운데 하나와 같으면 자른다. 서비스 공통 확인은 그대로 두고 `ReaderSpec.coverStill` 로 뺐다). 캐러셀 칸을 누르면 클릭 알림이 오지 않는다(격자 칸은 온다).
   - 서재 위에 뜬 설정 창(책장 편집)의 스위치를 누르면 알림의 요소가 책 칸이 아니라 누른 자리로 맞췄더니 그 뒤에 깔린 칸을 누른 것으로 보았다. 누른 요소와 자리가 똑같은 칸만 칸으로 본다.
   - 병렬 읽기(목차 창 ≡ › `Parallel Read`): 두 책이 나란히 뜨면 Pebble Desk 는 먼저 연 책(트리의 첫 `gridcell-`) 하나만 편 책으로 보고 읽은 시간·진행률을 그 책에 적는다(Readest 는 두 쪽을 같이 넘겼다).
+
+### BookFusion `com.bookfusion.android.reader` (2026-10-23, 에뮬레이터 `CremaPebble_A11_Play`(안드로이드 11) · WebView 155, Play 스토어 2.24.1, **지원**)
+
+- **받기·시험 책**: Play 스토어(무료, 인앱 구매). 처음 열면 `Welcome to BookFusion` 창에서 `Later` 로 계정 없이 쓸 수 있고, 내 EPUB 을 올려 읽는다(`ExternalContentActivity` 가 EPUB·PDF 의 `ACTION_VIEW` 를 받는다. `file://` 은 저장소 권한이 없어 열지 못하고, `content://media/…` 로 보내면 Bookshelf 에 들어가며 바로 열린다). 시험 책은 직접 만든 EPUB 두 권(`퓨전 첫 책`·홍길동, `퓨전 둘째 책, 이야기`·김철수, 표지 그림 포함). 계정 책(동기화·받기)은 계정이 없어 보지 못했다.
+- **앱 구조**: 코드가 난독화돼 있다(액티비티·클래스 이름이 `o.getLayoutResId` 같은 다른 라이브러리의 메서드 이름들). 화면: `activities.SplashActivity` → `activities.HomeActivity`(Bookshelf·책 상세·서재 메뉴가 모두 이 안, 일부는 Compose) → 읽는 화면 EPUB `o.getLayoutResId`(조각 `EpubBookFragment`)·PDF `o.writePhotoListTofacebook_common_release`(`PdfBookFragment`), 두 액티비티는 같은 바탕 클래스. 그 밖의 `o.` 액티비티는 업데이트 안내(`o.setExpiresIn`)·로그인(`o.createInstancedefault`)·권한 요청·자격 증명·'Save Article'(`o.getFlushBehavior`)이다. e-ink 모드는 이 시험에서 따로 켜지 않았다.
+- **요소 이름**: 리소스 이름도 줄여 대부분 `패키지:id/`(이름 없음)이고, 남은 것은 `title_text_view`·`cover_image_layout`·`action_button`·`tags_chip_group`·`highlight_text_view` 등 몇 개.
+- **서재(Bookshelf)**: `You're currently reading` 줄(가로 목록)과 `My bookshelf`(목록·격자 보기, `Date` 정렬). 줄·격자 칸은 안드로이드 뷰: 칸 `ViewGroup`(누를 수 있음) 아래 표지 `cover_image_layout`(그림은 Compose 라 그림 요소 없음)·이름 없는 저자 글자·제목 `title_text_view`, 표지 오른쪽 위 칸(받는 중·올리는 중에만 진행 표시가 들어간다, 코드에서 확인), 줄 칸에는 진행 고리와 `Continue`(진행률 글자는 없다). 목록 보기 칸은 Compose: 누를 수 있는 묶음 아래 표지 자리(안에 그림 요소 하나)·저자·제목 글자, 이름 없음. 서재 어디에도 진행률 글자는 없다. `You're currently reading` 줄의 순서는 읽은 순서가 아니다(둘째 책을 마지막에 읽어도 첫 책이 왼쪽).
+- **누름 알림**: 줄·격자 칸은 누르면 `TYPE_VIEW_CLICKED`(누른 요소가 칸이라 제목을 읽을 수 있다). Compose(목록 보기 칸·책 상세의 `Read`)는 손가락으로 누르면 알림이 없다. 줄 칸은 바로 읽는 화면을 열고, 격자·목록 칸은 책 상세(Compose: 뒤로·메뉴 단추, 저자·제목(가장 큰 글자)·`Language`·`Format`·`Size`, `Read` 단추(안에 `Button` 요소), 표지 자리)를 먼저 띄운다. `Read` 를 누르면 상세가 먼저 사라지고 조금 뒤 읽는 화면이 뜬다.
+- **읽는 화면**: 본문은 웹 화면(`HorizontalScrollView` 안, 쪽마다 문단 글자). 제목은 어디에도 없다(목차 창도 Compose 라 글자가 나오지 않는다). 가운데를 누르면 위에 단추(`Back`·`Search`·`Contents`·`Highlights`·`Settings` 설명), 아래에 듣기 단추·막대·장 이름·`3 pages left`(`Last page`)·진행률 `0.0%`·`14.5%`(이름 없는 글자). 설정(`General`·`Advanced`)에 화면 아래 진행률을 늘 보이게 하는 것은 없었다.
+- **책 바로 열기**: 받는 링크는 `bookfusion://auth`(로그인)뿐이고, 읽는 화면은 내보내지 않은 액티비티에 앱 안의 책 객체(Parcelable `book`·`initState`)를 넘겨 연다 → 홈에서는 앱만 연다. 앱을 다시 열면 떠 있던 읽는 화면이 그대로 나온다.
+- **Pebble Desk**(`readers/BookFusion.kt`): 읽는 화면은 깔린 판의 매니페스트에서 `singleTop` + `configChanges` 0x1fb4 인 액티비티(`ReaderSpec.isViewer`, 이름은 보지 않는다. 예전 판의 읽는 화면 이름도 기억해 두어 업데이트 전에 읽은 시간을 업데이트 뒤에 셀 때 쓴다), 서재는 `HomeActivity`. 줄·격자 칸을 누르면 그 칸(`openOnViewer`), 목록 칸·격자 칸 뒤의 책 상세는 1초마다 기억해(`webBook`, 서비스는 사라진 상세를 3초 둔다) 그 뒤 읽는 화면이 열리면 그 책. 모른 채 서재에서 넘어오면 '책 모름'(`clickOnly`). 목록 보기 칸은 읽지 않는다(처음에는 모양으로 읽어 표지를 미리 잘라 두었으나, 책을 열 때 거치는 상세에서 표지·저자를 똑같이 얻어 뺐다). 진행률은 메뉴의 `%` 글자(본문 웹 화면은 훑지 않는다).
+  - 에뮬레이터에서 확인: 줄 칸을 눌러 `퓨전 둘째 책, 이야기 · 김철수` 가 새 책으로 들어가고 메뉴로 16%, 서재로 돌아와 표지(줄 칸에서 자름)가 붙었다. 목록 칸 → 책 상세 → `Read` 로 `퓨전 첫 책 · 홍길동` 이 새 책으로(표지는 상세에서 자름), 격자 칸 → 상세 → `Read` 로 둘째 책이 맨 앞으로(`OPENED` 한 번). 상세의 `Read` 를 기억이 지우던 문제(상세가 사라진 뒤 1초 확인에서 지움)를 고친 뒤 확인했다. 목록 칸만 눌러 상세 없이 넘어가는 길은 없다.
+- **판마다 바뀌는 이름**(2026-10-23, Uptodown 에서 받은 2.24.0·2.23.15. 서명 인증서가 Play 판과 같은 것(`CN=Peng`, SHA-256 `c533c28c…7b26d307`)을 확인하고 씀): 2.24.0 → 2.24.1 같은 작은 판에서도 `o.` 아래 이름이 **모두** 바뀐다. 읽는 화면(EPUB·PDF)은 2.23.15 `o.startlambda1`·`o.CameraEffectTextures`, 2.24.0 `o.onSuccesslambda10`·`o.getCaption`, 2.24.1 `o.getLayoutResId`·`o.writePhotoListTofacebook_common_release`. 그래서 이름을 적지 않는다. 처음에는 `o.` 아래를 모두 읽는 화면으로 봤다가(로그인·업데이트 안내 같은 다른 `o.` 화면도 들어간다), 매니페스트 속성으로 바꿨다: 세 판 모두 읽는 화면 둘만 `launchMode=singleTop`·`configChanges=0x1fb4`(다른 `o.` 화면은 standard·`0x4b4`·`0x5a0` 이나 없음, `HomeActivity` 는 singleInstance·`0xd80`). `activities.HomeActivity`·`SplashActivity`·`externalcontent.ExternalContentActivity` 와 남은 요소 이름(`title_text_view`·`cover_image_layout` 등 8개)은 세 판이 같다(2.23.15 에는 `server.ServerActivity` 가 없다).
+  - 에뮬레이터에서 두 판을 깔아 확인: 2.24.0 은 격자 칸 → 책 상세 → `Read` 로 `퓨전 셋째 책 · 이영희` 가 새 책, 6%. 2.23.15 는 서재에 목록·격자 전환 단추가 없고(격자만) 격자 칸 → 책 상세(2.24.1 과 같은 Compose 화면) → `Read` 로 둘째 책이 맨 앞으로, 8%. 두 판 모두 서비스가 그 판의 읽는 화면 이름을 VIEWER 로 적었다.
+  - 매니페스트 속성으로 바꾼 뒤(2026-10-23) 같은 에뮬레이터에서 2.23.15 를 새로 깔고 2.24.0 → 2.24.1 로 덮어 업데이트하며(자동 추가 서비스는 켠 채) 판마다 `You're currently reading` 칸으로 책을 열었다: 세 판 모두 그 판의 읽는 화면(`startlambda1`·`onSuccesslambda10`·`getLayoutResId`)을 읽는 화면으로 적고 `퓨전 첫 책` 을 맨 앞으로, 메뉴의 진행률(6%·8%·10%)을 적었다. 2.24.1 에서 책을 70초 펴 두니 오늘 읽은 시간이 1분 늘었다(사용 기록 쪽도 같은 판단).
+- **계정**(2026-10-23, 사용자가 에뮬레이터에서 가입·로그인): 서재 머리에 `Welcome <이름>!`, 계정 없이 올린 책은 계정 서재로 올라간다. 책을 길게 누른 메뉴의 `Remove from Device` 로 기기에서만 지우면("서재에는 남고 다시 받을 수 있다") 받지 않은 책이 된다.
+  - 받지 않은 책: 줄·격자 칸 표지에 어두운 막과 오른쪽 위 받기 아이콘(칸의 오른쪽 위 묶음 안 `ImageView`, 누를 수 있음)이 붙고, 목록 보기 칸에는 `Download book` 설명의 단추가 하나 더 붙는다. Pebble Desk 는 줄·격자 칸은 그 묶음에 무엇이 들어 있어 표지를 자르지 않고, 목록 칸은 칸으로 읽지 않는다.
+  - 받지 않은 책은 '지금 읽는 책' 줄에서 눌러도 바로 열리지 않고 책 상세가 뜬다(단추 `Download (157KB)`, 표지는 막 없이 깨끗하다). 받으면 같은 자리 단추가 `Read` 로 바뀐다.
+  - 확인: 둘째 책(목록에 있음)을 기기에서 지우고 줄 칸 → 상세 → `Download` → `Read` 로 열어 맨 앞으로, 진행률 4%(클라우드에서 맞춘 값). 새로 올린 넷째 책을 기기에서 지우고 격자 칸 → 상세 → `Download` → `Read` 로 열어 새 책 `퓨전 넷째 책 · 박민수`, 표지는 막·아이콘 없는 상세의 표지.

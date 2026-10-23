@@ -1,5 +1,7 @@
 package com.woody.pebbledesk.readers
 
+import android.content.Context
+
 /**
  * 읽는 책 자동 추가가 받는 이북 앱들(앱마다 파일 하나). 앱을 더하면 여기와
  * `res/xml/reader_watch.xml` 의 packageNames(시스템이 이 앱들의 화면만 보낸다), 설정 › 독서 › 자동 추가 안내의 앱(`ReaderGuide.APPS`,
@@ -7,7 +9,7 @@ package com.woody.pebbledesk.readers
  */
 object ReaderApps {
     val ALL = listOf(
-        KyoboLibrary, KyoboEbook, KyoboEbookMobile, Millie, MillieMobile, Aladin, Bookers, Ridi, RidiOneStore, Yes24Library, Yes24LibraryMobile, Yes24Ebook, MyYes, MoonReader, MoonReaderPro, EasyView, EasyViewFree, CherieViewer, Kindle, Libby, NeoReader, KOReader, KOReaderFdroid, Readest,
+        KyoboLibrary, KyoboEbook, KyoboEbookMobile, Millie, MillieMobile, Aladin, Bookers, Ridi, RidiOneStore, Yes24Library, Yes24LibraryMobile, Yes24Ebook, MyYes, MoonReader, MoonReaderPro, EasyView, EasyViewFree, CherieViewer, Kindle, Libby, NeoReader, KOReader, KOReaderFdroid, Readest, BookFusion,
     )
 
     val byPackage = ALL.associateBy { it.pkg }
@@ -21,10 +23,8 @@ object ReaderApps {
     /** 이북 앱 패키지(읽고 있는 앱 고르기에서 먼저 보이고, 오늘 읽은 시간을 센다) */
     val packages = byPackage.keys
 
-    private val viewers = ALL.flatMap { it.viewers }.toSet()
-
-    /** [cls](액티비티 전체 이름)가 이 앱들의 읽는 화면인가 */
-    fun isViewer(cls: String) = cls in viewers
+    /** [pkg] 앱의 [cls](액티비티 전체 이름)가 읽는 화면인가([ReaderSpec.isViewer]) */
+    fun isViewer(context: Context, pkg: String, cls: String) = byPackage[pkg]?.isViewer(context, cls) == true
 
     /**
      * 읽는 화면이 보인 동안만 읽은 시간으로 세는 액티비티들: 읽는 화면이 안에 뜨는 서재 액티비티([ReaderSpec.viewerHolder], Libby)와

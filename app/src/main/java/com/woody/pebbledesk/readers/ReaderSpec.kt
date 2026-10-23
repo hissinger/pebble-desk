@@ -16,7 +16,7 @@ open class ReaderSpec(
     val classPrefix: String,
     /** 책 칸이 보이는 화면들(서재·탭·책장 안) */
     val shelves: Set<String>,
-    /** 읽는 화면들. 오늘 읽은 시간에서도 읽는 화면으로 센다([ReaderApps.isViewer]). */
+    /** 읽는 화면들. 오늘 읽은 시간에서도 읽는 화면으로 센다([isViewer]). */
     val viewers: Set<String>,
     /** 서재 칸의 제목(보기 방식마다 이름이 다르면 여럿) */
     val titles: List<String>,
@@ -54,6 +54,11 @@ open class ReaderSpec(
     val eagerCovers: Boolean = false,
     /** 칸을 눌러도 읽는 화면이 열려야 편 것으로 본다(my YES: 누르면 내려받기·기간 만료 안내가 먼저 뜬다. 밀리: 받지 않은 책은 누르면 받기만 한다. YES24 도서관: 칸 안의 받기·반납 단추도 칸 클릭으로 온다) */
     val openOnViewer: Boolean = false,
+    /**
+     * 책을 서재에서 누른 칸으로만 아는 앱(BookFusion: 읽는 화면에 제목이 없다). 서재에서 읽는 화면으로 넘어왔는데 누른 칸을 모르면
+     * (누름 알림이 오지 않는 칸) 책 모름으로 적는다(앞서 편 책에 읽은 시간·진행률을 붙이지 않게)
+     */
+    val clickOnly: Boolean = false,
     /**
      * 누른 요소가 든 칸을 못 찾았을 때 누른 곳 자리의 칸으로 본다. 끄는 앱: my YES(구매목록 창이 책장 위에 겹쳐 뒤 창의 칸을 고를 수 있다),
      * Libby(칸 안의 `책 열기`·`대출 관리` 단추도 칸 자리에 든다)
@@ -95,6 +100,12 @@ open class ReaderSpec(
      */
     val needsBookFiles: Boolean = false,
 ) {
+    /**
+     * [cls](액티비티 전체 이름, 서재 안에 뜨는 읽는 화면은 `<서재 액티비티>#<이름>`)가 읽는 화면인가. 오늘 읽은 시간도 이것으로 센다([ReaderApps.isViewer]).
+     * 기본: [viewers] 에 있다. 액티비티 이름이 판마다 바뀌는(난독화) 앱(BookFusion)은 깔린 판의 매니페스트(액티비티 속성)로 정한다([context] 는 그때 쓴다).
+     */
+    open fun isViewer(context: Context, cls: String): Boolean = cls in viewers
+
     /** 서재에 보이는 책 칸들. 기본: 제목 요소마다 그것이 든 칸을 찾아 읽는다. */
     open fun shelfCells(root: AccessibilityNodeInfo): List<Cell> =
         titles.flatMap { root.byId(pkg, it) }.mapNotNull { title -> cellOf(title)?.let(::readCell) }
