@@ -8,6 +8,15 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.util.LruCache
 import android.view.accessibility.AccessibilityNodeInfo
+import com.woody.pebbledesk.BookShelf
+import com.woody.pebbledesk.HomeSignals
+import com.woody.pebbledesk.OpenSteps
+import com.woody.pebbledesk.Seen
+import com.woody.pebbledesk.ShelfBook
+import com.woody.pebbledesk.ShelfRecorder
+import com.woody.pebbledesk.Target
+import com.woody.pebbledesk.WatchLog
+import com.woody.pebbledesk.hasTitle
 import java.io.File
 import kotlin.math.abs
 
@@ -38,9 +47,14 @@ open class EasyViewSpec(pkg: String) : ReaderApp(
     titles = listOf("txtFileName"), thumbs = listOf("imgFileIcon"), authors = emptyList(), progress = "txtFilePer", due = null,
     viewerProgress = listOf("txtPageInfo_TitleBar"),
     openOnViewer = true,
-    opensBookFile = true,
     needsBookFiles = true,
 ) {
+    override fun newAdapter(): ReaderAdapter = EasyViewReader(this)
+
+    /** 홈에서 그 책의 파일을 바로 연다(`actMain` 이 `file://` 보기를 받는다). 그 파일이 열리면 이 책으로(읽는 화면에 파일 이름만 보인다). 모르거나 지워졌으면 앱을 연다 */
+    override fun open(ctx: HomeContext, book: ShelfBook): OpenResult =
+        ctx.bookFile(book)?.let { path -> OpenResult.File(ctx.component, path, started = { HomeSignals.fileOpened(pkg, book, path) }) } ?: OpenResult.Launch
+
     /**
      * 파일 이름 칸 → 책 파일만, 제목·저자는 EPUB 책 정보가 있으면 그것. 표지 칸은 아래에 겹친 파일 종류 띠(`EPUB`)를 빼고,
      * 글 파일(TXT 등)은 그림이 본문 첫 쪽 미리 보기라 표지로 자르지 않는다. 탭(폴더·최근문서·즐겨찾기)은 옆으로 넘기는 쪽이라
@@ -122,7 +136,7 @@ open class EasyViewSpec(pkg: String) : ReaderApp(
     private val resolved = LruCache<String, String>(RESOLVED_MAX)
 
     /** `#휴대폰/Books/a.epub` → `/storage/emulated/0/Books/a.epub`, `/sdcard/Download/a.epub` → `/storage/emulated/0/Download/a.epub`. 그 밖(네트워크·클라우드 등)은 null */
-    override fun bookFile(context: Context, shown: String): String? {
+    fun bookFile(context: Context, shown: String): String? {
         // 책 파일 읽기를 켜고 끄면 실제 대소문자를 찾는지가 달라진다
         val key = "${BookFiles.canRead(context)}|$shown"
         resolved.get(key)?.let { return it }
@@ -254,10 +268,9 @@ open class EasyViewSpec(pkg: String) : ReaderApp(
     private fun luma(c: Int) = (299 * Color.red(c) + 587 * Color.green(c) + 114 * Color.blue(c)) / 1000
 
     /** ▶(마지막 파일)·마지막 쪽의 다음 파일은 `다시 열겠습니까?`·`다음 파일을 열겠습니까?` 창에 파일 이름·위치를 보인 뒤 연다 */
-    override val confirmsOpen: Boolean get() = true
 
     /** 열기 확인 창(`첫페이지부터 보기` 칸 `chkOpenFirstPage` 가 있는 창)의 위치 `txtFilePath` + 파일 이름 `txtFileName` */
-    override fun openingFile(windows: AppWindows): String? {
+    fun openingFile(windows: AppWindows): String? {
         for (root in windows.all) {
             if (root.byId(pkg, "chkOpenFirstPage").isEmpty()) continue
             val name = root.byId(pkg, "txtFileName").firstNotNullOfOrNull { n -> n.text?.let(::plain)?.takeIf { it.isNotEmpty() } } ?: continue
@@ -357,3 +370,282 @@ object EasyViewFree : EasyViewSpec("com.ezne.easyview.free")
 
 /** 유료판 채리뷰어(Play·원스토어) */
 object CherieViewer : EasyViewSpec("com.ezne.easyview.pro")
+
+/**
+ * 이지뷰어·채리뷰어의 판단과 기억: 서재는 파일 목록이라 책을 제목이 아니라 그 파일로 가른다(폴더가 다르면 이름·제목이 같아도 다른 책,
+ * 서재 칸의 진행률·표지도 그 파일의 책에). 칸을 눌러도 읽는 화면에 그 파일 이름이 보일 때 편 것으로 보고(누른 뒤 다른 앱으로 다른 파일을 열었을 수 있다),
+ * ▶·다음 파일의 열기 확인 창과 홈에서 바로 연 파일도 그렇게 안다. 다른 앱으로 연 파일은 넣지 않는다.
+ */
+class EasyViewReader(private val ev: EasyViewSpec) : ScreenReader(ev) {
+    /** 열기 확인 창(▶·다음 파일)에 보인 파일([Cell.file] 꼴)과 그 때 */
+    private var openingFiles: Pair<String, Long>? = null
+    /** 이 읽는 화면에서 파일 이름마다 정한 책 id(모르면 null. 같은 파일을 보는 동안 판단을 바꾸지 않게) */
+    private var viewerFileBooks: Pair<String, String?>? = null
+    /** 서재에서 누른 파일 칸. 읽는 화면에 그 파일 이름이 보이면 편 것으로 본다 */
+    private var clickedFiles: Cell? = null
+    /** 이번 읽는 화면에서 본 파일 이름(바뀌면 다른 책을 연 것) */
+    private var viewerFiles: String? = null
+
+    override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {
+        // 같은 읽는 화면의 알림이 한 번 더 온 것이면 이 읽는 화면에서 본 파일·누른 칸을 그대로 둔다
+        if (!again) {
+            viewerFiles = null
+            viewerFileBooks = null
+            clickedFiles = null
+        }
+        // 파일 칸은 읽는 화면에 그 파일 이름이 보일 때 편 것으로 본다(누른 뒤 다른 앱으로 다른 파일을 열었을 수 있다)
+        takeClicked(ctx)?.let { cell -> if (cell.file != null) clickedFiles = cell else openCell(ctx, cell) }
+        // 홈에서 바로 연 책의 파일도 그렇게
+        HomeSignals.take(ctx.pkg)?.takeIf { ctx.now - it.second < CLICK_OPEN_MS }?.let { (cell, _) -> if (clickedFiles == null) clickedFiles = cell }
+    }
+
+    /** 열기 확인 창(▶·다음 파일)이 뜨면 그 파일을 기억한다 */
+    override fun onWindow(ctx: AppContext) = rememberOpening(ctx)
+
+    override fun onClick(ctx: AppContext, click: Click) {
+        // 열기 확인 창의 `확인`을 누르는 순간에도 본다(창이 뜰 때 글자가 아직 비어 있었을 수 있다)
+        rememberOpening(ctx)
+        super.onClick(ctx, click)
+    }
+
+    override fun openCell(ctx: AppContext, cell: Cell, at: Long?) = openBook(ctx, cell, at)
+
+    /**
+     * 책을 폈다. 파일 칸([Cell.file])과 읽는 화면의 파일 이름으로 정한 책 [id] 는 제목이 아니라 파일로 책을 가른다([fileBookId]):
+     * 찾기·넣기 뒤 편 책 기록 전에 제목을 책 정보로 바꾸고 그 파일을 적는다(잘라 둔 표지보다 먼저 — EPUB·그림이면 파일에서 원본 표지를 꺼내게).
+     * 잘라 둔 표지는 그 파일 칸의 것만.
+     */
+    private fun openBook(ctx: AppContext, cell: Cell, at: Long? = null, id: String? = null) {
+        val path = cell.file?.let { ev.bookFile(ctx.context, it) }
+        val name = cell.file?.substringAfterLast('/')
+        val fileId = id ?: cell.file?.let { fileBookId(ctx, it, cell.title, path) }
+        val byFile = id != null || cell.file != null
+        ctx.opened(Seen(cell.title, cell.author, cell.progress, cell.due), at, if (byFile) Target.Exact(fileId) else Target.ByTitle,
+            cell.file?.let(::fileCoverKey), object : OpenSteps {
+                override fun found(book: ShelfBook) {
+                    // 파일 이름이 제목이던 책(책 정보가 보이기 전에 넣음)은 이제 칸에 보이는 책 정보의 제목·저자로
+                    if (fileId != null && name != null) retitle(ctx, book, name, cell)
+                    cell.file?.let { rememberShelfFile(ctx, it, path, book) }
+                }
+            })
+        // 그 밖의 표지는 지금(누른 칸이 반전돼 있거나 화면이 넘어가는 중) 찍지 않고, 서재로 돌아와 화면이 멈췄을 때 잘라 온다.
+    }
+
+    /** 서재가 멈췄다: 파일 칸은 파일로 책을 정해 그 책에 진행률을 적고 표지 자리는 그 파일 열쇠로(같은 제목의 다른 폴더 파일에 붙지 않게) */
+    override fun onShelf(ctx: AppContext) {
+        val root = ctx.root ?: return ctx.noWindow()
+        val seen = readShelf(root)
+        ctx.log(WatchLog.Kind.SHELF, "${seen.size}")
+        val lookup = ctx.recorder.lookup
+        val spots = mutableListOf<CoverSpot>()
+        val statuses = mutableListOf<BookShelf.Status>()
+        for (s in seen) {
+            val key = s.file?.let(::fileCoverKey)
+            val book = if (s.file != null) fileBookId(ctx, s.file, s.title, ev.bookFile(ctx.context, s.file))?.let { lookup.get(it) }
+                else lookup.byTitle(s.title)
+            if (book == null) {
+                val thumb = s.thumb?.takeIf(::usableThumb)
+                if (thumb != null && (key?.let { !ctx.recorder.hasPendingCover(it) } ?: !ctx.recorder.hasPendingTitle(s.title))) spots += CoverSpot(s.title, thumb, key = key)
+                continue
+            }
+            statuses += BookShelf.Status(book.id, s.progress, s.due, s.author)
+            if (s.thumb != null && !lookup.hasCover(book.id) && !ShelfRecorder.coverFromFile(ctx.context, lookup.filePath(book.id))) spots += CoverSpot(s.title, s.thumb, book.id, key)
+        }
+        // 서재 한 화면의 진행률을 한 번에 쓴다
+        ctx.recorder.statuses(statuses)
+        ctx.capture(spots)
+    }
+
+    /**
+     * 읽는 화면: 위 줄의 파일 이름([ViewerInfo.file])으로 그 파일로 넣은 책. 처음 보는(바뀐) 파일이면 그때(처음이면 읽는 화면이 열린 때)부터 그 책.
+     * 넣은 적 없는 파일을 ▶·다음 파일로 열었으면 확인 창으로 그 파일을 알 때 넣고, 다른 앱으로 연 파일은 넣지 않고 여기부터 책 모름.
+     */
+    override fun onViewer(ctx: AppContext) {
+        val shown = readShown(ctx) ?: return
+        val recorder = ctx.recorder
+        val lookup = recorder.lookup
+        val shownFile = shown.file?.takeIf { shown.title == null }
+        val fileAt = shownFile?.let { viewerFileAt(ctx, it) }
+        // 서재에서 누른 파일 칸: 그 파일 이름이 보이면 편 것으로 적는다. 열린 직후 앞 파일 이름이 남아 보이는 동안([VIEWER_SWAP_MS])은 기다리고(그때 다시 읽는다),
+        // 그 뒤에도 파일 이름이 한 번도 보이지 않으면(이지뷰어 설정으로 위 줄·파일명을 끔) 누른 칸을 편 것으로, 다른 파일이 보이면 버린다
+        clickedFiles?.let { cell ->
+            val opened = ctx.viewerOpenedAt ?: 0L
+            val wait = opened + VIEWER_SWAP_MS - ctx.now
+            when {
+                fileAt != null && sameFileName(cell.file.orEmpty().substringAfterLast('/'), shownFile.orEmpty()) -> { clickedFiles = null; openBook(ctx, cell, fileAt) }
+                wait > 0 -> ctx.viewerAgain(wait)
+                viewerFiles != null -> clickedFiles = null
+                else -> { clickedFiles = null; openBook(ctx, cell, opened) }
+            }
+        }
+        // 열기 확인 창으로 안 파일(▶·다음 파일). 그 창은 그 뒤 처음 보는 파일에 한 번만 쓴다(같은 이름의 다른 파일을 나중에 열어도 그 파일로 보지 않게)
+        val opening = shownFile?.takeIf { fileAt != null }?.let { openingFor(ctx, it) }?.also { openingFiles = null }
+        // 파일로 정한 책은 제목이 아니라 id 로 다룬다(폴더가 다른 같은 이름·제목의 책과 섞지 않게)
+        val fileBook = shownFile?.let { name ->
+            val decided = viewerFileBooks?.takeIf { fileAt == null && it.first == name }
+            if (decided != null) decided.second else fileGuess(ctx, name, opening, fresh = fileAt != null).also { viewerFileBooks = name to it }
+        }?.let { lookup.bookOf(it) }
+        val fileId = fileBook?.id
+        // 그 책의 파일을 아직 모르면(서재에서 누를 때는 받기 전이던 원격 파일) 이 읽는 화면에서 처음 볼 때, 서재에서 열 때 본 위치로 다시 찾는다
+        if (fileAt != null && fileId != null) lookup.get(fileId)?.takeIf { lookup.filePath(it.id) == null }?.let { book ->
+            shelfFileOf(ctx, book.id)?.let { ev.bookFile(ctx.context, it) }?.let { recorder.setFile(book.id, it); fileInfo(ctx, book, it) }
+        }
+        val info = fileBook?.title?.let { ViewerInfo(it, "", shown.progress) } ?: shown
+        val progress = info.progress
+        if (progress >= 0 || info.title != null || shownFile != null) ctx.log(WatchLog.Kind.PROGRESS, "$progress", info.title ?: shownFile.orEmpty())
+        retryProgress(ctx, progress)
+        if (shownFile != null && fileId == null) {
+            // 넣은 적 없는 파일을 ▶·다음 파일로 열었다: 확인 창으로 그 파일을 알면 서재에서 연 것처럼 넣는다
+            // (실제 경로를 모르면(원격) 확인 창에 보인 위치로. 제목은 파일 이름·그림은 폴더 이름, 읽히는 EPUB 이면 책 정보 [fileInfo])
+            if (opening != null) {
+                viewerFileBooks = null
+                val f = File(opening.path ?: opening.shown)
+                val title = if (isImageFile(f.name)) f.parentFile?.name.orEmpty().trimStart('#') else withoutBookFile(f.name)
+                return openBook(ctx, Cell(title, "", progress, -1, null, Rect(), file = opening.path ?: opening.shown), fileAt)
+            }
+            // 다른 앱으로 연 파일은 넣지 않고 여기부터 책 모름(앞서 편 책에 붙이지 않게)
+            if (fileAt != null && recorder.openedId(ctx.pkg) != null) ctx.unknown(fileAt)
+            return
+        }
+        // 그림 폴더 책은 쪽을 넘기며 보는 그림을 책의 파일로(홈에서 누르면 그 그림부터 연다)
+        if (fileAt != null && fileId != null && isImageFile(shownFile.orEmpty())) lookup.filePath(fileId)?.takeIf(::isImageFile)?.let { cur ->
+            File(File(cur).parentFile, shownFile.orEmpty()).takeIf { it.path != cur && it.isFile }?.let { recorder.setFile(fileId, it.path) }
+        }
+        info.title?.let { title ->
+            // 편 책 기록의 책이 이 책(파일로 정한 책은 id)이면 그 책을 읽는 중이다. 아니면 이 책을 편 것으로 다시 적는다(그래야 그 뒤 시간이 이 책에)
+            if (recorder.recordedBook(ctx.pkg)?.let { if (fileId != null) it.id == fileId else it.hasTitle(title) } != true) {
+                openBook(ctx, Cell(title, info.author, progress, -1, null, Rect()), ctx.unknownOpenAt ?: fileAt, fileId)
+                return
+            }
+        }
+        // 진행률은 편 책 기록의 책에('책 모름'이면 적지 않는다)
+        if (progress < 0) return
+        val book = recorder.recordedBook(ctx.pkg) ?: return
+        recorder.status(book.id, progress)
+    }
+
+    /**
+     * 읽는 화면에 [name] 파일이 보인다: 이 읽는 화면에서 처음 본 파일이면 읽는 화면이 열린 때, 앞서 본 파일과 다르면 지금, 같으면 null.
+     * 이지뷰어는 읽는 화면을 다시 쓸 때 위 줄을 늦게 바꿔 처음에 앞 파일 이름이 보이므로, 열린 지 [VIEWER_SWAP_MS] 안에 바뀌면 열린 때로 본다
+     */
+    private fun viewerFileAt(ctx: AppContext, name: String): Long? {
+        val now = ctx.now
+        val opened = ctx.viewerOpenedAt
+        val before = viewerFiles
+        viewerFiles = name
+        return when (before) {
+            null -> opened ?: now
+            name -> null
+            else -> opened?.takeIf { now - it < VIEWER_SWAP_MS } ?: now
+        }
+    }
+
+    /**
+     * 읽는 화면에 보이는 파일 이름 [name] 의 책 id. 서재에서 눌러 넣은 책만, 확인한 것만 쓰고 짐작하지 않는다(모르면 null, 다른 책에 붙이지 않는다):
+     * - ▶·다음 파일의 열기 확인 창으로 연 파일 [opening] 이면 그 파일로 넣은 책(실제 경로를 모르는 원격 파일은 서재에서 마지막으로 편 파일과 위치·이름이 모두 같을 때)
+     * - 서재에서 눌러 이 읽는 화면을 연 책(그 책을 이 읽는 화면이 열릴 무렵에 폈을 때만, [fresh] 가 아니면 같은 화면에서 이어 읽는 중)이
+     *   그 이름의 파일로 넣은 책이거나, 위치를 모르는 파일로 넣은 책인데 서재에서 마지막으로 편 파일 이름이 이것이면 그 책
+     * 그 밖(다른 앱으로 연 파일, 같은 이름의 책이 한 권 있어도)은 모른다
+     */
+    private fun fileGuess(ctx: AppContext, name: String, opening: Opening?, fresh: Boolean): String? {
+        val lookup = ctx.recorder.lookup
+        if (opening != null) return opening.path?.let(lookup::byPath) ?: lastShelfBook(ctx) { it.equals(opening.shown, ignoreCase = true) }
+        val justOpened = !fresh || (ctx.lastOpenedAt ?: 0L) >= (ctx.viewerOpenedAt ?: Long.MAX_VALUE) - OPENED_SLACK_MS
+        return ctx.recorder.openedId(ctx.pkg)?.takeIf { justOpened }
+            ?.takeIf { it in lookup.idsByFileName(name) || inSameFolder(ctx, it, name) || it == lastShelfBook(ctx) { last -> sameFileName(last.substringAfterLast('/'), name) } }
+    }
+
+    /** 그림 폴더 책 [bookId] 의 폴더에 그림 [name] 이 있다(쪽을 넘기면 읽는 화면 위 줄의 그림 이름이 바뀐다) */
+    private fun inSameFolder(ctx: AppContext, bookId: String, name: String): Boolean =
+        isImageFile(name) && ctx.recorder.lookup.filePath(bookId)?.takeIf(::isImageFile)?.let { File(File(it).parentFile, name).isFile } == true
+
+    /** 이 앱 서재에서 마지막으로 편 파일이 [bookId] 책이면 그 파일(화면에 보인 위치 + 이름) */
+    private fun shelfFileOf(ctx: AppContext, bookId: String): String? =
+        ctx.prefs.getString("shelf_file_${ctx.pkg}", null)?.takeIf { ctx.prefs.getString("shelf_book_${ctx.pkg}", null) == bookId }
+
+    /** 이 앱 서재에서 마지막으로 편 파일(화면에 보인 위치 + 이름)이 [matches] 이고 그 책의 파일(실제 경로)을 모르면 그 책의 id */
+    private fun lastShelfBook(ctx: AppContext, matches: (String) -> Boolean): String? {
+        ctx.prefs.getString("shelf_file_${ctx.pkg}", null)?.takeIf(matches) ?: return null
+        return ctx.prefs.getString("shelf_book_${ctx.pkg}", null)?.takeIf { ctx.recorder.lookup.filePath(it) == null }
+    }
+
+    /** 열기 확인 창에 보인 파일을 기억한다([EasyViewSpec.openingFile]) */
+    private fun rememberOpening(ctx: AppContext) {
+        ev.openingFile(ctx.windows())?.let { openingFiles = it to ctx.now }
+    }
+
+    /** 열기 확인 창으로 연 파일: 창에 보인 위치 + 이름 [shown](이름은 읽는 화면의 실제 이름)과 실제 경로 [path](원격 등 모르면 null) */
+    private class Opening(val shown: String, val path: String?)
+
+    /** 조금 전 열기 확인 창에 보인 파일의 이름이 [name] 이면 그 파일 */
+    private fun openingFor(ctx: AppContext, name: String): Opening? {
+        val (shown, at) = openingFiles ?: return null
+        // 창을 본 뒤 곧 열린 파일만(확인을 누르고 읽는 화면이 열리기까지)
+        if (at < (ctx.viewerOpenedAt ?: 0L) - OPENING_MS || ctx.now - at > CLICK_OPEN_MS) return null
+        val shownName = shown.substringAfterLast('/')
+        if (!sameFileName(shownName, name)) return null
+        // 확인 창의 이름은 목록처럼 대소문자가 바뀌어 보일 수 있어, 같은 이름이면 읽는 화면 위 줄의 이름(실제 이름)으로
+        val real = if (shownName.equals(name, ignoreCase = true)) shown.dropLast(shownName.length) + name else shown
+        return Opening(real, ev.bookFile(ctx.context, real))
+    }
+
+    /**
+     * 파일 목록인 서재(이지뷰어)에서 [shown] 파일([Cell.file], 실제 경로 [path])로 [book] 을 폈다: 실제 경로를 알면 책의 파일로 적고(읽는 화면의 파일 이름으로
+     * 찾고, EPUB 표지·책 정보를 꺼내고, 홈에서 바로 연다), 그 파일 이름을 이 앱에서 마지막으로 편 책으로 둔다(실제 경로를 모르는 파일도 읽는 화면에서 알아보게)
+     */
+    private fun rememberShelfFile(ctx: AppContext, shown: String, path: String?, book: ShelfBook) {
+        // 이미 다른 파일이 적힌 책(제목이 같은 다른 파일)의 경로는 덮어쓰지 않는다
+        path?.takeIf { p -> ctx.recorder.lookup.filePath(book.id)?.equals(p, ignoreCase = true) != false }
+            ?.let { ctx.recorder.setFile(book.id, it); fileInfo(ctx, book, it) }
+        ctx.prefs.edit().putString("shelf_file_${ctx.pkg}", shown).putString("shelf_book_${ctx.pkg}", book.id).apply()
+    }
+
+    /**
+     * 파일 이름이 제목인 책(책 정보가 보이지 않던 칸: 받기 전의 원격 파일·격자 보기·TXT 등)은 그 파일이 읽히는 EPUB 이면 책 정보의 제목·저자로 바꾼다.
+     * 앱이 보이던 제목(파일 이름)은 [ShelfBook.seenTitle] 로 남아 서재 칸·편 책 기록과 계속 맞는다([BookShelf.setTitle]).
+     */
+    private fun fileInfo(ctx: AppContext, book: ShelfBook, path: String) {
+        // 사용자가 고친 제목(앱이 보인 제목과 다르다)은 두고, 파일 이름이 제목인 책만
+        if (book.seenTitle.isNotEmpty() && book.seenTitle != book.title) return
+        if (!book.title.equals(withoutBookFile(File(path).name), ignoreCase = true) || !BookFiles.canRead(ctx.context)) return
+        val epub = BookFiles.epub(path) ?: return
+        if (epub.title.isNotBlank()) ctx.recorder.setTitle(book.id, epub.title)
+        if (book.author.isEmpty() && epub.author.isNotBlank()) ctx.recorder.setAuthor(book.id, epub.author)
+    }
+
+    /**
+     * 파일 [name] 으로 넣은 책 [book] 의 제목이 그 파일 이름이면(받기 전의 원격 파일·격자 보기에서 넣음) 서재 칸 [cell] 에 보이는 책 정보의 제목·저자로 바꾼다.
+     * 앱이 보이던 제목(파일 이름)은 [ShelfBook.seenTitle] 로 남는다
+     */
+    private fun retitle(ctx: AppContext, book: ShelfBook, name: String, cell: Cell) {
+        val stem = withoutBookFile(name)
+        if (!book.title.equals(stem, ignoreCase = true) || cell.title.equals(stem, ignoreCase = true)) return
+        ctx.recorder.setTitle(book.id, cell.title)
+        if (book.author.isEmpty() && cell.author.isNotEmpty()) ctx.recorder.setAuthor(book.id, cell.author)
+    }
+
+    /**
+     * 파일 칸(파일 목록인 서재, 이지뷰어)에 보인 파일 [shown](제목 [title], 실제 경로 [path])의 책 id. 폴더가 다르면 이름·제목이 같아도 다른 책이다
+     * (`만화A/01.zip`·`만화B/01.zip`): 실제 경로를 알면 그 파일로 넣은 책, 없으면 제목이 같고 파일이 적히지 않은 책(파일을 적기 전에 넣은 책).
+     * 실제 경로를 모르면(원격 등) 제목이 같고 파일이 적히지 않은 책, 없으면 서재에서 마지막으로 편 파일과 위치·이름이 모두 같은 책.
+     * 읽고 있는 책이 먼저, 없으면 나간 책(지운 책은 빼고). 없으면 null(새 책)
+     */
+    private fun fileBookId(ctx: AppContext, shown: String, title: String, path: String?): String? {
+        val lookup = ctx.recorder.lookup
+        path?.let(lookup::byPath)?.let { return it }
+        return lookup.withoutFile(title)
+            ?: if (path == null) lastShelfBook(ctx) { it.equals(shown, ignoreCase = true) } else null
+    }
+
+    /** 파일 칸에서 잘라 둔 표지의 열쇠(제목이 아니라 그 파일) */
+    private fun fileCoverKey(shown: String) = "file:" + shown.lowercase()
+
+    companion object {
+        /** 열기 확인 창을 본 뒤 이만큼 안에 열린 읽는 화면만 그 창의 파일로 본다 */
+        private const val OPENING_MS = 30_000L
+        /** 읽는 화면이 열린 뒤 위 줄의 파일 이름이 이만큼 안에 바뀌면 앞 파일 이름이 남아 있던 것 */
+        private const val VIEWER_SWAP_MS = 5_000L
+        /** 서재에서 눌러 연 책은 읽는 화면이 열리기 조금 전에 편 것으로 적힐 수 있다 */
+        private const val OPENED_SLACK_MS = 5_000L
+    }
+}

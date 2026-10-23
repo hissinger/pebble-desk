@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
-import com.woody.pebbledesk.HomeSignals
 import com.woody.pebbledesk.ShelfBook
 
 /**
@@ -75,8 +74,6 @@ open class ReaderApp(
      * 요소 이름이 아니라 웹 화면 안의 HTML id 로 가르는 앱(Readest, [showsViewer] 를 바꾼다)은 읽는 화면의 이름일 뿐이다.
      */
     val viewerHolder: String? = null,
-    /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([bookFile] 으로 안 경로)을 바로 여는 앱(이지뷰어). 파일을 모르면 앱을 연다. */
-    val opensBookFile: Boolean = false,
     /**
      * 내 파일을 열지만 어느 파일인지 내놓지 않는 앱(문리더): 읽는 화면 제목으로 안 책의 표지가 없으면 저장소에서 그 제목의 EPUB 을 찾아
      * 그 책의 파일로 적는다(표지는 그릴 때 그 파일에서 꺼낸다). 책 파일 읽기를 허용했을 때만([BookFiles.canRead]).
@@ -148,22 +145,10 @@ open class ReaderApp(
     open fun bookFiles(context: Context, titles: Collection<String>): List<String> = emptyList()
 
     /**
-     * 서재 칸의 파일([Cell.file], 화면에 보이는 위치 + 파일 이름) → 실제 경로(그 책의 파일로 적어 두어 읽는 화면의 파일 이름으로 찾고,
-     * EPUB 표지를 꺼내고, 홈에서 바로 연다). 모르면 null. 기본: null
-     */
-    open fun bookFile(context: Context, shown: String): String? = null
-
-    /**
      * 서재 칸에서 자른 그림 [crop] 이 이북 앱이 표지 대신 그리는 기본 그림(파일 종류 아이콘 등)인가. 그러면 표지로 두지 않는다
      * (표지는 한 번 붙으면 다시 찍지 않으므로, 진짜 표지가 보일 때 자르게). 화면 스레드가 아닌 곳에서 부른다. 기본: 아니다
      */
     open fun placeholderCover(context: Context, crop: Bitmap): Boolean = false
-
-    /** 책을 열기 전에 확인 창으로 그 파일을 보이는 앱(이지뷰어 ▶·다음 파일). 그 창이 뜰 때·누를 때 [openingFile] 을 읽는다 */
-    open val confirmsOpen: Boolean get() = false
-
-    /** 확인 창에 보이는 열 파일([Cell.file] 과 같은 꼴: 위치 + 파일 이름). 없으면 null */
-    open fun openingFile(windows: AppWindows): String? = null
 
     /** 읽는 화면 제목을 찾을 요소 이름들(앞에서부터, 글자가 있는 것). 기본: [viewerTitle] 하나 */
     protected open val viewerTitleIds: List<String> get() = listOfNotNull(viewerTitle)
@@ -208,17 +193,8 @@ open class ReaderApp(
     /** 시작하기의 책 파일 읽기 앱 순서(켜야 책이 들어오는 앱(KOReader)이 앞에) */
     open val fileOrder: Int get() = 1
 
-    /**
-     * 홈에서 이 책을 연다. 책 파일을 바로 여는 앱은 그 파일, 그 밖은 앱. 옮기는 동안 기본은 예전 `AppStore.openBook` 의 갈래 그대로
-     */
-    open fun open(ctx: HomeContext, book: ShelfBook): OpenResult {
-        // 지워진 파일이면(읽을 수 있을 때만 안다) 앱을 연다
-        if (opensBookFile) ctx.bookFile(book)?.let { path ->
-            // 읽는 화면에 파일 이름만 보이는 앱(이지뷰어)은 그 파일이 열리면 이 책으로
-            return OpenResult.File(ctx.component, path, started = { HomeSignals.fileOpened(pkg, book, path) })
-        }
-        return OpenResult.Launch
-    }
+    /** 홈에서 이 책을 연다. 기본: 앱을 연다(책 파일·링크로 바로 여는 앱은 그 앱 파일에서 바꾼다) */
+    open fun open(ctx: HomeContext, book: ShelfBook): OpenResult = OpenResult.Launch
 
     /** 서재 편집 중인가([shelfEditing]) */
     fun editing(root: AccessibilityNodeInfo): Boolean = shelfEditing?.let { root.byId(pkg, it).isNotEmpty() } == true
