@@ -1,107 +1,18 @@
 package com.woody.pebbledesk.readers
 
-import android.graphics.Rect
-import android.view.accessibility.AccessibilityNodeInfo
-import com.woody.pebbledesk.BookShelf
 import com.woody.pebbledesk.Seen
-import com.woody.pebbledesk.ShelfRecorder
 import com.woody.pebbledesk.WatchLog
 import com.woody.pebbledesk.hasTitle
 import com.woody.pebbledesk.normTitle
-import com.woody.pebbledesk.sameTitle
 import java.io.File
 
 /**
  * 옮기는 동안만 쓰는 어댑터(docs/reader-adapter-plan.md 3단계 `Legacy`): 아직 그 앱 파일로 옮기지 않은 특수 앱의 처리를
- * 예전 서비스 코드 그대로, [ReaderApp] 의 표시(`recent`·`searchesBookFile`)로 갈라 둔다.
- * 표시가 없는 앱에는 바탕 [ScreenReader] 와 같다. 특수 앱을 하나씩 옮기며(4단계) 그 앱의 갈래·기억을 여기서 지운다.
+ * 예전 서비스 코드 그대로, [ReaderApp] 의 표시(`searchesBookFile`)로 갈라 둔다. 표시가 없는 앱에는 바탕 [ScreenReader] 와 같다.
  */
 open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
-    private var lastRecentRead = 0L
     /** 저장소에서 책 파일을 찾아 본 책(정리한 제목, [searchFile]). 서비스가 살아 있는 동안 한 권에 한 번만 */
     private val fileSearched = mutableSetOf<String>()
-    /** 서재에서 읽는 화면으로 갔다 왔다(서재의 '최근 읽은 책' 줄로 어떤 책인지 안다) */
-    private var readSince = false
-    /** 서재를 떠나 읽는 화면이 처음 열린 때 */
-    private var readerAt: Long? = null
-    /** 읽는 화면 메뉴로 이미 책을 알았다('최근 읽은 책' 줄은 늦게 바뀌어 다시 보지 않는다) */
-    private var readKnown = false
-    /** 서재로 돌아왔는데 '최근 읽은 책' 줄이 아직 읽으러 가기 전 그대로다(바뀌기를 기다린다) */
-    private var recentWait = false
-
-    // ── 화면 ──
-
-    override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {
-        val now = ctx.now
-        // 서재를 떠나 처음 연 읽는 화면의 때만 적는다(읽는 중 목차 같은 다른 화면에 갔다 와도 처음부터 그 책으로 세게).
-        // 줄이 바뀌기를 기다리다 서재에서 다시 읽으러 갔으면 이번 책의 때로 다시 적는다.
-        if (app.recent != null && ((!readSince).also { readSince = true } || recentWait.also { recentWait = false })) readerAt = now
-        takeClicked(ctx)?.let { openCell(ctx, it) }
-    }
-
-    // ── 서재 ──
-
-    override fun onShelfLive(ctx: AppContext, force: Boolean) {
-        // 서재를 잠깐만 보고 책으로 넘어가도 읽으러 가기 전의 '최근 읽은 책' 줄을 알도록 멈추기를 기다리지 않는다(1초에 한 번).
-        val now = ctx.now
-        if (force || now - lastRecentRead >= THROTTLE_MS) {
-            lastRecentRead = now
-            ctx.root?.let { rememberRecent(ctx, it) }
-        }
-        super.onShelfLive(ctx, force)
-    }
-
-    /**
-     * 서재 화면이 멈췄다: 책 칸을 눌러도 알림이 오지 않는 앱(알라딘)의 '최근 읽은 책' 줄로 방금 읽은 책을 안 뒤 바탕([ScreenReader.onShelf])과 같이.
-     */
-    override fun onShelf(ctx: AppContext) {
-        val root = ctx.root ?: return ctx.noWindow()
-        val seen = readShelf(root)
-        ctx.log(WatchLog.Kind.SHELF, "${seen.size}")
-        // 책 칸을 눌러도 알림이 오지 않는 앱(알라딘): 읽는 화면에서 돌아오면 서재 아래 '최근 읽은 책'이 방금 편 책이다.
-        // 그 줄이 읽으러 가기 전 그대로(모르면 그대로로 본다)면 믿지 않고 바뀌기를 기다린다: 알라딘은 줄을 늦게 바꾸고, 내 파일(PDF 등)은 줄에 오르지 않는다.
-        val recent = app.recentTitle(root)
-        if (readSince) {
-            if (readKnown) {
-                readKnown = false
-                readSince = false
-            } else if (recent != null && recentBefore(ctx).let { it == null || it == recent }) {
-                // 몰랐으면 처음 본 줄을 읽으러 가기 전의 줄로 적어 둔다(그래야 바뀌면 알아본다).
-                setRecentBefore(ctx, recent)
-                if (!recentWait) {
-                    recentWait = true
-                    ctx.log(WatchLog.Kind.RECENT_WAIT, recent)
-                }
-            } else recent?.let { title ->
-                readSince = false
-                recentWait = false
-                openCell(ctx, seen.firstOrNull { sameTitle(it.title, title) } ?: Cell(title, "", -1, -1, null, Rect()), readerAt)
-            }
-        }
-        rememberRecent(ctx, root)
-        val spots = mutableListOf<CoverSpot>()
-        shelfStatuses(ctx, seen, spots)
-        if (!app.secure) ctx.capture(spots)
-    }
-
-    /** 읽으러 가기 전에 본 서재의 '최근 읽은 책'([ReaderApp.recent]) */
-    private fun recentBefore(ctx: AppContext) = ctx.prefs.getString("recent_${ctx.pkg}", null)
-
-    /** [title] 이 null 이면 지운다(모른다) */
-    private fun setRecentBefore(ctx: AppContext, title: String?) {
-        if (recentBefore(ctx) != title) ctx.prefs.edit().putString("recent_${ctx.pkg}", title).apply()
-    }
-
-    /**
-     * 읽으러 가기 전의 '최근 읽은 책' 줄을 적어 둔다(돌아와 아직 기다리는 동안은 고치지 않는다).
-     * 줄이 안 보이면(아직 안 그려짐) 지운다: 앞서 적은 줄과 비교하면 그사이 바뀐 줄을 방금 편 책으로 잘못 본다.
-     */
-    private fun rememberRecent(ctx: AppContext, root: AccessibilityNodeInfo) {
-        if (app.recent == null || readSince) return
-        setRecentBefore(ctx, app.recentTitle(root))
-    }
-
-    // ── 읽는 화면 ──
 
     override fun onViewer(ctx: AppContext) {
         val shown = readShown(ctx) ?: return
@@ -110,12 +21,8 @@ open class LegacyReader(app: ReaderApp) : ScreenReader(app) {
         logShown(ctx, shown)
         retryProgress(ctx, progress)
         shown.title?.let { title ->
-            // '최근 읽은 책' 줄로 아는 앱은 서재를 떠난 뒤 메뉴로 처음 안 책은 앞서 편 책과 같아도 편 것으로 본다(맨 앞으로).
-            // 같은 책을 다시 읽으면 그 줄이 그대로라 서재로 돌아와서는 알 수 없다.
-            val first = readSince && (!readKnown).also { readKnown = true }
-            // 편 책 기록의 책이 이 제목의 읽고 있는 책이면 그 책을 읽는 중이다(같은 제목의 책이 여럿이어도 목록 순서로 다른 책으로 바꾸지 않는다).
-            // 아니면(서비스가 꺼졌다 켜져 '책 모름'·다른 책·책 id 없는 옛 줄·그 책이 목록에 없음) 이 제목의 책을 편 것으로 다시 적는다(그래야 그 뒤 시간이 이 책에)
-            val opened = first || recorder.recordedBook(ctx.pkg)?.hasTitle(title) != true
+            // 편 책 기록의 책이 이 제목의 읽고 있는 책이면 그 책을 읽는 중이다. 아니면 이 제목의 책을 편 것으로 다시 적는다(그래야 그 뒤 시간이 이 책에)
+            val opened = recorder.recordedBook(ctx.pkg)?.hasTitle(title) != true
             if (opened) ctx.opened(Seen(title, shown.author, progress), ctx.unknownOpenAt)
             if (app.searchesBookFile) searchFile(ctx, title, shown.author)
             if (opened) return

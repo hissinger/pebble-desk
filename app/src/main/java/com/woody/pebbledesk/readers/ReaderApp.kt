@@ -45,8 +45,6 @@ open class ReaderApp(
     val viewerPages: Pair<String, String>? = null,
     /** 쪽으로 셈한 진행률을 올림한다(서재에 보이는 % 와 맞추려고. 북커스는 1/368쪽을 1% 로 보인다) */
     val pagesRoundUp: Boolean = false,
-    /** 서재 화면의 '최근 읽은 책' 제목(책 칸을 눌러도 알림이 오지 않는 앱. 읽는 화면에서 돌아오면 이것이 방금 편 책) */
-    val recent: String? = null,
     /**
      * 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스): 멈추기를 기다리지 않고 표지를 잘라 둔다(멈췄을 때는 모든 앱이 자른다).
      * 밀리는 앱을 다시 열 때 잠깐 칸을 다른 책으로 채우므로 쓰지 않는다.
@@ -193,10 +191,6 @@ open class ReaderApp(
 
     /** 서재 편집 중인가([shelfEditing]) */
     fun editing(root: AccessibilityNodeInfo): Boolean = shelfEditing?.let { root.byId(pkg, it).isNotEmpty() } == true
-
-    /** 서재의 '최근 읽은 책' 제목([recent], 없으면 null) */
-    fun recentTitle(root: AccessibilityNodeInfo): String? =
-        recent?.let { id -> root.byId(pkg, id).firstOrNull()?.text?.let(::plain)?.takeIf { it.isNotEmpty() } }
 
     /**
      * 누른 책 칸. 이벤트로 받은 요소는 위(부모)로 올라갈 수 없어서, 그 앱의 창(맨 앞 창부터)을 한 번 훑어 누른 요소를 찾고
