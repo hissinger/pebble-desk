@@ -18,12 +18,13 @@ shot() { a exec-out screencap -p > "$OUT/$1.png"; }
 home() { key KEYCODE_HOME "${1:-4}"; }
 a shell input keyevent KEYCODE_WAKEUP
 a shell svc power stayon true
+# 중간에 멈춰도 화면 켜 두기를 되돌린다
+trap 'adb shell svc power stayon false </dev/null' EXIT
 home 3
 "$HERE/watch-snap.sh" "$OUT/before" >/dev/null
 source "$HERE/watch-flows/$FLOW.sh"
 # 자동 추가 기록은 몇 초 늦게 저장한다
 sleep 6
 "$HERE/watch-snap.sh" "$OUT/after" >/dev/null
-a shell svc power stayon false
 python3 "$HERE/watch-norm.py" "$OUT/after" "$OUT/before" > "$OUT/diff.txt"
 cat "$OUT/diff.txt"

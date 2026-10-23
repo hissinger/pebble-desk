@@ -10,11 +10,13 @@ P=com.woody.pebbledesk
 DD=/data/user_de/0/$P
 mkdir -p "$OUT"
 a() { adb "$@" </dev/null; }
-a exec-out run-as $P cat $DD/databases/pebble.db > "$OUT/pebble.db"
-# WAL 에만 있는 쓰기도 가져온다
-a exec-out run-as $P cat $DD/databases/pebble.db-wal > "$OUT/pebble.db-wal" 2>/dev/null || rm -f "$OUT/pebble.db-wal"
-a exec-out run-as $P cat $DD/files/watch_log.txt > "$OUT/watch_log.txt" 2>/dev/null || true
-a exec-out run-as $P cat $DD/shared_prefs/reader_watch.xml > "$OUT/reader_watch.xml" 2>/dev/null || true
+# exec-out 은 없는 파일이어도 오류 글을 내보내므로 있는 것만 가져온다
+pull() { if a shell run-as $P test -f "$DD/$1"; then a exec-out run-as $P cat "$DD/$1" > "$OUT/$2"; else rm -f "$OUT/$2"; fi; }
+# DB 는 WAL·shm 과 한 번에(따로 가져오면 그사이 체크포인트로 WAL 이 맞지 않아 마지막 쓰기가 빠진다)
+rm -rf "$OUT/db"; mkdir -p "$OUT/db"
+a exec-out run-as $P sh -c "cd $DD/databases && tar cf - pebble.db*" | tar xf - -C "$OUT/db"
+pull files/watch_log.txt watch_log.txt
+pull shared_prefs/reader_watch.xml reader_watch.xml
 a exec-out run-as $P ls $DD/files/books > "$OUT/covers.txt" 2>/dev/null || true
 python3 "$(dirname "$0")/watch-norm.py" "$OUT" > "$OUT/summary.txt"
 echo "$OUT/summary.txt"

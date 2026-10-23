@@ -7,14 +7,19 @@
 책 id 는 매번 달라 제목으로 바꿔 적는다. 같은 시험 순서의 두 결과(옮기기 전·뒤)의 요약이 같으면 동작이 같다.
 """
 import os
+import shutil
 import sqlite3
+import tempfile
 import sys
 import xml.etree.ElementTree as ET
 
 
 def load(folder):
-    db = os.path.join(folder, "pebble.db")
-    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True) if not os.path.exists(db + "-wal") else sqlite3.connect(db)
+    # 가져온 것을 바꾸지 않게(WAL 을 읽으면 체크포인트로 합쳐진다) 사본에서 읽는다
+    tmp = tempfile.mkdtemp()
+    for f in os.listdir(os.path.join(folder, "db")):
+        shutil.copy(os.path.join(folder, "db", f), tmp)
+    con = sqlite3.connect(os.path.join(tmp, "pebble.db"))
     q = lambda s: con.execute(s).fetchall()
     titles = {i: t for i, t in q("SELECT id, title FROM shelf UNION ALL SELECT id, title FROM past")}
     files = dict(q("SELECT book_id, path FROM book_file"))
@@ -68,7 +73,7 @@ SKIP = {"FIRST_EVENT", "CONNECTED", "UNBOUND", "DESTROYED", "OTHER_WINDOW"}
 def main():
     cur = load(sys.argv[1])
     before = load(sys.argv[2]) if len(sys.argv) > 2 else None
-    since = max([r[0] for r in before["log"]] + [r[0] for r in before["opens"]] + [0]) if before else 0
+    since = max([r[0] for r in before["log"]] + [0]) if before else 0
     print("# 읽고 있는 책(앞에서부터)" + (" — 앞 결과에서 바뀐 것" if before else ""))
     old = {b["id"]: book_line(before, b) for b in before["shelf"]} if before else {}
     old_order = [b["id"] for b in before["shelf"]] if before else []
@@ -87,14 +92,18 @@ def main():
     for p in cur["past"]:
         if p["id"] not in old_past:
             print(f"- {p['title']}{' (지움)' if p['hidden'] else ''}")
+    # 편 책 기록·열림 표시는 읽는 화면이 열린 때로 거슬러 적기도 해 때가 아니라 앞 결과에 없던 줄로 고른다
+    old_opens = set(before["opens"]) if before else set()
+    old_marks = set(before["marks"]) if before else set()
     print("# 편 책 기록")
-    for at, pkg, title, bid in cur["opens"]:
-        if at > since:
+    for row in cur["opens"]:
+        if row not in old_opens:
+            _, pkg, title, bid = row
             print(f"- {short(pkg)} | {title or '(책 모름)'} | {name(cur, bid)}")
     print("# 열림 표시")
-    for at, pkg, shown in cur["marks"]:
-        if at > since:
-            print(f"- {short(pkg)} | {'열림' if shown else '닫힘'}")
+    for row in cur["marks"]:
+        if row not in old_marks:
+            print(f"- {short(row[1])} | {'열림' if row[2] else '닫힘'}")
     print("# 자동 추가 기록")
     for at, kind, pkg, arg, detail in cur["log"]:
         if at > since and kind not in SKIP:
