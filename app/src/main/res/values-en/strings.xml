@@ -274,6 +274,7 @@
     <string name="guide_ko">KOReader</string>
     <string name="guide_readest">Readest</string>
     <string name="guide_bookfusion">BookFusion</string>
+    <string name="guide_woojoo">Woojoo</string>
     <string name="guide_permissions">Permissions</string>
     <string name="guide_todo">In the app</string>
     <string name="guide_todo_none">Nothing to change.</string>
@@ -346,8 +347,13 @@
     <string name="guide_note_readest">Tapping the book on the home screen opens it in Readest directly.</string>
     <string name="guide_n_bookfusion_title">Only for books opened from Bookshelf</string>
     <string name="guide_t_bookfusion_shelf">Open books from the Bookshelf screen. The reading screen shows no title, so books opened another way can\'t be recognized.</string>
+    <string name="guide_t_woojoo_open">Open books from My Library. Books opened another way, and PDFs or comics, come in when you tap the middle to open the menu while reading (right away if you allow reading book files).</string>
+    <string name="guide_n_woojoo_progress">While reading, added if you allow reading book files or open the menu</string>
+    <string name="guide_n_woojoo_cover">PDFs and comics only if you allow reading book files</string>
+    <string name="guide_files_woojoo">opened book, covers, progress</string>
+    <string name="guide_note_woojoo">If you allow reading book files, tapping the book on the home screen opens its file in Woojoo.</string>
     <string name="book_files">Read book files</string>
-    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For Readest, the cover, author and progress are read from its data folder (Readest/Books) once you move its data location to \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601). For NeoReader and Moon+ Reader, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
+    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For Readest, the cover, author and progress are read from its data folder (Readest/Books) once you move its data location to \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601). For Woojoo, the book you open and your progress are known from the records Woojoo keeps (the Woojoo folder) without opening the menu, and PDFs and comics take their cover from there. For NeoReader, Moon+ Reader and Woojoo, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
     <string name="open_file_access">Open All files access</string>
     <string name="file_notice_title">Turn on Read\u00A0book\u00A0files to get %s book info</string>
     <string name="file_notice_desc">Info such as book covers and titles is read from the files.</string>

@@ -418,8 +418,9 @@ class ReaderWatchService : AccessibilityService() {
         if (fileAt != null && fileId != null) BookShelf.get(this, fileId)?.takeIf { BookShelf.filePath(this, it.id) == null }?.let { book ->
             shelfFileOf(spec, book.id)?.let { spec.bookFile(this, it) }?.let { BookShelf.setFilePath(this, book.id, it); fileInfo(book, it) }
         }
-        // 파일로만 여는 앱(네오리더)은 그 책의 파일을 알 때만 넣는다(메뉴 제목만으로 넣으면 홈에서 열 수 없다)
-        val info = file?.let { ViewerInfo(knownTitle(it), it.author, shown.progress) } ?: fileTitle?.let { ViewerInfo(it, "", shown.progress) }
+        // 파일로만 여는 앱(네오리더)은 그 책의 파일을 알 때만 넣는다(메뉴 제목만으로 넣으면 홈에서 열 수 없다).
+        // 진행률이 화면에 안 보이면 그 앱 데이터의 것(우주 [ReaderSpec.fileData]: 책을 열 때 적는다)
+        val info = file?.let { ViewerInfo(knownTitle(it), it.author, shown.progress.takeIf { p -> p >= 0 || !spec.fileData } ?: it.progress) } ?: fileTitle?.let { ViewerInfo(it, "", shown.progress) }
             ?: if (spec.fileViewer != null) ViewerInfo(null, "", shown.progress) else shown
         val progress = info.progress
         if (progress >= 0 || info.title != null || shownFile != null) WatchLog.add(this, WatchLog.Kind.PROGRESS, spec.pkg, "$progress", info.title ?: shownFile.orEmpty())
@@ -468,10 +469,32 @@ class ReaderWatchService : AccessibilityService() {
             else if (spec.searchesBookFile) searchFile(spec, title, info.author)
             if (opened) return
         }
-        if (progress < 0) return
-        // 진행률은 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다)
+        // 진행률은 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다).
+        // 화면에 진행률이 없으면 그 책 파일의 것을 그 앱 데이터에서(우주: 메뉴·상태 줄 없이 읽는 동안, [ReaderSpec.fileData]). 표지가 없으면 그것도
+        if (progress < 0 && !spec.fileData) return
         val book = recordedBook(spec) ?: return
-        BookShelf.updateStatus(this, book.id, progress, -1)
+        val path = if (spec.fileData) BookShelf.filePath(this, book.id) else null
+        path?.let { dataCover(spec, book.id, it) }
+        if (progress >= 0) return BookShelf.updateStatus(this, book.id, progress, -1)
+        val p = path?.let { spec.fileProgress(this, it) }?.takeIf { it >= 0 } ?: return
+        WatchLog.add(this, WatchLog.Kind.PROGRESS, spec.pkg, "$p", book.title)
+        BookShelf.updateStatus(this, book.id, p, -1)
+    }
+
+    /** [dataCover] 를 뒤에서 꺼내는 중인 책 파일들(같은 파일을 겹쳐 꺼내지 않게) */
+    private val dataCovers = mutableSetOf<String>()
+
+    /**
+     * 표지가 없는 책 [id] 에 그 앱이 남긴 책 파일 [path] 의 표지를 붙인다([ReaderSpec.fileCover], 우주의 PDF 등). EPUB·그림은 그릴 때 책 파일에서 꺼내므로 하지 않는다.
+     * 아직 없으면(그 앱이 책을 연 뒤 그림을 늦게 남긴다) 다음에 읽는 화면을 읽을 때 다시 본다.
+     */
+    private fun dataCover(spec: ReaderSpec, id: String, path: String) {
+        if (coverFromFile(path) || BookShelf.hasCover(this, id) || !dataCovers.add(path)) return
+        Bg.run({ spec.fileCover(this, path) }) done@{ result ->
+            dataCovers -= path
+            val bytes = result.getOrNull() ?: return@done
+            if (!BookShelf.hasCover(this, id)) runCatching { BookShelf.setCover(this, id, bytes) }
+        }
     }
 
     /** 책이 열려 있는지를 데이터로 아는 앱(KOReader)을 모두 맞춘다(홈으로 돌아올 때, [syncFileApps]). 깔려 있는 앱만. 책 열쇠로 가르는 앱(Readest)도 */

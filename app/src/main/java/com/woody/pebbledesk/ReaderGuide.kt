@@ -26,6 +26,7 @@ import com.woody.pebbledesk.readers.ReaderSpec
 import com.woody.pebbledesk.readers.Readest
 import com.woody.pebbledesk.readers.Ridi
 import com.woody.pebbledesk.readers.RidiOneStore
+import com.woody.pebbledesk.readers.Woojoo
 import com.woody.pebbledesk.readers.Yes24Ebook
 import com.woody.pebbledesk.readers.Yes24Library
 import com.woody.pebbledesk.readers.Yes24LibraryMobile
@@ -168,6 +169,12 @@ internal object ReaderGuide {
         App(listOf(R.string.guide_bookfusion), listOf(BookFusion), Info(
             listOf(R.string.guide_t_bookfusion_shelf, R.string.guide_t_progress_menu),
             cover = YES, title = yes(R.string.guide_n_bookfusion_title), author = YES, progress = READING_MENU, due = NO,
+        )),
+        App(listOf(R.string.guide_woojoo), listOf(Woojoo), Info(
+            listOf(R.string.guide_t_woojoo_open),
+            cover = yes(R.string.guide_n_woojoo_cover), title = YES, author = YES, progress = yes(R.string.guide_n_woojoo_progress), due = OWN_FILE,
+            bookFiles = R.string.guide_files_woojoo, note = R.string.guide_note_woojoo,
+            coverBefore11 = Field(R.string.guide_added_book_files, R.string.guide_n_epub),
         )),
     )
 }

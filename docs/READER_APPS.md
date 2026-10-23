@@ -25,6 +25,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | KOReader `org.koreader.launcher`(F-Droid 판 `org.koreader.launcher.fdroid`. 오픈소스, 내 파일) | X (파일 목록·읽는 화면이 `MainActivity` 하나. 열림·닫힘은 KOReader 가 남기는 파일로) | O (파일 위치를 알면 `ACTION_VIEW` `file://`, 읽던 쪽으로) | X (그냥 열면 마지막 화면) | X | 사용자가 둔 곳(공유 저장소) |
 | Readest `com.bilingify.readest`(Bilingify, 오픈소스 Tauri 앱. 내 파일을 가져와 앱 데이터에 복사) | X (액티비티 하나. 읽는 화면은 웹 화면 안 HTML id `titlebar-close`·`gridcell-<해시>`) | O `readest://book/<해시>`(위젯과 같다, 이어 읽던 쪽으로) | O (그냥 열면 서재) | ? | 기본은 앱 전용 저장소. `데이터 위치 변경` 으로 공유 저장소에 둘 수 있다 |
 | BookFusion `com.bookfusion.android.reader`(내 EPUB·PDF 를 올리거나 스토어에서. 계정 없이도 올려 읽을 수 있다) | `o.getLayoutResId`(EPUB)·`o.writePhotoListTofacebook_common_release`(PDF). 난독화 이름이라 판마다 바뀐다(2.24.0·2.23.15 확인) | X (읽는 화면은 앱 안에서만 열리고, 받는 링크는 로그인 `bookfusion://auth` 뿐) | 그냥 열면 Bookshelf(읽던 책이 떠 있었으면 그 책) | X | 앱 전용 저장소 (미확인) |
+| 우주 `com.inno.woojoo`(우주뷰어, 이노스페이스원. Librera Reader 를 고친 내 파일 리더) | `HorizontalViewActivity`(책 넘김)·`VerticalViewActivity`(스크롤) | O (`file://` 를 `com.inno.OpenerActivity` 로, 읽던 쪽으로) | O (그냥 열면 내 서재) | X | 사용자가 둔 곳(공유 저장소). 우주 기록은 `/sdcard/Woojoo` |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
 - 사용 기록에는 **앱·화면 이름과 시각만** 남는다. 어떤 책인지는 알 수 없다.
@@ -77,6 +78,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | KOReader | 파일 | 파일 | 파일 | 파일 | X |
 | Readest | 파일·서재 | 파일·서재·메뉴(목차) | 파일·메뉴(목차) | 파일·메뉴(진행 창)·읽는 화면 | X |
 | BookFusion | 서재·책 상세 | 서재·책 상세 | 서재·책 상세 | 메뉴 | X |
+| 우주 | 서재·파일 | 서재·메뉴·파일 | 서재·파일 | 서재·메뉴·파일 | X |
 
 ### 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -270,6 +272,16 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **진행률**: 메뉴 아래 줄 오른쪽 끝(`14.5%`). 서재에는 없다.
 - **반납일**: 없다.
 - **제약**: 홈에서 책을 누르면 BookFusion 을 연다(특정 책 바로 열기는 없다). 계정 책 가운데 받지 않은 책은 서재에서 누르면 책 상세의 `Download` → `Read` 로 열고, 그렇게 연 책도 들어온다(표지는 받기 전 상세에서 자른다).
+
+### 우주 `com.inno.woojoo`
+
+- **권한**: 공통 + 책 파일 읽기(있으면 다른 길로 연 책도 메뉴 없이 알고, 홈에서 그 파일을 바로 연다).
+- **할 것**: 책은 내 서재에서 눌러 연다. 책 파일 읽기가 없으면 다른 길로 연 책과 PDF·만화는 읽다가 가운데를 눌러 메뉴를 띄워야 들어온다.
+- **표지**: 서재 칸에서 잘라 온다(EPUB 등). 파일을 알면 EPUB 파일의 표지. PDF·만화는 우주 기록의 표지 그림(`thumb_path`).
+- **제목·저자**: 서재에서 누른 칸(저자는 목록 보기 `title2`, 격자 보기는 칸 설명), 메뉴 제목, 우주 기록 `Woojoo/RecentBooks/RecentBooks.json`. PDF·만화는 읽는 화면 제목이 파일 이름이라 파일 이름(확장자 뗌)으로 들어온다(서재 칸은 PDF 속 제목이라 쓰지 않는다).
+- **진행률**: 서재 칸(`1%`), 메뉴 아래 줄 `(14%)`, 상태 표시줄(켰을 때 `13 / 96`), 책을 열 때 우주 기록에 적힌 것(지난번 닫은 곳), 읽는 동안 쪽마다 적히는 `app-Progress.json`(책 파일 읽기).
+- **반납일**: 없다(내 파일).
+- **제약**: 홈에서 책을 누르면 파일을 아는 책은 `OpenerActivity` 로 그 파일을 바로 연다(모르면 앱). 홈 버튼으로 나오면 그때의 진행률은 다음에 그 책을 열 때(또는 서재·메뉴에서) 맞춰진다.
 
 ## 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -650,3 +662,17 @@ Bilingify 의 오픈소스 리더(https://github.com/readest/readest, Tauri). �
   - 받지 않은 책: 줄·격자 칸 표지에 어두운 막과 오른쪽 위 받기 아이콘(칸의 오른쪽 위 묶음 안 `ImageView`, 누를 수 있음)이 붙고, 목록 보기 칸에는 `Download book` 설명의 단추가 하나 더 붙는다. Pebble Desk 는 줄·격자 칸은 그 묶음에 무엇이 들어 있어 표지를 자르지 않고, 목록 칸은 칸으로 읽지 않는다.
   - 받지 않은 책은 '지금 읽는 책' 줄에서 눌러도 바로 열리지 않고 책 상세가 뜬다(단추 `Download (157KB)`, 표지는 막 없이 깨끗하다). 받으면 같은 자리 단추가 `Read` 로 바뀐다.
   - 확인: 둘째 책(목록에 있음)을 기기에서 지우고 줄 칸 → 상세 → `Download` → `Read` 로 열어 맨 앞으로, 진행률 4%(클라우드에서 맞춘 값). 새로 올린 넷째 책을 기기에서 지우고 격자 칸 → 상세 → `Download` → `Read` 로 열어 새 책 `퓨전 넷째 책 · 박민수`, 표지는 막·아이콘 없는 상세의 표지.
+
+### 우주 `com.inno.woojoo` (2026-10-23, 에뮬레이터 `CremaPebble_A11_Play`(안드로이드 11), 사용자가 받은 APK 1.0.22, **지원**)
+
+- **앱**: 이노스페이스원의 우주(Woojoo, 앱 이름 `우주`). 오픈소스 Librera Reader(`com.foobnix`)를 `com.inno` 로 고친 것(MuPDF 1.11, 서재·설정·`AppProfile` 구조가 같다). 처음 열면 모든 파일 액세스를 묻고, 저장소 `Woojoo/`(`Document` 사용 가이드 PDF·`profile.Woojoo/device.<모델>/app-*.json`·`RecentBooks`)를 만든다.
+- **서재** `com.inno.ui2.MainTabs2`: 내 서재 · 전체/즐겨찾기/SD카드 탭, 격자·목록 보기, 쪽 넘김(`1 / 5`). 책 칸 `card_view`(설명 `도서 <저자> <제목> <확장자>`, `FileMetaAdapter`) 안에 `browserItemIcon`·`title1`·`idPercentText`(격자: 읽지 않은 책도 `0%`), 목록 보기는 `title2`(저자)·`browserExt`·`browseDate`·`starIcon`, 진행률은 칸 옆(`card_view` 밖, 읽지 않은 책은 `INVISIBLE` 만). SD카드 탭의 폴더 칸은 `text1`.
+- **읽는 화면**: `com.inno.pdf.search.activity.HorizontalViewActivity`(읽기 방식 `readingMode` 2, 기본), 스크롤 방식은 `org.ebookdroid.ui.viewer.VerticalViewActivity`(설정 화면에서 바꾸는 곳은 찾지 못함). 본문은 직접 그린 뷰. 가운데를 누르면(0.25초 뒤) 위에 `책 닫기`·제목 `title`·장 `chapter`, 아래에 `currentPage`·`maxPage`·`pagePercent` `(14%)`. 뒤로 키는 `책 닫기`·`앱 종료` 창. 에뮬레이터에서 PDF 는 가운데를 눌러도 메뉴가 뜨지 않았다.
+- **제목**: `HorizontalModeController.getTitle` 은 `BookType.hasTitle`(EPUB·FB2·MOBI·TXT·HTML·DOC 등)이면 우주 DB 의 책 정보 제목, 아니면(PDF·XPS·TIFF·CBZ·CBR·DjVu) 파일 이름(확장자 포함). 서재 칸은 PDF 를 PDF 속 제목(`우주 사용가이드_v3.0`)으로 보이다가 연 뒤에는 파일 이름(`우주 사용가이드.pdf`)으로 보이기도 한다.
+- **우주 기록**: `Woojoo/RecentBooks/RecentBooks.json`(`RecentBookUtils`, 최근 10권, 때 순): 책을 불러온 뒤와 `onStop` 에 `{title, author, progress:"14%", file_path, thumb_path(표지 300×450 PNG), time}` 을 적는다(`saveRecentBookInfo`, 제목은 메뉴 제목과 같은 `dc.getTitle()`, 진행률은 `pagePercent` 글자). `profile.Woojoo/device.<모델>/app-Recent.json` 은 연 파일(`internal-storage:/Download/a.epub`)과 때, `app-Progress.json` 은 파일 이름 → 진행 비율 `p`(쪽을 넘길 때마다 다시 쓴다). 읽는 화면의 상태 표시줄(`bottomIndicators`: 시각 `pagesTime`·쪽 `pagesCountIndicator` `13 / 96`·배터리)은 우주 설정 `statusBarPosition` 이 기본 0(없음)이라 보이지 않는다.
+- **책 바로 열기**: `com.inno.OpenerActivity` 가 `ACTION_VIEW`(`*/*`·책 형식들)를 받는다. `file://` 경로를 주면 그 책을 읽던 쪽으로 연다. 실행 화면 `MainTabs2` 는 파일 보기를 받지 않는다.
+- **Pebble Desk**(`readers/Woojoo.kt`): 서재 칸·메뉴·우주 기록(`fileBook`, 책 파일 읽기). 홈에서는 파일을 아는 책을 `OpenerActivity` 로(`ReaderSpec.fileOpener`).
+  - 에뮬레이터에서 확인: 목록 보기에서 칸을 눌러 `우주 시험 둘 · 라마바` 가 새 책으로, 진행률 1%(우주 기록)·파일 경로가 붙고 EPUB 표지, 메뉴로 14%. 홈에서 그 책을 누르면 읽던 13쪽으로 바로 열렸다. `OpenerActivity` 로 연 `우주 시험 하나` 는 메뉴 없이 우주 기록으로 맨 앞에 오고 파일이 붙었다. PDF 칸을 누르면 '책 모름' 뒤 우주 기록으로 `우주 사용가이드`(파일 포함)가 들어왔다.
+  - 메뉴 없이 PDF 쪽을 넘기면 진행률이 13% → 21% 로 `app-Progress.json`(0.214)을 따라갔고, 표지가 없던 PDF 책에 우주 기록의 표지 그림이 붙었다.
+  - 앞 책의 읽는 화면이 남은 채(홈으로 나와) 다른 책을 `OpenerActivity` 로 열면 우주가 네이티브로 죽었다(SIGBUS, `MuPdfDocument.getMeta`, 두 번). 만든 EPUB(한 장에 문단 400개)을 열 때도 MuPDF 가 죽었다(스택 넘침). 둘 다 우주 쪽 문제로 보고, 실기기는 확인하지 못했다.
+
