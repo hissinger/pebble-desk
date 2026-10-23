@@ -23,8 +23,8 @@ class GuideAppsTest {
         assertEquals(ReaderApps.ALL.map { it.pkg }.sorted(), guided.map { it.pkg }.sorted())
     }
 
-    @Test fun `책 파일로 책·표지를 아는 앱은 책 파일 읽기가 필요하다고 적혀 있다`() {
-        val usesFiles = ReaderApps.ALL.filter { it.searchesBookFile || it.fileEntry != null }
+    @Test fun `파일로만 여는 앱은 책 파일 읽기가 필요하다고 적혀 있다`() {
+        val usesFiles = ReaderApps.ALL.filter { it.fileEntry != null }
         assertEquals(emptyList<String>(), usesFiles.filterNot { it.needsBookFiles }.map { it.pkg })
     }
 

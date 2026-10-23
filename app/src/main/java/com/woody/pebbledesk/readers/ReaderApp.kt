@@ -68,11 +68,6 @@ open class ReaderApp(
      */
     val viewerHolder: String? = null,
     /**
-     * 내 파일을 열지만 어느 파일인지 내놓지 않는 앱(문리더): 읽는 화면 제목으로 안 책의 표지가 없으면 저장소에서 그 제목의 EPUB 을 찾아
-     * 그 책의 파일로 적는다(표지는 그릴 때 그 파일에서 꺼낸다). 책 파일 읽기를 허용했을 때만([BookFiles.canRead]).
-     */
-    val searchesBookFile: Boolean = false,
-    /**
      * 책 파일 읽기가 필요하다([BookFiles.canRead]): 꺼져 있으면 책(KOReader)·표지(문리더·네오리더)·표지와 책 정보(이지뷰어·채리뷰어)를 모른다.
      * 깔려 있으면 시작하기에 책 파일 읽기 쪽을 더하고([ReaderApps.fileApps]), 꺼진 채 그 앱의 읽는 화면이 뜨면 홈에서 묻는다. 앱을 더할 때 여기서 정한다.
      */
@@ -158,8 +153,8 @@ open class ReaderApp(
      */
     open fun showsViewer(root: AccessibilityNodeInfo): Boolean = viewerHolder?.let { root.byId(pkg, it).isNotEmpty() } == true
 
-    /** 서비스가 붙을 때마다 새로 만드는 이 앱의 어댑터(판단과 기억). 옮기는 동안 기본은 예전 서비스 코드 그대로인 [LegacyReader] */
-    open fun newAdapter(): ReaderAdapter = LegacyReader(this)
+    /** 서비스가 붙을 때마다 새로 만드는 이 앱의 어댑터(판단과 기억). 기본은 화면만 읽는 바탕 [ScreenReader], 다른 길로 책을 아는 앱은 그 앱 파일의 어댑터 */
+    open fun newAdapter(): ReaderAdapter = ScreenReader(this)
 
     /** 읽은 시간을 세는 방식: 기본은 읽는 화면이 앞에 있던 동안. 서재 안에 뜨는 읽는 화면([viewerHolder])은 표시로 자르고 표시가 없으면 안 셈 */
     open val viewerTime: ViewerTime get() = if (viewerHolder != null) ViewerTime.MARKS_CLOSED else ViewerTime.SCREEN
