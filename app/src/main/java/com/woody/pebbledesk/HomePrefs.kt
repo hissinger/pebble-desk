@@ -114,10 +114,13 @@ class HomePrefs(context: Context) {
         get() = sp.getString("update_shown", null)
         set(v) = sp.edit().putString("update_shown", v).apply()
 
-    /** 자주 쓰는 앱을 격자(아이콘 아래 이름, 한 줄에 4개)로. false 면 목록 */
+    /**
+     * 자주 쓰는 앱을 격자(아이콘 아래 이름, 한 줄에 4개)로. false 면 목록. 1.5.12 까지는 목록이 기본이라 고른 적 없이 쓰던 사람은 목록 그대로,
+     * 새로 깐 사람은 처음 [language] 를 정할 때 격자로 적어 둔다.
+     */
     var favGrid: Boolean
-        get() = sp.getBoolean("fav_grid", false)
-        set(v) = sp.edit().putBoolean("fav_grid", v).apply()
+        get() = sp.getBoolean(KEY_FAV_GRID, false)
+        set(v) = sp.edit().putBoolean(KEY_FAV_GRID, v).apply()
 
     /** 독서 기록의 4주를 날마다 막대그래프로. false 면 링 달력 */
     var readingGraph: Boolean
@@ -217,6 +220,7 @@ class HomePrefs(context: Context) {
         private const val KEY_ENGLISH = "english"
         private const val KEY_LANGUAGE = "language"
         private const val KEY_FAV_NAMES = "favorite_names"
+        private const val KEY_FAV_GRID = "fav_grid"
         private const val KEY_TEXT_SCALE = "text_scale"
         private const val KEY_ROW_SCALE = "row_scale"
         private const val KEY_PALETTE = "palette"
@@ -246,6 +250,7 @@ class HomePrefs(context: Context) {
         /**
          * 앱 언어. 처음 읽을 때 한 번 정해 저장한다: 1.5.8 까지 영어로 바꿔 둔 사람은 영어, 그 밖에 이미 쓰던 사람(설정 파일에 무엇이든 있다)은
          * 보던 그대로 한국어, 새로 깐 사람은 기기 언어를 따른다(업데이트한 뒤 기기 언어가 영어인 한국 사용자의 화면이 갑자기 바뀌지 않게).
+         * 새로 깐 사람은 여기서 자주 쓰는 앱 격자([favGrid])도 적어 둔다(앱이 처음 읽는 설정이라 새로 깐 것을 가를 수 있는 곳).
          */
         internal fun language(sp: android.content.SharedPreferences): AppLanguage {
             AppLanguage.of(sp.getString(KEY_LANGUAGE, null))?.let { return it }
@@ -254,7 +259,9 @@ class HomePrefs(context: Context) {
                 sp.all.isNotEmpty() -> AppLanguage.KOREAN
                 else -> AppLanguage.SYSTEM
             }
-            sp.edit().putString(KEY_LANGUAGE, first.key).remove(KEY_ENGLISH).apply()
+            val edit = sp.edit().putString(KEY_LANGUAGE, first.key).remove(KEY_ENGLISH)
+            if (first == AppLanguage.SYSTEM) edit.putBoolean(KEY_FAV_GRID, true)
+            edit.apply()
             return first
         }
     }
