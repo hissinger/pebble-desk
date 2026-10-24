@@ -48,6 +48,6 @@ class GuideAppsTest {
             if (p.eventType != XmlPullParser.START_TAG) continue
             for (i in 0 until p.attributeCount) if (p.getAttributeName(i).endsWith("packageNames")) names = p.getAttributeValue(i).split(',')
         }
-        assertEquals(ReaderApps.ALL.map { it.pkg }.sorted(), names.sorted())
+        assertEquals(ReaderApps.ALL.map { it.pkg }.distinct().sorted(), names.sorted())
     }
 }

@@ -82,9 +82,9 @@ class ReaderWatchService : AccessibilityService(), WatchHost {
     /** 지금 앞에 있는 그 앱의 화면(다른 앱·시스템 창이면 null) */
     override fun root(pkg: String): AccessibilityNodeInfo? = rootInActiveWindow?.takeIf { it.packageName == pkg }
 
-    /** 화면에 떠 있는 그 앱의 창들(읽는 화면 + 위에 뜬 메뉴·알림). 창 목록을 못 얻으면 맨 앞 창만. */
+    /** 화면에 떠 있는 그 앱의 창들(위에 뜬 메뉴·알림이 먼저, 화면 자체가 끝). 창 목록을 못 얻으면 맨 앞 창만. */
     override fun windows(pkg: String): AppWindows {
-        val all = runCatching { windows.mapNotNull { it.root }.filter { it.packageName == pkg } }.getOrDefault(emptyList())
+        val all = runCatching { windows.sortedByDescending { it.layer }.mapNotNull { it.root }.filter { it.packageName == pkg } }.getOrDefault(emptyList())
         return AppWindows(root(pkg), all.ifEmpty { listOfNotNull(root(pkg)) })
     }
 
@@ -124,12 +124,6 @@ class ReaderWatchService : AccessibilityService(), WatchHost {
     private val activities = HashMap<String, Pair<Long, Set<String>>>()
 
     companion object {
-        /**
-         * 홈에서 [book] 의 파일 [path] 를 [pkg] 로 바로 열었다(이지뷰어처럼 읽는 화면에 파일 이름만 보이는 앱): 서재에서 누른 칸처럼 그 파일이 열리면
-         * 그 책을 편 것으로 본다(열리지 않거나 다른 파일이 열리면 버린다)
-         */
-        fun bookFileOpened(pkg: String, book: ShelfBook, path: String) = HomeSignals.fileOpened(pkg, book, path)
-
         /**
          * 서비스가 연결·끊긴 때와 끊긴 횟수(기기 정보에서 본다). 켜 둔 서비스가 저절로 꺼지는 기기(Moaan MIX7S)에서
          * 언제 끊겼는지 알려고. 이 앱 프로세스가 왜 끝났는지는 기기 정보가 안드로이드에서 따로 읽는다.

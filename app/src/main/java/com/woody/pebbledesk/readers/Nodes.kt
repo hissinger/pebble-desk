@@ -35,7 +35,7 @@ class FileBook(
     val openedAt: Long = 0, val closedAt: Long = 0,
 )
 
-/** 화면에 떠 있는 그 앱의 창들. [active] 는 맨 앞 창(다른 앱이면 null), [all] 은 읽는 화면 + 위에 뜬 메뉴·알림 창 */
+/** 화면에 떠 있는 그 앱의 창들. [active] 는 맨 앞 창(다른 앱이면 null), [all] 은 위에 뜬 메뉴·알림 창이 먼저이고 화면 자체(읽는 화면·서재)가 끝 */
 class AppWindows(val active: AccessibilityNodeInfo?, val all: List<AccessibilityNodeInfo>)
 
 /** 책 칸을 찾을 때 위로 올라가는 단계, 칸 안을 훑는 깊이 */
@@ -55,6 +55,11 @@ fun usableThumb(r: Rect) =
 internal fun AccessibilityNodeInfo.bounds() = Rect().also { getBoundsInScreen(it) }
 
 internal fun AccessibilityNodeInfo.isWebView() = className?.endsWith("WebView") == true
+
+/** 여러 칸을 담는 목록(RecyclerView·ListView·GridView, Compose 목록은 목록 정보로) */
+internal fun AccessibilityNodeInfo.isList() = collectionInfo != null || className?.let { LIST_CLASS.containsMatchIn(it) } == true
+
+private val LIST_CLASS = Regex("""(RecyclerView|ListView|GridView)$""")
 
 internal fun AccessibilityNodeInfo.byId(pkg: String, id: String): List<AccessibilityNodeInfo> =
     findAccessibilityNodeInfosByViewId("$pkg:id/$id")

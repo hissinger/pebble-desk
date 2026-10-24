@@ -2,12 +2,14 @@ package com.woody.pebbledesk
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.woody.pebbledesk.readers.AppContext
 import com.woody.pebbledesk.readers.AppWindows
 import com.woody.pebbledesk.readers.Cell
 import com.woody.pebbledesk.readers.Click
+import com.woody.pebbledesk.readers.CoverSpot
 import com.woody.pebbledesk.readers.ReaderAdapter
 import com.woody.pebbledesk.readers.ReaderApp
 import com.woody.pebbledesk.readers.ScreenReader
@@ -57,12 +59,22 @@ class WatchCoreTest {
     }
 
     private class Host(override val context: Context) : WatchHost {
-        override fun root(pkg: String): AccessibilityNodeInfo? = null
+        /** 앞에 있는 앱의 화면(찍기 시험만) */
+        var front: AccessibilityNodeInfo? = null
+        /** 찍는 사이 앱을 떠난다 */
+        var leaveOnShot = false
+        override fun root(pkg: String): AccessibilityNodeInfo? = front
         override fun windows(pkg: String) = AppWindows(null, emptyList())
         override val noActiveWindow = false
         override fun isActivity(pkg: String, cls: String) = true
-        override val canScreenshot = false
-        override fun screenshot(done: (Bitmap) -> Unit) {}
+        override var canScreenshot = false
+        /** 찍는 사이 일어나는 일 */
+        var onShot: () -> Unit = {}
+        override fun screenshot(done: (Bitmap) -> Unit) {
+            if (leaveOnShot) front = null
+            onShot()
+            done(Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888))
+        }
     }
 
     /** 부른 것을 적어 두는 기록기(편 책 기록은 앱마다 마지막 것) */
@@ -95,14 +107,17 @@ class WatchCoreTest {
     private class Probe(app: ReaderApp, val log: MutableList<String>) : ScreenReader(app) {
         var fail = false
         override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) { log += "enter:${ctx.pkg}:$again"; super.onEnterViewer(ctx, from, again) }
-        override fun onShelf(ctx: AppContext) { log += "shelf:${ctx.pkg}" }
+        /** 서재가 멈추면 찍을 표지 자리 */
+        var spots: List<CoverSpot>? = null
+        override fun onShelf(ctx: AppContext) { log += "shelf:${ctx.pkg}"; spots?.let { ctx.capture(it) } }
+        override fun stillSpots(ctx: AppContext, spots: List<CoverSpot>): List<CoverSpot> { log += "still:${ctx.pkg}"; return emptyList() }
         override fun onShelfLive(ctx: AppContext, force: Boolean) { log += "live:${ctx.pkg}:$force" }
         override fun onViewer(ctx: AppContext) {
             log += "viewer:${ctx.pkg}"
             if (fail) error("앱 처리 실패")
         }
         override fun onClick(ctx: AppContext, click: Click) { log += "click:${ctx.pkg}" }
-        override fun onWindow(ctx: AppContext) { log += "window:${ctx.pkg}" }
+        override fun onWindow(ctx: AppContext, cls: String?) { log += "window:${ctx.pkg}" }
         override fun beforeOpened(ctx: AppContext) { log += "before:${ctx.pkg}"; super.beforeOpened(ctx) }
         override fun afterOpened(ctx: AppContext, book: ShelfBook) { log += "after:${ctx.pkg}" }
         override fun screenName(ctx: AppContext, activity: String?) = holderName ?: activity
@@ -125,7 +140,9 @@ class WatchCoreTest {
 
     private val clock = Clock()
 
-    private fun core(recorder: BookRecorder, vararg apps: ReaderApp) = WatchCore(Host(app), clock, recorder, apps.toList())
+    private val host by lazy { Host(app) }
+
+    private fun core(recorder: BookRecorder, vararg apps: ReaderApp) = WatchCore(host, clock, recorder, apps.toList())
 
     private fun WatchCore.window(pkg: String, cls: String) = onEvent(pkg, AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED, cls, null)
     private fun WatchCore.content(pkg: String) = onEvent(pkg, AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED, null, null)
@@ -227,6 +244,34 @@ class WatchCoreTest {
         core.window("a", "a.Shelf")
         clock.advance(2000)
         assertTrue("shelf:a" in log)
+    }
+
+    @Test fun `찍는 사이 그 앱을 떠났으면 찍은 것을 버린다`() {
+        host.canScreenshot = true
+        host.front = AccessibilityNodeInfo.obtain()
+        val core = core(Recorder(), app("a"))
+        core.window("a", "a.Shelf")
+        adapters.getValue("a").spots = listOf(CoverSpot("책", Rect(0, 0, 5, 5)))
+        clock.advance(2000)
+        assertTrue("still:a" in log)
+        log.clear()
+        host.leaveOnShot = true
+        core.content("a")
+        clock.advance(2000)
+        assertTrue("shelf:a" in log)
+        assertTrue(log.none { it.startsWith("still") })
+    }
+
+    @Test fun `찍는 사이 그 앱의 읽는 화면으로 넘어갔으면 찍은 것을 버린다`() {
+        host.canScreenshot = true
+        host.front = AccessibilityNodeInfo.obtain()
+        val core = core(Recorder(), app("a"))
+        core.window("a", "a.Shelf")
+        adapters.getValue("a").spots = listOf(CoverSpot("책", Rect(0, 0, 5, 5)))
+        host.onShot = { core.window("a", "a.ViewerActivity") }
+        clock.advance(2000)
+        assertTrue("shelf:a" in log)
+        assertTrue(log.none { it.startsWith("still") })
     }
 
     @Test fun `같은 화면 알림이 한 번 더 오면 다시 들어온 것이 아니다`() {

@@ -28,6 +28,8 @@ class EasyViewTest {
         assertEquals("만화.zip", EasyViewSpec.viewerFileName("Books/만화.zip/p01.jpg"))
         assertEquals("ezview_test1", EasyViewSpec.viewerFileName("ezview_test1#2 2장"))
         assertEquals("a#b.epub", EasyViewSpec.viewerFileName("a#b.epub#2 2장"))
+        assertEquals("Vol#3 part 2.epub", EasyViewSpec.viewerFileName("Vol#3 part 2.epub#1 표지"))
+        assertEquals("Issue#3 Final.cbz", EasyViewSpec.viewerFileName("Issue#3 Final.cbz"))
     }
 
 }

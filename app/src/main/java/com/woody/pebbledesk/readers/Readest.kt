@@ -158,8 +158,11 @@ object Readest : ReaderApp(
     fun keyIntent(key: String): Intent =
         Intent(Intent.ACTION_VIEW, Uri.parse("readest://book/$key")).setClassName(pkg, MAIN)
 
-    /** 데이터 폴더에서 표지를 가져올 수 있다: 서재 화면에서 표지를 자르지 않는다 */
+    /** 데이터 폴더에서 표지를 가져올 수 있다: 서재 화면에서 표지를 자르지 않는다(데이터에 표지가 없는 책은 자른다, [hasDataCover]) */
     fun dataCovers(context: Context): Boolean = data(context) != null
+
+    /** 열쇠 [key] 의 책 표지가 데이터 폴더에 있다 */
+    fun hasDataCover(context: Context, key: String): Boolean = data(context)?.cover(key) != null
 
     /** 데이터 폴더를 읽을 수 있으면 그것(책 파일 읽기를 허용했고 데이터를 공유 저장소로 옮겼을 때) */
     private fun data(context: Context): ReadestData? {
@@ -243,11 +246,13 @@ object Readest : ReaderApp(
 /**
  * Readest 의 판단과 기억: 읽는 화면에 늘 보이는 책 열쇠(해시)로 책을 가른다. 한 번 안 열쇠는 그 책으로 적어 두어(서비스가 다시 시작돼도)
  * 서재를 거치지 않고 연 책(Readest '시작 시 마지막 책 열기'·파일 관리자·홈에서 바로 열기)도 알아본다. 서재에서 누른 칸은 읽는 화면에 들어올 때
- * 기록하지 않고 처음 보는 열쇠의 제목으로 쓴다. 데이터 폴더를 읽을 수 있으면 진행률·저자·표지는 데이터에서, 서재에서 표지를 자르지 않는다.
+ * 기록하지 않고 처음 보는 열쇠의 제목으로 쓴다. 데이터 폴더를 읽을 수 있으면 진행률·저자·표지는 데이터에서(서재에서는 데이터에 표지가 없는 책만 자른다).
  */
 class ReadestReader : ScreenReader(Readest) {
     /** 제목을 아직 몰라 책 모름으로 둔 열쇠 */
     private var unknownKey: String? = null
+    /** 이 읽는 화면(연 때)에서 처음 본 열쇠와 그 뒤 열쇠가 바뀐 때: 같은 읽는 화면 안에서 다른 책으로 넘어가면 그때부터 그 책 */
+    private var screenKey: Triple<Long?, String, Long>? = null
     /** 데이터에서 표지를 가져오는 중이거나 가져온 열쇠([keyCover]) */
     private val keyCovers = mutableSetOf<String>()
 
@@ -276,8 +281,31 @@ class ReadestReader : ScreenReader(Readest) {
         unknownKey = null
     }
 
-    /** 데이터 폴더에서 표지를 가져오는 동안은 화면에서 자르지 않는다 */
-    override fun capturesCovers(ctx: AppContext) = !Readest.dataCovers(ctx.context)
+    /** 서재 칸 표지는 데이터에 표지가 없는 책만 찍는다([cropSpots]) */
+    override fun onShelfLive(ctx: AppContext, force: Boolean) = super.onShelfLive(cropOnly(ctx), force)
+
+    override fun onShelf(ctx: AppContext) = super.onShelf(cropOnly(ctx))
+
+    /** 찍기 전에 [cropSpots] 로 거르는 문맥(찍고 버리지 않게) */
+    private fun cropOnly(ctx: AppContext): AppContext = object : AppContext by ctx {
+        override fun capture(spots: List<CoverSpot>, retry: Boolean) = ctx.capture(cropSpots(ctx, spots), retry)
+    }
+
+    /** 찍은 뒤 다시 보기도 같은 규칙으로 */
+    override fun stillSpots(ctx: AppContext, spots: List<CoverSpot>): List<CoverSpot> = cropSpots(ctx, super.stillSpots(ctx, spots))
+
+    /**
+     * 데이터 폴더를 읽을 수 있으면 표지는 데이터에서 가져오므로, 데이터에 표지(`cover.png`)가 없는 책의 자리만 자른다
+     * (열쇠를 모르는 책·목록에 없는 책은 데이터에서 가져올 수 있으므로 자르지 않는다)
+     */
+    private fun cropSpots(ctx: AppContext, spots: List<CoverSpot>): List<CoverSpot> {
+        if (spots.isEmpty() || !Readest.dataCovers(ctx.context)) return spots
+        return spots.filter { spot ->
+            val book = spot.id?.let { ctx.recorder.lookup.get(it) } ?: ctx.recorder.lookup.byTitle(spot.title) ?: return@filter false
+            val key = ReadestReader.bookKey(ctx.context, book.id) ?: return@filter false
+            !Readest.hasDataCover(ctx.context, key)
+        }
+    }
 
     /**
      * 열쇠 [key] 의 책: 적어 둔 책이면 그 책(제목을 고쳐도), 처음 보는 열쇠는 데이터의 제목, 없으면 이 읽는 화면을 열기 전에 서재에서 누른 칸,
@@ -285,7 +313,10 @@ class ReadestReader : ScreenReader(Readest) {
      */
     private fun readKeyed(ctx: AppContext, key: String, shown: ViewerInfo) {
         val recorder = ctx.recorder
-        val opened = ctx.viewerOpenedAt ?: ctx.now
+        // 읽는 화면이 열린 때. 같은 읽는 화면 안에서 열쇠가 바뀌었으면(서재를 못 보고 다른 책을 엶) 바뀐 때
+        val opened = screenKey?.takeIf { it.first == ctx.viewerOpenedAt && it.second == key }?.third
+            ?: (if (screenKey?.first == ctx.viewerOpenedAt && ctx.viewerOpenedAt != null) ctx.now else ctx.viewerOpenedAt ?: ctx.now)
+                .also { screenKey = Triple(ctx.viewerOpenedAt, key, it) }
         val data = Readest.keyBook(ctx.context, key)
         val progress = data?.progress?.takeIf { it >= 0 } ?: shown.progress
         ctx.log(WatchLog.Kind.PROGRESS, "$progress", data?.title ?: shown.title.orEmpty())
@@ -316,8 +347,20 @@ class ReadestReader : ScreenReader(Readest) {
             return null
         }
         val author = data?.author?.ifEmpty { null } ?: shown.author.takeIf { shown.title == title }.orEmpty()
-        ctx.opened(Seen(title, author, progress), opened)
-        return ctx.recorder.recordedBook(ctx.pkg)?.also { setKeyBook(ctx, key, it.id) }
+        val lookup = ctx.recorder.lookup
+        // 이 열쇠로 적어 둔 책이 나간 책이면 그 책만 되살린다(같은 제목의 다른 나간 책이 아니라. 기록에서 지운 책은 다시 알아본다)
+        val own = ctx.prefs.getString(keyPref(key), null)?.takeIf { lookup.withoutFile(title) == it }
+        // 제목이 같은 책(나간 책도)이 이미 다른 열쇠로 이어져 있으면(`X: 1권`·`X: 2권` 은 정리한 제목이 같다) 다른 책이다
+        val sameTitle = if (own == null) lookup.byTitle(title)?.id ?: lookup.withoutFile(title) else null
+        val otherKey = sameTitle?.let { bookKey(ctx.context, it) }?.takeIf { it != key }
+        val target = when {
+            own != null -> Target.Exact(own)
+            otherKey != null -> Target.Exact(null)
+            else -> Target.ByTitle
+        }
+        val book = ctx.opened(Seen(title, author, progress), opened, target)
+        // 편 책 기록에 그 책이 적혔을 때만 열쇠 ↔ 책(저장이 조용히 실패했으면 다음에 다시)
+        return book.takeIf { ctx.recorder.recordedBook(ctx.pkg)?.id == it.id }?.also { setKeyBook(ctx, key, it.id) }
     }
 
     /** 열쇠 [key] 로 적어 둔 책(읽고 있는 책일 때만. 빼거나 지운 책은 다시 알아본다) */
@@ -363,27 +406,49 @@ internal class ReadestData(val dir: File) {
     /** 해시 [key] 의 책(제목·저자·진행률. 책 파일 경로는 쓰지 않아 비운다). 지운 책·없는 책은 null */
     fun book(key: String): FileBook? {
         val entry = library()[key] ?: return null
-        val progress = progressOf(runCatching { JSONObject(File(File(dir, key), CONFIG).readText()) }.getOrNull()?.optJSONArray("progress"))
-            .takeIf { it >= 0 } ?: progressOf(entry.optJSONArray("progress"))
+        val progress = configProgress(key).takeIf { it >= 0 } ?: progressOf(entry.optJSONArray("progress"))
         return FileBook(entry.optString("title").trim(), entry.optString("author").trim(), "", progress)
     }
 
     /** 해시 [key] 의 표지 그림(없으면 null) */
     fun cover(key: String): File? = File(File(dir, key), COVER).takeIf { it.isFile }
 
-    private var read: Pair<Long, Map<String, JSONObject>>? = null
+    /** 마지막으로 읽은 library.json: 고친 때·길이 → 책들 */
+    private var read: Pair<Pair<Long, Long>, Map<String, JSONObject>>? = null
+    /** 마지막으로 읽은 config.json: 해시·고친 때·길이 → 진행률(쪽을 넘길 때마다 묻는다) */
+    private var config: Pair<Triple<String, Long, Long>, Int>? = null
+
+    /**
+     * 해시 [key] 의 config.json 진행률(바뀌었을 때만 다시 읽는다). 없으면 -1. 고친 때는 거칠 수 있어(SD 카드 2초) 막 고친 파일은 늘 다시 읽고,
+     * 쓰는 도중이라 못 읽은 것은 기억하지 않는다
+     */
+    @Synchronized private fun configProgress(key: String): Int {
+        val file = File(File(dir, key), CONFIG)
+        val modified = file.lastModified()
+        val stamp = Triple(key, modified, file.length())
+        val settled = modified != 0L && System.currentTimeMillis() - modified >= FRESH_MS
+        config?.takeIf { settled && it.first == stamp }?.let { return it.second }
+        val json = runCatching { JSONObject(file.readText()) }.getOrNull()
+        val progress = progressOf(json?.optJSONArray("progress"))
+        config = if (json != null) stamp to progress else null
+        return progress
+    }
 
     /** library.json 의 책들(해시 → 줄, 지운 책은 뺀다). 못 읽으면 빈 목록 */
     @Synchronized private fun library(): Map<String, JSONObject> {
         val file = File(dir, LIBRARY)
         val modified = file.lastModified()
-        read?.takeIf { it.first == modified }?.let { return it.second }
-        val books = runCatching { JSONArray(file.readText()) }.getOrNull()?.let { list ->
-            (0 until list.length()).mapNotNull { list.optJSONObject(it) }
-                .filter { it.isNull("deletedAt") && it.optString("hash").isNotEmpty() }
-                .associateBy { it.optString("hash") }
+        val stamp = modified to file.length()
+        val settled = modified != 0L && System.currentTimeMillis() - modified >= FRESH_MS
+        read?.takeIf { settled && it.first == stamp }?.let { return it.second }
+        val list = runCatching { JSONArray(file.readText()) }.getOrNull()
+        val books = list?.let {
+            (0 until it.length()).mapNotNull(it::optJSONObject)
+                .filter { o -> o.isNull("deletedAt") && o.optString("hash").isNotEmpty() }
+                .associateBy { o -> o.optString("hash") }
         }.orEmpty()
-        read = modified to books
+        // 쓰는 도중이라 못 읽은 것은 기억하지 않는다
+        read = if (list != null) stamp to books else null
         return books
     }
 
@@ -404,3 +469,5 @@ private const val DATA = "Readest"
 private const val LIBRARY = "library.json"
 private const val CONFIG = "config.json"
 private const val COVER = "cover.png"
+/** 이만큼 안에 고친 config.json 은 고친 때가 같아도 다시 읽는다(고친 때가 2초 단위인 저장소) */
+private const val FRESH_MS = 3000L

@@ -212,7 +212,7 @@ object AppStore {
      * false: 부르는 쪽이 뒤에서 다시 찾아([findBookFile]) 연다([openFoundFile]).
      */
     fun openBook(context: Context, book: ShelfBook, app: AppEntry): Boolean {
-        val reader = ReaderApps.byPackage[app.pkg] ?: run { launch(context, app); return true }
+        val reader = ReaderApps.forPackage(context, app.pkg) ?: run { launch(context, app); return true }
         fun fail(onFail: Fallback) = if (onFail == Fallback.LAUNCH) { launch(context, app); true } else false
         return when (val r = reader.open(HomeContext(context, app.component), book)) {
             OpenResult.Launch -> { launch(context, app); true }
@@ -230,7 +230,7 @@ object AppStore {
      */
     fun findBookFile(context: Context, book: ShelfBook, app: AppEntry): String? {
         val titles = listOf(book.title, book.seenTitle).filter { it.isNotEmpty() }.distinct()
-        val found = ReaderApps.byPackage[app.pkg]?.bookFiles(context, titles).orEmpty()
+        val found = ReaderApps.forPackage(context, app.pkg)?.bookFiles(context, titles).orEmpty()
         return found.firstOrNull { BookShelf.idByFile(context, it).let { id -> id == null || id == book.id } } ?: found.firstOrNull()
             ?: titles.takeIf { BookFiles.canRead(context) }?.let(BookFiles::findByName)
     }

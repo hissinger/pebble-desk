@@ -31,6 +31,10 @@ object MillieMobile : ReaderApp(
     /** 제목 앞에 붙는 표시(`오디오북 리더 오디오북 리더 완독 완독 하나님을 아는 지식`) */
     private val BADGES = Regex("""^((오디오북|리더|완독)\s+)+""")
 
+    /** 저자 뒤의 표시(`한강 지음`, `<정지원 저>`) */
+    /** 저자 표시: `지음`·`저` 뒤가 끝·` / 역자`·`>` 인 것(제목 안의 ` 저 ` 는 아니다) */
+    private val AUTHOR_ROLE = Regex("""\s(지음|저)(?=\s*$|\s+/|>)""")
+
     /** 웹 서재: 글자가 표지 단추 꼴인 요소가 책 칸이고 그 자리가 표지다. 같은 책이 여럿이면 가장 큰 표지. */
     override fun shelfCells(root: AccessibilityNodeInfo): List<Cell> {
         val found = mutableMapOf<String, Cell>()
@@ -59,10 +63,15 @@ object MillieMobile : ReaderApp(
         return Cell(title, authorName(author), -1, -1, r, r)
     }
 
-    /** 표지 단추 글자 → 제목·저자. 표지 단추가 아니면 null. */
+    /**
+     * 표지 단추 글자 → 제목·저자. 표지 단추가 아니면 null. 제목에도 `/` 가 들 수 있어(`A/B/저자 지음 / 역자 옮김`) 저자 표시(`지음`·`저`) 바로 앞의
+     * `/` 에서 나눈다(저자 표시가 없으면 첫 `/`).
+     */
     internal fun coverText(text: String): Pair<String, String>? {
         val body = text.takeIf { it.endsWith(THUMB) }?.removeSuffix(THUMB) ?: return null
-        val slash = body.indexOf('/').takeIf { it > 0 } ?: return null
+        // 첫 저자 표시 바로 앞의 `/`(그 뒤 ` / 역자 옮김`·` / 둘째 저자 지음` 이 와도)
+        val role = AUTHOR_ROLE.findAll(body).map { body.lastIndexOf('/', it.range.first) }.firstOrNull { it > 0 }
+        val slash = role ?: body.indexOf('/').takeIf { it > 0 } ?: return null
         val title = BADGES.replace(body.substring(0, slash), "").trim().ifEmpty { return null }
         return title to body.substring(slash + 1).trim()
     }

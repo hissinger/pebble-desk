@@ -258,7 +258,8 @@
     <string name="guide_millie">Millie (e-ink)</string>
     <string name="guide_millie_mobile">Millie</string>
     <string name="guide_aladin">Aladin</string>
-    <string name="guide_bookers">Bookers</string>
+    <string name="guide_bookers">Bookers (1.x)</string>
+    <string name="guide_bookers2">Bookers (2.0 and later)</string>
     <string name="guide_ridi">Ridi</string>
     <string name="guide_ridi_onestore">Ridi (ONE store)</string>
     <string name="guide_yes24lib">YES24 Library (e-ink)</string>
@@ -308,6 +309,7 @@
     <string name="guide_n_moon_cover">For books opened from the Home tab or bookshelf view, added when Read book files is on</string>
     <string name="guide_n_moon_title">For books opened from the Home tab or bookshelf view, added when you open the menu</string>
     <string name="guide_n_kindle_title">For books not yet downloaded, added when you open the menu</string>
+    <string name="guide_n_bookers2_cover">Added only for books whose details you viewed</string>
     <string name="guide_n_epub">EPUB only</string>
     <string name="guide_r_kyobo_shelf">Cannot be read from the Kyobo eBook app</string>
     <string name="guide_r_myyes_capture">my YES blocks screen capture</string>

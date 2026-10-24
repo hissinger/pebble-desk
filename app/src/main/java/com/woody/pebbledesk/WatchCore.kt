@@ -15,6 +15,7 @@ import com.woody.pebbledesk.readers.ReaderAdapter
 import com.woody.pebbledesk.readers.ReaderApp
 import com.woody.pebbledesk.readers.ScreenReader
 import com.woody.pebbledesk.readers.ViewerTime
+import com.woody.pebbledesk.readers.installed
 import com.woody.pebbledesk.readers.usableThumb
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -64,7 +65,8 @@ object HomeSignals {
 class WatchCore(private val host: WatchHost, private val clock: WatchClock, private val recorder: BookRecorder, apps: List<ReaderApp>) {
     private val context get() = host.context
     private val prefs: SharedPreferences by lazy { Storage.of(context).getSharedPreferences(WATCH_PREFS, Context.MODE_PRIVATE) }
-    private val entries: Map<String, Entry> = apps.associate { it.pkg to Entry(it) }
+    /** 패키지마다 앱 파일의 기억(판에 따라 다른 앱이면 여럿, 알림마다 깔린 판의 것을 고른다 [entry]) */
+    private val entries: Map<String, List<Entry>> = apps.map { Entry(it) }.groupBy { it.pkg }
 
     /** 그 앱의 화면이 마지막으로 바뀐 때(어느 앱이든) */
     private var lastTransition = 0L
@@ -87,7 +89,7 @@ class WatchCore(private val host: WatchHost, private val clock: WatchClock, priv
 
     /** 이북 앱의 접근성 알림. 다른 앱은 무시한다. [click] 은 누름 알림일 때만 */
     fun onEvent(pkg: String, type: Int, cls: String?, click: Click?) {
-        val e = entries[pkg] ?: return
+        val e = entry(pkg) ?: return
         WatchLog.event(context, pkg)
         guard(e) {
             // 서재는 화면이 바뀌는 동안(칸을 다시 채우는 중, 표지를 불러오는 중, 누른 칸이 반전된 순간) 읽지 않고 멈출 때까지 미룬다.
@@ -98,7 +100,7 @@ class WatchCore(private val host: WatchHost, private val clock: WatchClock, priv
                     val isScreen = cls != null && cls.startsWith(e.app.classPrefix) && host.isActivity(pkg, cls)
                     val name = cls?.takeIf { isScreen }?.let { withHolder(e, it) }
                     logScreen(e, name ?: cls.orEmpty(), isScreen)
-                    if (!isScreen) e.adapter.onWindow(e)
+                    if (!isScreen) e.adapter.onWindow(e, cls)
                     name?.let { enterScreen(e, it, byWindow = true) }
                     readScreen(e, force = true)
                 }
@@ -111,6 +113,14 @@ class WatchCore(private val host: WatchHost, private val clock: WatchClock, priv
                 AccessibilityEvent.TYPE_VIEW_CLICKED -> click?.let { e.adapter.onClick(e, it) }
             }
         }
+    }
+
+    /** [pkg] 의 깔린 판을 맡는 앱 파일의 기억([installed]) */
+    private fun entry(pkg: String): Entry? {
+        val list = entries[pkg] ?: return null
+        list.singleOrNull()?.let { return it }
+        val app = list.map { it.app }.installed(context)
+        return list.first { it.app === app }
     }
 
     /** 서비스가 붙었다 */
@@ -126,7 +136,7 @@ class WatchCore(private val host: WatchHost, private val clock: WatchClock, priv
 
     /** 홈으로 돌아왔다(읽은 시간·책을 그리기 전): 데이터로 아는 앱을 맞춘다 */
     fun home() {
-        for (e in entries.values) guard(e) { e.adapter.onHome(e) }
+        for (e in entries.values.flatten()) guard(e) { e.adapter.onHome(e) }
     }
 
     /**
@@ -136,7 +146,7 @@ class WatchCore(private val host: WatchHost, private val clock: WatchClock, priv
      */
     private fun closeHeldViewers() {
         val now = clock.now()
-        for (e in entries.values) when (e.app.viewerTime) {
+        for (e in entries.values.flatten()) when (e.app.viewerTime) {
             ViewerTime.MARKS_CLOSED -> {
                 e.screen = null
                 recorder.viewerShown(e.pkg, shown = false, at = now)
@@ -240,13 +250,20 @@ class WatchCore(private val host: WatchHost, private val clock: WatchClock, priv
         val wanted = spots.distinctBy { it.id ?: it.key ?: it.title }
         val app = e.app
         val appContext = context.applicationContext
+        val screenAt = e.screen
         host.screenshot { shot ->
-            val still = e.adapter.stillSpots(e, wanted)
+            // 찍는 사이 그 앱을 떠났거나 그 앱의 다른 화면(읽는 화면 등)으로 넘어갔으면 다른 화면이 찍혔을 수 있어 버린다. 다음에 서재를 볼 때 다시 찍는다
+            if (host.root(e.pkg) == null || e.screen != screenAt) { shot.recycle(); return@screenshot }
+            // 찍은 뒤 다시 읽기·기록도 앱 처리라 그 예외는 적고 넘어간다(화면 스레드에서 돈다)
+            var still = emptyList<CoverSpot>()
+            guard(e) { still = e.adapter.stillSpots(e, wanted) }
+            if (still.isEmpty()) { shot.recycle(); return@screenshot }
             Bg.run({
                 try {
                     still.mapNotNull { spot ->
-                        val r = Rect(spot.rect).apply { intersect(0, 0, shot.width, shot.height) }
-                        if (!usableThumb(r)) return@mapNotNull null
+                        // 화면 밖 자리(웹 화면·Compose 요소가 화면 밖 좌표를 주기도 한다)는 건너뛴다(그 화면의 다른 표지는 그대로)
+                        val r = Rect(spot.rect)
+                        if (!r.intersect(0, 0, shot.width, shot.height) || !usableThumb(r)) return@mapNotNull null
                         val raw = Bitmap.createBitmap(shot, r.left, r.top, r.width(), r.height())
                         // 이북 앱의 기본 그림(이지뷰어의 파일 종류 아이콘: 그림을 아직 만들지 않은 파일·받기 전의 원격 파일). 칸 바탕이 남은 그림으로 본다.
                         if (app.placeholderCover(appContext, raw)) return@mapNotNull null
@@ -259,11 +276,13 @@ class WatchCore(private val host: WatchHost, private val clock: WatchClock, priv
                     shot.recycle()
                 }
             }) { result ->
-                for ((spot, bytes) in result.getOrNull().orEmpty()) {
-                    // 열쇠 자리(파일 칸)는 그 칸의 책(id), 목록에 없으면 그 열쇠로 잘라 둔다
-                    val book = if (spot.key != null) spot.id?.let { recorder.lookup.get(it) } else recorder.lookup.byTitle(spot.title)
-                    // 한 권이 실패해도(저장 공간 등) 나머지는 넣는다. 못 넣은 책은 다음에 서재를 볼 때 다시 한다.
-                    if (book == null) recorder.pendingCover(spot.key ?: normTitle(spot.title), bytes) else recorder.cover(book.id, bytes)
+                guard(e) {
+                    for ((spot, bytes) in result.getOrNull().orEmpty()) {
+                        // 열쇠 자리(파일 칸)는 그 칸의 책(id), 목록에 없으면 그 열쇠로 잘라 둔다
+                        val book = if (spot.key != null) spot.id?.let { recorder.lookup.get(it) } else recorder.lookup.byTitle(spot.title)
+                        // 한 권이 실패해도(저장 공간 등) 나머지는 넣는다. 못 넣은 책은 다음에 서재를 볼 때 다시 한다.
+                        if (book == null) recorder.pendingCover(spot.key ?: normTitle(spot.title), bytes) else recorder.cover(book.id, bytes)
+                    }
                 }
             }
         }

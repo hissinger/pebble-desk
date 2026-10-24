@@ -74,19 +74,18 @@ class MoonReaderReader(app: MoonReaderApp) : ScreenReader(app) {
         val key = normTitle(title)
         if (key in fileSearched) return
         val lookup = ctx.recorder.lookup
-        val book = lookup.byTitle(title) ?: return
+        // 이 앱의 책만(같은 제목의 다른 앱 책에 이 앱의 파일을 적지 않는다)
+        val book = lookup.byTitle(title)?.takeIf { it.app?.substringBefore('/') == ctx.pkg } ?: return
         if (lookup.hasCover(book.id) || lookup.filePath(book.id) != null || !BookFiles.canRead(ctx.context)) return
         fileSearched += key
         ctx.inBackground({ BookFiles.findEpub(title, author) }) { result ->
             val path = result.getOrNull() ?: return@inBackground
             ctx.log(WatchLog.Kind.FILE, title, File(path).name)
-            saveFile(ctx, title, path)
+            // 찾는 사이 책을 빼거나(다른 앱으로 되살렸을 수도 있다) 다른 파일을 적었으면 두지 않고, 다음에 다시 찾는다.
+            // 홈에서 그 파일을 바로 열고, 표지가 없으면 그릴 때 그 파일에서 꺼낸다
+            val still = lookup.get(book.id)?.takeIf { it.app?.substringBefore('/') == ctx.pkg && lookup.filePath(it.id) == null }
+            if (still != null) ctx.recorder.setFile(still.id, path) else fileSearched -= key
         }
-    }
-
-    /** 이북 앱이 [title] 로 연 파일을 그 책에 적어 둔다(홈에서 그 파일을 바로 열고, 표지가 없으면 그릴 때 그 파일에서 꺼낸다) */
-    private fun saveFile(ctx: AppContext, title: String, path: String) {
-        ctx.recorder.lookup.byTitle(title)?.let { ctx.recorder.setFile(it.id, path) }
     }
 
 }

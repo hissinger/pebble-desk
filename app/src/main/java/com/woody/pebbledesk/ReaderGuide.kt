@@ -5,6 +5,7 @@ import android.os.Build
 import com.woody.pebbledesk.readers.Aladin
 import com.woody.pebbledesk.readers.BookFusion
 import com.woody.pebbledesk.readers.Bookers
+import com.woody.pebbledesk.readers.Bookers2
 import com.woody.pebbledesk.readers.CherieViewer
 import com.woody.pebbledesk.readers.EasyView
 import com.woody.pebbledesk.readers.EasyViewFree
@@ -108,6 +109,10 @@ internal object ReaderGuide {
             listOf(R.string.guide_t_aladin_list),
             cover = yes(R.string.guide_n_resume_cover), title = yes(R.string.guide_n_aladin_title),
             author = Field(R.string.guide_added_list_view), progress = YES, due = Field(R.string.guide_added_list_view),
+        )),
+        App(listOf(R.string.guide_bookers2), listOf(Bookers2), Info(
+            listOf(R.string.guide_t_libby_time),
+            cover = yes(R.string.guide_n_bookers2_cover), title = YES, author = YES, progress = YES, due = YES,
         )),
         App(listOf(R.string.guide_bookers), listOf(Bookers), Info(
             listOf(R.string.guide_t_bookers_bottom),

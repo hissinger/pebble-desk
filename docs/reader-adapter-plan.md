@@ -15,9 +15,9 @@
 | 앱 | `ReaderSpec` 표시 | 서비스에 들어간 처리 | 서비스에 든 그 앱의 기억 |
 |---|---|---|---|
 | KOReader | `fileState` | `syncFiles`·`fileOpened`·`markFileViewer`·`newFile`·`saveFile`, 내용 바뀜 무시, `closeHeldViewers` 의 '열림' | prefs `sync_<앱>`·`file_<앱>` |
-| Readest | `viewerKeys` | `readKeyed`·`newKeyed`·`keyedBook`·`keyCover`·`syncKeys`, 누른 칸을 열쇠 볼 때 씀 | `unknownKeys`·`keyCovers`, prefs `key_…`·`book_key_…`·`last_key_…` |
+| Readest | `viewerKey` | `readKeyed`·`newKeyed`·`keyedBook`·`keyCover`·`cropSpots`(찍기 전·찍은 뒤), 누른 칸을 열쇠 볼 때 씀 | `unknownKey`·`keyCovers`, prefs `key_…`·`book_key_…`·`last_key_…` |
 | 네오리더 | `viewerTabs`·`fileViewer` | `enterTab`, `fileRetries`, 파일 모르면 넣지 않음 | `unknownTab`, prefs `tab_book_<탭>` |
-| 이지뷰어·채리뷰어 | `confirmsOpen`(+`bookFile`) | `rememberOpening`·`openingFor`·`viewerFileAt`·`fileGuess`·`inSameFolder`·`rememberShelfFile`·`lastShelfBook`·`retitle`·`fileInfo`, 홈에서 연 파일 `homeOpened` | `openingFiles`·`viewerFiles`·`viewerFileBooks`·`clickedFiles`, prefs `shelf_file_…`·`shelf_book_…` |
+| 이지뷰어·채리뷰어 | `confirmsOpen`(+`bookFile`) | `rememberOpening`·`openingFor`·`viewerFileAt`·`fileGuess`·`inSameFolder`·`rememberShelfFile`·`lastShelfBook`·`retitle`·`fileInfo`, 홈에서 연 파일 `homeOpened` | `openingFiles`·`viewerFiles`·`viewerFileBooks`·`clickedFiles`, prefs `shelf_file_…`·`shelf_book_…`·원격 파일 `remote_…`·`remote_of_…` |
 | BookFusion·밀리(e-ink) | `clickOnly`·`webBook` | 책 상세 기억·사라진 뒤 3초·누를 때 상세 표지 찍기 | `webBook`·`webGone`·`lastWebRead` |
 | 알라딘 | `recent` | 돌아와서 '최근 읽은 책' 줄로 판단 | `readSince`·`readerAt`·`readKnown`·`recentWait`, prefs `recent_<앱>` |
 | Libby·Readest | `viewerHolder` | `withHolder`·`checkHolder`, 읽는 화면 열림·닫힘 표시 | `holderSpec`·`lastHolderCheck` |
@@ -261,7 +261,7 @@ interface ReaderAdapter {
     /** 읽는 화면에 들어왔다(공통 전이 뒤): 그 앱의 읽는 화면 기억 비우기와 무엇으로 책을 기록하나(바탕: 누른 칸). 앱마다 다른 것은 여기서만 바꾼다 */
     fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {}
     /** 액티비티가 아닌 창이 떴다(대화상자. 지금 이지뷰어 열기 확인 창 rememberOpening) */
-    fun onWindow(ctx: AppContext) {}
+    fun onWindow(ctx: AppContext, cls: String?) {}
     /**
      * 화면 이름(screenInsideActivity 앱만 부른다, Libby·Readest): [activity](창 알림의 액티비티, 내용 알림이면 기억한 화면의 액티비티 부분, 모르면 null)
      * 안에 읽는 화면이 떠 있으면 `activity#요소`, 아니면 activity. 판단할 수 없으면(맨 앞 창이 그 앱이 아님) null — "지금 모름".
@@ -282,7 +282,7 @@ interface ReaderAdapter {
     fun beforeOpened(ctx: AppContext) {}
     /** ctx.opened 의 기록기가 **예외 없이 돌아온 뒤**: bookOpened 가 끝난 뒤에 하던 이어 두기(Readest 열쇠 ↔ 책). 기록 도중의 일은 OpenSteps */
     fun afterOpened(ctx: AppContext, book: ShelfBook) {}
-    /** 화면에서 표지를 잘라도 되나(기본 true). 그 앱 데이터에서 원본 표지를 가져올 수 있으면 false(Readest, 지금 dataCovers). ctx.capture 가 맨 앞에서 본다 */
+    /** 화면에서 표지를 잘라도 되나(기본 true). ctx.capture 가 맨 앞에서 본다(지금 덮는 앱 없음. Readest 는 데이터에 표지가 없는 책만 찍게 찍기 전에 거른다) */
     fun capturesCovers(ctx: AppContext): Boolean = true
     /**
      * 화면을 찍은 직후(메인 스레드), 찍기 전에 정한 자리 가운데 아직 그 자리에 있는 것만 돌려준다(기본: 그대로).
@@ -368,7 +368,7 @@ class CoverSpot(val title: String, val rect: Rect, val id: String? = null, val k
 | 앱 | 순서 |
 |---|---|
 | 바탕(대부분) | 누른 칸(`takeClicked`, 120초 안)이 있으면 그 칸 `opened(ByTitle)` |
-| BookFusion·밀리 e-ink | ① 기억한 책 상세(사라진 지 3초 안, 그 뒤 다른 칸을 누르지 않았을 때)면 그 상세 `opened(ByTitle)` → 그 `beforeOpened` 가 누른 칸을 비움 ② 없으면 바탕(누른 칸) ③ BookFusion 은 둘 다 없고 서재에서 넘어왔으면 `unknown` |
+| BookFusion·밀리 e-ink | ① 기억한 책 상세(보이거나 사라진 지 3초 안·`keepsHidden`(밀리 받기 창), 상세를 마지막으로 본 뒤 다른 칸을 누르지 않았을 때)면 그 상세 `opened(ByTitle)` → 그 `beforeOpened` 가 누른 칸을 비움 ② 없으면 바탕(누른 칸) ③ BookFusion 은 둘 다 없고 서재에서 넘어왔으면 `unknown` |
 | Readest | 누른 칸을 **기록하지 않고 남겨 둔다**(읽는 화면에서 열쇠를 볼 때 처음 보는 열쇠의 제목으로 쓴다) |
 | 이지뷰어 | 다시 들어온 것이면(`!again`) 이 읽는 화면의 파일 기억(본 파일·파일마다 정한 책·누른 파일)을 비움 → 누른 칸이 파일 칸이면 기록하지 않고 "누른 파일"로, 아니면 바탕 → 홈에서 연 파일(`HomeSignals`, 120초 안)도 누른 파일이 없을 때 "누른 파일"로 |
 | 우주 | 데이터 묻기 횟수·메뉴 제목 기억을 다시 세고(`DataAsk`) 바탕 |
@@ -433,9 +433,9 @@ class CoverSpot(val title: String, val rect: Rect, val id: String? = null, val k
 
 | 기록 뒤 일 | 지금 쓰는 책 | 옮긴 뒤 |
 |---|---|---|
-| Readest 열쇠 ↔ 책 | `recordedBook` 을 다시 읽음 | `afterOpened` 에서 `recordedBook` |
-| 우주·네오리더 파일 적기 | `recordedBook` 을 다시 읽음(기록하지 않은 때도) | `onViewer` 에서 `recordedBook` |
-| KOReader 파일 적기 | 제목으로 찾은 책(`saveFile`) | `lookup.byTitle` |
+| Readest 열쇠 ↔ 책 | `recordedBook` 을 다시 읽음 | `opened` 가 돌려준 책이 `recordedBook` 과 같을 때만(2026-10-24 리뷰로 고침) |
+| 우주·네오리더 파일 적기 | `recordedBook` 을 다시 읽음(기록하지 않은 때도) | 기록했으면 `opened` 가 돌려준 책, 아니면 `recordedBook`(2026-10-24 리뷰로 고침) |
+| KOReader 파일 적기 | 제목으로 찾은 책(`saveFile`) | `opened` 가 돌려준 책이나 `recordedBook`, KOReader(두 판) 책일 때만(다른 앱 책에는 적지 않는다, 2026-10-24 리뷰로 고침) |
 | 이지뷰어 제목 바꾸기·서재 파일, 네오리더 탭 ↔ 책 | 기록기 안의 그 책 | `steps.found`·`logged` 의 `book` |
 
 ### `AppContext`: 앱 파일이 받는 것(G5 반영)
@@ -525,7 +525,7 @@ KOReader F-Droid·이지뷰어 두 판·채리뷰어)은 지금처럼 같은 클
   다른 앱 무영향도 확인했다. 이 단계(B1)에서 통로를 우주 어댑터로 옮긴다.
 - **지금**: `Woojoo.kt` + 공통 `fileBook`(묻는 횟수 `fileTries`·메뉴 제목별 기억 `fileTitles`·`knownTitle`), `fileData`(데이터 진행률·`dataCover`), `fileOpener`(`Apps.openBook`).
 - **옮긴 뒤 `Woojoo.kt`**: `onViewer` 에서 RecentBooks 로 책을 찾고(`DataAsk`: 메뉴 제목이 새로 보일 때와 읽는 화면이 앞에 온 뒤 메뉴 없이 6번까지)
-  `opened(Exact(lookup.byFile(path) ?: lookup.withoutFile(title)), at = 데이터로 안 책의 편 때)`(제목은 `lookup.knownTitle`), 그 뒤 `recordedBook` 에 `setFile`.
+  `opened(Exact(lookup.byFile(path) ?: lookup.withoutFile(title)), at = 데이터로 안 책의 편 때)`(제목은 `lookup.knownTitle`), 그 뒤 `opened` 가 돌려준 책에 `setFile`(메뉴 없이 데이터로 안 책이 떠난 탭의 책이면 이 탭의 책으로 보지 않는다).
   찾지 못하면 `recordShown`(메뉴 제목). 화면에 진행률이 없으면 `app-Progress.json` 으로 `status`, 표지가 없고 그 파일에서 표지를 꺼낼 수 없으면(EPUB·그림이 아니거나 책 파일을 읽을 수 없음) `inBackground { 우주 표지 그림 } → cover`(같은 파일 겹쳐 꺼내지 않음).
   서재는 `ScreenReader`(PDF 칸 거르기 `readCell`). `open` = `File(OpenerActivity, 경로)`.
 - **`DataAsk`**(readers/ 도우미, 우주·네오리더): 지금 서비스의 `fileBook`·`fileTries`·`fileTitles` 를 그대로 옮긴 것. 이 단계에서 만들고 네오리더는 B4 에서 쓴다(그때까지 네오리더는 `Legacy` 의 것).
@@ -552,7 +552,7 @@ KOReader F-Droid·이지뷰어 두 판·채리뷰어)은 지금처럼 같은 클
 
 - **지금**: `KOReader.kt`(history.lua·.sdr) + 서비스 `syncFiles`(앞에 올 때·홈으로 돌아올 때)·`fileOpened`·`markFileViewer`·`newFile`·`saveFile`, prefs `sync_<앱>`·`file_<앱>`, 내용 바뀜 무시,
   `closeHeldViewers` 에서 '열림', `ReaderApps.hostsViewer`·`shownByDefault`, 시작하기에서 먼저 보임.
-- **옮긴 뒤 `KOReader.kt`**: `onViewer`(앞에 와 잠잠해짐 — 지금 `readViewer` 의 `fileState` 갈래와 같은 때)·`onHome`(깔려 있을 때) 에서 지난번 뒤에 열고 닫은 책들을 **`opened(ByTitle)` 뒤 제목으로 찾은 책에 `setFile`**(지금 `fileOpened`·`saveFile`) ·`viewerShown(at)` 으로.
+- **옮긴 뒤 `KOReader.kt`**: `onViewer`(앞에 와 잠잠해짐 — 지금 `readViewer` 의 `fileState` 갈래와 같은 때)·`onHome`(깔려 있을 때) 에서 지난번 뒤에 열고 닫은 책들을 **`opened(ByTitle)` 뒤 그 책에 `setFile`**(KOReader 두 판의 책일 때만, `fileOpened`·`saveFile`) ·`viewerShown(at)` 으로.
   처음 맞출 때 지금 책만, 목록에 없는 책은 처음 보는 파일일 때만 넣는 규칙도 어댑터 안에. 데이터를 읽을 수 없으면 '열림'.
   `viewerTime = MARKS_OPEN`, `markedScreens` = 읽는 화면 액티비티, `readsContent = false`, `fileOrder = 0`. `open` = `File(실행 화면, 경로)`.
 - **서비스에서 지울 것**: 위 함수, `fileState` 표시와 그 갈래 4곳(내용 바뀜·`readViewer`·`closeHeldViewers`·`syncFiles`), `ReaderApps` 의 `fileState` 쓰임.
@@ -562,7 +562,7 @@ KOReader F-Droid·이지뷰어 두 판·채리뷰어)은 지금처럼 같은 클
 
 - **지금**: `NeoReader.kt`(Metadata 창구) + 서비스 `enterTab`·`setTabBook`·`tabBook`(prefs `tab_book_<탭>`)·`unknownTab`, `fileBook`·`fileTries`·`fileTitles`·`knownTitle`·`fileRetries`(파일을 모르면 넣지 않음),
   `Apps` 의 `fileReaders`·`fileViewer` 갈래·`findBookFile` 의 `bookFiles`.
-- **옮긴 뒤 `NeoReader.kt`**: `keepsUnknownOnReenter = true`(공통 전이가 책 모름이 된 때를 지우지 않음 — 같은 모르는 탭에 다시 오면 처음 열린 때를 둔다, 지금 `enterTab` 의 `unknownTab` 비교와 함께).
+- **옮긴 뒤 `NeoReader.kt`**: `keepsUnknownOnReenter = true`(공통 전이가 책 모름이 된 때를 지우지 않음 — 같은 모르는 탭에 다시 오면 처음 열린 때를 둔다, 지금 `enterTab` 의 `unknownTab` 비교와 함께. 날이 바뀌었으면 다시 적는다(탭이 앞에 올 때 본다)).
   `onEnterViewer`(바탕 뒤)에서 탭의 책 `opened(Exact(id))` 또는 `unknown`, `onViewer` 에서 메뉴 제목·Metadata(`DataAsk`)로
   `opened(Exact(lookup.byFile(path) ?: lookup.withoutFile(title)), at = 데이터로 안 책의 편 때, steps.logged = 탭 ↔ 책)` 뒤 `recordedBook` 에 `setFile`.
   파일을 모르면 메뉴 제목으로 **기록하지 않고**(바탕 `recordShown` 을 부르지 않음) 진행률만 편 책 기록의 책에 적고 `viewerAgain`, 5번까지 — 지금 동작.
@@ -720,10 +720,63 @@ KOReader F-Droid·이지뷰어 두 판·채리뷰어)은 지금처럼 같은 클
 - **B6**: `DetailMemory` 대신 두 앱이 같이 쓰는 어댑터 `DetailReader`(책 상세 읽기는 각 앱의 `webBook` 을 넘긴다).
 - **Readest 열쇠 ↔ 책**: `afterOpened` 대신 `ctx.opened` 가 돌아온 뒤 바로(`newKeyed`) — 예외면 둘 다 건너뛰어 같다.
 - **앱 처리 예외**: `WatchCore` 가 그 알림만 건너뛰고 `WatchLog` 에 `ERROR` 로 적는다(예전에는 서비스가 죽었다).
+- **옮긴 뒤 리뷰·기기 시험으로 더한 공통 자리(2026-10-24)**: 모양(서비스 → `WatchCore` → 앱 선언 + 어댑터 → 기록기)은 그대로이고, 다음을 더하거나 바꿨다.
+  - 패키지는 같은데 판에 따라 다른 앱(북커스 2.0): `ReaderApp.handles` 와 `installed()`, `WatchCore` 는 패키지마다 앱 목록을 두고 알림마다 깔린 판을 고른다(계획에 없던 경우).
+  - 훅 `onWindow(ctx, cls)`: 뜬 창의 이름을 넘긴다(밀리 받기 창).
+  - 도우미 `DetailReader`: `keepsHidden(ctx, gone)`(기본 아니다), 상세를 마지막으로 본 때로 누른 칸과 가름, 상세 안의 단추는 누른 칸을 버리지 않음.
+  - 바탕 `ScreenReader` 의 누름(바탕 흐름을 바꾼 공통 변경, 앱마다 시험함): 서재 화면 창 자체에서 칸이 아닌 것을 누르면 앞서 누른 칸을 버린다(받기만 한 칸이 그 뒤 연 다른 책 대신 들어가지 않게). 화면 창인지는 서재 화면이 뜰 때 기억한 창 id 로 가린다(모달 대화상자는 창 목록에서 아래 창을 빼고, 누름 알림 전에 닫히기도 한다). 위 창을 누른 것은 기록에 `위 창`.
+  - `WatchCore.capture`: 찍는 사이 그 앱을 떠났거나 화면이 바뀌었으면 찍은 것을 버린다.
+  - 기록기 `coverFromFile`: EPUB 에서 표지를 실제로 꺼낼 수 있을 때만.
 - **시험**: 단위 `BookLookupTest`·`BookRecorderTest`·`WatchCoreTest`(연결 시험)·`CommonCodeTest`(공통 코드에 앱 이름 없음). 에뮬은 `tools/emu/watch-*.sh` 로 우주·BookFusion·이지뷰어(한 바퀴)·KOReader·문리더(주 에뮬)·Readest(Readest 에뮬)를
   단계마다 바꾸기 전 빌드와 비교해 모두 같았다.
-- **실기기 확인 대기**(에뮬에 로그인·대출·앱이 없음): 교보도서관·교보eBook·밀리(e-ink·휴대폰)·알라딘·북커스·리디·YES24·킨들·Libby·네오리더. 이 앱들은 단위 테스트와 코드 대조로만 봤다.
-  정한 것 10 대로 이 개편이 든 판은 실기기 확인 전에는 릴리스하지 않는다. 이지뷰어의 열기 확인 창·원격 파일·그림 폴더도 코드를 그대로 옮겼고 에뮬에서 다시 보지 않았다.
+- **에뮬 더(2026-10-24)**: Libby·킨들·문리더 유료판도 바꾸기 전 빌드와 같았다. 네오리더는 `Poke3Dpi350_A10`(Go6 시험판, 여러 탭)에서 두 앱 데이터를 비우고
+  바꾸기 전·뒤 빌드를 두 번씩 같은 순서(메뉴 없이 PDF / 파일 안 제목이 같은 다른 PDF / 아는 PDF 다시 / CBZ 메뉴 없이 → 메뉴)로 돌려 DB·탭 기억이 같았고, 홈에서 누르면 그 책의 탭으로 열렸다
+  (제목 없는 진행률 다시 보기 줄이 한 번은 한쪽에만 있었으나 다음 판에서는 둘 다 있어 때의 차이).
+- **실기기(크레마 페블, 2026-10-24)**: 밀리(e-ink) 서재 칸, 알라딘 격자 칸(메뉴 제목 → 나간 책 되살림, 돌아와서 다시 적지 않음), 리디(26.10.2 업데이트 앞뒤), 킨들(나간 책 되살림·저자),
+  교보eBook(e-ink, 아래 줄 진행률·메뉴 제목)이 바꾸기 전과 같게 들어왔다. 밀리(e-ink) 검색 › 상세 › `바로 읽기` 는 밀리가 다운로드에 실패해 읽는 화면까지 못 갔다(실패해도 책은 안 들어감).
+  교보도서관·YES24 전자도서관은 빌린 책이 없어 못 봤고, my YES 는 USB 디버깅을 끈 채 사용자가 눌러 봐야 한다. 북커스는 시험 중에 2.0.0 으로 업데이트되어 지금 코드로는 읽을 수 없다(READER_APPS.md 북커스).
+- **같이 고친 것**: 서재에 책이 한 권뿐일 때 위 탭을 누르면 그 책을 누른 것으로 잡았다(바꾸기 전부터. 북커스 1.x 는 만료된 칸이 그대로 들어갔고, 밀리 e-ink 는 누른 칸으로 기억만 했다).
+  위로 올라가며 칸을 찾을 때 목록(RecyclerView 등)을 넘지 않고, 제목이 누른 곳 밖의 목록에만 있는 묶음은 칸으로 보지 않는다(`ReaderApp.cellOf`·`titleInOtherList`, `ClickedCellTest`).
+  고친 뒤 페블에서 밀리 탭 누르기(책 아님)·칸 누르기, 알라딘·리디·킨들이 같게 들어오는 것을 봤다.
+- **실기기(갤럭시 A23 안드로이드 14, 2026-10-24)**: 밀리(휴대폰) 5.47.1.0(내서재 표지 → 책·저자·표지, 메뉴 진행률), 교보eBook(휴대폰) 3.9.14(메뉴 제목 → 책, 아래 줄 진행률),
+  YES24 eBook 3.4.44(서재 칸 → 책·저자·표지·진행률, 책이 한 권인 서재에서 탭을 눌러도 책 아님)가 들어왔다. 북커스 2.0.0 은 새 앱 파일 `Bookers2` 로 읽는다(READER_APPS.md).
+- **교보도서관(페블, 2026-10-24)**: 받지 않은 칸을 눌러 받기만 했는데 그 책이 들어왔다(개편 전부터, 누르면 바로 편 것으로 봤다). `openOnViewer` 로 읽는 화면이 열려야 편 것으로 바꿨고,
+  받아 둔 「성과를 만드는 생각」을 누르면 읽는 화면이 뜬 뒤 들어오는 것을 봤다(저자·반납일·표지). 고친 뒤 받기만 한 책이 들어오지 않는 것은 사용자가 확인했다(기록에도 누름만, 편 책 없음).
+- **북커스 1.0.33(페블, 2026-10-24)**: 받기 단추만 눌러도 들어오던 것을 교보도서관처럼 `openOnViewer` 로 고쳤고, 받기만 한 책은 안 들어오고 열면 들어오는 것·탭 누름은 책이 아닌 것·반납일을 봤다.
+- **밀리(e-ink) `바로 읽기`(페블, 2026-10-24)**: 개편 전부터 있던 두 가지를 고쳤다(`DetailReader`, BookFusion 도 같이 쓴다).
+  ① 상세 표지가 들어오지 않았다: 목록에 없는 책은 상세 표지를 찍지 않았고(`onShelf` 가 목록에 있는 책만), 찍어도 찍은 뒤 다시 보기가 서재 칸끼리만 맞춰 상세 자리를 늘 버렸다(`stillSpots`).
+  → 상세가 멈추면 목록에 없는 책도 잘라 두고, 상세 자리는 그 상세가 그대로면 둔다. ② 받아야 하는 책은 받기 창(`SearchDownloadDialog`)이 떠 있는 동안 상세가 안 보여 3초 뒤 잊고,
+  읽는 화면이 열릴 때 메뉴 제목으로만(저자 없이) 들어왔다 → 밀리만의 일이라 도우미에는 기본이 아무것도 안 하는 자리(`keepsHidden`)만 두고, 밀리 어댑터 `MillieReader` 가
+  상세를 기억한 채 받기 창(`SearchDownloadDialog`)이 뜨고 상세가 그 무렵(2초 안) 사라졌으면 60초까지 잊지 않게 했다(`onWindow`·`keepsHidden(ctx, gone)`. 받기를 취소하고 뒤로 나가 사라진 것은 3초). 나눈 뒤에도 받아야 하는 「할 수 있다! AI 주식 투자」가 저자 머신러너·표지로 들어왔다. 고친 뒤 받아야 하는 「AI 시대에도 승승장구하는 아날로그형 직장인」이
+  제목·저자 김찬기·상세 표지로 들어왔다. BookFusion 은 `CremaPebble_A11_Play`(BookFusion 2.24.0, 사용자 계정)에서 이 수정 앞뒤 빌드로 `bookfusion` 순서(격자 칸 → 상세 → `Read`)를
+  앱 데이터를 비우고 두 번씩 돌려 같았다(첫 바퀴는 서비스가 붙는 때 차이로 기록 줄 하나만 달랐다).
+- **YES24 전자도서관 e-ink 1.0.27(페블, 2026-10-24, 고양시도서관센터)**: 대출 → 상세의 `다운로드 받기`(받기만)는 들어오지 않고(`openOnViewer`, 상세는 `LibDetailActivity` 라 서재가 아니다),
+  내 서재 칸을 눌러 열면 「고양이와 물리학」이 저자 블라트코 베드럴·표지·진행률 1%·반납일(`반납 D-day` → 오늘)로 들어왔다. 책이 한 권인 서재에서 탭을 눌러도 책이 아니다.
+- **YES24 전자도서관 휴대폰 1.0.63(갤럭시, 2026-10-24, 같은 계정)**: 내 서재 칸의 받기 단추만 누르면 들어오지 않고, 표지를 눌러 열면 저자·표지·반납일(`D-15 (2026.11.08 까지)`)로,
+  메뉴를 띄우면 진행률 2% 가 들어왔다. 탭 누름은 책이 아니다. 책을 처음 열면 읽는 화면 위에 다섯 쪽짜리 사용 안내(`LibTutorialActivity`)가 떠, 위 `닫기` 를 누르기 전에는
+  쪽 넘김·메뉴가 그 안내로 가 진행률이 들어오지 않는다(닫으면 그 뒤로는 안 뜬다). 페블 e-ink 판은 같은 책을 빌린 직후 서재에 `반납 D-day` 로 보여 반납일이 오늘로 적혔다
+  (서재를 볼 때마다 다시 적으므로 앱이 맞게 보이면 고쳐진다, 페블을 다시 보지 못함).
+- **my YES 1.5.99(페블, 2026-10-24, 사용자가 USB 디버깅을 끈 채 눌러 보고 기록으로 확인)**: 기본책장에서 연 「메밀꽃 필 무렵 [에디션]」이 저자 이효석(서재 칸)·진행률 46% 로,
+  구매목록 창의 `열기`(누른 요소가 비어 와 먼저 '책 모름')로 다시 연 같은 책은 메뉴 제목으로 그 책이 다시 앞에·50% 로 들어왔다. 받기만 한 「수상한 사람들」은 들어오지 않았고, 표지는 화면 캡처가 막혀 없다(원래대로).
+- **이지뷰어 남은 경우(에뮬 `CremaPebble_A11_Play`, 2026-10-24)**: 바꾸기 전(`eedd412`)·뒤 빌드를 앱 데이터를 비우고 같은 순서로 돌려 같았다 —
+  같은 이름 다른 폴더(`SameA`·`SameB` 의 `same.epub` 가 두 권, 각자 경로·저자), 다른 앱으로 연 파일(책 모름) → ▶ 열기 확인 창 `확인`(그 파일로 넣음, 「세 번째 시험 책」·이순신·경로),
+  원격 파일(Mac 의 pyftpdlib `10.0.2.2:2121` 의 `#macftp/novels/Ftp_Book2.epub` → 받은 파일 `easyview/down/<서버>/novels/ftp_book2.epub` 로 「FTP 두 번째 책」·정약용).
+  다른 곳은 기록 줄 하나뿐: 바꾸기 전 빌드는 책 하나인 폴더에서 위 경로 단추(`#휴대폰`)를 누른 것을 그 책을 누른 것으로 적었다(오늘 고친 책 한 권 서재의 탭 누름).
+- **앱별 코드 리뷰(2026-10-24, 두 번)**: 1차 지적을 고친 뒤 페블(교보도서관 칸 → 열면 들어옴, 밀리 e-ink 받은 책·받아야 하는 책의 `바로 읽기` → 저자·표지, 북커스 1.0.33 받기만 → 안 들어옴·열면 들어옴)과
+  에뮬(BookFusion 두 번, 이지뷰어 원격·같은 이름 다른 폴더·▶ 확인 창)에서 바꾸기 전과 같았다. 2차에서 고친 것: 책 상세를 마지막으로 본 뒤 누른 칸이 먼저(`DetailReader` 사라진 때는 늦게 적혀),
+  밀리 받기 창 기억은 상세가 그 창 무렵 사라졌을 때만, Readest 열쇠의 책이 나간 책이면 그 책만 되살리고 같은 제목의 나간 책이 다른 열쇠면 새 책·찍기 전에 거름·config.json 막 고친 것은 다시 읽음,
+  이지뷰어 원격 파일은 위치·이름 → 책을 따로 적어 다시 열어도 같은 책(로컬 같은 제목과 섞지 않음)·`Vol#3 x.cbz` 는 장이 아님·확인 창 취소는 10초, 북커스 2.0 메뉴 제목은 나간 `(접근성)` 책도 보고 일반판 책이면 그대로,
+  네오리더 메뉴 없이 데이터로 안 책이 떠난 탭의 책이면 이 탭의 책으로 보지 않음·파일을 받는 화면을 거쳐 연 완독한 책은 되살림·모르는 탭 시각은 날이 바뀔 때만 지움,
+  EPUB 표지는 실제로 꺼낼 수 있어야 있다고 봄·같은 책 복사본은 한 권으로, KOReader 두 판이 서로의 책에 파일을 적음, 문리더는 이 앱 책만 저장소를 훑음.
+  그 뒤 남긴 것을 기기에서 확인해 고쳤다(2026-10-24): 우주 닫은 책 기록(에뮬, 고치기 전 3/3 → 4/4 맞음), 북커스 2.0 `읽고 싶은 책` 탭·받지 않은 칸(갤럭시: 칸으로 못 읽어 `(접근성)` 없는 메뉴 제목으로 들어왔다 →
+  격자·리스트 모두 그 칸, 받기 창·받는 중은 읽는 화면이 아님), YES24 eBook 묶음 칸(갤럭시: 시리즈 이름으로 들어왔다 → 시리즈 책 목록도 서재), 찍는 사이 앱을 떠나면 버림(단위 시험),
+  화면만 한 대화상자는 크기 대신 창 층으로(맨 아래 층이 화면 자체. 단위 시험, 기기에서는 화면을 누른 것이 그대로 화면으로 보였다. 위 창을 누르면 기록에 `위 창`).
+- **세 번째 리뷰(2026-10-24)**: 대화상자 누름을 창 id 로, 찍는 사이 화면이 바뀌면 버림, 밀리 받기 창 기억은 상세가 다시 보이면 지움·120초, 휴대폰 밀리 첫 저자 표시,
+  Readest 같은 읽는 화면 안 열쇠 바뀜·library.json 캐시·지운 책, 이지뷰어 원격 표는 정말 원격일 때만·받은 파일을 나중에 찾아도 같은 책·누른 칸 파일 이름 맞추기, 북커스 2.0 `내 서재` 는 위 제목 글자만·
+  `다운로드` 로 시작하는 제목·`D-day`·나간 `(접근성)` 책보다 읽고 있는 일반판, 네오리더 떠난 탭의 책은 묻기에서 빼고 계속 묻기·파일로 열면 지움·날 바뀜은 탭이 올 때, 우주 제목 못 읽은 칸 누른 때도 기준,
+  EPUB 찾기는 부제가 둘 다 있고 다르면 다른 권, 문리더 찾는 사이 다른 앱 책이 되면 버림. 기기: 우주 3/3·BookFusion·이지뷰어(같은 이름·원격 두 번)·북커스 2.0(홈 카드 아님·격자·리스트)·YES24 시리즈 권이 맞게 들어왔다.
+- **아직 확인 못 함**: 리디 원스토어판·채리뷰어(APK 를 본 적 없어 Play 판·이지뷰어와 같은 코드라고 보고 읽는다).
+  그 밖의 앱은 실기기나 에뮬에서 봤다(네오리더·우주·KOReader·Readest·BookFusion·문리더·Libby 는 에뮬). 정한 것 10 의 실기기 확인은 위로 마쳤다.
 
 ## 검토 반영
 

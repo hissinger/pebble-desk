@@ -25,6 +25,8 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
     /** 이번 서재 방문에서 책(정리한 제목)마다 바로 자르기를 해 본 횟수. 창 바뀜으로 화면이 새로 열릴 때마다 비운다 */
     private val eagerTries = mutableMapOf<String, Int>()
     private var lastEagerRead = 0L
+    /** 서재 화면(액티비티) 창의 id: 누른 것이 그 창 안이면 화면 자체, 아니면 위에 뜬 창(대화상자는 창 목록에서 아래 창을 가리기도 하고 누름 알림 전에 닫히기도 해 창 목록으로는 못 가른다) */
+    private var shelfWindow: Int? = null
 
     /**
      * 공통 전이(덮지 않는다): 서재 안에 뜨는 읽는 화면의 열림·닫힘 표시, 책 파일 읽기 안내, 그리고 읽는 화면이 앞에 왔으면
@@ -33,6 +35,7 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
     final override fun onScreen(ctx: AppContext, name: String, from: String?, again: Boolean, byWindow: Boolean) {
         // 화면이 새로 열릴 때마다(홈에서 돌아온 서재 포함) 바로 자르기 횟수를 다시 센다.
         if (byWindow) eagerTries.clear()
+        if (byWindow && name in app.shelves) shelfWindow = ctx.root?.windowId?.takeIf { it >= 0 }
         val now = ctx.now
         val viewer = app.isViewer(ctx.context, name)
         // 읽는 화면이 서재 액티비티 안에 뜨는 앱은 읽는 화면이 보이고 사라진 때를 읽은 시간에 적는다
@@ -83,9 +86,14 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
             // 방금 읽어 둔 칸으로 맞춘 것은 그 뒤 읽는 화면에서 진행률이 바뀌었을 수 있어 목록에 이미 있는 책에는 쓰지 않는다(반납일은 그대로).
             if (c.stale && ctx.recorder.lookup.byTitle(c.title) != null) c.copy(progress = -1) else c
         }
-        ctx.log(WatchLog.Kind.CLICK, cell?.title.orEmpty())
+        // 위에 뜬 창(대화상자)에서 누른 것은 기록에 `위 창` 으로
+        val main = cell != null || onScreenItself(click)
+        ctx.log(WatchLog.Kind.CLICK, cell?.title.orEmpty(), if (main) "" else ON_TOP)
         when {
             cell == null -> {
+                // 서재 화면 자체에서 책 칸이 아닌 것(탭·다른 칸·표지만 있는 칸)을 눌렀으면 앞서 누른 칸은 버린다(받기만 한 칸이 그 뒤 연 다른 책 대신
+                // 들어가지 않게, 교보도서관). 위에 뜬 창(받기·기간 안내)의 단추는 그 칸을 열려는 것이라 둔다(my YES).
+                if (main && forgetsOnOtherClick) clicked = null
                 // 표지만 있는 칸일 수 있다(누르자마자 읽는 화면으로 넘어가 누른 요소도 읽을 수 없다). 메뉴에 제목이 없는 앱은 알 길이 없어 두지 않는다.
                 if (app.tellsTitle) unknownClick = ctx.now
                 onClickNoCell(ctx)
@@ -95,6 +103,18 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
             else -> openCell(ctx, cell)
         }
     }
+
+    /** 누른 것이 서재 화면 창 자체 안인가(위에 뜬 창이 아니다). 서재 화면 창을 모르면(서비스가 그 앱이 떠 있는 동안 다시 시작됨) 아니라고 본다(기억을 두는 쪽) */
+    private fun onScreenItself(click: Click): Boolean {
+        val window = click.source?.windowId?.takeIf { it >= 0 } ?: return false
+        return window == shelfWindow
+    }
+
+    /**
+     * 서재 화면 자체에서 칸이 아닌 것을 누르면 앞서 누른 칸을 버리는가. 책 상세에서 여는 앱([DetailReader])은 상세 안의 단추(같은 창의 웹 화면)를
+     * 누르기 전에 상세를 못 읽었을 수 있어 두고, 상세·나중에 누른 칸으로 가른다
+     */
+    protected open val forgetsOnOtherClick: Boolean get() = true
 
     /** 서재에서 누른 것이 책 칸이 아니다(제목 못 읽은 누름을 적은 뒤). 바탕: 아무것도 안 함 */
     protected open fun onClickNoCell(ctx: AppContext) {}
@@ -119,8 +139,9 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
         ctx.capture(readShelf(root).distinctBy { it.title }.mapNotNull { s ->
             val thumb = s.thumb?.takeIf(::usableThumb) ?: return@mapNotNull null
             val book = lookup.byTitle(s.title)
-            // 목록에 없는 책은 들어올 때 붙일 표지를 미리 찍어 둔다.
-            val need = if (book == null) !ctx.recorder.hasPendingTitle(s.title) else !lookup.hasCover(book.id)
+            // 목록에 없는 책은 들어올 때 붙일 표지를 미리 찍어 둔다. 책 파일에서 표지를 꺼내는 책은 자르지 않는다(멈춘 서재와 같게)
+            val need = if (book == null) !ctx.recorder.hasPendingTitle(s.title)
+                else !lookup.hasCover(book.id) && !ShelfRecorder.coverFromFile(ctx.context, lookup.filePath(book.id))
             if (need && tryCover(s.title)) CoverSpot(s.title, thumb) else null
         }, retry = false)
     }
@@ -247,6 +268,8 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
     companion object {
         /** 칸을 누른 뒤 이 안에 읽는 화면이 열리면 그 책을 편 것으로 본다(내려받기를 기다리는 시간) */
         const val CLICK_OPEN_MS = 120_000L
+        /** 자동 추가 기록에서 위에 뜬 창을 누른 것의 표시 */
+        private const val ON_TOP = "위 창"
         /** 진행률이 비어 있으면 이 간격으로 다시 읽어 본다 */
         const val VIEWER_RETRY_MS = 1000L
         /** 멈추기 전에 하는 일(바로 자르기·책 상세·최근 줄)의 간격 */

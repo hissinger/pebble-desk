@@ -26,7 +26,7 @@ object Millie : ReaderApp(
     viewerProgress = listOf("tv_viewer_add_on_right"), viewerLoading = "epub_loading_message",
     openOnViewer = true,
 ) {
-    override fun newAdapter(): ReaderAdapter = DetailReader(this, clickOnly = false, ::webBook)
+    override fun newAdapter(): ReaderAdapter = MillieReader()
 
     /** 읽는 화면 메뉴(위 막대)에 제목이 보인다(이름 없는 글자라 [viewerTitle] 대신 [readViewer] 에서 읽는다) */
     override val tellsTitle: Boolean get() = true
@@ -83,3 +83,47 @@ private val COVER_OVERLAYS = listOf(
     "download_start", "dowload_progressBar", "download_cancel", "container_not_service", "v_badge_not_service",
     "container_coming_soon", "bookshelf_cell_cover_dim_none", "bookshelf_cell_cover_dim_selected",
 )
+
+/**
+ * 밀리(e-ink)의 판단과 기억: 책 상세는 [DetailReader] 그대로이고, 받아야 하는 책은 `바로 읽기`를 누르면 받기 창(`SearchDownloadDialog`)이
+ * 상세 위에 떠 받는 동안 상세가 안 보인다. 상세가 그 창이 뜰 무렵([COVER_SLACK_MS] 안) 사라졌으면 창이 뜬 뒤 [DOWNLOAD_KEEP_MS] 까지는 상세를 잊지 않는다(그 사이 상세가 다시 보이면 받기를 취소한 것)
+ * (받는 데 3초를 넘기면 상세를 잊어 저자 없이 메뉴 제목으로 들어왔다, 2026-10-24 페블). 받기를 취소하고 상세에서 뒤로 나가 사라진 것은 바탕대로 잊는다.
+ * 그 사이 서재 칸을 누르면 그 칸이 먼저다([DetailReader]).
+ */
+private class MillieReader : DetailReader(Millie, clickOnly = false, Millie::webBook) {
+    /** 기억한 상세 위에 받기 창이 뜬 때 */
+    private var coveredAt: Long? = null
+
+    override fun keepsHidden(ctx: AppContext, gone: Long): Boolean =
+        coveredAt?.let { abs(gone - it) <= COVER_SLACK_MS && ctx.now - it < DOWNLOAD_KEEP_MS } == true
+
+    override fun onWindow(ctx: AppContext, cls: String?) {
+        super.onWindow(ctx, cls)
+        if (remembers && cls?.endsWith(DOWNLOAD_DIALOG) == true) coveredAt = ctx.now
+    }
+
+    override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {
+        super.onEnterViewer(ctx, from, again)
+        coveredAt = null
+    }
+
+    /** 받기 창이 뜬 뒤 상세가 다시 보이면(받기를 취소함) 그 창은 지나갔다: 그 뒤 상세가 사라지면 바탕대로 잊는다 */
+    override fun onShelfLive(ctx: AppContext, force: Boolean) {
+        super.onShelfLive(ctx, force)
+        coveredAt?.takeIf { detailShown && ctx.now - it > COVER_SLACK_MS }?.let { coveredAt = null }
+    }
+
+    override fun beforeOpened(ctx: AppContext) {
+        super.beforeOpened(ctx)
+        coveredAt = null
+    }
+
+    companion object {
+        /** 받기 창이 뜬 뒤 상세를 기억해 두는 때(받는 데 걸리는 때, 누른 칸을 기다리는 때와 같게) */
+        private const val DOWNLOAD_KEEP_MS = ScreenReader.CLICK_OPEN_MS
+        /** 받기 창이 뜬 때와 상세가 사라진 때(1초마다 읽어 늦게 적힌다)의 차이가 이만큼 안이면 그 창에 가려진 것 */
+        private const val COVER_SLACK_MS = 2_000L
+        /** 검색 상세의 `바로 읽기` 로 받을 때 뜨는 창 */
+        private const val DOWNLOAD_DIALOG = "SearchDownloadDialog"
+    }
+}

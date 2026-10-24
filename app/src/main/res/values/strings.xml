@@ -262,7 +262,8 @@
     <string name="guide_millie">밀리의서재(e-ink)</string>
     <string name="guide_millie_mobile">밀리의서재</string>
     <string name="guide_aladin">알라딘</string>
-    <string name="guide_bookers">북커스</string>
+    <string name="guide_bookers">북커스(1.x)</string>
+    <string name="guide_bookers2">북커스(2.0 부터)</string>
     <string name="guide_ridi">리디</string>
     <string name="guide_ridi_onestore">리디(원스토어)</string>
     <string name="guide_yes24lib">YES24 전자도서관(e-ink)</string>
@@ -312,6 +313,7 @@
     <string name="guide_n_moon_cover">홈 탭·책장 보기로 연 책은 책 파일 읽기를 켜면 들어옵니다</string>
     <string name="guide_n_moon_title">홈 탭·책장 보기로 연 책은 메뉴를 띄우면 들어옵니다</string>
     <string name="guide_n_kindle_title">받지 않았던 책은 메뉴를 띄우면 들어옵니다</string>
+    <string name="guide_n_bookers2_cover">책 상세를 본 책만 들어옵니다</string>
     <string name="guide_n_epub">EPUB 만 들어옵니다</string>
     <string name="guide_r_kyobo_shelf">교보eBook 앱에서 읽을 수 없습니다</string>
     <string name="guide_r_myyes_capture">my YES 가 화면 캡처를 막습니다</string>

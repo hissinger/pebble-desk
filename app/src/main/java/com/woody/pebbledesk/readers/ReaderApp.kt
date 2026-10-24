@@ -50,7 +50,10 @@ open class ReaderApp(
      * 밀리는 앱을 다시 열 때 잠깐 칸을 다른 책으로 채우므로 쓰지 않는다.
      */
     val eagerCovers: Boolean = false,
-    /** 칸을 눌러도 읽는 화면이 열려야 편 것으로 본다(my YES: 누르면 내려받기·기간 만료 안내가 먼저 뜬다. 밀리: 받지 않은 책은 누르면 받기만 한다. YES24 도서관: 칸 안의 받기·반납 단추도 칸 클릭으로 온다) */
+    /**
+     * 칸을 눌러도 읽는 화면이 열려야 편 것으로 본다(my YES: 누르면 내려받기·기간 만료 안내가 먼저 뜬다. 밀리·교보도서관·북커스: 받지 않은 책은 누르면 받기만 한다.
+     * YES24 도서관·YES24 eBook: 칸 안의 받기·반납 단추도 칸 클릭으로 온다). 그 사이 서재 화면에서 책 칸이 아닌 것을 누르면 그 칸은 버린다([ScreenReader.onClick])
+     */
     val openOnViewer: Boolean = false,
     /**
      * 누른 요소가 든 칸을 못 찾았을 때 누른 곳 자리의 칸으로 본다. 끄는 앱: my YES(구매목록 창이 책장 위에 겹쳐 뒤 창의 칸을 고를 수 있다),
@@ -156,6 +159,12 @@ open class ReaderApp(
     /** 서비스가 붙을 때마다 새로 만드는 이 앱의 어댑터(판단과 기억). 기본은 화면만 읽는 바탕 [ScreenReader], 다른 길로 책을 아는 앱은 그 앱 파일의 어댑터 */
     open fun newAdapter(): ReaderAdapter = ScreenReader(this)
 
+    /**
+     * 깔린 판을 이 앱 파일이 맡는가. 한 패키지가 판에 따라 전혀 다른 앱이 되면(북커스 2.0.0) 판마다 앱 파일을 따로 두고,
+     * [ReaderApps.ALL] 에 적은 순서로 이것을 물어 고른다([installed]). 기본: 맡는다
+     */
+    open fun handles(context: Context): Boolean = true
+
     /** 읽은 시간을 세는 방식: 기본은 읽는 화면이 앞에 있던 동안. 서재 안에 뜨는 읽는 화면([viewerHolder])은 표시로 자르고 표시가 없으면 안 셈 */
     open val viewerTime: ViewerTime get() = if (viewerHolder != null) ViewerTime.MARKS_CLOSED else ViewerTime.SCREEN
 
@@ -201,7 +210,7 @@ open class ReaderApp(
             for (n in path.asReversed()) {
                 val titleCount = titles.sumOf { n.count(pkg, it) }
                 if (titleCount == 0) continue
-                if (titleCount == 1 && thumbs.sumOf { n.count(pkg, it) } > 0) readCell(n)?.let { return it }
+                if (titleCount == 1 && thumbs.sumOf { n.count(pkg, it) } > 0 && !titleInOtherList(n, at)) readCell(n)?.let { return it }
                 break
             }
         }
@@ -232,20 +241,35 @@ open class ReaderApp(
     }
 
     /**
-     * [node] 가 들어 있는 책 칸: 위로 올라가며 제목이 하나뿐인 가장 큰 묶음(그 위는 여러 권을 담은 목록).
+     * [node] 가 들어 있는 책 칸: 위로 올라가며 제목이 하나뿐인 가장 큰 묶음(그 위는 여러 권을 담은 목록, 목록 자체는 칸이 아니다).
      * 표지 그림이 없는 묶음은 책 칸이 아니다(알라딘은 `분야`·`필터` 단추도 같은 이름을 쓴다).
      */
     private fun cellOf(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val at = node.bounds()
         var cell: AccessibilityNodeInfo? = null
         var n: AccessibilityNodeInfo? = node
         for (i in 0 until CELL_UP) {
-            val c = n ?: break
+            // 칸은 목록 안의 한 칸까지(책이 한 권이면 목록 밖까지 제목이 하나뿐이라 화면 전체가 칸이 되었다, 밀리 e-ink)
+            val c = n?.takeUnless { it.isList() } ?: break
             val titleCount = titles.sumOf { c.count(pkg, it) }
-            if (titleCount > 1) break
+            if (titleCount > 1 || (titleCount == 1 && titleInOtherList(c, at))) break
             if (titleCount == 1) cell = c
             n = c.parent
         }
         return cell?.takeIf { c -> thumbs.sumOf { c.count(pkg, it) } > 0 }
+    }
+
+    /**
+     * [n] 안의 제목이 누른 곳([at])을 품지 않는 목록 속에 있는가: 그러면 [n] 은 책 칸이 아니라 목록 밖까지 품은 묶음이다
+     * (서재에 책이 한 권뿐일 때 위 탭을 누르면 화면 전체가 그 한 권의 칸으로 보였다, 북커스 내서재).
+     */
+    private fun titleInOtherList(n: AccessibilityNodeInfo, at: Rect): Boolean {
+        fun walk(c: AccessibilityNodeInfo, depth: Int): Boolean {
+            if (depth > 0 && c.isList() && !c.bounds().contains(at) && titles.any { c.count(pkg, it) > 0 }) return true
+            if (depth < WALK_DEPTH) for (i in 0 until c.childCount) if (c.getChild(i)?.let { walk(it, depth + 1) } == true) return true
+            return false
+        }
+        return walk(n, 0)
     }
 
     /** 책 칸 하나: 칸 아래 요소들을 직접 훑어 이름별 글자를 모은다(누른 칸에서는 이름으로 찾기가 안 된다). */
@@ -297,3 +321,6 @@ open class ReaderApp(
     private fun textOf(n: AccessibilityNodeInfo): String? = n.text?.toString()
         ?: (0 until n.childCount).mapNotNull { n.getChild(it)?.text?.toString() }.joinToString("").ifEmpty { null }
 }
+
+/** 한 패키지의 앱 파일들([ReaderApps.ALL] 순서) 가운데 깔린 판을 맡는 것([ReaderApp.handles]). 맡는 것이 없으면 마지막 것 */
+internal fun List<ReaderApp>.installed(context: Context): ReaderApp = singleOrNull() ?: firstOrNull { it.handles(context) } ?: last()

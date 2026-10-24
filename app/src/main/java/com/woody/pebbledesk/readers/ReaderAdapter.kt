@@ -24,8 +24,8 @@ interface ReaderAdapter {
     fun onScreen(ctx: AppContext, name: String, from: String?, again: Boolean, byWindow: Boolean)
     /** 읽는 화면에 들어왔다(공통 전이 뒤): 그 앱의 읽는 화면 기억 비우기와 무엇으로 책을 기록하나(바탕: 누른 칸) */
     fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {}
-    /** 액티비티가 아닌 창이 떴다(대화상자) */
-    fun onWindow(ctx: AppContext) {}
+    /** 액티비티가 아닌 창이 떴다(대화상자). [cls] 는 그 창의 클래스 이름(모르면 null) */
+    fun onWindow(ctx: AppContext, cls: String?) {}
     /**
      * 화면 이름([ReaderApp.screenInsideActivity] 앱만 부른다): [activity] 안에 읽는 화면이 떠 있으면 `activity#요소`, 아니면 activity.
      * 판단할 수 없으면(맨 앞 창이 그 앱이 아님) null

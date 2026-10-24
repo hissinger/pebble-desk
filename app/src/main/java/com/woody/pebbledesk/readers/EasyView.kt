@@ -34,7 +34,7 @@ import kotlin.math.abs
  * (`#휴대폰` · `Books`, 실제 경로로 들어간 폴더는 `sdcard` · `Download`). `#휴대폰` 은 내부 저장소, `#USB메모리`·`#USB_1234-5678` 은 SD 카드·USB 맨 위
  * (이지뷰어 문자열 `storage_internal`·`storage_usb`·`device_usb`, 기기 언어를 따른다)라 실제 경로로 바꿔 책의 파일로 적는다([bookFile]): EPUB 표지(책 파일 읽기)와
  * 홈에서 그 파일 바로 열기(`actMain` 이 `file://` 보기를 받는다). 사용자가 더한 서버(`+`: FTP·SMB·WebDAV·클라우드)의 파일은 이지뷰어가 받아 둔 파일에서
- * 찾는다([downloaded], 다운로드 경로를 휴대폰·SD카드로 바꾼 경우만). 못 찾으면 그 앱에서 마지막으로 편 파일(위치 + 이름)만 기억한다.
+ * 찾는다([downloaded], 다운로드 경로를 휴대폰·SD카드로 바꾼 경우만). 원격 파일은 위치(서버 이름) + 이름 → 책도 적어 두어 받은 파일을 못 찾아도 같은 책으로 본다.
  * 패키지마다 같은 코드로 만든 앱이라(Play·원스토어 같은 패키지) 요소 이름은 같다. 이지뷰어(26.10.20)를 디컴파일해 보면 화면·앱 클래스가
  * 패키지와 상관없이 `com.ezne.easyview.` 아래에 있고(`MyApp`·`actMain`), 유료 기능은 실행 중에 패키지 이름이 `.pro` 로 끝나는지(와 리소스
  * `APP_PERM_PRO`)로 켠다. 채리뷰어는 받아 보지 못해 그 패키지 아래 이름(`com.ezne.easyview.pro.actMain`)도 같이 받는다
@@ -111,7 +111,11 @@ open class EasyViewSpec(pkg: String) : ReaderApp(
      */
     override fun clickedCell(source: AccessibilityNodeInfo?, text: List<CharSequence>, windows: AppWindows, last: List<Cell>?): Cell? {
         val c = super.clickedCell(source, text, windows, last) ?: return null
-        val file = c.file?.takeIf { '/' !in it } ?: return c
+        // 파일이 없는 칸(누른 요소를 잃어 글자로만 맞춘 칸. 글자는 파일 이름 `a.epub`)은 방금 읽어 둔 서재 칸 가운데 그 파일 이름이 하나뿐일 때만 그 칸으로
+        // (파일로 책을 가르는 앱이라 제목만으로 넣지 않는다)
+        val found = c.file ?: return last?.filter { it.file?.let { f -> sameFileName(f.substringAfterLast('/'), c.title) } == true }
+            ?.singleOrNull()?.copy(stale = true)
+        val file = found.takeIf { '/' !in it } ?: return c
         val folder = (listOfNotNull(windows.active) + windows.all).firstNotNullOfOrNull(::folderOf)
         if (folder != null) return inFolder(c, folder)
         return last?.singleOrNull { it.file?.let { f -> '/' in f && f.substringAfterLast('/') == file } == true }?.let { c.copy(title = it.title, file = it.file) }
@@ -141,6 +145,16 @@ open class EasyViewSpec(pkg: String) : ReaderApp(
         val key = "${BookFiles.canRead(context)}|$shown"
         resolved.get(key)?.let { return it }
         return resolve(context, shown)?.also { resolved.put(key, it) }
+    }
+
+    /** 사용자가 더한 서버(FTP·클라우드 등)의 파일 `#서버/…` 인가(저장소 이름을 못 읽으면 아니다: 로컬 파일을 원격으로 기억하지 않게) */
+    fun isRemote(context: Context, shown: String): Boolean {
+        if (!shown.startsWith("#") || '/' !in shown) return false
+        val labels = labels(context).takeIf { it.isNotEmpty() } ?: return false
+        val label = shown.substring(1).substringBefore('/')
+        val local = listOf("storage_internal", "device_phone", "storage_external", "device_sdcard", "storage_usb").mapNotNull(labels::get)
+        val usb = labels["device_usb"]?.let { "${it}_" }
+        return label !in local && !(usb != null && label.startsWith(usb))
     }
 
     private fun resolve(context: Context, shown: String): String? {
@@ -267,8 +281,6 @@ open class EasyViewSpec(pkg: String) : ReaderApp(
 
     private fun luma(c: Int) = (299 * Color.red(c) + 587 * Color.green(c) + 114 * Color.blue(c)) / 1000
 
-    /** ▶(마지막 파일)·마지막 쪽의 다음 파일은 `다시 열겠습니까?`·`다음 파일을 열겠습니까?` 창에 파일 이름·위치를 보인 뒤 연다 */
-
     /** 열기 확인 창(`첫페이지부터 보기` 칸 `chkOpenFirstPage` 가 있는 창)의 위치 `txtFilePath` + 파일 이름 `txtFileName` */
     fun openingFile(windows: AppWindows): String? {
         for (root in windows.all) {
@@ -332,13 +344,20 @@ open class EasyViewSpec(pkg: String) : ReaderApp(
 
         /** 읽는 화면 위 줄 → 파일 이름: 첫 줄에서 EPUB 의 `#장 번호 장 제목` 을 떼고, 경로가 붙었으면(설정·압축 파일 안 그림) 책 파일인 마지막 조각 */
         internal fun viewerFileName(text: String): String? {
-            val line = text.lineSequence().first().replace(CHAPTER, "").trim()
+            val first = text.lineSequence().first()
+            val line = when {
+                CHAPTER.containsMatchIn(first) -> first.replace(CHAPTER, "")
+                isBookFile(first) -> first
+                else -> first.replace(BARE_CHAPTER, "")
+            }.trim()
             val parts = line.split('/').filter { it.isNotBlank() }
             return (parts.lastOrNull { withoutBookFile(it) != it } ?: parts.lastOrNull())?.trim()
         }
 
-        /** EPUB 제목 뒤의 `#3 3장` */
-        private val CHAPTER = Regex("""#\d+(\s.*)?$""")
+        /** EPUB 파일 이름 뒤의 `#3 3장`(`a.epub#3 3장`. 다른 파일 이름 안의 `Vol#3 x.cbz` 는 이름의 일부) */
+        private val CHAPTER = Regex("""(?i)(?<=\.epub)#\d+(\s.*)?$""")
+        /** 확장자를 숨긴 EPUB 이름 뒤의 장(`이름#3 3장`, 보이는 확장자가 없을 때만. 앞에 빈칸이 있는 `원피스 #12` 는 이름의 일부) */
+        private val BARE_CHAPTER = Regex("""(?<=\S)#\d+(\s.*)?$""")
 
         /** 화면 클래스: 이지뷰어처럼 패키지와 상관없는 이름과, 패키지 아래 이름(채리뷰어 미확인) */
         private fun screens(pkg: String, name: String) = setOf("$BASE.$name", "$pkg.$name")
@@ -394,13 +413,18 @@ class EasyViewReader(private val ev: EasyViewSpec) : ScreenReader(ev) {
             clickedFiles = null
         }
         // 파일 칸은 읽는 화면에 그 파일 이름이 보일 때 편 것으로 본다(누른 뒤 다른 앱으로 다른 파일을 열었을 수 있다)
-        takeClicked(ctx)?.let { cell -> if (cell.file != null) clickedFiles = cell else openCell(ctx, cell) }
+        takeClicked(ctx)?.let { cell ->
+            // 서재 칸을 눌러 연 것이면 앞서 뜬 열기 확인 창(취소했을 수 있다)은 이 읽는 화면에 쓰지 않는다
+            openingFiles = null
+            // 이 앱의 누른 칸에는 늘 파일이 있다([clickedCell])
+            clickedFiles = cell
+        }
         // 홈에서 바로 연 책의 파일도 그렇게
         HomeSignals.take(ctx.pkg)?.takeIf { ctx.now - it.second < CLICK_OPEN_MS }?.let { (cell, _) -> if (clickedFiles == null) clickedFiles = cell }
     }
 
     /** 열기 확인 창(▶·다음 파일)이 뜨면 그 파일을 기억한다 */
-    override fun onWindow(ctx: AppContext) = rememberOpening(ctx)
+    override fun onWindow(ctx: AppContext, cls: String?) = rememberOpening(ctx)
 
     override fun onClick(ctx: AppContext, click: Click) {
         // 열기 확인 창의 `확인`을 누르는 순간에도 본다(창이 뜰 때 글자가 아직 비어 있었을 수 있다)
@@ -434,6 +458,9 @@ class EasyViewReader(private val ev: EasyViewSpec) : ScreenReader(ev) {
     /** 서재가 멈췄다: 파일 칸은 파일로 책을 정해 그 책에 진행률을 적고 표지 자리는 그 파일 열쇠로(같은 제목의 다른 폴더 파일에 붙지 않게) */
     override fun onShelf(ctx: AppContext) {
         val root = ctx.root ?: return ctx.noWindow()
+        // 열기 확인 창이 닫혔는데 읽는 화면이 열리지 않은 채 서재가 멈췄으면 그 창은 취소한 것이다(그 뒤 다른 앱으로 연 같은 이름의 파일에 쓰지 않게)
+        // (받는 창 등 그 앱의 다른 창이 떠 있으면 아직 여는 중이다)
+        openingFiles?.takeIf { ctx.now - it.second >= OPENING_CANCEL_MS && ctx.windows().all.size <= 1 }?.let { openingFiles = null }
         val seen = readShelf(root)
         ctx.log(WatchLog.Kind.SHELF, "${seen.size}")
         val lookup = ctx.recorder.lookup
@@ -555,9 +582,15 @@ class EasyViewReader(private val ev: EasyViewSpec) : ScreenReader(ev) {
             ?.takeIf { it in lookup.idsByFileName(name) || inSameFolder(ctx, it, name) || it == lastShelfBook(ctx) { last -> sameFileName(last.substringAfterLast('/'), name) } }
     }
 
-    /** 그림 폴더 책 [bookId] 의 폴더에 그림 [name] 이 있다(쪽을 넘기면 읽는 화면 위 줄의 그림 이름이 바뀐다) */
-    private fun inSameFolder(ctx: AppContext, bookId: String, name: String): Boolean =
-        isImageFile(name) && ctx.recorder.lookup.filePath(bookId)?.takeIf(::isImageFile)?.let { File(File(it).parentFile, name).isFile } == true
+    /**
+     * 그림 폴더 책 [bookId] 의 폴더에 그림 [name] 이 있다(쪽을 넘기면 읽는 화면 위 줄의 그림 이름이 바뀐다). 책 파일 읽기가 꺼져 있으면 파일이 있는지 볼 수 없어
+     * 그 책이 그림 폴더 책이면 그 폴더의 그림으로 본다(이 읽는 화면에서 그 책을 이미 정했을 때만 묻는다, [fileGuess])
+     */
+    private fun inSameFolder(ctx: AppContext, bookId: String, name: String): Boolean {
+        if (!isImageFile(name)) return false
+        val cur = ctx.recorder.lookup.filePath(bookId)?.takeIf(::isImageFile) ?: return false
+        return !BookFiles.canRead(ctx.context) || File(File(cur).parentFile, name).isFile
+    }
 
     /** 이 앱 서재에서 마지막으로 편 파일이 [bookId] 책이면 그 파일(화면에 보인 위치 + 이름) */
     private fun shelfFileOf(ctx: AppContext, bookId: String): String? =
@@ -580,7 +613,8 @@ class EasyViewReader(private val ev: EasyViewSpec) : ScreenReader(ev) {
     /** 조금 전 열기 확인 창에 보인 파일의 이름이 [name] 이면 그 파일 */
     private fun openingFor(ctx: AppContext, name: String): Opening? {
         val (shown, at) = openingFiles ?: return null
-        // 창을 본 뒤 곧 열린 파일만(확인을 누르고 읽는 화면이 열리기까지)
+        // 창을 본 뒤 곧 열린 파일만(확인을 누르고 읽는 화면이 열리기까지). 읽는 화면 안에서 뜬 다음 파일 창은 읽는 화면이 창보다 먼저 열려 있어,
+        // 창을 본 지 [CLICK_OPEN_MS] 안이면 쓴다(창이 닫힌 뒤 서재가 멈추면 취소로 보고 지운다, [onShelf])
         if (at < (ctx.viewerOpenedAt ?: 0L) - OPENING_MS || ctx.now - at > CLICK_OPEN_MS) return null
         val shownName = shown.substringAfterLast('/')
         if (!sameFileName(shownName, name)) return null
@@ -597,8 +631,21 @@ class EasyViewReader(private val ev: EasyViewSpec) : ScreenReader(ev) {
         // 이미 다른 파일이 적힌 책(제목이 같은 다른 파일)의 경로는 덮어쓰지 않는다
         path?.takeIf { p -> ctx.recorder.lookup.filePath(book.id)?.equals(p, ignoreCase = true) != false }
             ?.let { ctx.recorder.setFile(book.id, it); fileInfo(ctx, book, it) }
-        ctx.prefs.edit().putString("shelf_file_${ctx.pkg}", shown).putString("shelf_book_${ctx.pkg}", book.id).apply()
+        val edit = ctx.prefs.edit().putString("shelf_file_${ctx.pkg}", shown).putString("shelf_book_${ctx.pkg}", book.id)
+        // 원격 파일은 보인 위치(서버 이름) + 이름 → 책으로 따로 적어 둔다(받은 파일을 못 찾아도 다시 열 때 같은 책, 같은 제목의 다른 파일과 섞지 않게)
+        if (ev.isRemote(ctx.context, shown)) edit.putString(remotePref(ctx, shown), book.id).putBoolean(remoteBookPref(ctx, book.id), true)
+        edit.apply()
     }
+
+    /** 원격 파일 [shown] 으로 넣은 책(읽고 있는 책, 또는 기록에서 지우지 않은 나간 책). 없으면 null */
+    private fun remoteBook(ctx: AppContext, shown: String, title: String): String? {
+        if (!ev.isRemote(ctx.context, shown)) return null
+        val lookup = ctx.recorder.lookup
+        return ctx.prefs.getString(remotePref(ctx, shown), null)?.takeIf { lookup.get(it) != null || lookup.withoutFile(title) == it }
+    }
+
+    private fun remotePref(ctx: AppContext, shown: String) = "remote_${ctx.pkg}_${shown.lowercase()}"
+    private fun remoteBookPref(ctx: AppContext, id: String) = "remote_of_${ctx.pkg}_$id"
 
     /**
      * 파일 이름이 제목인 책(책 정보가 보이지 않던 칸: 받기 전의 원격 파일·격자 보기·TXT 등)은 그 파일이 읽히는 EPUB 이면 책 정보의 제목·저자로 바꾼다.
@@ -627,22 +674,25 @@ class EasyViewReader(private val ev: EasyViewSpec) : ScreenReader(ev) {
     /**
      * 파일 칸(파일 목록인 서재, 이지뷰어)에 보인 파일 [shown](제목 [title], 실제 경로 [path])의 책 id. 폴더가 다르면 이름·제목이 같아도 다른 책이다
      * (`만화A/01.zip`·`만화B/01.zip`): 실제 경로를 알면 그 파일로 넣은 책, 없으면 제목이 같고 파일이 적히지 않은 책(파일을 적기 전에 넣은 책).
-     * 실제 경로를 모르면(원격 등) 제목이 같고 파일이 적히지 않은 책, 없으면 서재에서 마지막으로 편 파일과 위치·이름이 모두 같은 책.
+     * 원격 파일은 그 위치·이름으로 넣은 책([remoteBook], 받은 파일을 나중에 찾아도 같은 책). 실제 경로를 모르면 그 밖에는 서재에서 마지막으로 편 파일과
+     * 위치·이름이 모두 같은 책만(제목만 같은 책에 붙이면 다른 폴더의 같은 이름 파일이 섞인다). 원격 파일로 넣은 책은 제목이 같아도 로컬 파일의 책이 아니다.
      * 읽고 있는 책이 먼저, 없으면 나간 책(지운 책은 빼고). 없으면 null(새 책)
      */
     private fun fileBookId(ctx: AppContext, shown: String, title: String, path: String?): String? {
         val lookup = ctx.recorder.lookup
-        path?.let(lookup::byPath)?.let { return it }
-        return lookup.withoutFile(title)
-            ?: if (path == null) lastShelfBook(ctx) { it.equals(shown, ignoreCase = true) } else null
+        val remote = remoteBook(ctx, shown, title)
+        if (path == null) return remote ?: lastShelfBook(ctx) { it.equals(shown, ignoreCase = true) }
+        return lookup.byPath(path) ?: remote ?: lookup.withoutFile(title)?.takeIf { !ctx.prefs.getBoolean(remoteBookPref(ctx, it), false) }
     }
 
     /** 파일 칸에서 잘라 둔 표지의 열쇠(제목이 아니라 그 파일) */
     private fun fileCoverKey(shown: String) = "file:" + shown.lowercase()
 
     companion object {
-        /** 열기 확인 창을 본 뒤 이만큼 안에 열린 읽는 화면만 그 창의 파일로 본다 */
+        /** 열기 확인 창을 본 뒤 이만큼 안에 열린 읽는 화면만 그 창의 파일로 본다(읽는 화면이 창보다 먼저 열려 있던 다음 파일 창은 [CLICK_OPEN_MS] 까지) */
         private const val OPENING_MS = 30_000L
+        /** 열기 확인 창을 본 지 이만큼 지나 창이 없는데 읽는 화면이 열리지 않았으면 취소한 것으로 본다(큰 파일·원격 받기는 읽는 화면이 늦게 뜬다) */
+        private const val OPENING_CANCEL_MS = 10_000L
         /** 읽는 화면이 열린 뒤 위 줄의 파일 이름이 이만큼 안에 바뀌면 앞 파일 이름이 남아 있던 것 */
         private const val VIEWER_SWAP_MS = 5_000L
         /** 서재에서 눌러 연 책은 읽는 화면이 열리기 조금 전에 편 것으로 적힐 수 있다 */

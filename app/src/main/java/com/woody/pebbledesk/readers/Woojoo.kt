@@ -82,13 +82,14 @@ object Woojoo : ReaderApp(
 
     /**
      * RecentBooks.json 에서: 메뉴 제목이 보이면 그 제목의 책(가장 최근 것), 안 보이면 이 읽는 화면이 열린 뒤([since])에 적힌 가장 최근 책.
-     * 책 파일 읽기를 허용하지 않았으면 null
+     * 메뉴 없이는 [notBefore](앞서 책을 편 것으로 적은 때) 전에 적힌 것도 믿지 않는다(우주는 책을 닫을 때도 적어, 닫고 곧 다른 칸을 누르면
+     * 맨 앞이 닫은 책이다). 책 파일 읽기를 허용하지 않았으면 null
      */
-    fun dataBook(context: Context, info: ViewerInfo, since: Long): FileBook? {
+    fun dataBook(context: Context, info: ViewerInfo, since: Long, notBefore: Long = 0): FileBook? {
         if (!BookFiles.canRead(context)) return null
         val list = WoojooData.recent(recentFile()) ?: return null
         val e = if (info.title != null) list.firstOrNull { withoutBookFile(it.title) == info.title }
-            else list.firstOrNull()?.takeIf { it.time >= since - OPEN_SLACK_MS }
+            else list.firstOrNull()?.takeIf { it.time >= since - OPEN_SLACK_MS && it.time >= notBefore }
         return e?.let { FileBook(withoutBookFile(it.title).ifBlank { withoutBookFile(File(it.path).name) }, it.author, it.path, it.progress) }
     }
 
@@ -142,13 +143,25 @@ object Woojoo : ReaderApp(
  * 화면에 진행률이 없으면 우주 기록의 진행률, 표지가 없으면 우주 기록의 표지 그림.
  */
 class WoojooReader : ScreenReader(Woojoo) {
-    private val ask = DataAsk(Woojoo::dataBook)
+    /**
+     * 이 읽는 화면이 열릴 때 앞서 책을 편 것으로 적은 때(서재에서 누른 칸이면 누른 때)나 제목을 못 읽은 칸(PDF 등)을 누른 때 가운데 늦은 것:
+     * 그 전에 적힌 우주 기록은 앞 책의 것이다(알림이 늦게 오는 만큼 [NOT_BEFORE_SLACK_MS] 봐준다)
+     */
+    private var notBefore = 0L
+    /** 서재에서 책 칸으로 알아보지 못한 것을 누른 때 */
+    private var noCellClickAt = 0L
+    private val ask = DataAsk { context, info, since -> Woojoo.dataBook(context, info, since, notBefore) }
     /** 표지 그림을 뒤에서 꺼내는 중인 책 파일들(같은 파일을 겹쳐 꺼내지 않게) */
     private val dataCovers = mutableSetOf<String>()
 
     override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {
         ask.reset()
         super.onEnterViewer(ctx, from, again)
+        notBefore = (maxOf(ctx.lastOpenedAt ?: 0L, noCellClickAt) - NOT_BEFORE_SLACK_MS).coerceAtLeast(0L)
+    }
+
+    override fun onClickNoCell(ctx: AppContext) {
+        noCellClickAt = ctx.now
     }
 
     /**
@@ -167,12 +180,14 @@ class WoojooReader : ScreenReader(Woojoo) {
         retryProgress(ctx, progress)
         val bookId = file?.let { f -> lookup.byFile(f.path) ?: lookup.withoutFile(info.title.orEmpty()) }
         info.title?.let { title ->
-            val opened = recorder.recordedBook(ctx.pkg)?.let { if (file != null) it.id == bookId else it.hasTitle(title) } != true
-            if (opened) {
+            val recorded = recorder.recordedBook(ctx.pkg)
+            val opened = recorded?.let { if (file != null) it.id == bookId else it.hasTitle(title) } != true
+            // 데이터로 안 책의 파일은 그 책에(편 책 기록에서 다시 찾으면 같은 때 적힌 다른 줄이 나올 수 있다)
+            val book = if (opened) {
                 val at = ctx.unknownOpenAt ?: ctx.viewerOpenedAt?.takeIf { file != null && shown.title == null }
                 ctx.opened(Seen(title, info.author, progress), at, if (file != null) Target.Exact(bookId) else Target.ByTitle)
-            }
-            if (file != null) recorder.recordedBook(ctx.pkg)?.let { recorder.setFile(it.id, file.path) }
+            } else recorded
+            if (file != null && book != null) recorder.setFile(book.id, file.path)
             if (opened) return
         }
         val book = recorder.recordedBook(ctx.pkg) ?: return
@@ -185,15 +200,20 @@ class WoojooReader : ScreenReader(Woojoo) {
     }
 
     /**
-     * 표지가 없는 책 [id] 에 우주가 남긴 책 파일 [path] 의 표지 그림을 붙인다(PDF 등). EPUB·그림은 그릴 때 책 파일에서 꺼내므로 하지 않는다.
+     * 표지가 없는 책 [id] 에 우주가 남긴 책 파일 [path] 의 표지 그림을 붙인다(PDF·표지 없는 EPUB 등). 표지를 꺼낼 수 있는 EPUB·그림은 그릴 때 책 파일에서 꺼내므로 하지 않는다.
      * 아직 없으면(우주가 책을 연 뒤 그림을 늦게 남긴다) 다음에 읽는 화면을 읽을 때 다시 본다.
      */
     private fun dataCover(ctx: AppContext, id: String, path: String) {
-        if (ShelfRecorder.coverFromFile(ctx.context, path) || ctx.recorder.lookup.hasCover(id) || !dataCovers.add(path)) return
+        if (ctx.recorder.lookup.hasCover(id) || ShelfRecorder.coverFromFile(ctx.context, path) || !dataCovers.add(path)) return
         ctx.inBackground({ Woojoo.dataCover(ctx.context, path) }) done@{ result ->
             dataCovers -= path
             ctx.recorder.cover(id, result.getOrNull() ?: return@done)
         }
+    }
+
+    companion object {
+        /** 앞서 책을 편 때보다 이만큼 앞에 적힌 우주 기록까지는 믿는다(누름 알림이 늦게 온다. 닫은 책의 기록은 보통 1초 넘게 앞이다) */
+        private const val NOT_BEFORE_SLACK_MS = 300L
     }
 }
 
