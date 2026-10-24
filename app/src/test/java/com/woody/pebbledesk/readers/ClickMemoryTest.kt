@@ -94,7 +94,18 @@ class ClickMemoryTest {
             override fun viewerShown(pkg: String, shown: Boolean, at: Long, current: Boolean) {}
             override fun openedId(pkg: String): String? = null
             override fun recordedBook(pkg: String): ShelfBook? = null
-            override val lookup: BookLookup get() = error("쓰지 않음")
+            override val lookup: BookLookup = object : BookLookup {
+                override fun byTitle(title: String): ShelfBook? = null
+                override fun get(id: String): ShelfBook? = null
+                override fun bookOf(id: String): ShelfBook? = null
+                override fun byFile(path: String): String? = null
+                override fun byPath(path: String): String? = null
+                override fun withoutFile(title: String): String? = null
+                override fun knownTitle(path: String, title: String) = title
+                override fun idsByFileName(name: String) = emptySet<String>()
+                override fun filePath(id: String): String? = null
+                override fun hasCover(id: String) = false
+            }
         }
         var adapter: ReaderAdapter? = null
         override fun opened(seen: Seen, at: Long?, target: Target, coverKey: String?, steps: OpenSteps?): ShelfBook {
@@ -135,6 +146,25 @@ class ClickMemoryTest {
         val ctx = Ctx().apply { windowsNow = AppWindows(root, listOf(root)) }
         val r = ScreenReader(app).also { ctx.adapter = it }
         showShelf(ctx, r)
+        r.onClick(ctx, Click(a.getChild(0), emptyList()))
+        ctx.t += 5_000
+        r.onClick(ctx, Click(tab, emptyList()))
+        ctx.t += 5_000
+        enterViewer(ctx, r)
+        assertEquals(emptyList<String>(), ctx.opened)
+    }
+
+    @Test fun `화면이 바뀔 때 앞 화면 창을 잡았어도 서재가 멈추면 서재 창으로 다시 잡는다`() {
+        val a = cell(400, "받기만 한 책")
+        val tab = inWindow(node("android.widget.TextView", 0, 100, 300, 200, null, "표지 보기"), SHELF_WINDOW)
+        val root = seal(node("android.widget.FrameLayout", 0, 0, 1080, 2000, null, null, tab,
+            node("androidx.recyclerview.widget.RecyclerView", 0, 300, 1080, 2000, null, null, a)))
+        val splash = seal(node("android.widget.FrameLayout", 0, 0, 1080, 2000), DIALOG_WINDOW)
+        val ctx = Ctx().apply { windowsNow = AppWindows(splash, listOf(splash)) }
+        val r = ScreenReader(app).also { ctx.adapter = it }
+        showShelf(ctx, r)
+        ctx.windowsNow = AppWindows(root, listOf(root))
+        r.onShelf(ctx)
         r.onClick(ctx, Click(a.getChild(0), emptyList()))
         ctx.t += 5_000
         r.onClick(ctx, Click(tab, emptyList()))

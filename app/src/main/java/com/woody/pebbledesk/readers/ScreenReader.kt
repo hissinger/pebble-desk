@@ -86,14 +86,12 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
             // 방금 읽어 둔 칸으로 맞춘 것은 그 뒤 읽는 화면에서 진행률이 바뀌었을 수 있어 목록에 이미 있는 책에는 쓰지 않는다(반납일은 그대로).
             if (c.stale && ctx.recorder.lookup.byTitle(c.title) != null) c.copy(progress = -1) else c
         }
-        // 위에 뜬 창(대화상자)에서 누른 것은 기록에 `위 창` 으로
-        val main = cell != null || onScreenItself(click)
-        ctx.log(WatchLog.Kind.CLICK, cell?.title.orEmpty(), if (main) "" else ON_TOP)
+        ctx.log(WatchLog.Kind.CLICK, cell?.title.orEmpty())
         when {
             cell == null -> {
                 // 그렇게 하는 앱([ReaderApp.forgetsClickOnOtherTap])은 서재 화면 자체에서 책 칸이 아닌 것(탭·다른 칸)을 눌렀으면 앞서 누른 칸을 버린다
                 // (받기만 한 칸이 그 뒤 연 다른 책 대신 들어가지 않게). 위에 뜬 창(받기·기간 안내)의 단추는 그 칸을 열려는 것이라 둔다.
-                if (main && app.forgetsClickOnOtherTap) clicked = null
+                if (app.forgetsClickOnOtherTap && onScreenItself(click)) clicked = null
                 // 표지만 있는 칸일 수 있다(누르자마자 읽는 화면으로 넘어가 누른 요소도 읽을 수 없다). 메뉴에 제목이 없는 앱은 알 길이 없어 두지 않는다.
                 if (app.tellsTitle) unknownClick = ctx.now
                 onClickNoCell(ctx)
@@ -102,6 +100,13 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
             app.openOnViewer -> clicked = if (cell.due in 0 until LocalDate.now().toEpochDay()) null else cell to ctx.now
             else -> openCell(ctx, cell)
         }
+    }
+
+    /**
+     * 서재가 멈췄을 때 그 앱의 창이 하나뿐이면 그 창을 서재 화면 창으로 다시 적는다(화면이 바뀐 알림 때는 앞 화면(시작 화면 등)의 창이 아직 맨 앞이기도 하다)
+     */
+    private fun noteShelfWindow(ctx: AppContext) {
+        ctx.windows().all.singleOrNull()?.windowId?.takeIf { it >= 0 }?.let { shelfWindow = it }
     }
 
     /** 누른 것이 서재 화면 창 자체 안인가(위에 뜬 창이 아니다). 서재 화면 창을 모르면(서비스가 그 앱이 떠 있는 동안 다시 시작됨) 아니라고 본다(기억을 두는 쪽) */
@@ -146,6 +151,7 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
      */
     override fun onShelf(ctx: AppContext) {
         val root = ctx.root ?: return ctx.noWindow()
+        noteShelfWindow(ctx)
         val seen = readShelf(root)
         ctx.log(WatchLog.Kind.SHELF, "${seen.size}")
         val spots = mutableListOf<CoverSpot>()
@@ -262,8 +268,6 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
     companion object {
         /** 칸을 누른 뒤 이 안에 읽는 화면이 열리면 그 책을 편 것으로 본다(내려받기를 기다리는 시간) */
         const val CLICK_OPEN_MS = 120_000L
-        /** 자동 추가 기록에서 위에 뜬 창을 누른 것의 표시 */
-        private const val ON_TOP = "위 창"
         /** 진행률이 비어 있으면 이 간격으로 다시 읽어 본다 */
         const val VIEWER_RETRY_MS = 1000L
         /** 멈추기 전에 하는 일(바로 자르기·책 상세·최근 줄)의 간격 */
