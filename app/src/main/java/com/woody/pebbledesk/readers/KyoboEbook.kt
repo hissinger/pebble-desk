@@ -4,7 +4,7 @@ package com.woody.pebbledesk.readers
  * 교보eBook(크레마 e-ink 판 `com.kyobo.ebook.eink`, 휴대폰 판 [KyoboEbookMobile] 과 다른 앱): 서재(Compose)에는 요소 이름이 없고 격자 보기에는 제목도 없어 서재는 읽지 않는다.
  * 교보도서관과 같은 읽는 화면이라 진행률 줄과 메뉴의 제목으로 안다(서재·내 책장 어디서 열어도).
  */
-object KyoboEbook : ReaderSpec(
+object KyoboEbook : ReaderApp(
     pkg = "com.kyobo.ebook.eink", classPrefix = "com.kyobo",
     shelves = emptySet(),
     viewers = setOf(

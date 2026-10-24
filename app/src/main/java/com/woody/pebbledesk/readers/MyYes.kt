@@ -7,7 +7,7 @@ package com.woody.pebbledesk.readers
  * 메뉴에 제목 `tv_book_title`·`text_space_page`(`28%`). 앱 화면 전체가 화면 캡처를 막아(검게 찍힘, 창 FLAG_SECURE) 표지는 자르지 않는다.
  * USB 디버깅이 켜져 있으면 앱이 스스로 닫힌다.
  */
-object MyYes : ReaderSpec(
+object MyYes : ReaderApp(
     pkg = "com.yes24.ebook.einkstore", classPrefix = "com.keph",
     shelves = setOf("com.keph.crema.lunar.ui.MainActivity"),
     viewers = setOf(

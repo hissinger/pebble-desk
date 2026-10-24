@@ -1,6 +1,9 @@
 package com.woody.pebbledesk.readers
 
 import android.content.Context
+import com.woody.pebbledesk.Seen
+import com.woody.pebbledesk.ShelfBook
+import com.woody.pebbledesk.hasTitle
 import com.woody.pebbledesk.readers.LuaData.num
 import com.woody.pebbledesk.readers.LuaData.str
 import com.woody.pebbledesk.readers.LuaData.table
@@ -12,43 +15,145 @@ import java.security.MessageDigest
 /**
  * KOReader(내 파일을 여는 오픈소스 리더, GitHub 판 `org.koreader.launcher`·F-Droid 판 `org.koreader.launcher.fdroid`): 서재와 읽는 화면이 모두
  * 액티비티 하나(`MainActivity`, NativeActivity)이고 화면 전체를 직접 그려 접근성에는 빈 뷰 하나만 보인다(글자·요소 이름 없음, 화면 바뀜 알림도
- * 앱이 앞에 올 때만). 그래서 어떤 책인지는 KOReader 가 저장소에 남기는 기록으로 안다([fileBook], '모든 파일 액세스'가 있어야 한다, [BookFiles]):
+ * 앱이 앞에 올 때만). 그래서 어떤 책인지는 KOReader 가 저장소에 남기는 기록으로 안다([KOReaderApp.fileBooks], '모든 파일 액세스'가 있어야 한다, [BookFiles]):
  * - `koreader/history.lua`: 연 책 목록(최근 것이 [1], 파일 경로·때). 책을 열 때 바로 쓰고, 닫을 때 그 책의 때를 다시 쓴다.
  * - 책 옆 `<이름>.sdr/metadata.<확장자>.lua`(설정에 따라 `koreader/docsettings/…`·`koreader/hashdocsettings/…`): 책 정보(`doc_props` 제목·저자),
  *   진행률(`percent_finished` 0~1), 고친 책 정보는 같은 폴더 `custom_metadata.lua`(`custom_props`). 책을 닫거나 KOReader 가 뒤로 갈 때 쓴다.
  * 처음 연 책은 `.sdr` 이 아직 없어 EPUB 은 책 파일의 정보로, 그 밖은 파일 이름(확장자 뗌)으로 안다.
  * 책이 열려 있는지(닫고 파일 목록에 있는지)는 history.lua 의 때와 책 파일의 접근 시각으로 안다([KOReaderData.books]). 읽은 시간은
  * 책이 열려 있던 동안만 센다(Libby 처럼 `viewer_mark`, 모르면 앱이 앞에 있던 동안을 다).
- * 앱 안에서 책을 바꿔도 알림이 없지만, 연 때·닫은 때가 파일에 남아 지켜보지 않고 KOReader 가 앞에 올 때와 홈으로 돌아올 때만 읽는다([fileState]).
+ * 앱 안에서 책을 바꿔도 알림이 없지만, 연 때·닫은 때가 파일에 남아 지켜보지 않고 KOReader 가 앞에 올 때와 홈으로 돌아올 때만 읽는다([KOReaderReader]).
  * (KOReader v2026.07.1, 2026-10-18 에뮬레이터에서 확인)
  */
-open class KOReaderSpec(pkg: String) : ReaderSpec(
+open class KOReaderApp(pkg: String) : ReaderApp(
     pkg = pkg, classPrefix = "org.koreader.launcher",
     shelves = emptySet(),
     viewers = setOf("org.koreader.launcher.MainActivity"),
     titles = emptyList(), thumbs = emptyList(), authors = emptyList(), progress = null, due = null,
     viewerProgress = emptyList(),
-    fileState = true,
-    opensBookFile = true,
     needsBookFiles = true,
 ) {
-    override fun fileBooks(context: Context, since: Long): List<FileBook>? {
+    /** 책이 열려 있던 동안만 센다(표시가 없으면 앞에 있던 동안을 다: 데이터를 못 읽으면) */
+    override val viewerTime get() = ViewerTime.MARKS_OPEN
+    override val markedScreens get() = viewers
+    /** 화면에 아무것도 드러내지 않아 내용 바뀜 알림으로는 읽지 않는다(앞에 올 때만 데이터로 맞춘다) */
+    override val readsContent get() = false
+    /** 켜야 책이 들어오는 앱이라 시작하기에서 먼저 */
+    override val fileOrder get() = 0
+
+    override fun newAdapter(): ReaderAdapter = KOReaderReader(this)
+
+    /** 홈에서 그 책의 파일을 바로 연다(모르거나 지워졌으면 앱을 연다) */
+    override fun open(ctx: HomeContext, book: ShelfBook): OpenResult =
+        ctx.bookFile(book)?.let { OpenResult.File(ctx.component, it) } ?: OpenResult.Launch
+
+    /**
+     * [since](ms) 뒤에 열었거나 닫은 책들과 지금 책(마지막), 오래된 것부터. 데이터를 읽을 수 없거나 history.lua 가 없으면 null(KOReader 가 다른 곳에 두면
+     * 읽을 수 없는 것과 같다: 앞에 있던 동안을 다 센다)
+     */
+    fun fileBooks(context: Context, since: Long): List<FileBook>? {
         if (!BookFiles.canRead(context)) return null
         return KOReaderData(File(BookFiles.storageRoot, "koreader")).books(since)
     }
 }
 
+/** KOReader 의 판단과 기억: 화면을 읽지 않고 그 앱이 앞에 와 잠잠해질 때와 홈으로 돌아올 때 데이터로 맞춘다 */
+class KOReaderReader(private val ko: KOReaderApp) : ScreenReader(ko) {
+    override fun onViewer(ctx: AppContext) = sync(ctx)
+
+    override fun onHome(ctx: AppContext) {
+        if (runCatching { ctx.context.packageManager.getApplicationInfo(ctx.pkg, 0) }.isSuccess) sync(ctx)
+    }
+
+    /**
+     * 책이 열려 있는지를 데이터로 아는 앱(KOReader)을 그 앱의 데이터로 맞춘다. 그 앱이 앞에 올 때와 홈으로 돌아올 때만
+     * 부르고(지켜보지 않는다), 지난번에 맞춘 뒤([since])의 일을 데이터에 적힌 때로 한꺼번에 적는다:
+     * - 그 사이 열었다 닫은 앞 책들(앱 안에서 책을 바꿈): 오래된 것부터 연 때에 편 것으로(목록에 없으면 넣는다), 열려 있던 동안만 읽은 시간으로.
+     * - 지금 책: 그 사이 열었으면(지금 닫혀 있어도) 연 때에 편 것으로. 그 전부터 열려 있던 책은 편 책 기록이 다르면(서비스가 다시 시작됨 등)
+     *   다시 적되, 목록에 없는 책은 처음 보는 파일일 때만 넣는다(완독·빼기 한 책이 그 앱에 열려 있어도 되살아나지 않게). 진행률을 그 책에.
+     * 처음 맞출 때는 지금 책만 본다(그 앱의 지난 기록을 모두 넣지 않게). 데이터를 읽을 수 없으면 앞에 있던 동안을 다 센다.
+     */
+    private fun sync(ctx: AppContext) {
+        val recorder = ctx.recorder
+        val now = System.currentTimeMillis()
+        val key = "sync_${ctx.pkg}"
+        // 그 앱은 때를 초로 버려 적으므로 지난번에 맞춘 그 초에 일어난 일도 다시 본다(같은 것은 다시 적히지 않는다)
+        val since = ctx.prefs.getLong(key, 0L).let { if (it > 0) it / 1000 * 1000 - 1000 else 0L }
+        // 처음 맞출 때는 지금 책만 묻는다(지난 기록의 책들을 읽지 않게)
+        val books = ko.fileBooks(ctx.context, if (since > 0) since else Long.MAX_VALUE)
+            ?: return recorder.viewerShown(ctx.pkg, shown = true, at = now)
+        ctx.prefs.edit().putLong(key, now).apply()
+        val current = books.lastOrNull() ?: return
+        if (since > 0) for (b in books.dropLast(1)) {
+            if (b.openedAt > since) {
+                fileOpened(ctx, b, b.openedAt)
+                recorder.viewerShown(ctx.pkg, shown = true, at = b.openedAt, current = false)
+            }
+            if (b.closedAt > since) recorder.viewerShown(ctx.pkg, shown = false, at = b.closedAt, current = false)
+        }
+        markFileViewer(ctx, current)
+        val title = recorder.lookup.knownTitle(current.path, current.title)
+        val newFile = newFile(ctx, current.path)
+        if (recorder.recordedBook(ctx.pkg)?.hasTitle(title) != true) when {
+            since > 0 && current.openedAt > since -> return fileOpened(ctx, current, current.openedAt)
+            current.closedAt == 0L && (newFile || recorder.lookup.byTitle(title) != null) ->
+                return fileOpened(ctx, current, ctx.viewerOpenedAt ?: now)
+        }
+        val book = recorder.recordedBook(ctx.pkg)?.takeIf { it.hasTitle(title) } ?: return
+        saveFile(ctx, book, current.path)
+        if (current.progress < 0) return
+        recorder.status(book.id, current.progress)
+    }
+
+    /** 데이터로 안 책 [b] 를 [at] 에 편 것으로 적는다(목록에 없으면 넣고 맨 앞으로, 그 파일을 적어 둔다) */
+    private fun fileOpened(ctx: AppContext, b: FileBook, at: Long) {
+        val title = ctx.recorder.lookup.knownTitle(b.path, b.title)
+        saveFile(ctx, ctx.opened(Seen(title, b.author, b.progress), at), b.path)
+    }
+
+    /**
+     * 지금 책의 열림·닫힘을 적는다(읽은 시간은 열려 있던 동안만): 닫혔으면 열려 있던 동안을 지난 일로 적고 지금은 닫힘,
+     * 열려 있으면 연 때부터 열림, 모르면(다른 앱이 접근 시각을 바꿈) 열림(앞에 있던 동안을 다 센다). 지금 상태가 앞서 적은 것보다 앞의 때면 앞서 적은 때부터.
+     */
+    private fun markFileViewer(ctx: AppContext, file: FileBook) {
+        val recorder = ctx.recorder
+        if (file.closedAt > 0) {
+            if (file.openedAt > 0) recorder.viewerShown(ctx.pkg, shown = true, at = file.openedAt, current = false)
+            recorder.viewerShown(ctx.pkg, shown = false, at = file.closedAt)
+        } else recorder.viewerShown(ctx.pkg, shown = true, at = file.openedAt.takeIf { it > 0 } ?: System.currentTimeMillis())
+    }
+
+    /** 그 앱 데이터의 지금 책 파일이 지난번에 본 것과 다른가(처음 보면 참). 지금 것을 적어 둔다(서비스가 다시 시작돼도 남긴다) */
+    private fun newFile(ctx: AppContext, path: String): Boolean {
+        val key = "file_${ctx.pkg}"
+        if (ctx.prefs.getString(key, null) == path) return false
+        ctx.prefs.edit().putString(key, path).apply()
+        return true
+    }
+
+    /**
+     * KOReader 로 편 책 [book] 에 그 파일을 적어 둔다(홈에서 그 파일을 바로 열고, 표지가 없으면 그릴 때 그 파일에서 꺼낸다). 다른 앱의 책에는 적지 않는다
+     * (두 판은 같은 `koreader` 폴더를 써서 한 판으로 넣은 책을 다른 판으로 열기도 한다)
+     */
+    private fun saveFile(ctx: AppContext, book: ShelfBook, path: String) {
+        if (book.app?.substringBefore('/') in KOREADER_PKGS) ctx.recorder.setFile(book.id, path)
+    }
+}
+
 /** GitHub 판 */
-object KOReader : KOReaderSpec("org.koreader.launcher")
+object KOReader : KOReaderApp("org.koreader.launcher")
+
+/** 두 판의 패키지 */
+private val KOREADER_PKGS get() = setOf(KOReader.pkg, KOReaderFdroid.pkg)
 
 /** F-Droid 판 */
-object KOReaderFdroid : KOReaderSpec("org.koreader.launcher.fdroid")
+object KOReaderFdroid : KOReaderApp("org.koreader.launcher.fdroid")
 
 /** KOReader 의 저장소 폴더 [dir](`/storage/emulated/0/koreader`)에서 읽는다. 같은 파일은 바뀌었을 때만 다시 읽는다. */
 internal class KOReaderData(private val dir: File) {
     /**
      * history.lua 의 책들 가운데 [since](ms) 뒤에 열었거나 닫은 책과 맨 앞 책(지금 책), 오래된 것부터(지금 책이 끝, 최근 [MAX_BOOKS]권까지).
-     * KOReader 안내서(`koreader/help/`, 처음 켜면 책처럼 연다)는 뺀다(사용자가 koreader 폴더에 둔 책은 넣는다). 기록이 없으면 빈 목록, 못 읽으면 null.
+     * KOReader 안내서(`koreader/help/`, 처음 켜면 책처럼 연다)는 뺀다(사용자가 koreader 폴더에 둔 책은 넣는다). history.lua 가 없거나 못 읽으면 null, 책 줄이 없으면 빈 목록.
      * 책마다 열림·닫힘: KOReader 는 책을 열 때 history.lua 맨 앞 줄의 때를 적고 그 책 파일의 접근 시각(atime)을 같은 때(초)로 맞추며
      * (`ReadHistory:addItem` 의 `lfs.touch`), 닫을 때는 그 줄의 때만 다시 적는다(`updateLastBookTime`). 저장소는 noatime 이라 읽기만으로는
      * 접근 시각이 바뀌지 않는다. 그래서 접근 시각 = 줄의 때면 열려 있음(연 때), 줄의 때가 더 늦으면 닫힘(닫은 때), 접근 시각이 더 늦으면(다른 앱이 바꿈) 모름.

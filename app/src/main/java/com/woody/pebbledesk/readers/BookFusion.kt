@@ -17,20 +17,22 @@ import com.woody.pebbledesk.Storage
  * 읽는 화면(본문 웹 화면)에는 제목이 어디에도 없어 책은 서재에서 누른 칸으로만 안다([openOnViewer]: 받지 않은 책은 누르면 받기부터 한다).
  * 서재 칸: 격자 보기·'You're currently reading' 칸은 안드로이드 뷰(저자·제목 글자, 저자는 이름 없음)라 누르면 알림이 온다(줄 칸은 바로 읽는 화면을,
  * 격자 칸은 책 상세를 연다). 목록 보기는 Compose 라 칸에 이름이 없고 눌러도 알림이 없어 읽지 않는다. 대신 칸을 누르면 책 상세(Compose)가 먼저 떠
- * 거기서 `Read` 로 연 책을 안다([webBook]. 표지·저자도 상세에서). 그 밖에 누른 칸을 모른 채 서재에서 읽는 화면으로 넘어오면 책 모름으로 적는다([clickOnly]).
+ * 거기서 `Read` 로 연 책을 안다([webBook]. 표지·저자도 상세에서). 그 밖에 누른 칸을 모른 채 서재에서 읽는 화면으로 넘어오면 책 모름으로 적는다([DetailReader]).
  * '지금 읽는 책' 줄의 순서는 읽은 순서가 아니라 그것으로는 알 수 없다. 서재에 진행률은 없다(그 줄에 진행 고리만).
  * 진행률은 읽는 화면 가운데를 눌러 메뉴를 띄우면 아래 줄 오른쪽 끝(`14.5%`).
  * 계정 책 가운데 이 기기에 받지 않은 책은 표지에 어두운 막과 받기 아이콘(표지 오른쪽 위 칸 안의 그림, 받는 중·올리는 중에는 진행 표시)이 붙어
  * 그 칸의 표지는 자르지 않는다. 그런 책은 '지금 읽는 책' 줄에서 눌러도 책 상세(`Download (157KB)`)가 먼저 뜨고, 받으면 `Read` 로 바뀐다(표지는 상세에서 자른다).
  * 책 바로 열기는 없다(읽는 화면은 앱 안에서만 열리고 받는 링크는 로그인 `bookfusion://auth` 뿐).
  */
-object BookFusion : ReaderSpec(
+object BookFusion : ReaderApp(
     pkg = "com.bookfusion.android.reader", classPrefix = "",
     shelves = setOf("com.bookfusion.android.reader.activities.HomeActivity"),
     viewers = emptySet(),
     titles = listOf("title_text_view"), thumbs = listOf(COVER), authors = emptyList(), progress = null, due = null,
-    viewerProgress = emptyList(), openOnViewer = true, clickOnly = true,
+    viewerProgress = emptyList(), openOnViewer = true,
 ) {
+    override fun newAdapter(): ReaderAdapter = DetailReader(this, clickOnly = true, ::webBook)
+
     /**
      * 읽는 화면(EPUB·PDF): 깔린 판의 매니페스트에서 [readerActivities] 인 액티비티. 이름은 판마다 바뀌지만 이 속성은 세 판이 같고 앱에서 읽는 화면 둘만 갖는다.
      * 예전 판의 읽는 화면도 지금 판에 없는 이름이면 읽는 화면으로 본다([pastReaders]: 업데이트 전에 읽은 시간을 업데이트 뒤에 사용 기록으로 셀 때).
@@ -121,7 +123,7 @@ object BookFusion : ReaderSpec(
      * 책 상세(격자·목록 보기 칸, 받지 않은 책은 '지금 읽는 책' 칸도 누르면 뜬다, Compose. 여기서 `Read` 로 읽는 화면을 연다. 받지 않은 책은 `Download` 뒤 `Read`): 글자들과 눌리는 단추(안에 버튼 요소, `Read`)를 가진 정보 칸.
      * 단추 위 글자 가운데 가장 큰 것이 제목, 그 바로 위가 저자(`Language`·`Format` 같은 항목은 제목 아래). 표지는 정보 칸과 같은 묶음의 글자 없는 그림 자리.
      */
-    override fun webBook(root: AccessibilityNodeInfo): Cell? {
+    fun webBook(root: AccessibilityNodeInfo): Cell? {
         fun walk(n: AccessibilityNodeInfo, depth: Int): Cell? =
             detail(n) ?: if (depth < DEEP_WALK_DEPTH) (0 until n.childCount).firstNotNullOfOrNull { i -> n.getChild(i)?.let { walk(it, depth + 1) } } else null
         return walk(root, 0)

@@ -321,7 +321,7 @@ class OnboardingActivity : EinkActivity() {
          * (미리 보기의 앱). 판만 다른 앱(KOReader F-Droid 판 등)은 이름이 같으면 하나로.
          */
         private fun fileAppNames(context: Context): List<String> =
-            ReaderApps.fileApps.sortedByDescending { it.fileState }.mapNotNull { AppStore.readerLabel(context, it.pkg) }.distinct()
+            ReaderApps.fileApps.sortedBy { it.fileOrder }.mapNotNull { AppStore.readerLabel(context, it.pkg) }.distinct()
 
         /** 예시 책 표지. 직접 그리는 그림이라 크레마 화면 대비만큼 미리 밝힌다(홈 표지와 같다). */
         private fun sampleCover(context: Context): Bitmap =

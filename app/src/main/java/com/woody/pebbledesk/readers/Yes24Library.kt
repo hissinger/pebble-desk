@@ -7,7 +7,7 @@ package com.woody.pebbledesk.readers
  * 휴대폰·태블릿판(`com.yes24.library`, '예스24 전자도서관 (리뉴얼)')은 패키지만 다르고 화면·요소 이름은 같다(1.0.61, 에뮬에서 확인).
  * 칸 안의 내려받기·`반납`·`연장` 단추를 눌러도 그 칸의 클릭(제목)이 와서, 읽는 화면이 열릴 때 편 것으로 본다([openOnViewer]).
  */
-open class Yes24LibrarySpec(pkg: String) : ReaderSpec(
+open class Yes24LibrarySpec(pkg: String) : ReaderApp(
     pkg = pkg, classPrefix = "com.yes24",
     shelves = setOf("com.yes24.library.shelf.LibShelfActivity"),
     viewers = setOf(

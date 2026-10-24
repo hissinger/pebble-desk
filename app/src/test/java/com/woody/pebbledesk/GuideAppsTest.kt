@@ -23,8 +23,8 @@ class GuideAppsTest {
         assertEquals(ReaderApps.ALL.map { it.pkg }.sorted(), guided.map { it.pkg }.sorted())
     }
 
-    @Test fun `책 파일로 책·표지를 아는 앱은 책 파일 읽기가 필요하다고 적혀 있다`() {
-        val usesFiles = ReaderApps.ALL.filter { it.fileState || it.searchesBookFile || it.fileViewer != null || it.opensBookFile }
+    @Test fun `파일로만 여는 앱은 책 파일 읽기가 필요하다고 적혀 있다`() {
+        val usesFiles = ReaderApps.ALL.filter { it.fileEntry != null }
         assertEquals(emptyList<String>(), usesFiles.filterNot { it.needsBookFiles }.map { it.pkg })
     }
 
@@ -48,6 +48,6 @@ class GuideAppsTest {
             if (p.eventType != XmlPullParser.START_TAG) continue
             for (i in 0 until p.attributeCount) if (p.getAttributeName(i).endsWith("packageNames")) names = p.getAttributeValue(i).split(',')
         }
-        assertEquals(ReaderApps.ALL.map { it.pkg }.sorted(), names.sorted())
+        assertEquals(ReaderApps.ALL.map { it.pkg }.distinct().sorted(), names.sorted())
     }
 }

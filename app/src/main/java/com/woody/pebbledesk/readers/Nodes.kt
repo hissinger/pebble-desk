@@ -7,7 +7,7 @@ import java.time.LocalDate
 /**
  * 서재 칸 한 권에서 읽은 것. [cell] 은 칸의 화면 위치, [thumb] 는 표지 그림 자리(모르면 null).
  * [stale] 은 방금 읽어 둔 서재 칸을 누른 글자로 맞춘 것(그 뒤 읽는 화면에서 진행률이 바뀌었을 수 있다).
- * [file] 은 파일 목록인 서재(이지뷰어)에서 칸의 파일: 화면에 보이는 위치 + 파일 이름(`#휴대폰/Books/a.epub`, 실제 경로는 [ReaderSpec.bookFile]).
+ * [file] 은 파일 목록인 서재(이지뷰어)에서 칸의 파일: 화면에 보이는 위치 + 파일 이름(`#휴대폰/Books/a.epub`, 실제 경로는 [ReaderApp.bookFile]).
  */
 data class Cell(
     val title: String, val author: String, val progress: Int, val due: Long, val thumb: Rect?, val cell: Rect,
@@ -27,7 +27,7 @@ class ViewerInfo(val title: String?, val author: String, val progress: Int, val 
 class FileViewer(val activity: String, val label: Int)
 
 /**
- * 이북 앱 데이터에서 찾은 책([ReaderSpec.fileBook]·[ReaderSpec.fileBooks]). [progress] 는 데이터에 진행률이 있으면(KOReader, 모르면 -1).
+ * 이북 앱 데이터에서 찾은 책(네오리더·우주의 데이터, KOReader 기록). [progress] 는 데이터에 진행률이 있으면(KOReader, 모르면 -1).
  * 열고 닫은 때를 아는 앱(KOReader): [openedAt] 은 이 책을 연 때, [closedAt] 은 닫았으면 닫은 때(열려 있으면 0. ms, 모르면 0)
  */
 class FileBook(
@@ -35,7 +35,7 @@ class FileBook(
     val openedAt: Long = 0, val closedAt: Long = 0,
 )
 
-/** 화면에 떠 있는 그 앱의 창들. [active] 는 맨 앞 창(다른 앱이면 null), [all] 은 읽는 화면 + 위에 뜬 메뉴·알림 창 */
+/** 화면에 떠 있는 그 앱의 창들. [active] 는 맨 앞 창(다른 앱이면 null), [all] 은 위에 뜬 메뉴·알림 창이 먼저이고 화면 자체(읽는 화면·서재)가 끝 */
 class AppWindows(val active: AccessibilityNodeInfo?, val all: List<AccessibilityNodeInfo>)
 
 /** 책 칸을 찾을 때 위로 올라가는 단계, 칸 안을 훑는 깊이 */
@@ -55,6 +55,11 @@ fun usableThumb(r: Rect) =
 internal fun AccessibilityNodeInfo.bounds() = Rect().also { getBoundsInScreen(it) }
 
 internal fun AccessibilityNodeInfo.isWebView() = className?.endsWith("WebView") == true
+
+/** 여러 칸을 담는 목록(RecyclerView·ListView·GridView, Compose 목록은 목록 정보로) */
+internal fun AccessibilityNodeInfo.isList() = collectionInfo != null || className?.let { LIST_CLASS.containsMatchIn(it) } == true
+
+private val LIST_CLASS = Regex("""(RecyclerView|ListView|GridView)$""")
 
 internal fun AccessibilityNodeInfo.byId(pkg: String, id: String): List<AccessibilityNodeInfo> =
     findAccessibilityNodeInfosByViewId("$pkg:id/$id")

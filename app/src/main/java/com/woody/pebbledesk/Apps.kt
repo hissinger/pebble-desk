@@ -18,6 +18,9 @@ import android.provider.Settings
 import android.util.LruCache
 import android.webkit.MimeTypeMap
 import com.woody.pebbledesk.readers.BookFiles
+import com.woody.pebbledesk.readers.Fallback
+import com.woody.pebbledesk.readers.HomeContext
+import com.woody.pebbledesk.readers.OpenResult
 import com.woody.pebbledesk.readers.ReaderApps
 import org.json.JSONArray
 import org.json.JSONObject
@@ -176,12 +179,12 @@ object AppStore {
     }
 
     /**
-     * 실행 화면이 없어 런처 조회에 나오지 않고 파일로만 여는 이북 앱(네오리더, [com.woody.pebbledesk.readers.ReaderSpec.fileViewer])의 항목.
+     * 실행 화면이 없어 런처 조회에 나오지 않고 파일로만 여는 이북 앱(네오리더, [com.woody.pebbledesk.readers.ReaderApp.fileEntry])의 항목.
      * 깔려 있고 켜져 있을 때만. 자동 추가로 그 앱의 책에 붙고, 책의 앱 이름과 그 책 열기에만 쓴다(모든 앱·자주 쓰는 앱·읽고 있는 앱 고르기에는
      * 넣지 않는다. 그냥 띄우면 아무것도 하지 않고, 고를 파일이 없다).
      */
     private fun fileReaders(context: Context): List<AppEntry> = cachedFileReaders ?: ReaderApps.ALL.mapNotNull { spec ->
-        val viewer = spec.fileViewer ?: return@mapNotNull null
+        val viewer = spec.fileEntry ?: return@mapNotNull null
         val enabled = runCatching { context.packageManager.getApplicationInfo(spec.pkg, 0).enabled }.getOrDefault(false)
         if (enabled) AppEntry(ComponentName(spec.pkg, viewer.activity), context.getString(viewer.label)) else null
     }.also { cachedFileReaders = it }
@@ -205,43 +208,29 @@ object AppStore {
     }
 
     /**
-     * 책의 앱을 연다. 파일로만 여는 이북 앱이면 그 책의 파일([BookShelf.filePath])을 연다. 파일을 모르거나 그 파일이 없으면(읽을 수 있을 때만 안다)
+     * 책의 앱을 연다. 이북 앱이면 그 앱이 정한 대로([ReaderApp.open]: 파일·링크·앱). 파일로만 여는 이북 앱의 책인데 그 파일을 모르거나 없으면
      * false: 부르는 쪽이 뒤에서 다시 찾아([findBookFile]) 연다([openFoundFile]).
-     * 책 파일을 바로 여는 앱(KOReader, [com.woody.pebbledesk.readers.ReaderSpec.opensBookFile])은 파일을 알면 그 파일을, 모르면 앱을 연다.
-     * 읽는 화면의 책 열쇠로 책을 아는 앱(Readest)은 그 열쇠를 알면 그 앱의 링크로 책을 바로 연다([com.woody.pebbledesk.readers.ReaderSpec.keyIntent]).
      */
     fun openBook(context: Context, book: ShelfBook, app: AppEntry): Boolean {
-        val spec = ReaderApps.byPackage[app.pkg]
-        val viewer = spec?.fileViewer?.takeIf { it.activity == app.component.className }
-        if (viewer == null) {
-            // BOOX 가 얼린 앱은 런처로 풀어야 해서 앱을 연다([launch])
-            spec?.let { s -> ReaderWatchService.bookKey(context, s.pkg, book.id)?.let(s::keyIntent) }
-                ?.takeIf { !(Device.hasBooxLauncher(context) && Device.isFrozen(context.packageManager, app.pkg)) }
-                ?.let { if (start(context, it)) return true }
-            // 지워진 파일이면(읽을 수 있을 때만 안다) 앱을 연다
-            if (spec?.opensBookFile == true) BookShelf.filePath(context, book.id)?.takeIf { !BookFiles.canRead(context) || File(it).isFile }
-                ?.let {
-                    if (!openFile(context, app.component, it)) return@let
-                    // 읽는 화면에 파일 이름만 보이는 앱(이지뷰어)은 그 파일이 열리면 이 책으로(KOReader 는 그 앱의 기록으로 안다)
-                    if (!spec.fileState) ReaderWatchService.bookFileOpened(app.pkg, book, it)
-                    return true
-                }
-            launch(context, app)
-            return true
+        val reader = ReaderApps.forPackage(context, app.pkg) ?: run { launch(context, app); return true }
+        fun fail(onFail: Fallback) = if (onFail == Fallback.LAUNCH) { launch(context, app); true } else false
+        return when (val r = reader.open(HomeContext(context, app.component), book)) {
+            OpenResult.Launch -> { launch(context, app); true }
+            is OpenResult.Start -> if (start(context, r.intent)) { r.started?.invoke(); true } else fail(r.onFail)
+            is OpenResult.File -> if (openFile(context, r.component, r.path)) { r.started?.invoke(); true } else fail(r.onFail)
+            OpenResult.FindFile -> false
         }
-        val path = BookShelf.filePath(context, book.id)?.takeIf { !BookFiles.canRead(context) || File(it).isFile } ?: return false
-        return openFile(context, app.component, path)
     }
 
     /**
-     * 파일로만 여는 이북 앱 [app] 의 책 [book] 인데 그 파일을 모를 때 다시 찾는다: 그 앱 데이터([com.woody.pebbledesk.readers.ReaderSpec.bookFiles]),
+     * 파일로만 여는 이북 앱 [app] 의 책 [book] 인데 그 파일을 모를 때 다시 찾는다: 그 앱 데이터([com.woody.pebbledesk.readers.ReaderApp.bookFiles]),
      * 없으면 저장소에서 같은 파일 이름(확장자 뗌)의 첫 책 파일([BookFiles.findByName], 책 파일 읽기가 켜져 있을 때만). 찾을 이름은 제목과
      * 이북 앱이 보여 준 제목(파일 이름이거나 파일 안의 제목). 그 앱 데이터에 같은 이름의 파일이 여럿이면(파일 안의 제목이 같은 PDF 등) 다른 책으로
      * 넣지 않은 파일이 먼저. 못 찾으면 null. 다른 앱을 깨우고 저장소를 훑으므로 화면 스레드에서 부르지 않는다.
      */
     fun findBookFile(context: Context, book: ShelfBook, app: AppEntry): String? {
         val titles = listOf(book.title, book.seenTitle).filter { it.isNotEmpty() }.distinct()
-        val found = ReaderApps.byPackage[app.pkg]?.bookFiles(context, titles).orEmpty()
+        val found = ReaderApps.forPackage(context, app.pkg)?.bookFiles(context, titles).orEmpty()
         return found.firstOrNull { BookShelf.idByFile(context, it).let { id -> id == null || id == book.id } } ?: found.firstOrNull()
             ?: titles.takeIf { BookFiles.canRead(context) }?.let(BookFiles::findByName)
     }

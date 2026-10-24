@@ -113,6 +113,7 @@
     <string name="wl_opened_finished">완독한 책이라 넣지 않음</string>
     <string name="wl_recent_wait">서재 아래 최근 읽은 책 \'%1$s\' 그대로 · 기다림</string>
     <string name="wl_file">책 파일 찾음 \'%1$s\' · %2$s</string>
+    <string name="wl_error">오류 %1$s · %2$s</string>
     <string name="wl_progress">진행률 %s</string>
     <string name="device_section_system">시스템 화면 시험 (이 앱이 여는 것)</string>
     <string name="device_system_a11y">접근성</string>
@@ -261,7 +262,8 @@
     <string name="guide_millie">밀리의서재(e-ink)</string>
     <string name="guide_millie_mobile">밀리의서재</string>
     <string name="guide_aladin">알라딘</string>
-    <string name="guide_bookers">북커스</string>
+    <string name="guide_bookers">북커스(1.x)</string>
+    <string name="guide_bookers2">북커스(2.0 부터)</string>
     <string name="guide_ridi">리디</string>
     <string name="guide_ridi_onestore">리디(원스토어)</string>
     <string name="guide_yes24lib">YES24 전자도서관(e-ink)</string>
@@ -278,6 +280,7 @@
     <string name="guide_ko">KOReader</string>
     <string name="guide_readest">Readest</string>
     <string name="guide_bookfusion">BookFusion</string>
+    <string name="guide_woojoo">우주</string>
     <string name="guide_permissions">필요한 권한</string>
     <string name="guide_todo">앱에서 할 것</string>
     <string name="guide_todo_none">따로 바꿀 것은 없습니다.</string>
@@ -310,6 +313,7 @@
     <string name="guide_n_moon_cover">홈 탭·책장 보기로 연 책은 책 파일 읽기를 켜면 들어옵니다</string>
     <string name="guide_n_moon_title">홈 탭·책장 보기로 연 책은 메뉴를 띄우면 들어옵니다</string>
     <string name="guide_n_kindle_title">받지 않았던 책은 메뉴를 띄우면 들어옵니다</string>
+    <string name="guide_n_bookers2_cover">책 상세를 본 책만 들어옵니다</string>
     <string name="guide_n_epub">EPUB 만 들어옵니다</string>
     <string name="guide_r_kyobo_shelf">교보eBook 앱에서 읽을 수 없습니다</string>
     <string name="guide_r_myyes_capture">my YES 가 화면 캡처를 막습니다</string>
@@ -351,8 +355,13 @@
     <string name="guide_note_readest">홈에서 책을 누르면 그 책을 Readest 로 바로 엽니다.</string>
     <string name="guide_n_bookfusion_title">Bookshelf 에서 연 책만 들어옵니다</string>
     <string name="guide_t_bookfusion_shelf">책은 Bookshelf 화면에서 눌러 여세요. 읽는 화면에 제목이 없어 다른 길로 연 책은 알 수 없습니다.</string>
+    <string name="guide_t_woojoo_open">내 서재에서 책을 눌러 여세요. 다른 길로 연 책과 PDF·만화는 읽다가 가운데를 눌러 메뉴를 띄우면 들어옵니다(책 파일 읽기를 허용했으면 바로).</string>
+    <string name="guide_n_woojoo_progress">읽는 중에는 책 파일 읽기나 메뉴로 들어옵니다</string>
+    <string name="guide_n_woojoo_cover">PDF·만화는 책 파일 읽기를 허용했을 때만 들어옵니다</string>
+    <string name="guide_files_woojoo">연 책·표지·진행률</string>
+    <string name="guide_note_woojoo">책 파일 읽기를 허용했으면 홈에서 책을 누를 때 그 파일을 우주로 바로 엽니다.</string>
     <string name="book_files">책 파일 읽기</string>
-    <string name="book_files_desc">KOReader 는 화면에 책 제목을 드러내지 않아, KOReader 가 남기는 기록(koreader 폴더, 책 옆 .sdr 폴더)으로 편 책과 진행률을 압니다. Readest 는 데이터 위치를 \u200B/\u2060sdcard\u2060/\u20600(SD 카드는 \u200B/\u2060sdcard\u2060/\u20601)으로 옮겼을 때 그 폴더(Readest/Books)에서 표지·저자·진행률을 읽습니다. 네오리더·문리더는 연 책의 EPUB 파일에서 표지를 꺼냅니다(이지뷰어는 표지와 책 정보). 책 파일에서는 제목·저자·표지만 꺼냅니다.\n\n안드로이드 설정의 모든 파일에 액세스에서 Pebble Desk 의 모든 파일 관리 허용을 켜 주세요. 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
+    <string name="book_files_desc">KOReader 는 화면에 책 제목을 드러내지 않아, KOReader 가 남기는 기록(koreader 폴더, 책 옆 .sdr 폴더)으로 편 책과 진행률을 압니다. Readest 는 데이터 위치를 \u200B/\u2060sdcard\u2060/\u20600(SD 카드는 \u200B/\u2060sdcard\u2060/\u20601)으로 옮겼을 때 그 폴더(Readest/Books)에서 표지·저자·진행률을 읽습니다. 우주는 우주가 남기는 기록(Woojoo 폴더)으로 메뉴를 띄우지 않아도 연 책과 진행률을 알고, PDF·만화는 그 기록의 표지를 씁니다. 네오리더·문리더·우주는 연 책의 EPUB 파일에서 표지를 꺼냅니다(이지뷰어는 표지와 책 정보). 책 파일에서는 제목·저자·표지만 꺼냅니다.\n\n안드로이드 설정의 모든 파일에 액세스에서 Pebble Desk 의 모든 파일 관리 허용을 켜 주세요. 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
     <string name="open_file_access">모든 파일에 액세스 열기</string>
     <!-- 홈의 책 파일 읽기 안내 창(%s = 이북 앱 이름). '책 파일 읽기'는 줄에서 나뉘지 않게 붙인다 -->
     <string name="file_notice_title">%s 책 정보를 가져오려면 책\u00A0파일\u00A0읽기를 켜 주세요</string>

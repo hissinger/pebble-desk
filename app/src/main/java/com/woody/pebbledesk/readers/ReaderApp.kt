@@ -1,17 +1,17 @@
 package com.woody.pebbledesk.readers
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
+import com.woody.pebbledesk.ShelfBook
 
 /**
  * 이북 앱 하나(읽는 책 자동 추가 [com.woody.pebbledesk.ReaderWatchService] 가 쓴다). 화면 이름·요소 이름과, 서재 칸·누른 칸·
  * 읽는 화면을 읽는 동작을 가진다. 기본 동작은 요소 이름으로 찾는 것이고, 다르게 읽어야 하는 앱은 그 앱 파일에서 메서드를 바꾼다
  * (리디·휴대폰 밀리·e-ink 밀리·문리더·킨들). 앱이 업데이트돼 이름이 바뀌면 그 앱 파일만 고친다. 앱 목록은 [ReaderApps].
  */
-open class ReaderSpec(
+open class ReaderApp(
     val pkg: String,
     val classPrefix: String,
     /** 책 칸이 보이는 화면들(서재·탭·책장 안) */
@@ -45,20 +45,16 @@ open class ReaderSpec(
     val viewerPages: Pair<String, String>? = null,
     /** 쪽으로 셈한 진행률을 올림한다(서재에 보이는 % 와 맞추려고. 북커스는 1/368쪽을 1% 로 보인다) */
     val pagesRoundUp: Boolean = false,
-    /** 서재 화면의 '최근 읽은 책' 제목(책 칸을 눌러도 알림이 오지 않는 앱. 읽는 화면에서 돌아오면 이것이 방금 편 책) */
-    val recent: String? = null,
     /**
      * 서재를 잠깐만 보고 책으로 넘어가는 앱(알라딘·북커스): 멈추기를 기다리지 않고 표지를 잘라 둔다(멈췄을 때는 모든 앱이 자른다).
      * 밀리는 앱을 다시 열 때 잠깐 칸을 다른 책으로 채우므로 쓰지 않는다.
      */
     val eagerCovers: Boolean = false,
-    /** 칸을 눌러도 읽는 화면이 열려야 편 것으로 본다(my YES: 누르면 내려받기·기간 만료 안내가 먼저 뜬다. 밀리: 받지 않은 책은 누르면 받기만 한다. YES24 도서관: 칸 안의 받기·반납 단추도 칸 클릭으로 온다) */
-    val openOnViewer: Boolean = false,
     /**
-     * 책을 서재에서 누른 칸으로만 아는 앱(BookFusion: 읽는 화면에 제목이 없다). 서재에서 읽는 화면으로 넘어왔는데 누른 칸을 모르면
-     * (누름 알림이 오지 않는 칸) 책 모름으로 적는다(앞서 편 책에 읽은 시간·진행률을 붙이지 않게)
+     * 칸을 눌러도 읽는 화면이 열려야 편 것으로 본다(my YES: 누르면 내려받기·기간 만료 안내가 먼저 뜬다. 밀리·교보도서관·북커스: 받지 않은 책은 누르면 받기만 한다.
+     * YES24 도서관·YES24 eBook: 칸 안의 받기·반납 단추도 칸 클릭으로 온다). 그 사이 서재 화면에서 책 칸이 아닌 것을 누르면 그 칸은 버린다([ScreenReader.onClick])
      */
-    val clickOnly: Boolean = false,
+    val openOnViewer: Boolean = false,
     /**
      * 누른 요소가 든 칸을 못 찾았을 때 누른 곳 자리의 칸으로 본다. 끄는 앱: my YES(구매목록 창이 책장 위에 겹쳐 뒤 창의 칸을 고를 수 있다),
      * Libby(칸 안의 `책 열기`·`대출 관리` 단추도 칸 자리에 든다)
@@ -74,26 +70,6 @@ open class ReaderSpec(
      * 요소 이름이 아니라 웹 화면 안의 HTML id 로 가르는 앱(Readest, [showsViewer] 를 바꾼다)은 읽는 화면의 이름일 뿐이다.
      */
     val viewerHolder: String? = null,
-    /** 실행 화면이 없어 파일로만 여는 앱(네오리더): 파일을 받는 화면과 고르기에 보일 이름, 파일을 모를 때 열 서재 앱 */
-    val fileViewer: FileViewer? = null,
-    /**
-     * 읽는 화면 액티비티가 여럿이고 하나가 책 한 권(탭)인 앱(네오리더 `ReaderTab1~4Activity`): 탭마다 메뉴로 마지막으로 안 책을
-     * 따로 기억해 두고, 다른 탭으로 넘어가면 그 탭의 책을 편 것으로 본다. 모르는 탭이면 메뉴로 알 때까지 진행률을 적지 않는다.
-     */
-    val viewerTabs: Boolean = false,
-    /**
-     * 책이 열려 있는지를 화면이 아니라 이북 앱 데이터([fileBooks] 의 [FileBook.openedAt]·[FileBook.closedAt])로 아는 앱(KOReader):
-     * 화면이 직접 그려져 앱 안에서 책을 열고 닫아도 알림이 없지만 그 때가 데이터에 남아, 그 앱이 앞에 올 때와 홈으로 돌아올 때 지난번 뒤의 일을
-     * 한꺼번에 맞춘다([com.woody.pebbledesk.ReaderWatchService.syncFileApps]). 읽은 시간은 책이 열려 있던 동안만 센다([ReaderApps.hostsViewer]).
-     */
-    val fileState: Boolean = false,
-    /** 실행 화면이 있지만 홈에서 책을 누르면 그 책의 파일([fileBooks]·[bookFile] 로 안 경로)을 바로 여는 앱(KOReader·이지뷰어). 파일을 모르면 앱을 연다. */
-    val opensBookFile: Boolean = false,
-    /**
-     * 내 파일을 열지만 어느 파일인지 내놓지 않는 앱(문리더): 읽는 화면 제목으로 안 책의 표지가 없으면 저장소에서 그 제목의 EPUB 을 찾아
-     * 그 책의 파일로 적는다(표지는 그릴 때 그 파일에서 꺼낸다). 책 파일 읽기를 허용했을 때만([BookFiles.canRead]).
-     */
-    val searchesBookFile: Boolean = false,
     /**
      * 책 파일 읽기가 필요하다([BookFiles.canRead]): 꺼져 있으면 책(KOReader)·표지(문리더·네오리더)·표지와 책 정보(이지뷰어·채리뷰어)를 모른다.
      * 깔려 있으면 시작하기에 책 파일 읽기 쪽을 더하고([ReaderApps.fileApps]), 꺼진 채 그 앱의 읽는 화면이 뜨면 홈에서 묻는다. 앱을 더할 때 여기서 정한다.
@@ -130,6 +106,12 @@ open class ReaderSpec(
     open val tellsTitle: Boolean get() = viewerTitle != null
 
     /**
+     * 서재 화면 자체에서 책 칸이 아닌 것(탭 등)을 누르면 앞서 누른 칸을 잊는가([openOnViewer] 앱에서 받기만 한 칸이 그 뒤 연 다른 책 대신 들어가지 않게).
+     * 기본: 잊지 않는다(위에 뜬 안내 창의 단추를 서재 화면으로 잘못 볼 수 있는 앱도 있어, 문제를 본 앱만 켠다)
+     */
+    open val forgetsClickOnOtherTap: Boolean get() = false
+
+    /**
      * 읽는 화면: 본문(웹 화면)은 훑지 않고 이름으로 찾은 요소만 읽는다. 진행률은 아래 줄([viewerProgress])에서,
      * 없으면 메뉴의 쪽([viewerPages])으로. 제목([viewerTitleIds])은 메뉴를 띄웠을 때만 보이고, 같은 이름이 여럿이면(목차 같은 목록) 믿지 않는다.
      * 메뉴·알림 창이 위에 떠 있어도 그 아래 읽는 화면의 진행률 줄을 읽도록 그 앱의 창을 모두 본다.
@@ -154,41 +136,16 @@ open class ReaderSpec(
     }
 
     /**
-     * 읽는 화면만으로는 어떤 책인지 모르거나 제목이 파일 이름일 때, 그 앱이 내놓은 데이터에서 책(제목·저자·파일 경로)을 찾는다.
-     * [info] 는 읽는 화면에서 읽은 것(메뉴 제목이 보이면 그 책을), [since] 는 이 읽는 화면이 열린 때(제목을 모르면 그 뒤에 연 책만 믿는다).
-     * 기본: 없음(null)
-     */
-    open fun fileBook(context: Context, info: ViewerInfo, since: Long): FileBook? = null
-
-    /**
-     * 파일로만 여는 앱([fileViewer])의 책 파일을 그 앱 데이터에서 다시 찾는다: 제목이나 파일 이름(확장자 뗌)이 [titles] 중 하나인 책 파일들의 경로
+     * 파일로만 여는 앱([fileEntry])의 책 파일을 그 앱 데이터에서 다시 찾는다: 제목이나 파일 이름(확장자 뗌)이 [titles] 중 하나인 책 파일들의 경로
      * (그 앱이 최근에 다룬 것부터. 파일이 옮겨졌거나 예전 판에서 파일 없이 넣은 책을 홈에서 누를 때). 모르면 빈 목록. 기본: 빈 목록
      */
     open fun bookFiles(context: Context, titles: Collection<String>): List<String> = emptyList()
-
-    /**
-     * 책이 열려 있는지를 데이터로 아는 앱([fileState]): [since](ms) 뒤에 열었거나 닫은 책들과 지금 책(마지막), 오래된 것부터.
-     * 기록이 없으면 빈 목록, 데이터를 읽을 수 없으면 null. 기본: null
-     */
-    open fun fileBooks(context: Context, since: Long): List<FileBook>? = null
-
-    /**
-     * 서재 칸의 파일([Cell.file], 화면에 보이는 위치 + 파일 이름) → 실제 경로(그 책의 파일로 적어 두어 읽는 화면의 파일 이름으로 찾고,
-     * EPUB 표지를 꺼내고, 홈에서 바로 연다). 모르면 null. 기본: null
-     */
-    open fun bookFile(context: Context, shown: String): String? = null
 
     /**
      * 서재 칸에서 자른 그림 [crop] 이 이북 앱이 표지 대신 그리는 기본 그림(파일 종류 아이콘 등)인가. 그러면 표지로 두지 않는다
      * (표지는 한 번 붙으면 다시 찍지 않으므로, 진짜 표지가 보일 때 자르게). 화면 스레드가 아닌 곳에서 부른다. 기본: 아니다
      */
     open fun placeholderCover(context: Context, crop: Bitmap): Boolean = false
-
-    /** 책을 열기 전에 확인 창으로 그 파일을 보이는 앱(이지뷰어 ▶·다음 파일). 그 창이 뜰 때·누를 때 [openingFile] 을 읽는다 */
-    open val confirmsOpen: Boolean get() = false
-
-    /** 확인 창에 보이는 열 파일([Cell.file] 과 같은 꼴: 위치 + 파일 이름). 없으면 null */
-    open fun openingFile(windows: AppWindows): String? = null
 
     /** 읽는 화면 제목을 찾을 요소 이름들(앞에서부터, 글자가 있는 것). 기본: [viewerTitle] 하나 */
     protected open val viewerTitleIds: List<String> get() = listOfNotNull(viewerTitle)
@@ -205,36 +162,45 @@ open class ReaderSpec(
      */
     open fun showsViewer(root: AccessibilityNodeInfo): Boolean = viewerHolder?.let { root.byId(pkg, it).isNotEmpty() } == true
 
+    /** 서비스가 붙을 때마다 새로 만드는 이 앱의 어댑터(판단과 기억). 기본은 화면만 읽는 바탕 [ScreenReader], 다른 길로 책을 아는 앱은 그 앱 파일의 어댑터 */
+    open fun newAdapter(): ReaderAdapter = ScreenReader(this)
+
     /**
-     * 읽는 화면에 지금 열린 책을 가리키는 그 앱의 열쇠가 늘 보이는 앱(Readest 책 해시)인가. 그러면 열쇠로 책을 가른다
-     * ([viewerKey]·[keyBook]·[keyCover]·[keyIntent], `ReaderWatchService.readKeyed`).
+     * 깔린 판을 이 앱 파일이 맡는가. 한 패키지가 판에 따라 전혀 다른 앱이 되면(북커스 2.0.0) 판마다 앱 파일을 따로 두고,
+     * [ReaderApps.ALL] 에 적은 순서로 이것을 물어 고른다([installed]). 기본: 맡는다
      */
-    open val viewerKeys: Boolean get() = false
+    open fun handles(context: Context): Boolean = true
 
-    /** 읽는 화면의 지금 책 열쇠([viewerKeys]). 모르면 null */
-    open fun viewerKey(windows: AppWindows): String? = null
+    /** 읽은 시간을 세는 방식: 기본은 읽는 화면이 앞에 있던 동안. 서재 안에 뜨는 읽는 화면([viewerHolder])은 표시로 자르고 표시가 없으면 안 셈 */
+    open val viewerTime: ViewerTime get() = if (viewerHolder != null) ViewerTime.MARKS_CLOSED else ViewerTime.SCREEN
 
-    /** 열쇠 [key] 의 책을 그 앱 데이터에서(제목·저자·진행률). 읽을 수 없거나 모르면 null. 기본: null */
-    open fun keyBook(context: Context, key: String): FileBook? = null
+    /** 표시로 읽은 시간을 자르는 액티비티(서재 안에 읽는 화면이 뜨는 앱은 서재 액티비티, 데이터로 아는 앱은 읽는 화면 액티비티) */
+    open val markedScreens: Set<String> get() = when (viewerTime) {
+        ViewerTime.MARKS_CLOSED -> shelves
+        ViewerTime.MARKS_OPEN -> viewers
+        ViewerTime.SCREEN -> emptySet()
+    }
 
-    /** 열쇠 [key] 의 책 표지(JPEG). 모르면 null. 그림을 다루므로 화면 스레드에서 부르지 않는다. 기본: null */
-    open fun keyCover(context: Context, key: String): ByteArray? = null
+    /** 내용 바뀜 알림으로 화면을 읽는다(앞에 올 때만 데이터로 맞추는 앱은 아니다) */
+    open val readsContent: Boolean get() = true
 
-    /** 홈에서 열쇠 [key] 의 책을 바로 여는 인텐트. 없으면 null(앱을 연다). 기본: null */
-    open fun keyIntent(key: String): Intent? = null
+    /** 읽는 화면이 서재 액티비티 안의 요소라 화면 이름이 알림 없이 바뀐다(내용 바뀜마다 화면 이름을 다시 정한다) */
+    open val screenInsideActivity: Boolean get() = viewerHolder != null
 
-    /** 그 앱 데이터에서 표지를 가져올 수 있다([keyCover]): 서재 화면에서 표지를 자르지 않는다. 기본: 아니다 */
-    open fun dataCovers(context: Context): Boolean = false
+    /** 읽는 화면에 다시 들어와도 책 모름이 된 때를 지우지 않는다(탭마다 책이 다른 앱: 같은 모르는 탭에 다시 오면 처음 열린 때를 둔다) */
+    open val keepsUnknownOnReenter: Boolean get() = false
+
+    /** 실행 화면이 없어 앱 목록 항목을 따로 두는 앱(네오리더): 파일을 받는 화면과 이름 */
+    open val fileEntry: FileViewer? get() = null
+
+    /** 시작하기의 책 파일 읽기 앱 순서(켜야 책이 들어오는 앱(KOReader)이 앞에) */
+    open val fileOrder: Int get() = 1
+
+    /** 홈에서 이 책을 연다. 기본: 앱을 연다(책 파일·링크로 바로 여는 앱은 그 앱 파일에서 바꾼다) */
+    open fun open(ctx: HomeContext, book: ShelfBook): OpenResult = OpenResult.Launch
 
     /** 서재 편집 중인가([shelfEditing]) */
     fun editing(root: AccessibilityNodeInfo): Boolean = shelfEditing?.let { root.byId(pkg, it).isNotEmpty() } == true
-
-    /** 서재의 '최근 읽은 책' 제목([recent], 없으면 null) */
-    fun recentTitle(root: AccessibilityNodeInfo): String? =
-        recent?.let { id -> root.byId(pkg, id).firstOrNull()?.text?.let(::plain)?.takeIf { it.isNotEmpty() } }
-
-    /** 서재 화면 안 웹 화면의 책 상세(여기서 읽는 화면으로 넘어가면 그 책을 편 것). 기본: 없음 */
-    open fun webBook(root: AccessibilityNodeInfo): Cell? = null
 
     /**
      * 누른 책 칸. 이벤트로 받은 요소는 위(부모)로 올라갈 수 없어서, 그 앱의 창(맨 앞 창부터)을 한 번 훑어 누른 요소를 찾고
@@ -250,7 +216,7 @@ open class ReaderSpec(
             for (n in path.asReversed()) {
                 val titleCount = titles.sumOf { n.count(pkg, it) }
                 if (titleCount == 0) continue
-                if (titleCount == 1 && thumbs.sumOf { n.count(pkg, it) } > 0) readCell(n)?.let { return it }
+                if (titleCount == 1 && thumbs.sumOf { n.count(pkg, it) } > 0 && !titleInOtherList(n, at)) readCell(n)?.let { return it }
                 break
             }
         }
@@ -281,20 +247,35 @@ open class ReaderSpec(
     }
 
     /**
-     * [node] 가 들어 있는 책 칸: 위로 올라가며 제목이 하나뿐인 가장 큰 묶음(그 위는 여러 권을 담은 목록).
+     * [node] 가 들어 있는 책 칸: 위로 올라가며 제목이 하나뿐인 가장 큰 묶음(그 위는 여러 권을 담은 목록, 목록 자체는 칸이 아니다).
      * 표지 그림이 없는 묶음은 책 칸이 아니다(알라딘은 `분야`·`필터` 단추도 같은 이름을 쓴다).
      */
     private fun cellOf(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val at = node.bounds()
         var cell: AccessibilityNodeInfo? = null
         var n: AccessibilityNodeInfo? = node
         for (i in 0 until CELL_UP) {
-            val c = n ?: break
+            // 칸은 목록 안의 한 칸까지(책이 한 권이면 목록 밖까지 제목이 하나뿐이라 화면 전체가 칸이 되었다, 밀리 e-ink)
+            val c = n?.takeUnless { it.isList() } ?: break
             val titleCount = titles.sumOf { c.count(pkg, it) }
-            if (titleCount > 1) break
+            if (titleCount > 1 || (titleCount == 1 && titleInOtherList(c, at))) break
             if (titleCount == 1) cell = c
             n = c.parent
         }
         return cell?.takeIf { c -> thumbs.sumOf { c.count(pkg, it) } > 0 }
+    }
+
+    /**
+     * [n] 안의 제목이 누른 곳([at])을 품지 않는 목록 속에 있는가: 그러면 [n] 은 책 칸이 아니라 목록 밖까지 품은 묶음이다
+     * (서재에 책이 한 권뿐일 때 위 탭을 누르면 화면 전체가 그 한 권의 칸으로 보였다, 북커스 내서재).
+     */
+    private fun titleInOtherList(n: AccessibilityNodeInfo, at: Rect): Boolean {
+        fun walk(c: AccessibilityNodeInfo, depth: Int): Boolean {
+            if (depth > 0 && c.isList() && !c.bounds().contains(at) && titles.any { c.count(pkg, it) > 0 }) return true
+            if (depth < WALK_DEPTH) for (i in 0 until c.childCount) if (c.getChild(i)?.let { walk(it, depth + 1) } == true) return true
+            return false
+        }
+        return walk(n, 0)
     }
 
     /** 책 칸 하나: 칸 아래 요소들을 직접 훑어 이름별 글자를 모은다(누른 칸에서는 이름으로 찾기가 안 된다). */
@@ -346,3 +327,6 @@ open class ReaderSpec(
     private fun textOf(n: AccessibilityNodeInfo): String? = n.text?.toString()
         ?: (0 until n.childCount).mapNotNull { n.getChild(it)?.text?.toString() }.joinToString("").ifEmpty { null }
 }
+
+/** 한 패키지의 앱 파일들([ReaderApps.ALL] 순서) 가운데 깔린 판을 맡는 것([ReaderApp.handles]). 맡는 것이 없으면 마지막 것 */
+internal fun List<ReaderApp>.installed(context: Context): ReaderApp = singleOrNull() ?: firstOrNull { it.handles(context) } ?: last()

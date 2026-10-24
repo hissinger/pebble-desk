@@ -67,19 +67,40 @@ object BookFiles {
 
     /**
      * 저장소에서 책 정보의 제목이 [title] 인 EPUB 의 경로(연 파일을 내놓지 않는 리더, 문리더). 얕은 폴더부터 [SEARCH_ENTRIES] 개까지 보고
-     * 숨긴 폴더(`.`)·`Android` 는 들어가지 않는다. 같은 제목([sameTitle])이 여럿이면 제목·저자가 그대로 같은 것. 못 찾으면 null.
+     * 숨긴 폴더(`.`)·`Android` 는 들어가지 않는다. 제목·저자가 그대로 같은 것, 없으면 제목이 그대로 같은 책 하나, 없으면 같은 제목([sameTitle])이고
+     * 한쪽에 부제가 없는 책 하나(같은 책의 복사본은 한 권으로 센다. 부제가 둘 다 있고 다르면 다른 권이다). 애매하면 짐작하지 않고 null.
      * 한 번 읽은 파일의 제목·저자는 기억해 두어 다음 찾기에서 다시 열지 않는다. 화면 스레드에서 부르지 않는다.
      */
     fun findEpub(title: String, author: String): String? {
-        var match: String? = null
+        val near = mutableListOf<Triple<String, String, String>>()
         for (f in storageFiles()) {
             if (!f.name.endsWith(".epub", ignoreCase = true)) continue
-            val (t, a) = epubNames.getOrPut("${f.path}@${f.lastModified()}") { epub(f.path)?.let { it.title to it.author } ?: ("" to "") }
+            val (t, a) = epubNames.getOrPut(fileKey(f)) { epub(f.path)?.let { it.title to it.author } ?: ("" to "") }
             if (t.isEmpty() || !sameTitle(t, title)) continue
             if (t == title && a == author) return f.path
-            if (match == null) match = f.path
+            near += Triple(f.path, t, a)
         }
-        return match
+        // 그대로 같은 것이 없으면 짐작하지 않는다: 같은 제목(저자만 다름)이 하나, 없으면 정리한 제목이 같고 한쪽에 부제가 없는 것이 하나뿐일 때만
+        // (`반지의 제왕: 두 개의 탑` 을 찾는데 저장소에 `반지의 제왕: 반지 원정대` 만 있어도 붙이지 않게)
+        fun one(list: List<Triple<String, String, String>>) = list.distinctBy { it.second to it.third }.singleOrNull()?.let { list.first().first }
+        fun subtitle(s: String) = s.substringAfter(':', "").trim()
+        return one(near.filter { it.second == title }) ?: one(near.filter { subtitle(it.second).isEmpty() || subtitle(title).isEmpty() })
+    }
+
+    /** EPUB [path] 에서 표지 그림을 꺼낼 수 있다(그 항목이 있고 그림으로 읽힌다. 파일마다 한 번 읽어 기억한다). 못 읽으면 아니다 */
+    fun hasEpubCover(path: String): Boolean {
+        if (!path.endsWith(".epub", ignoreCase = true)) return false
+        val f = File(path)
+        return epubCovers.getOrPut(fileKey(f)) {
+            runCatching {
+                ZipFile(path).use { zip ->
+                    val entry = readEpub(zip)?.cover?.let(zip::getEntry) ?: return@use false
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    zip.getInputStream(entry).use { BitmapFactory.decodeStream(it, null, bounds) }
+                    bounds.outWidth > 0 && bounds.outHeight > 0
+                }
+            }.getOrDefault(false)
+        }
     }
 
     /**
@@ -109,8 +130,13 @@ object BookFiles {
         }
     }
 
-    /** 찾기에서 읽은 EPUB(경로@수정 시각)의 제목·저자([findEpub]. 못 읽은 파일은 빈 제목) */
+    /** 파일을 기억하는 열쇠(경로·고친 때·길이. 고친 때를 두고 덮어쓴 파일도 다시 읽게) */
+    private fun fileKey(f: File) = "${f.path}@${f.lastModified()}@${f.length()}"
+
+    /** 찾기에서 읽은 EPUB(경로·고친 때·길이)의 제목·저자([findEpub]. 못 읽은 파일은 빈 제목) */
     private val epubNames = ConcurrentHashMap<String, Pair<String, String>>()
+    /** 파일(`경로@고친 때`)마다 표지가 있는지 */
+    private val epubCovers = ConcurrentHashMap<String, Boolean>()
 
     private const val SEARCH_ENTRIES = 5000
     private const val SEARCH_DEPTH = 6

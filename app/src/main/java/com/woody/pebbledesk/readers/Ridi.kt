@@ -11,7 +11,7 @@ import android.view.accessibility.AccessibilityNodeInfo
  * 진행률은 뷰어 설정의 '하단 좌/우 정보 표시'를 켜면 아래 좌·우(`15 / 640`, `2%`), 꺼 두면 메뉴의 쪽(`14 / 626`).
  * 원스토어판(`com.ridi.books.onestore`, '리디 완전판')은 패키지만 다르고 코드는 같다고 본다 **(미확인)**.
  */
-open class RidiSpec(pkg: String) : ReaderSpec(
+open class RidiSpec(pkg: String) : ReaderApp(
     pkg = pkg, classPrefix = "com.ridi",
     shelves = setOf("com.ridi.books.viewer.main.activity.MainActivity"),
     viewers = setOf(

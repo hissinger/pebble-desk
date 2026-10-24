@@ -13,7 +13,7 @@ import kotlin.math.abs
  * 받지 않은 칸은 표지 가운데에 받기 단추(받는 중에는 진행 원·취소 단추)를, 서비스가 끝난 책은 흰 막을 겹쳐 그려 그런 칸의 표지는 자르지 않는다
  * ([COVER_OVERLAYS], 칸 레이아웃 `view_bookshelf_cell`, 2026-10-21 페블에서 확인).
  */
-object Millie : ReaderSpec(
+object Millie : ReaderApp(
     pkg = "kr.co.millie.eink", classPrefix = "kr.co.millie",
     shelves = setOf("kr.co.millie.eink.bookshelf.BookshelfActivity", "kr.co.millie.eink.bookshelf.BookShelfDetailActivity"),
     viewers = setOf(
@@ -26,6 +26,8 @@ object Millie : ReaderSpec(
     viewerProgress = listOf("tv_viewer_add_on_right"), viewerLoading = "epub_loading_message",
     openOnViewer = true,
 ) {
+    override fun newAdapter(): ReaderAdapter = MillieReader()
+
     /** 읽는 화면 메뉴(위 막대)에 제목이 보인다(이름 없는 글자라 [viewerTitle] 대신 [readViewer] 에서 읽는다) */
     override val tellsTitle: Boolean get() = true
 
@@ -53,7 +55,7 @@ object Millie : ReaderSpec(
      * 검색(웹 화면)의 책 상세: `바로 읽기` 단추와 같은 줄 맨 왼쪽 단추에 왼쪽을 맞춘, 단추 위의 글자들이 제목·저자다.
      * 표지는 그 왼쪽의 그림. 요소 이름이 없는 웹 화면이라 위치로 찾는다(`바로 읽기` 클릭에는 글자가 없다).
      */
-    override fun webBook(root: AccessibilityNodeInfo): Cell? {
+    fun webBook(root: AccessibilityNodeInfo): Cell? {
         val texts = mutableListOf<Pair<String, Rect>>()
         val images = mutableListOf<Rect>()
         fun walk(n: AccessibilityNodeInfo, depth: Int) {
@@ -81,3 +83,47 @@ private val COVER_OVERLAYS = listOf(
     "download_start", "dowload_progressBar", "download_cancel", "container_not_service", "v_badge_not_service",
     "container_coming_soon", "bookshelf_cell_cover_dim_none", "bookshelf_cell_cover_dim_selected",
 )
+
+/**
+ * 밀리(e-ink)의 판단과 기억: 책 상세는 [DetailReader] 그대로이고, 받아야 하는 책은 `바로 읽기`를 누르면 받기 창(`SearchDownloadDialog`)이
+ * 상세 위에 떠 받는 동안 상세가 안 보인다. 상세가 그 창이 뜰 무렵([COVER_SLACK_MS] 안) 사라졌으면 창이 뜬 뒤 [DOWNLOAD_KEEP_MS] 까지는 상세를 잊지 않는다(그 사이 상세가 다시 보이면 받기를 취소한 것)
+ * (받는 데 3초를 넘기면 상세를 잊어 저자 없이 메뉴 제목으로 들어왔다, 2026-10-24 페블). 받기를 취소하고 상세에서 뒤로 나가 사라진 것은 바탕대로 잊는다.
+ * 그 사이 서재 칸을 누르면 그 칸이 먼저다([DetailReader]).
+ */
+private class MillieReader : DetailReader(Millie, clickOnly = false, Millie::webBook) {
+    /** 기억한 상세 위에 받기 창이 뜬 때 */
+    private var coveredAt: Long? = null
+
+    override fun keepsHidden(ctx: AppContext, gone: Long): Boolean =
+        coveredAt?.let { abs(gone - it) <= COVER_SLACK_MS && ctx.now - it < DOWNLOAD_KEEP_MS } == true
+
+    override fun onWindow(ctx: AppContext, cls: String?) {
+        super.onWindow(ctx, cls)
+        if (remembers && cls?.endsWith(DOWNLOAD_DIALOG) == true) coveredAt = ctx.now
+    }
+
+    override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {
+        super.onEnterViewer(ctx, from, again)
+        coveredAt = null
+    }
+
+    /** 받기 창이 뜬 뒤 상세가 다시 보이면(받기를 취소함) 그 창은 지나갔다: 그 뒤 상세가 사라지면 바탕대로 잊는다 */
+    override fun onShelfLive(ctx: AppContext, force: Boolean) {
+        super.onShelfLive(ctx, force)
+        coveredAt?.takeIf { detailShown && ctx.now - it > COVER_SLACK_MS }?.let { coveredAt = null }
+    }
+
+    override fun beforeOpened(ctx: AppContext) {
+        super.beforeOpened(ctx)
+        coveredAt = null
+    }
+
+    companion object {
+        /** 받기 창이 뜬 뒤 상세를 기억해 두는 때(받는 데 걸리는 때, 누른 칸을 기다리는 때와 같게) */
+        private const val DOWNLOAD_KEEP_MS = ScreenReader.CLICK_OPEN_MS
+        /** 받기 창이 뜬 때와 상세가 사라진 때(1초마다 읽어 늦게 적힌다)의 차이가 이만큼 안이면 그 창에 가려진 것 */
+        private const val COVER_SLACK_MS = 2_000L
+        /** 검색 상세의 `바로 읽기` 로 받을 때 뜨는 창 */
+        private const val DOWNLOAD_DIALOG = "SearchDownloadDialog"
+    }
+}
