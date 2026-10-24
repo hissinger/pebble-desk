@@ -31,10 +31,15 @@ class ClickMemoryTest {
     private val shelf = "$pkg.ShelfActivity"
     private val viewer = "$pkg.ViewerActivity"
 
-    private val app = object : ReaderApp(
+    /** 서재에서 칸이 아닌 것을 누르면 앞서 누른 칸을 잊는 앱([forgets]) */
+    private inner class TestApp(val forgets: Boolean) : ReaderApp(
         pkg, pkg, setOf(shelf), setOf(viewer), titles = listOf("title"), thumbs = listOf("cover"),
         authors = emptyList(), progress = null, due = null, viewerProgress = emptyList(), openOnViewer = true,
-    ) {}
+    ) {
+        override val forgetsClickOnOtherTap get() = forgets
+    }
+
+    private val app: ReaderApp = TestApp(forgets = true)
 
     private fun node(cls: String, l: Int, t: Int, r: Int, b: Int, id: String? = null, text: String? = null, vararg kids: AccessibilityNodeInfo) =
         AccessibilityNodeInfo.obtain().apply {
@@ -136,6 +141,22 @@ class ClickMemoryTest {
         ctx.t += 5_000
         enterViewer(ctx, r)
         assertEquals(emptyList<String>(), ctx.opened)
+    }
+
+    @Test fun `잊는 앱이 아니면(기본) 서재에서 칸이 아닌 것을 눌러도 앞서 누른 칸을 둔다`() {
+        val a = cell(400, "받기만 한 책")
+        val tab = inWindow(node("android.widget.TextView", 0, 100, 300, 200, null, "표지 보기"), SHELF_WINDOW)
+        val root = seal(node("android.widget.FrameLayout", 0, 0, 1080, 2000, null, null, tab,
+            node("androidx.recyclerview.widget.RecyclerView", 0, 300, 1080, 2000, null, null, a)))
+        val ctx = Ctx().apply { windowsNow = AppWindows(root, listOf(root)) }
+        val r = ScreenReader(TestApp(forgets = false)).also { ctx.adapter = it }
+        showShelf(ctx, r)
+        r.onClick(ctx, Click(a.getChild(0), emptyList()))
+        ctx.t += 5_000
+        r.onClick(ctx, Click(tab, emptyList()))
+        ctx.t += 5_000
+        enterViewer(ctx, r)
+        assertEquals(listOf("받기만 한 책"), ctx.opened)
     }
 
     @Test fun `위에 뜬 창(받기 안내)의 단추는 그 칸을 열려는 것이라 둔다`() {

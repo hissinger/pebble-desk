@@ -106,6 +106,12 @@ open class ReaderApp(
     open val tellsTitle: Boolean get() = viewerTitle != null
 
     /**
+     * 서재 화면 자체에서 책 칸이 아닌 것(탭 등)을 누르면 앞서 누른 칸을 잊는가([openOnViewer] 앱에서 받기만 한 칸이 그 뒤 연 다른 책 대신 들어가지 않게).
+     * 기본: 잊지 않는다(위에 뜬 안내 창의 단추를 서재 화면으로 잘못 볼 수 있는 앱도 있어, 문제를 본 앱만 켠다)
+     */
+    open val forgetsClickOnOtherTap: Boolean get() = false
+
+    /**
      * 읽는 화면: 본문(웹 화면)은 훑지 않고 이름으로 찾은 요소만 읽는다. 진행률은 아래 줄([viewerProgress])에서,
      * 없으면 메뉴의 쪽([viewerPages])으로. 제목([viewerTitleIds])은 메뉴를 띄웠을 때만 보이고, 같은 이름이 여럿이면(목차 같은 목록) 믿지 않는다.
      * 메뉴·알림 창이 위에 떠 있어도 그 아래 읽는 화면의 진행률 줄을 읽도록 그 앱의 창을 모두 본다.

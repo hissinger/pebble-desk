@@ -19,9 +19,6 @@ open class DetailReader(app: ReaderApp, private val clickOnly: Boolean, private 
     private var seenAt = 0L
     private var lastRead = 0L
 
-    /** 상세 안의 단추를 눌러도 앞서 누른 칸을 두고 상세·그 뒤 누른 칸으로 가른다 */
-    override val forgetsOnOtherClick: Boolean get() = false
-
     /** 기억한 책 상세가 있는가(앱 어댑터가 [keepsHidden] 을 정할 때) */
     protected val remembers: Boolean get() = book != null
     /** 기억한 상세가 지금 보이는가(사라졌다고 적지 않았다) */

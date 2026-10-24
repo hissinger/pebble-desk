@@ -14,4 +14,7 @@ object KyoboLibrary : ReaderApp(
     ),
     titles = listOf("tvTitle"), thumbs = listOf("ivThumbnail"), authors = listOf("tvAuthor"), progress = "tvReadPercentageTxt", due = "tvRemainDate",
     viewerProgress = listOf("bookIndicator"), viewerTitle = "viewer_top_booktitle", openOnViewer = true,
-)
+) {
+    /** 받기만 한 칸을 누른 뒤 탭을 눌러 다른 책을 열면 그 칸이 들어왔다(2026-10-24 페블) */
+    override val forgetsClickOnOtherTap get() = true
+}

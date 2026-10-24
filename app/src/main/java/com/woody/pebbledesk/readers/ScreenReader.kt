@@ -91,9 +91,9 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
         ctx.log(WatchLog.Kind.CLICK, cell?.title.orEmpty(), if (main) "" else ON_TOP)
         when {
             cell == null -> {
-                // 서재 화면 자체에서 책 칸이 아닌 것(탭·다른 칸·표지만 있는 칸)을 눌렀으면 앞서 누른 칸은 버린다(받기만 한 칸이 그 뒤 연 다른 책 대신
-                // 들어가지 않게, 교보도서관). 위에 뜬 창(받기·기간 안내)의 단추는 그 칸을 열려는 것이라 둔다(my YES).
-                if (main && forgetsOnOtherClick) clicked = null
+                // 그렇게 하는 앱([ReaderApp.forgetsClickOnOtherTap])은 서재 화면 자체에서 책 칸이 아닌 것(탭·다른 칸)을 눌렀으면 앞서 누른 칸을 버린다
+                // (받기만 한 칸이 그 뒤 연 다른 책 대신 들어가지 않게). 위에 뜬 창(받기·기간 안내)의 단추는 그 칸을 열려는 것이라 둔다.
+                if (main && app.forgetsClickOnOtherTap) clicked = null
                 // 표지만 있는 칸일 수 있다(누르자마자 읽는 화면으로 넘어가 누른 요소도 읽을 수 없다). 메뉴에 제목이 없는 앱은 알 길이 없어 두지 않는다.
                 if (app.tellsTitle) unknownClick = ctx.now
                 onClickNoCell(ctx)
@@ -109,12 +109,6 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
         val window = click.source?.windowId?.takeIf { it >= 0 } ?: return false
         return window == shelfWindow
     }
-
-    /**
-     * 서재 화면 자체에서 칸이 아닌 것을 누르면 앞서 누른 칸을 버리는가. 책 상세에서 여는 앱([DetailReader])은 상세 안의 단추(같은 창의 웹 화면)를
-     * 누르기 전에 상세를 못 읽었을 수 있어 두고, 상세·나중에 누른 칸으로 가른다
-     */
-    protected open val forgetsOnOtherClick: Boolean get() = true
 
     /** 서재에서 누른 것이 책 칸이 아니다(제목 못 읽은 누름을 적은 뒤). 바탕: 아무것도 안 함 */
     protected open fun onClickNoCell(ctx: AppContext) {}
