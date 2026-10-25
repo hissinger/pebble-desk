@@ -575,6 +575,20 @@ jadx --no-res -d src/framework fs/system/system/framework/framework.jar
 - 원인: 서재 표지는 접근성 서비스의 화면 캡처(`AccessibilityService.takeScreenshot`)로 잘라 오는데, 이 함수는 **안드로이드 11(API 30)부터** 있다. 안드로이드 10 에서는 자르지 않고 넘어간다(`ReaderWatchService.captureCovers`). 그래서 안드로이드 9·10 기기(BOOX Leaf·Poke3 도)는 화면에서 자르는 표지가 모두 빈 표지다. 책 파일·앱 데이터에서 꺼내는 표지(책 파일 읽기를 켠 문리더·네오리더·이지뷰어·채리뷰어의 EPUB, KOReader, 데이터를 옮긴 Readest)는 들어온다. 기본 홈 여부와는 상관없다.
 - 우회: 책 상세 › `책 정보 고치기` › `표지 다시 찾기`(docs/TROUBLESHOOTING.md).
 
+## 안드로이드 8 (Oreo, API 26·27) 지원 조사 (2026-10-25)
+
+1.6.0 까지 minSdk 28 이라 8.x 기기(InkPalm 5 등)에는 깔리지 않는다. **결론: 지금은 지원하지 않는다**(2026-10-25). 8 기기 사용자 보고가 없고, 기기가 적고(Likebook P6·InkPalm 5 등 2018~2021년), 리디(minSdk 29)·이지뷰어(29)·킨들(30)·북커스(28)·밀리 휴대폰판(29)은 지금 판이 8 에 깔리지 않는다(교보도서관·밀리 e-ink·YES24·알라딘·교보eBook·문리더·KOReader 는 23~26 이라 깔린다). 쓰는 사람이 생기면 아래대로 한다.
+
+지원하려면 고칠 것:
+
+- **서명**: APK 가 v3 만 서명돼 있어 8 은 서명을 읽지 못한다(v1·v2 만 본다, 8.0 에뮬에서 `INSTALL_PARSE_FAILED_NO_CERTIFICATES`). 길은 둘이다.
+  - 이력을 두고 v2 를 켠다: apksigner 가 v2 에는 이력의 가장 오래된 키(디버그 키)를 요구한다(`the oldest signer in the SigningCertificateLineage is missing`). 8 에서는 앱 서명이 디버그 키로 보이고 업데이트도 디버그 키로 이어진다. 8.0 설치·11 에서 1.6.0 위 덮어 설치 확인.
+  - 이력을 빼고 v2·v3 를 릴리스 키로만: 10·11·13 에서 1.6.0 위에 덮어 깔리고(이력만 빈다) 8.0 에서도 릴리스 키로 보인다. 1.4.2 이하(디버그 키)에서는 올라올 수 없다. 1.6.0 까지의 앱 안 업데이트는 깔린 이력이 새 APK 이력의 앞부분이어야 받으므로(`Update.continuesSigning`) 거부한다 → 먼저 한 판에서 확인을 "지금 서명 키가 같으면 받는다"로 넓히고 그다음 판에서 이력을 뺀다(그 사이 판을 받지 않은 사람은 한 번 직접 설치).
+- **API 28 부터 있는 것**(minSdk 26 lint 의 NewApi 16곳): 업데이트 확인의 `signingInfo`·`GET_SIGNING_CERTIFICATES`(8 은 `GET_SIGNATURES` 로), `longVersionCode`(Update·Bookers2), 굵기 숫자 `Typeface.create(…, 800/500, …)`(Ui, 8 은 굵게·보통만), 토큰 `Handler.postDelayed`(Apps), 기기 정보의 대기 버킷·백그라운드 제한.
+- 서재 표지 자르기는 9·10 처럼 되지 않는다(화면 캡처는 11 부터).
+
+**읽은 시간 — 화면이 꺼질 때**: 9 부터는 `SCREEN_NON_INTERACTIVE` 로 읽기를 끊는데(`Reading.kt` `Counter.feed`), 이 이벤트는 8 에 없다. 에뮬레이터 `CremaPebble_A8_27`(8.1)·`CremaPebble_A8_26`(8.0)(페블 규격, google_apis arm64)에서 앱(설정)을 연 채 화면을 90초 끄고 켰다. 전원 키·시간 초과, 잠금 화면 있음·없음 모두에서 끌 때 액티비티가 멈추고(`am_on_stop_called … sleeping`) 사용 기록에 `MOVE_TO_BACKGROUND` 가, 켤 때 `MOVE_TO_FOREGROUND` 가 남았다. 앱은 같은 클래스의 `MOVE_TO_BACKGROUND` 로 읽는 화면 구간을 닫고 켤 때 다시 열므로, 꺼진 동안은 읽은 시간에 들어가지 않는다. 기기마다 다른 잠자기 화면(e-ink 대기 그림)에서도 같은지는 실기기에서 **(미확인)**.
+
 ## Pebble Desk 에 넣은 것
 
 | 내용 | 기기 구분 | 확인 |
