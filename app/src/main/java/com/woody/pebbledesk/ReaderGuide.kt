@@ -148,7 +148,7 @@ internal object ReaderGuide {
         )),
         App(listOf(R.string.guide_kindle), listOf(Kindle), Info(
             listOf(R.string.guide_t_kindle_menu),
-            cover = YES, title = yes(R.string.guide_n_kindle_title), author = YES, progress = READING_MENU, due = NO,
+            cover = yes(R.string.guide_n_kindle_cover), title = yes(R.string.guide_n_kindle_title), author = YES, progress = READING_MENU, due = NO,
         )),
         App(listOf(R.string.guide_libby), listOf(Libby), Info(
             listOf(R.string.guide_t_progress_menu, R.string.guide_t_libby_time),

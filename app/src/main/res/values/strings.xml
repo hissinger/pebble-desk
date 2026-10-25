@@ -312,6 +312,7 @@
     <string name="guide_n_yes24lib_title">도서관 화면에서 연 책은 메뉴를 띄우면 들어옵니다</string>
     <string name="guide_n_moon_cover">홈 탭·책장 보기로 연 책은 책 파일 읽기를 켜면 들어옵니다</string>
     <string name="guide_n_moon_title">홈 탭·책장 보기로 연 책은 메뉴를 띄우면 들어옵니다</string>
+    <string name="guide_n_kindle_cover">Send to Kindle 문서는 읽고 서재로 돌아가면 들어옵니다</string>
     <string name="guide_n_kindle_title">받지 않았던 책은 메뉴를 띄우면 들어옵니다</string>
     <string name="guide_n_bookers2_cover">책 상세를 본 책만 들어옵니다</string>
     <string name="guide_n_epub">EPUB 만 들어옵니다</string>

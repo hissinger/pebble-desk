@@ -1,12 +1,16 @@
 package com.woody.pebbledesk.readers
 
+import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
+import kotlin.math.abs
 
 /**
  * 킨들(e-ink 판이 따로 없고 휴대폰 판 하나. 한국어가 없어 한국어 기기에서도 영어로 보인다): 서재(`oob.MainActivity` 의 홈 탭
  * `From Your Library` 줄·Library 탭)의 책 칸은 설명이 `제목, 성, 이름, , Book downloaded.Reading is 12% completed., 1.2 Megabyte`
- * 이다(진행률을 보이는 요소가 따로 없어 `progress` 없이 설명의 `Reading is 12% completed.` 로 읽는다). 격자 보기 칸(`badgeable_cover`)에는 설명과 표지(`cover_image`)뿐이고, 목록 보기 칸(이름 없는 단추)에는 제목
+ * 이다(진행률을 보이는 요소가 따로 없어 `progress` 없이 설명의 `Reading is 12% completed.` 로 읽는다). 저자 뒤 칸은 산 책이면 비고, 구독으로 빌린 책이면
+ * 구독 이름(`Kindle Unlimited` 등, [ORIGINS])이다. 격자 보기 칸(`badgeable_cover`)에는 설명과 표지(`cover_image`)뿐이고, 목록 보기 칸(이름 없는 단추)에는 제목
  * `lib_book_row_title`·저자 `lib_book_row_author`(`BRONTË, EMILY`, 대문자)도 있다. 받은 책 칸을 누르면 읽는 화면이 열릴 때 편 것으로 보고,
  * 받지 않은 책(누르면 Library 탭은 내려받기만, 홈 탭은 받은 뒤 바로 연다)은 읽는 화면 메뉴의 제목으로 안다. 읽는 화면의 본문·위 제목·아래 `12%` 는 직접 그리는 뷰라 드러나지 않고, 메뉴를 띄우면
  * 제목 `command_bar_title_bottom`·진행률 `nln_text_secondary`(`Location 1 of 4559  •  0%`)가 보인다.
@@ -25,8 +29,14 @@ object Kindle : ReaderApp(
     viewerProgress = listOf("nln_text_secondary"), viewerTitle = "command_bar_title_bottom",
     eagerCovers = true, openOnViewer = true,
 ) {
-    /** 책 칸 설명에서 제목·저자(`, , ` 앞)와 상태를 가르는 곳 */
-    private const val SEP = ", , "
+    /**
+     * 책 칸 설명에서 저자와 상태 사이 칸에 들어가는 구독 이름(킨들 앱 8.158 `com.amazon.kcp.util.f1.A`, 영어 문구. 산 책은 빈 칸).
+     * Kindle Unlimited 는 앱 안에서 Kindle+ 로 이름을 바꾸는 중이라 둘 다 나온다.
+     */
+    private val ORIGINS = listOf("Kindle Unlimited", "Kindle+", "Prime Reading", "Comixology Unlimited", "Wait for Free")
+
+    /** 책 칸 설명에서 제목·저자와 상태를 가르는 곳: 산 책은 `, , `, 구독으로 빌린 책은 `, Kindle Unlimited, ` 등 */
+    private val SEPS = (listOf("") + ORIGINS).map { ", $it, " }
 
     /** 격자 보기·홈 탭 칸의 표지 위에 그리는 표시들 */
     private val BADGES = setOf("top_right_badge", "top_right_corner_badge", "bottom_right_badge")
@@ -75,10 +85,17 @@ object Kindle : ReaderApp(
     /** '이어 읽기' 표지([RECENT]): 설명의 앞 문장(`Most recent book. `)을 떼면 책 칸 설명, 그림이 곧 표지 */
     private fun recentCell(n: AccessibilityNodeInfo): Cell? {
         val desc = n.contentDescription?.toString()?.substringAfter(". ", "") ?: return null
-        val head = desc.substringBefore(SEP, "").takeIf { it.isNotBlank() } ?: return null
+        val (head, state) = splitDesc(desc) ?: return null
         val (name, author) = splitHead(head)
         val r = n.bounds()
-        return Cell(name, personName(author), percent(desc.substringAfter(SEP)), -1, r, r)
+        return Cell(name, personName(author), percent(state), -1, r, r)
+    }
+
+    /** 책 칸 설명을 제목·저자와 상태로 가른다(가르는 곳이 [SEPS] 중 가장 앞의 것). 책 칸 설명이 아니면 null */
+    internal fun splitDesc(desc: String): Pair<String, String>? {
+        val (at, sep) = SEPS.mapNotNull { s -> desc.indexOf(s).takeIf { it >= 0 }?.let { it to s } }.minByOrNull { it.first } ?: return null
+        val head = desc.substring(0, at).takeIf { it.isNotBlank() } ?: return null
+        return head to desc.substring(at + sep.length)
     }
 
     /**
@@ -94,14 +111,14 @@ object Kindle : ReaderApp(
     }
 
     /**
-     * 설명이 `제목, 저자, , 상태, 크기` 인 묶음 하나와 그 표지 자리. 목록 보기는 제목 글자가 따로 있어 그것을 쓰고, 격자 보기는 설명에서 가른다:
+     * 설명이 `제목, 저자, (구독), 상태, 크기` 인 묶음 하나와 그 표지 자리. 목록 보기는 제목 글자가 따로 있어 그것을 쓰고, 격자 보기는 설명에서 가른다:
      * 저자는 `성, 이름` 이라 쉼표로 나눈 끝의 둘(둘뿐이면 끝 하나), 나머지가 제목(`Moby Dick: or, the White Whale`).
      * 격자 보기·홈 탭 칸은 표지 위에 진행률 띠(`top_right_badge`)·받음 ✓(`bottom_right_badge`)·오디오 표시를 그려, 표시가 있는 칸의 표지는 자르지 않는다
      * (목록 보기 칸은 표시가 표지 밖에 있다).
      */
     private fun descCell(n: AccessibilityNodeInfo): Pair<Cell, Rect>? {
         val desc = n.contentDescription?.toString() ?: return null
-        val head = desc.substringBefore(SEP, "").takeIf { it.isNotBlank() } ?: return null
+        val (head, state) = splitDesc(desc) ?: return null
         var title: String? = null
         var thumb: Rect? = null
         var badged = false
@@ -116,8 +133,57 @@ object Kindle : ReaderApp(
         walk(n, 0)
         val cover = thumb ?: return null
         val (name, author) = title?.takeIf { head.startsWith(it) }?.let { t -> t to head.removePrefix(t).removePrefix(", ") } ?: splitHead(head)
-        return Cell(name, personName(author), percent(desc.substringAfter(SEP)), -1, cover.takeUnless { badged }, n.bounds()) to cover
+        return Cell(name, personName(author), percent(state), -1, cover.takeUnless { badged }, n.bounds()) to cover
     }
+
+    /**
+     * 킨들이 표지 대신 그리는 기본 표지인가: Send to Kindle·이메일로 보낸 문서는 받기 전에도, 받은 뒤에도(홈 탭) 서재 칸에 이것을 그리고, 진짜 표지는
+     * 연 뒤에 '이어 읽기' 표지([RECENT])·목록 보기 칸에 나온다. 연한 회색 바탕에 위쪽(높이 14~29%)에 왼쪽 끝부터 폭의 87% 까지 주황 띠(흰 `KINDLE`),
+     * 그 아래 파일 이름과 큰 회색 `k`(2026-10-26 에뮬레이터 화면, 격자·목록 보기 같은 모양). 흑백 화면에서도 알아보게 색은 보지 않고 밝기만 보고,
+     * 크레마 화면 대비가 캡처를 어둡게 해도 알아보게 밝기는 그 그림의 바탕에 견준다.
+     */
+    override fun placeholderCover(context: Context, crop: Bitmap): Boolean {
+        val w = crop.width
+        val h = crop.height
+        val px = IntArray(w * h).also { crop.getPixels(it, 0, w, 0, 0, w, h) }
+        return placeholder(px, w, h)
+    }
+
+    /** [placeholderCover] 의 판단: 폭 [w]·높이 [h] 의 ARGB 점들 [px] */
+    internal fun placeholder(px: IntArray, w: Int, h: Int): Boolean {
+        val lum = FloatArray(w * h) { i -> px[i].let { 0.299f * (it shr 16 and 0xff) + 0.587f * (it shr 8 and 0xff) + 0.114f * (it and 0xff) } }
+        /** 비율로 준 칸의 점들의 밝기 */
+        fun area(x0: Float, x1: Float, y0: Float, y1: Float): FloatArray {
+            val left = (x0 * w).toInt()
+            val cols = (x1 * w).toInt() - left
+            val top = (y0 * h).toInt()
+            return FloatArray(cols * ((y1 * h).toInt() - top)) { i -> lum[(top + i / cols) * w + left + i % cols] }
+        }
+        fun FloatArray.share(test: (Float) -> Boolean) = if (isEmpty()) 0f else count(test).toFloat() / size
+        // 띠 아래 바탕(파일 이름·k 를 피한 오른쪽 가운데)은 고르게 밝고, 띠 위·띠 오른쪽 끝은 바탕만큼 밝고(위 왼쪽은 옅은 그러데이션),
+        // 띠 안은 흰 글자 사이가 바탕보다 어두운 중간 밝기(주황. 검은 글자 표지와 가른다)
+        val back = area(0.45f, 0.95f, 0.45f, 0.68f)
+        val bg = back.average().toFloat()
+        return bg >= MIN_BG && back.share { abs(it - bg) <= BG_SLACK } >= MOSTLY &&
+            area(0.65f, 0.95f, 0.02f, 0.11f).share { it >= bg - NEAR_BG } >= MOSTLY &&
+            area(0.91f, 0.98f, 0.17f, 0.27f).share { it >= bg - NEAR_BG } >= MOSTLY &&
+            area(0.03f, 0.80f, 0.17f, 0.27f).share { it < bg - BAND_GAP && it >= bg * BAND_FLOOR } >= BAND_MID
+    }
+
+    /** 기본 표지 바탕으로 볼 수 있는 가장 어두운 밝기(0~255. 바탕 #ecedee 는 약 237, 크레마 화면 대비 56 으로 어두워지면 약 208) */
+    private const val MIN_BG = 150f
+    /** 바탕 칸의 점이 바탕 밝기에서 벗어날 수 있는 만큼 */
+    private const val BG_SLACK = 20f
+    /** 띠 위·띠 오른쪽 끝의 점이 바탕보다 어두울 수 있는 만큼(그러데이션이 대비에 짙어진다) */
+    private const val NEAR_BG = 35f
+    /** 띠 색은 바탕보다 이만큼 넘게 어둡고(주황 #ffa800 은 약 175) */
+    private const val BAND_GAP = 25f
+    /** 바탕 밝기의 이 비율 이상(검은 글자는 아니다) */
+    private const val BAND_FLOOR = 0.3f
+    /** 바탕 칸들에서 그래야 하는 점의 비율 */
+    private const val MOSTLY = 0.95f
+    /** 띠 칸에서 띠 색이어야 하는 점의 비율(흰 `KINDLE` 글자를 빼고 약 0.65) */
+    private const val BAND_MID = 0.45f
 
     /** 격자 보기 설명의 `제목, 성, 이름` → 제목·`성, 이름` */
     private fun splitHead(head: String): Pair<String, String> {
