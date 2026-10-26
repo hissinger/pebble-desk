@@ -132,7 +132,7 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
         // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 서재). 앱이 정한 책은 그 열쇠의 것만
         (if (exact) coverKey?.takeIf { it in pendingCovers } else pendingFor(book.title))?.let { key ->
             val bytes = pendingCovers.remove(key) ?: return@let
-            if (coverFromFile(context, BookShelf.filePath(context, book.id))) return@let
+            if (coverFromFile(context, BookShelf.filePath(context, book.id), BookShelf.fileCovers(context, book.id))) return@let
             cover(book.id, bytes)
         }
         return book
@@ -190,10 +190,10 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
 
     companion object {
         /**
-         * 책 파일(표지가 든 EPUB, 만화 묶음은 첫 그림(CBR·CB7 등은 libarchive 를 받았을 때), 그림 폴더는 첫 그림)에서 표지를 꺼낼 수 있다([BookShelf.cover]): 화면에서 자른 작은 표지를 두지 않는다.
-         * 표지가 없는 EPUB 이면 아니다(그 책은 화면에서 자른다)
+         * 책 파일 [path] 에서 그 책을 넣은 앱의 길 [covers]([com.woody.pebbledesk.readers.ReaderApp.fileCovers])로 표지를 꺼낼 수 있다([BookShelf.cover]):
+         * 화면에서 자른 작은 표지를 두지 않는다. 꺼낼 수 없으면(표지가 없는 EPUB 등) 아니다(그 책은 화면에서 자른다)
          */
-        fun coverFromFile(context: Context, path: String?) =
-            path != null && BookFiles.canRead(context) && (isImageFile(path) || BookFiles.hasCover(context, path))
+        fun coverFromFile(context: Context, path: String?, covers: BookFiles.Covers): Boolean =
+            path != null && BookFiles.canRead(context) && covers.has(context, path)
     }
 }

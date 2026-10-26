@@ -15,6 +15,7 @@ import android.util.LruCache
 import com.woody.pebbledesk.Db.rows
 import com.woody.pebbledesk.Db.tx
 import com.woody.pebbledesk.readers.BookFiles
+import com.woody.pebbledesk.readers.ReaderApps
 import com.woody.pebbledesk.readers.isImageFile
 import com.woody.pebbledesk.readers.withoutBookFile
 import org.json.JSONObject
@@ -828,23 +829,28 @@ object BookShelf {
     fun findByTitle(context: Context, title: String): ShelfBook? = list(context).firstOrNull { it.hasTitle(title) }
 
     /**
-     * 표지 그림이 없는 책: 이북 앱이 연 책 파일([filePath], 연 파일을 아는 앱: KOReader·네오리더·이지뷰어·우주·문리더)이 EPUB·CBZ 면 그 표지를 꺼내 이 책의 표지로 둔다([BookFiles.cover]).
+     * 표지 그림이 없는 책: 이북 앱이 연 책 파일([filePath], 연 파일을 아는 앱: KOReader·네오리더·이지뷰어·우주·문리더)에서 그 책을 넣은 앱의 길([fileCovers])로 표지를 꺼내 이 책의 표지로 둔다.
      * 파일을 적을 때 뒤에서 꺼내 두고([prefetchFileCover]), 그때 못 했으면(그 전에 넣은 책·책 파일 읽기를 나중에 허용) 그릴 때([cover]) 꺼낸다.
      * 같은 책은 한 번만 꺼낸다(뒤에서 꺼내는 중에 그리면 끝나기를 기다린다). 한 번 둔 표지는 책 파일을 지우거나 권한을 꺼도 남는다.
-     * 표지가 없는 파일(EPUB·CBZ 가 아님 등)은 그 파일이 바뀔 때까지 다시 열지 않는다.
+     * 표지가 없는 파일은 그 파일이 바뀔 때까지 다시 열지 않는다.
      */
     private fun fileCover(context: Context, id: String) {
-        // 압축 만화(CBR·CB7 등)는 풀기가 오래 걸릴 수 있어 화면 스레드에서는 풀지 않고 뒤에서 꺼낸다(다음에 그릴 때 보인다)
-        if (Looper.myLooper() == Looper.getMainLooper() && filePath(context, id)?.let(BookFiles::isArchiveComic) == true) return prefetchFileCover(context, id)
+        val path = filePath(context, id) ?: return
+        // 그 책을 넣은 앱이 고른 길로만 꺼낸다. 오래 걸릴 수 있는 파일(압축 만화)은 화면 스레드에서 꺼내지 않고 뒤에서(다음에 그릴 때 보인다)
+        val covers = fileCovers(context, id)
+        if (Looper.myLooper() == Looper.getMainLooper() && covers.slow(path)) return prefetchFileCover(context, id)
         synchronized(fileCoverLocks.getOrPut(id) { Any() }) {
             if (hasCover(context, id)) return
-            val path = filePath(context, id) ?: return
             val tried = "$path@${File(path).lastModified()}"
             if (tried in noFileCover) return
-            val bytes = BookFiles.cover(context, path) ?: run { noFileCover += tried; return }
+            val bytes = covers.cover(context, path) ?: run { noFileCover += tried; return }
             runCatching { saveCover(context, id, bytes) }
         }
     }
+
+    /** 책 [id](읽고 있는 책, 없으면 나간 책)를 넣은 이북 앱이 책 파일에서 표지를 꺼내는 길([com.woody.pebbledesk.readers.ReaderApp.fileCovers]). 모르는 앱이면 기본 */
+    fun fileCovers(context: Context, id: String): BookFiles.Covers =
+        bookOf(context, setOf(id))?.app?.substringBefore('/')?.let { ReaderApps.forPackage(context, it) }?.fileCovers ?: BookFiles.BOOKS
 
     /**
      * 압축 만화를 푸는 libarchive 를 받았다([com.woody.pebbledesk.readers.ArchiveLib]): 받기 전에 표지가 없다고 기억한 파일을 잊고, 표지 그림이 없는

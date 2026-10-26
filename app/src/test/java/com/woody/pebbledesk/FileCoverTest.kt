@@ -2,6 +2,7 @@ package com.woody.pebbledesk
 
 import android.Manifest
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -31,7 +32,9 @@ class FileCoverTest {
 
     @Before fun setUp() {
         BookShelf.clearCaches()
-        Db.get(app).execSQL("INSERT INTO shelf VALUES (0, 'b-1', '만화', '', NULL, 0, -1, -1, '', '')")
+        // KOReader 가 넣은 만화(만화 묶음의 첫 그림을 고른 앱), 킨들이 넣은 책(기본 길의 앱)
+        Db.get(app).execSQL("INSERT INTO shelf VALUES (0, 'b-1', '만화', '', 'org.koreader.launcher/org.koreader.launcher.MainActivity', 0, -1, -1, '', '')")
+        Db.get(app).execSQL("INSERT INTO shelf VALUES (1, 'b-2', '다른 앱', '', 'com.amazon.kindle/com.amazon.kindle.UpgradePage', 0, -1, -1, '', '')")
     }
 
     @After fun tearDown() {
@@ -57,12 +60,31 @@ class FileCoverTest {
         assertTrue(awaitCover())
     }
 
+    @Test fun `만화 묶음의 첫 그림은 그 책을 넣은 앱이 골랐을 때만 - 고르지 않은 앱의 책은 화면에서 자른다`() {
+        shadowOf(app).grantPermissions(Manifest.permission.READ_EXTERNAL_STORAGE)
+        val other = File(tmp.root, "other.cbz").also { cbz().copyTo(it) }
+        BookShelf.setFilePath(app, "b-2", other.path)
+        BookShelf.cover(app, BookShelf.list(app).first { it.id == "b-2" }, 100)
+        Thread.sleep(300)
+        assertFalse(BookShelf.hasCover(app, "b-2"))
+        assertFalse(ShelfRecorder.coverFromFile(app, other.path, BookShelf.fileCovers(app, "b-2")))
+        BookShelf.setFilePath(app, "b-1", cbz().path)
+        assertTrue(awaitCover())
+        assertTrue(ShelfRecorder.coverFromFile(app, cbz().path, BookShelf.fileCovers(app, "b-1")))
+    }
+
+    @Test fun `만화 묶음의 첫 그림을 쓰는 앱은 그 앱 파일에서 고른다`() {
+        val on = com.woody.pebbledesk.readers.ReaderApps.ALL.filter { it.fileCovers === com.woody.pebbledesk.readers.BookFiles.WITH_COMICS }.map { it.pkg }.toSet()
+        assertEquals(setOf("org.koreader.launcher", "org.koreader.launcher.fdroid", "com.onyx.kreader", "com.ezne.easyview.n", "com.ezne.easyview.free",
+            "com.ezne.easyview.pro", "com.inno.woojoo"), on)
+    }
+
     @Test fun `책 파일 읽기가 꺼져 있을 때 적은 파일도 허용한 뒤 그릴 때 꺼낸다`() {
         // 권한이 없으면 뒤에서 꺼내지 않는다(그 자리에서 끝난다)
         BookShelf.setFilePath(app, "b-1", cbz().path)
         assertFalse(BookShelf.hasCover(app, "b-1"))
         shadowOf(app).grantPermissions(Manifest.permission.READ_EXTERNAL_STORAGE)
-        BookShelf.cover(app, BookShelf.list(app).single(), 100)
+        BookShelf.cover(app, BookShelf.list(app).first { it.id == "b-1" }, 100)
         assertTrue(BookShelf.hasCover(app, "b-1"))
     }
 }

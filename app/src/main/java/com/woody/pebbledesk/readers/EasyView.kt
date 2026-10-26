@@ -51,6 +51,9 @@ open class EasyViewSpec(pkg: String) : ReaderApp(
 ) {
     override fun newAdapter(): ReaderAdapter = EasyViewReader(this)
 
+    /** 만화 묶음(ZIP·CBZ·CBR, CB7 은 글자 파일로 연다)은 목록 그림을 자르지 않고 그 파일의 첫 그림을 표지로(목록 그림은 작고, CB7 은 깨진 글자다) */
+    override val fileCovers get() = BookFiles.WITH_COMICS
+
     /** 홈에서 그 책의 파일을 바로 연다(`actMain` 이 `file://` 보기를 받는다). 그 파일이 열리면 이 책으로(읽는 화면에 파일 이름만 보인다). 모르거나 지워졌으면 앱을 연다 */
     override fun open(ctx: HomeContext, book: ShelfBook): OpenResult =
         ctx.bookFile(book)?.let { path -> OpenResult.File(ctx.component, path, started = { HomeSignals.fileOpened(pkg, book, path) }) } ?: OpenResult.Launch
@@ -82,7 +85,7 @@ open class EasyViewSpec(pkg: String) : ReaderApp(
 
     /**
      * 칸 [c] 의 파일이 [folder] 안에 있다. 그림 파일은 그 폴더가 한 권(제목은 폴더 이름. 이지뷰어는 그림을 열면 그 폴더의 그림을 차례로 보인다,
-     * 표지는 그 폴더의 첫 그림 [BookFiles.cover])
+     * 표지는 그 폴더의 첫 그림 [BookFiles.BOOKS])
      */
     private fun inFolder(c: Cell, folder: String): Cell {
         val file = "$folder/${c.file}"
@@ -476,7 +479,7 @@ class EasyViewReader(private val ev: EasyViewSpec) : ScreenReader(ev) {
                 continue
             }
             statuses += BookShelf.Status(book.id, s.progress, s.due, s.author)
-            if (s.thumb != null && !lookup.hasCover(book.id) && !ShelfRecorder.coverFromFile(ctx.context, lookup.filePath(book.id))) spots += CoverSpot(s.title, s.thumb, book.id, key)
+            if (s.thumb != null && !lookup.hasCover(book.id) && !ShelfRecorder.coverFromFile(ctx.context, lookup.filePath(book.id), app.fileCovers)) spots += CoverSpot(s.title, s.thumb, book.id, key)
         }
         // 서재 한 화면의 진행률을 한 번에 쓴다
         ctx.recorder.statuses(statuses)

@@ -140,7 +140,7 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
             val book = lookup.byTitle(s.title)
             // 목록에 없는 책은 들어올 때 붙일 표지를 미리 찍어 둔다. 책 파일에서 표지를 꺼내는 책은 자르지 않는다(멈춘 서재와 같게)
             val need = if (book == null) !ctx.recorder.hasPendingTitle(s.title)
-                else !lookup.hasCover(book.id) && !ShelfRecorder.coverFromFile(ctx.context, lookup.filePath(book.id))
+                else !lookup.hasCover(book.id) && !ShelfRecorder.coverFromFile(ctx.context, lookup.filePath(book.id), app.fileCovers)
             if (need && tryCover(s.title)) CoverSpot(s.title, thumb) else null
         }, retry = false)
     }
@@ -178,7 +178,7 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
                 continue
             }
             statuses += BookShelf.Status(book.id, s.progress, s.due, s.author)
-            if (s.thumb != null && !lookup.hasCover(book.id) && !ShelfRecorder.coverFromFile(ctx.context, lookup.filePath(book.id))) spots += CoverSpot(s.title, s.thumb, book.id)
+            if (s.thumb != null && !lookup.hasCover(book.id) && !ShelfRecorder.coverFromFile(ctx.context, lookup.filePath(book.id), app.fileCovers)) spots += CoverSpot(s.title, s.thumb, book.id)
         }
         // 서재 한 화면의 진행률·반납일을 한 번에 쓴다
         ctx.recorder.statuses(statuses)
