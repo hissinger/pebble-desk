@@ -122,7 +122,7 @@ TERMS = {
 }
 
 # 지원하는 이북 앱(자동 추가). 킨들은 앱만: 킨들 기기는 안드로이드 앱을 깔 수 없어 기기 이름으로는 넣지 않는다
-APPS = ["킨들", "킨들 앱", "Kindle", "Kindle app", "Libby", "리비", "KOReader", "코리더", "Readest", "Moon+ Reader", "문리더", "이지뷰어", "EzViewer", "채리뷰어", "CherieViewer", "교보도서관", "Kyobo Library",
+APPS = ["킨들", "킨들 앱", "Kindle", "Kindle app", "Libby", "리비", "KOReader", "코리더", "Readest", "BookFusion", "Moon+ Reader", "문리더", "이지뷰어", "EzViewer", "채리뷰어", "CherieViewer", "우주뷰어", "Woojoo", "Google Play 북", "Google Play Books", "Mihon", "Kahon", "교보도서관", "Kyobo Library",
         "교보eBook", "Kyobo eBook", "밀리의서재", "millie", "알라딘 전자책", "Aladin eBook", "북커스", "Bookers", "리디", "RIDI",
         "YES24 전자도서관", "YES24 Library", "my YES", "YES24 eBook", "네오리더", "NeoReader"]
 
@@ -259,7 +259,7 @@ It runs on Android 9 or later and is free with no ads (PolyForm Noncommercial 1.
 ## Features
 
 {chr(10).join("- " + f for f in en["features"])}
-- Supported reading apps (auto-add): Kindle, Libby, KOReader, Readest, Moon+ Reader, EzViewer (이지뷰어), CherieViewer (채리뷰어), Kyobo Library, Kyobo eBook, millie (밀리의서재), Aladin, Bookers, RIDI, YES24 Library, my YES, YES24 eBook, NeoReader (BOOX)
+- Supported reading apps (auto-add): Kindle, Libby, KOReader, Readest, BookFusion, Moon+ Reader, EzViewer (이지뷰어), CherieViewer (채리뷰어), Woojoo (우주뷰어), Google Play Books, Mihon, Kahon, Kyobo Library, Kyobo eBook, millie (밀리의서재), Aladin, Bookers, RIDI, YES24 Library, my YES, YES24 eBook, NeoReader (BOOX)
 
 ## Compared with other launchers
 
