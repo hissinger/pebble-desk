@@ -115,6 +115,7 @@
     <string name="wl_recent_wait">서재 아래 최근 읽은 책 \'%1$s\' 그대로 · 기다림</string>
     <string name="wl_file">책 파일 찾음 \'%1$s\' · %2$s</string>
     <string name="wl_error">오류 %1$s · %2$s</string>
+    <string name="wl_crash">앱 오류로 끝남 %2$s · %1$s</string>
     <string name="wl_progress">진행률 %s</string>
     <string name="device_section_system">시스템 화면 시험 (이 앱이 여는 것)</string>
     <string name="device_system_a11y">접근성</string>
