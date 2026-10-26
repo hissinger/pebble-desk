@@ -20,6 +20,7 @@ import java.util.zip.ZipOutputStream
 @Config(sdk = [34])
 class KOReaderDataTest {
     @get:Rule val tmp = TemporaryFolder()
+    private val app get() = org.robolectric.RuntimeEnvironment.getApplication()
 
     private val ko get() = File(tmp.root, "koreader").apply { mkdirs() }
 
@@ -222,12 +223,12 @@ class KOReaderDataTest {
     @Test fun `그림이 없는 CBZ·ZIP 이 아닌 cbz 는 표지가 없다`() {
         val noImage = File(tmp.root, "n.cbz")
         ZipOutputStream(noImage.outputStream()).use { z -> z.putNextEntry(ZipEntry("ComicInfo.xml")); z.closeEntry() }
-        assertFalse(BookFiles.hasCover(noImage.path))
-        assertNull(BookFiles.cover(noImage.path))
+        assertFalse(BookFiles.hasCover(app, noImage.path))
+        assertNull(BookFiles.cover(app, noImage.path))
         // RAR 을 이름만 바꾼 것
         val rar = File(tmp.root, "r.cbz").apply { writeBytes("Rar!\u001a\u0007\u0000".toByteArray()) }
-        assertFalse(BookFiles.hasCover(rar.path))
-        assertNull(BookFiles.cover(rar.path))
+        assertFalse(BookFiles.hasCover(app, rar.path))
+        assertNull(BookFiles.cover(app, rar.path))
     }
 
     private fun writeEpub(file: File, title: String, author: String, cover: Boolean = false) {

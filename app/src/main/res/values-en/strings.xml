@@ -302,7 +302,8 @@
     <string name="guide_added_search_open">Added only for books opened with Read now in search</string>
     <string name="guide_added_expired">Added only for expired loans</string>
     <string name="guide_added_epub">Added for EPUB only</string>
-    <string name="guide_added_epub_cbz">Added for EPUB and CBZ only</string>
+    <string name="guide_added_epub_comics">Added for EPUB and comics only</string>
+    <string name="guide_n_comic_archives">CBR and CB7 once you get the comic cover unpacking tool in Settings › Reading</string>
     <string name="guide_added_book_files">Added when Read book files is on</string>
     <string name="guide_n_reading_menu">While reading, added when you open the menu</string>
     <string name="guide_n_kel_title">For books opened in cover view, added when you open the menu</string>
@@ -370,6 +371,15 @@
     <string name="book_files">Read book files</string>
     <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For Readest, the cover, author and progress are read from its data folder (Readest/Books) once you move its data location to \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601). For Woojoo, the book you open and your progress are known from the records Woojoo keeps (the Woojoo folder) without opening the menu, and PDFs and comics take their cover from there. For NeoReader, Moon+ Reader and Woojoo, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Mihon and Kahon use the cover image in a local manga\'s folder, and the author from local manga info, downloaded chapters and automatic backups. Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
     <string name="open_file_access">Open All files access</string>
+    <string name="comic_archives">Comic cover (CBR/CB7) unpacking tool</string>
+    <string name="comic_archives_get">Get</string>
+    <string name="comic_archives_ready">Installed</string>
+    <string name="comic_archives_downloading">Downloading</string>
+    <string name="comic_archives_desc">CBR and CB7 comic files are compressed, so a decompression library (libarchive) is needed to take their covers. Only needed for comics, and works with Read book files on.</string>
+    <string name="comic_archives_get_size">Get (%s)</string>
+    <string name="comic_archives_ready_desc">The decompression library is installed. Covers are taken from CBR and CB7 comic files.</string>
+    <string name="comic_archives_remove">Remove</string>
+    <string name="comic_archives_failed">Couldn\'t download. Please try again later.</string>
     <string name="file_notice_title">Turn on Read\u00A0book\u00A0files to get %s book info</string>
     <string name="file_notice_desc">Info such as book covers and titles is read from the files.</string>
     <string name="book_file_missing_title">Couldn\'t find this book\'s file</string>

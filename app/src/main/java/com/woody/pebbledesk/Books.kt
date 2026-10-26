@@ -828,20 +828,47 @@ object BookShelf {
     fun findByTitle(context: Context, title: String): ShelfBook? = list(context).firstOrNull { it.hasTitle(title) }
 
     /**
-     * 표지 그림이 없는 책: 이북 앱이 연 책 파일([filePath], KOReader·네오리더)이 EPUB·CBZ 면 그 표지를 꺼내 이 책의 표지로 둔다([BookFiles.cover]).
-     * 그릴 때([cover]) 꺼내므로 책을 넣은 때와 상관없이 처음 그릴 때부터 보이고, 한 번 둔 표지는 책 파일을 지우거나 권한을 꺼도 남는다.
+     * 표지 그림이 없는 책: 이북 앱이 연 책 파일([filePath], 연 파일을 아는 앱: KOReader·네오리더·이지뷰어·우주·문리더)이 EPUB·CBZ 면 그 표지를 꺼내 이 책의 표지로 둔다([BookFiles.cover]).
+     * 파일을 적을 때 뒤에서 꺼내 두고([prefetchFileCover]), 그때 못 했으면(그 전에 넣은 책·책 파일 읽기를 나중에 허용) 그릴 때([cover]) 꺼낸다.
+     * 같은 책은 한 번만 꺼낸다(뒤에서 꺼내는 중에 그리면 끝나기를 기다린다). 한 번 둔 표지는 책 파일을 지우거나 권한을 꺼도 남는다.
      * 표지가 없는 파일(EPUB·CBZ 가 아님 등)은 그 파일이 바뀔 때까지 다시 열지 않는다.
      */
     private fun fileCover(context: Context, id: String) {
-        val path = filePath(context, id) ?: return
-        val tried = "$path@${File(path).lastModified()}"
-        if (tried in noFileCover) return
-        val bytes = BookFiles.cover(path) ?: run { noFileCover += tried; return }
-        runCatching { saveCover(context, id, bytes) }
+        // 압축 만화(CBR·CB7 등)는 풀기가 오래 걸릴 수 있어 화면 스레드에서는 풀지 않고 뒤에서 꺼낸다(다음에 그릴 때 보인다)
+        if (Looper.myLooper() == Looper.getMainLooper() && filePath(context, id)?.let(BookFiles::isArchiveComic) == true) return prefetchFileCover(context, id)
+        synchronized(fileCoverLocks.getOrPut(id) { Any() }) {
+            if (hasCover(context, id)) return
+            val path = filePath(context, id) ?: return
+            val tried = "$path@${File(path).lastModified()}"
+            if (tried in noFileCover) return
+            val bytes = BookFiles.cover(context, path) ?: run { noFileCover += tried; return }
+            runCatching { saveCover(context, id, bytes) }
+        }
+    }
+
+    /**
+     * 압축 만화를 푸는 libarchive 를 받았다([com.woody.pebbledesk.readers.ArchiveLib]): 받기 전에 표지가 없다고 기억한 파일을 잊고, 표지 그림이 없는
+     * 읽고 있는 책들의 파일 표지를 뒤에서 꺼내 둔다(받기 전에 넣은 CBR·CB7 책도 홈에 돌아오면 보이게).
+     */
+    fun archiveLibChanged(context: Context) {
+        noFileCover.clear()
+        list(context).forEach { prefetchFileCover(context, it.id) }
+    }
+
+    /**
+     * 표지 그림이 없는 책 [id] 의 책 파일 표지를 뒤에서 꺼내 둔다([fileCover]): 큰 그림·큰 EPUB 을 홈이 그릴 때 화면 스레드에서 꺼내지 않게.
+     * 책 파일 읽기가 꺼져 있으면 하지 않는다(못 읽은 파일을 표지 없는 파일로 기억하지 않게).
+     */
+    private fun prefetchFileCover(context: Context, id: String) {
+        if (hasCover(context, id) || !BookFiles.canRead(context)) return
+        val app = context.applicationContext
+        Bg.run({ fileCover(app, id) }) {}
     }
 
     /** 표지를 꺼내 봤지만 없던 책 파일(경로@수정 시각, [fileCover]) */
-    private val noFileCover = mutableSetOf<String>()
+    private val noFileCover: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    /** 책마다 표지 꺼내기를 한 번에 하나만([fileCover]) */
+    private val fileCoverLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
 
     @Throws(IOException::class)
     private fun saveCover(context: Context, id: String, bytes: ByteArray) {
@@ -948,10 +975,11 @@ object BookShelf {
         list(context).firstOrNull { it.hasTitle(title) && accept(it) }?.id
             ?: history(context).lastOrNull { !it.hidden && it.book.hasTitle(title) && accept(it.book) }?.book?.id
 
-    /** 책이 나간 책이 되어도 남긴다(다시 읽을 때 그 파일을 연다). */
+    /** 책이 나간 책이 되어도 남긴다(다시 읽을 때 그 파일을 연다). 표지 그림이 없으면 그 파일의 표지를 뒤에서 꺼내 둔다([prefetchFileCover]). */
     fun setFilePath(context: Context, id: String, path: String) {
         if (filePath(context, id) == path) return
         Db.get(context).tx { insertWithOnConflict("book_file", null, Db.values("book_id" to id, "path" to path), SQLiteDatabase.CONFLICT_REPLACE) }
+        prefetchFileCover(context, id)
     }
 
     /** 책 빼기: 읽고 있는 책에서 빼서 나간 책으로 남긴다. [review] 가 있으면(빼기 메뉴에서 고친 별점·감상) 진행 중 회차의 것으로 같이 저장한다. */

@@ -163,4 +163,6 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.12-release.apk
 
 완독 도장 그림(`app/src/main/res/drawable-nodpi/stamp_completed.png`)은 위 라이선스가 아니다. Pixabay의 [TheDigitalArtist 'Approved Stamp'](https://pixabay.com/illustrations/approved-stamp-approval-business-5254258/)([Pixabay Content License](https://pixabay.com/service/license-summary/))를 고친 것이다(가운데 글자를 `COMPLETED`로, 흑백, `tools/stamp_completed.py`).
 
+만화 표지 압축 해제용 libarchive 의 Java 부분(`app/src/main/java/me/zhanghai/android/libarchive/`)은 [libarchive-android](https://github.com/zhanghai/libarchive-android)(Apache-2.0)를 가져와 네이티브 라이브러리를 부르는 한 줄만 고친 것이다. 네이티브 라이브러리 `libarchive-jni.so` 는 앱에 넣지 않고 사용자가 설정에서 받는다(이 저장소의 릴리스 [`libarchive-1.1.7`](https://github.com/hissinger/pebble-desk/releases/tag/libarchive-1.1.7), 그 안의 libarchive·bzip2·xz·lz4·zstd·Mbed TLS·zlib 라이선스는 같은 릴리스의 `NOTICE.txt`, 만드는 법은 `tools/libarchive/make-assets.sh`).
+
 시작하기 화면의 예시 책 표지(`app/src/main/res/drawable-nodpi/sample_cover.jpg`)는 윤동주 『하늘과 바람과 별과 시』(정음사, 1948) 초판 표지로, 국립한글박물관 아카이브의 스캔을 Wikimedia Commons 에 올린 [퍼블릭 도메인 파일](https://commons.wikimedia.org/wiki/File:%EC%9C%A4%EB%8F%99%EC%A3%BC_%ED%95%98%EB%8A%98%EA%B3%BC_%EB%B0%94%EB%9E%8C%EA%B3%BC_%EB%B3%84%EA%B3%BC_%EC%8B%9C_(%EC%B4%88%ED%8C%90%EB%B3%B8,_1948).pdf)을 흑백으로 줄인 것이다(`tools/sample_cover.py`).

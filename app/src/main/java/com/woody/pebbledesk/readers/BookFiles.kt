@@ -88,9 +88,14 @@ object BookFiles {
         return one(near.filter { it.second == title }) ?: one(near.filter { subtitle(it.second).isEmpty() || subtitle(title).isEmpty() })
     }
 
-    /** 책 파일 [path](EPUB·CBZ)에서 표지 그림을 꺼낼 수 있다(그 항목이 있고 그림으로 읽힌다. 파일마다 한 번 읽어 기억한다). 못 읽으면 아니다 */
-    fun hasCover(path: String): Boolean {
-        if (!path.endsWith(".epub", ignoreCase = true) && !isComicZip(path)) return false
+    /**
+     * 책 파일 [path] 에서 표지 그림을 꺼낼 수 있다: EPUB·ZIP 만화(CBZ·ZIP)는 그 항목이 있고 그림으로 읽힌다(파일마다 한 번 읽어 기억한다).
+     * 압축 만화(CBR·CB7 등, [isArchiveComic])는 libarchive 를 받아 두었으면 그렇다고 본다(열어 보지 않는다: 솔리드 묶음은 훑기만 해도 오래 걸린다).
+     * 못 읽으면 아니다
+     */
+    fun hasCover(context: Context, path: String): Boolean {
+        if (isArchiveComic(path)) return ArchiveLib.installed(context)
+        if (!path.endsWith(".epub", ignoreCase = true) && !isZipComic(path)) return false
         val f = File(path)
         return fileCovers.getOrPut(fileKey(f)) {
             runCatching {
@@ -143,13 +148,18 @@ object BookFiles {
     private const val SEARCH_DEPTH = 6
 
     /**
-     * 책 파일의 표지(JPEG, 긴 변을 [COVER_PX] 안으로 줄임): EPUB 은 책 정보의 표지 그림, CBZ 는 묶음 안 첫 그림, 그림 파일(그림 폴더 한 권, 이지뷰어)은
-     * 그 폴더의 첫 그림(이름 순, 숫자는 크기 순). 없거나 못 읽으면 null. 큰 그림을 다루므로 화면 스레드에서 부르지 않는다.
+     * 책 파일의 표지(JPEG, 긴 변을 [COVER_PX] 안으로 줄임): EPUB 은 책 정보의 표지 그림, 만화 묶음은 묶음 안 첫 그림(ZIP 은 안드로이드 기본으로,
+     * CBR·CB7 등은 받아 둔 [ArchiveLib] 로), 그림 파일(그림 폴더 한 권, 이지뷰어)은 그 폴더의 첫 그림(이름 순, 숫자는 크기 순).
+     * 없거나 못 읽으면 null. 큰 그림·압축을 다루므로 화면 스레드에서 부르지 않는다.
      */
-    fun cover(path: String): ByteArray? = runCatching {
+    fun cover(context: Context, path: String): ByteArray? = runCatching {
         if (isImageFile(path)) {
             val first = File(path).parentFile?.listFiles { f -> f.isFile && isImageFile(f.name) }?.minWithOrNull(compareBy(NATURAL) { it.name }) ?: return null
             return scaledJpeg { first.inputStream() }
+        }
+        if (isArchiveComic(path)) {
+            val bytes = ArchiveLib.firstImage(context, path, fileKey(File(path))) ?: return null
+            return scaledJpeg { bytes.inputStream() }
         }
         ZipFile(path).use { zip ->
             val entry = coverEntry(zip, path) ?: return null
@@ -157,19 +167,25 @@ object BookFiles {
         }
     }.getOrNull()
 
-    /** 만화 묶음(CBZ, 그림을 ZIP 으로 묶은 것)인가. CBR(RAR)은 풀 수 없어 표지가 없다 */
-    private fun isComicZip(path: String) = path.endsWith(".cbz", ignoreCase = true)
+    /** ZIP 으로 묶은 만화(CBZ·ZIP. KOReader·이지뷰어는 ZIP 도 만화로 연다)인가: 안드로이드 기본으로 푼다 */
+    private fun isZipComic(path: String) = ZIP_COMIC.containsMatchIn(path)
+    private val ZIP_COMIC = Regex("""\.(cbz|zip)$""", RegexOption.IGNORE_CASE)
 
-    /** 묶음 [zip](책 파일 [path])에서 표지 그림 항목: CBZ 는 첫 그림, 그 밖은 EPUB 책 정보의 표지. 없으면 null */
+    /** 그 밖의 압축 만화(CBR·RAR·CB7·7z·CBT·TAR)인가: 받아 둔 [ArchiveLib] 로만 푼다 */
+    fun isArchiveComic(path: String) = ARCHIVE_COMIC.containsMatchIn(path)
+    private val ARCHIVE_COMIC = Regex("""\.(cbr|rar|cb7|7z|cbt|tar)$""", RegexOption.IGNORE_CASE)
+
+    /** 묶음 [zip](책 파일 [path])에서 표지 그림 항목: ZIP 만화는 첫 그림, 그 밖은 EPUB 책 정보의 표지. 없으면 null */
     private fun coverEntry(zip: ZipFile, path: String): ZipEntry? =
-        if (isComicZip(path)) comicCover(zip) else readEpub(zip)?.cover?.let(zip::getEntry)
+        if (isZipComic(path)) comicCover(zip) else readEpub(zip)?.cover?.let(zip::getEntry)
 
-    /**
-     * CBZ 의 첫 그림(항목 경로 이름 순, 숫자는 크기 순. KOReader 가 쓰는 MuPDF 도 이 순서로 쪽을 놓는다). 숨긴 항목(`.`)·`__MACOSX` 아래는 뺀다
-     */
+    /** ZIP 만화의 첫 그림([isComicPage] 가운데 이름 순, 숫자는 크기 순. KOReader 가 쓰는 MuPDF 도 이 순서로 쪽을 놓는다) */
     internal fun comicCover(zip: ZipFile): ZipEntry? = zip.entries().asSequence()
-        .filter { e -> !e.isDirectory && isImageFile(e.name) && e.name.split('/').none { it.startsWith('.') || it == "__MACOSX" } }
+        .filter { e -> !e.isDirectory && isComicPage(e.name) }
         .minWithOrNull(compareBy(NATURAL) { it.name })
+
+    /** 만화 묶음 안의 쪽 그림인가: 그림 파일이고 숨긴 항목(`.`)·`__MACOSX` 아래가 아니다 */
+    internal fun isComicPage(name: String) = isImageFile(name) && name.split('/', '\\').none { it.startsWith('.') || it == "__MACOSX" }
 
     /** 그림 파일 [file] 하나를 표지로(이북 앱이 따로 둔 표지 그림, Readest `cover.png`). 못 읽으면 null. 화면 스레드에서 부르지 않는다. */
     fun imageCover(file: File): ByteArray? = runCatching { scaledJpeg { file.inputStream() } }.getOrNull()
@@ -189,7 +205,7 @@ object BookFiles {
     }
 
     /** 파일 이름 순서(대소문자 무시, 숫자는 크기 순: `p2` 가 `p10` 앞) */
-    private val NATURAL = Comparator<String> { a, b ->
+    internal val NATURAL = Comparator<String> { a, b ->
         val x = DIGITS.findAll(a.lowercase()).map { it.value }.toList()
         val y = DIGITS.findAll(b.lowercase()).map { it.value }.toList()
         for (i in 0 until minOf(x.size, y.size)) {
