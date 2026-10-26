@@ -277,6 +277,9 @@
     <string name="guide_readest">Readest</string>
     <string name="guide_bookfusion">BookFusion</string>
     <string name="guide_woojoo">Woojoo</string>
+    <string name="guide_playbooks">Google Play Books</string>
+    <string name="guide_mihon">Mihon</string>
+    <string name="guide_kahon">Kahon</string>
     <string name="guide_permissions">Permissions</string>
     <string name="guide_todo">In the app</string>
     <string name="guide_todo_none">Nothing to change.</string>
@@ -356,8 +359,15 @@
     <string name="guide_n_woojoo_cover">PDFs and comics only if you allow reading book files</string>
     <string name="guide_files_woojoo">opened book, covers, progress</string>
     <string name="guide_note_woojoo">If you allow reading book files, tapping the book on the home screen opens its file in Woojoo.</string>
+    <string name="guide_n_playbooks_library">Added when the book shows in your Play Books library</string>
+    <string name="guide_n_mihon_cover">Added when the series shows in your library or History</string>
+    <string name="guide_n_mihon_local">Local manga only</string>
+    <string name="guide_n_mihon_detail">Added when you view the series page, or with reading book files on</string>
+    <string name="guide_n_mihon_chapter">Shows the chapter name from the menu instead of a percentage</string>
+    <string name="guide_t_mihon_open">When you open a chapter, tap the middle once to open the menu.</string>
+    <string name="guide_note_mihon">Each series counts as one book (chapters don\'t become separate books). A cover taken from the library includes the title and badges (such as the unread count) Mihon draws on it. With reading book files on, local manga use the cover image in the series folder.</string>
     <string name="book_files">Read book files</string>
-    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For Readest, the cover, author and progress are read from its data folder (Readest/Books) once you move its data location to \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601). For Woojoo, the book you open and your progress are known from the records Woojoo keeps (the Woojoo folder) without opening the menu, and PDFs and comics take their cover from there. For NeoReader, Moon+ Reader and Woojoo, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
+    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For Readest, the cover, author and progress are read from its data folder (Readest/Books) once you move its data location to \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601). For Woojoo, the book you open and your progress are known from the records Woojoo keeps (the Woojoo folder) without opening the menu, and PDFs and comics take their cover from there. For NeoReader, Moon+ Reader and Woojoo, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Mihon and Kahon use the cover image in a local manga\'s folder, and the author from local manga info, downloaded chapters and automatic backups. Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
     <string name="open_file_access">Open All files access</string>
     <string name="file_notice_title">Turn on Read\u00A0book\u00A0files to get %s book info</string>
     <string name="file_notice_desc">Info such as book covers and titles is read from the files.</string>

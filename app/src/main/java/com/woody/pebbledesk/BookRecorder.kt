@@ -20,8 +20,8 @@ interface BookRecorder {
     fun opened(pkg: String, seen: Seen, at: Long?, target: Target, coverKey: String? = null, steps: OpenSteps? = null): ShelfBook
     /** 여기부터 [pkg] 에서 어떤 책인지 모른다(앞서 편 책에 붙이지 않게) */
     fun unknown(pkg: String, at: Long)
-    /** 진행률·반납일·저자(음수·빈 값은 그대로 둔다) */
-    fun status(bookId: String, progress: Int, due: Long = -1, author: String = "")
+    /** 진행률·반납일·저자·읽는 화(음수·빈 값은 그대로 둔다) */
+    fun status(bookId: String, progress: Int, due: Long = -1, author: String = "", chapter: String = "")
     /** 서재 한 화면의 것을 한 번에 */
     fun statuses(list: List<BookShelf.Status>)
     fun setFile(bookId: String, path: String)
@@ -29,6 +29,11 @@ interface BookRecorder {
     fun setAuthor(bookId: String, author: String)
     /** 표지가 없을 때만 붙인다. 저장 실패는 삼킨다(못 넣은 책은 다음에 다시) */
     fun cover(bookId: String, jpeg: ByteArray)
+    /**
+     * 이북 앱 데이터의 표지 그림으로 바꾼다: 화면에서 자른 표지가 이미 붙어 있어도(그 표지에 앱이 그린 글자·표시가 든 경우). 저장 실패는 삼킨다.
+     * 기본: [cover] 와 같다(표지가 없을 때만)
+     */
+    fun replaceCover(bookId: String, jpeg: ByteArray) = cover(bookId, jpeg)
     /** 아직 목록에 없는 책의 잘라 둔 표지(그 책이 들어오면 [opened] 가 붙인다, 최근 [PENDING_MAX]권만). 열쇠는 정리한 제목 또는 파일 칸 열쇠 */
     fun pendingCover(key: String, jpeg: ByteArray)
     fun hasPendingCover(key: String): Boolean
@@ -47,8 +52,8 @@ interface BookRecorder {
     }
 }
 
-/** 화면·데이터에서 본 책: 앱이 보여 준 제목, 저자, 진행률·반납일(모르면 -1) */
-data class Seen(val title: String, val author: String = "", val progress: Int = -1, val due: Long = -1)
+/** 화면·데이터에서 본 책: 앱이 보여 준 제목, 저자, 진행률·반납일(모르면 -1), 읽는 화(화 이름 등, 모르면 "") */
+data class Seen(val title: String, val author: String = "", val progress: Int = -1, val due: Long = -1, val chapter: String = "")
 
 /** 편 책이 어떤 책인가 */
 sealed interface Target {
@@ -110,14 +115,14 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
         var result = WatchLog.Opened.FRONT
         val book = (if (exact) id?.let { BookShelf.get(context, it) } else BookShelf.findByTitle(context, title))?.also {
             BookShelf.moveToFront(context, it.id)
-            BookShelf.updateStatus(context, it.id, seen.progress, seen.due, seen.author)
+            BookShelf.updateStatus(context, it.id, seen.progress, seen.due, seen.author, seen.chapter)
         } ?: run {
             // 완독한 책도 펴면 들어온다(새 회차가 그날 시작, [BookShelf.addOpened]). 파일로만 여는 이북 앱(네오리더)은 그 항목([AppStore.fileReaders])으로
             val app = AppStore.readerKey(context, pkg)
             result = WatchLog.Opened.NEW
             // 앱이 정한 책은 그 책(나간 책)만 되살린다(같은 제목의 다른 파일을 되살리지 않게)
-            if (exact) BookShelf.addOpened(context, title, seen.author, app, seen.progress, seen.due, openedAt) { it.id == id }
-            else BookShelf.addOpened(context, title, seen.author, app, seen.progress, seen.due, openedAt)
+            if (exact) BookShelf.addOpened(context, title, seen.author, app, seen.progress, seen.due, openedAt, seen.chapter) { it.id == id }
+            else BookShelf.addOpened(context, title, seen.author, app, seen.progress, seen.due, openedAt, seen.chapter)
         }
         steps?.found(book)
         WatchLog.add(context, WatchLog.Kind.OPENED, pkg, title, result.name)
@@ -134,7 +139,8 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
     }
 
     override fun unknown(pkg: String, at: Long) = ReadingLog.bookOpened(context, pkg, "", "", at)
-    override fun status(bookId: String, progress: Int, due: Long, author: String) = BookShelf.updateStatus(context, bookId, progress, due, author)
+    override fun status(bookId: String, progress: Int, due: Long, author: String, chapter: String) =
+        BookShelf.updateStatus(context, bookId, progress, due, author, chapter)
     override fun statuses(list: List<BookShelf.Status>) = BookShelf.updateStatuses(context, list)
     override fun setFile(bookId: String, path: String) = BookShelf.setFilePath(context, bookId, path)
     override fun setTitle(bookId: String, title: String) = BookShelf.setTitle(context, bookId, title)
@@ -142,6 +148,10 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
 
     override fun cover(bookId: String, jpeg: ByteArray) {
         if (!BookShelf.hasCover(context, bookId)) runCatching { BookShelf.setCover(context, bookId, jpeg) }
+    }
+
+    override fun replaceCover(bookId: String, jpeg: ByteArray) {
+        runCatching { BookShelf.setCover(context, bookId, jpeg) }
     }
 
     override fun pendingCover(key: String, jpeg: ByteArray) { pendingCovers[key] = jpeg }

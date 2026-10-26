@@ -243,6 +243,8 @@ data class ShelfBook(
     val due: Long = -1,
     /** 자동으로 넣을 때 이북 앱이 보여 준 제목. 사용자가 제목을 고쳐도 다음에 펼 때 이 책으로 찾는다. 직접 넣은 책은 "" */
     val seenTitle: String = "",
+    /** 이북 앱이 보여 준 읽는 화(Mihon 의 화 이름 `Ch. 12` 등, 앱이 쓴 그대로). 모르면 "". 나간 책에는 남기지 않는다 */
+    val chapter: String = "",
 )
 
 /**
@@ -251,9 +253,10 @@ data class ShelfBook(
  */
 data class PastBook(val book: ShelfBook, val leftAt: Long, val hidden: Boolean = false)
 
-/** 홈·목록에 붙이는 진행률·반납일 `[47% 읽음, 반납 4일 남음]`. 모르는 값은 뺀다(홈은 한 줄씩, 목록은 이어서). */
+/** 홈·목록에 붙이는 읽는 화·진행률·반납일 `[Ch. 12, 47% 읽음, 반납 4일 남음]`. 모르는 값은 뺀다(홈은 한 줄씩, 목록은 이어서). */
 fun Context.bookStatus(book: ShelfBook, today: LocalDate = LocalDate.now()): List<String> {
     val parts = mutableListOf<String>()
+    if (book.chapter.isNotEmpty()) parts += book.chapter
     if (book.progress >= 0) parts += getString(R.string.progress_pct, book.progress)
     if (book.due >= 0) {
         val left = book.due - today.toEpochDay()
@@ -486,8 +489,8 @@ object BookShelf {
                 ))
             }
         }
-        // 나간 책은 반납일을 저장하지 않는다(DB 에 칸이 없다): 메모리 사본도 같게(다시 띄운 뒤와 다르지 않게. 되살리면 서재에서 다시 읽는다)
-        cachedHistory = past.map { if (it.book.due < 0) it else it.copy(book = it.book.copy(due = -1)) }
+        // 나간 책은 반납일·읽는 화를 저장하지 않는다(DB 에 칸이 없다): 메모리 사본도 같게(다시 띄운 뒤와 다르지 않게. 되살리면 이북 앱에서 다시 읽는다)
+        cachedHistory = past.map { if (it.book.due < 0 && it.book.chapter.isEmpty()) it else it.copy(book = it.book.copy(due = -1, chapter = "")) }
     }
 
     /**
@@ -616,9 +619,9 @@ object BookShelf {
     private fun newId() = ID_PREFIX + UUID.randomUUID()
 
     private fun readIndex(context: Context): List<ShelfBook> =
-        Db.get(context).rows("SELECT id, title, author, app, updated_at, progress, due, seen_title FROM shelf ORDER BY pos") { c ->
+        Db.get(context).rows("SELECT id, title, author, app, updated_at, progress, due, seen_title, chapter FROM shelf ORDER BY pos") { c ->
             ShelfBook(c.getString(0), c.getString(1).orEmpty(), c.getString(2).orEmpty(), c.getString(3)?.ifEmpty { null },
-                c.getLong(4), c.getInt(5), c.getLong(6), c.getString(7).orEmpty())
+                c.getLong(4), c.getInt(5), c.getLong(6), c.getString(7).orEmpty(), c.getString(8).orEmpty())
         }
 
     /** 줄인 표지(흑백, 컬러 [Palette] 면 원래 색). 표지 그림이 없거나 읽지 못하면 제목·저자·앱 이름으로 그린 빈 표지([BlankCover]). */
@@ -732,16 +735,16 @@ object BookShelf {
      */
     @Synchronized fun addOpened(
         context: Context, title: String, author: String, app: String?, progress: Int, due: Long, at: Long = System.currentTimeMillis(),
-        revive: (ShelfBook) -> Boolean = { it.hasTitle(title) },
+        chapter: String = "", revive: (ShelfBook) -> Boolean = { it.hasTitle(title) },
     ): ShelfBook {
         val now = System.currentTimeMillis()
         val past = history(context).lastOrNull { !it.hidden && revive(it.book) }?.book
-        // 화면에서 모르는 진행률(-1)은 예전 값 그대로([updateStatus] 와 같게). 반납일은 나간 책에 남기지 않으니(writeHistory) 본 것으로
+        // 화면에서 모르는 진행률(-1)은 예전 값 그대로([updateStatus] 와 같게). 반납일·읽는 화는 나간 책에 남기지 않으니(writeHistory) 본 것으로
         val added = past?.copy(
             author = past.author.ifEmpty { author }, app = app ?: past.app, updatedAt = now,
-            progress = if (progress >= 0) progress else past.progress, due = due,
+            progress = if (progress >= 0) progress else past.progress, due = due, chapter = chapter,
         )
-            ?: ShelfBook(newId(), title, author, app, now, progress, due, seenTitle = title)
+            ?: ShelfBook(newId(), title, author, app, now, progress, due, seenTitle = title, chapter = chapter)
         // 마지막 회차가 완독으로 끝난 책이면 새 회차를 연다. 이미 진행 중이던 회차(다시 읽기·감상·완독 뒤 5분 넘게 읽음)면 이어진다.
         val newRound = past != null && startsRoundOnReturn(context, past.id)
         atomic(context) {
@@ -784,12 +787,12 @@ object BookShelf {
         }
     }
 
-    /** 이북 앱 서재에서 본 책 [id] 의 진행률·반납일(모르면 -1)·저자([updateStatuses]) */
-    data class Status(val id: String, val progress: Int, val due: Long, val author: String = "")
+    /** 이북 앱 서재에서 본 책 [id] 의 진행률·반납일(모르면 -1)·저자·읽는 화(모르면 "")([updateStatuses]) */
+    data class Status(val id: String, val progress: Int, val due: Long, val author: String = "", val chapter: String = "")
 
-    /** 이북 앱 서재에서 본 진행률·반납일(저자는 비어 있을 때만)을 적는다(순서는 그대로). 바뀐 게 없으면 쓰지 않는다. */
-    fun updateStatus(context: Context, id: String, progress: Int, due: Long, author: String = "") =
-        updateStatuses(context, listOf(Status(id, progress, due, author)))
+    /** 이북 앱 서재에서 본 진행률·반납일·읽는 화(저자는 비어 있을 때만)를 적는다(순서는 그대로). 바뀐 게 없으면 쓰지 않는다. */
+    fun updateStatus(context: Context, id: String, progress: Int, due: Long, author: String = "", chapter: String = "") =
+        updateStatuses(context, listOf(Status(id, progress, due, author, chapter)))
 
     /** 서재 한 화면에서 본 여러 책의 [updateStatus] 를 한 번에 쓴다. */
     @Synchronized fun updateStatuses(context: Context, statuses: List<Status>) {
@@ -799,9 +802,10 @@ object BookShelf {
             val d = if (s.due >= 0) s.due else due
             // 저자는 비어 있을 때만 채운다(읽는 화면 메뉴의 제목으로 먼저 들어온 책).
             val a = author.ifBlank { s.author }
-            if (p == progress && d == due && a == author) return this
+            val ch = s.chapter.ifEmpty { chapter }
+            if (p == progress && d == due && a == author && ch == chapter) return this
             // 저자가 채워지면 빈 표지를 다시 그리도록 updatedAt 도 새로.
-            return copy(progress = p, due = d, author = a, updatedAt = if (a != author) now else updatedAt)
+            return copy(progress = p, due = d, author = a, chapter = ch, updatedAt = if (a != author) now else updatedAt)
         }
         // 같은 책이 여러 칸이면 차례로(앞 칸에서 본 값을 뒤 칸의 모르는 값(-1)이 지우지 않게)
         write(context, statuses.fold(list(context)) { books, s -> books.map { if (it.id == s.id) it.with(s) else it } })
@@ -968,7 +972,7 @@ object BookShelf {
         if (books == before) return
         fun ShelfBook.values(pos: Int) = Db.values(
             "pos" to pos, "id" to id, "title" to title, "author" to author, "app" to app.orEmpty(),
-            "updated_at" to updatedAt, "progress" to progress, "due" to due, "seen_title" to seenTitle,
+            "updated_at" to updatedAt, "progress" to progress, "due" to due, "seen_title" to seenTitle, "chapter" to chapter,
         )
         Db.get(context).tx {
             if (books.map { it.id } == before.map { it.id }) {
