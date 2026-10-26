@@ -214,7 +214,8 @@ Pebble Desk(1.2.x)를 기본 홈으로 쓰는 홈 화면. 책 1권(밀리의서�
 - Ocean 5 Pro: 8코어 · 4GB · 64GB · 2400mAh · 185g. Ocean 5 표준: 4코어 · 4GB · 64GB · 2000mAh · 179g. 장기 배터리판: 1GB · 64GB. Musnap Ocean: 8코어 2.2GHz · 4GB · 64GB · 3000mAh. SD 카드 없음.
 - OS: 掌阅 **SmartOS**. Musnap Ocean 은 `SmartOS 3.1.0`, 시스템 버전 `3.1.10.183.0`, 소프트웨어 `3.1.2702.183(127021)`(설명서 그림), 안드로이드 14 · 보안 패치 2024-07(jpwhiteside 리뷰). 다른 앱을 깔 수 있다. Google Play 는 설정 › `Google Settings` 에서 Google 서비스를 켜면 나타난다(설명서·리뷰). 중국판도 같은지는 **(미확인)**.
 - 설정(`Mine` 탭): WLAN · Bluetooth · Google Settings · System Settings(Display: 홈 보기·테마·화면 보호기·배경·조명·잠자기 / System: 음량·날짜·언어·입력기·글꼴·화면 회전 / **Auxiliary functions: Global Gestures**·Smart Assistant·펜 버튼·덮개 깨우기 / Privacy / System & Updates) · Read · Notes · Schedule · Apps · Help · About.
-- 앱별 표시 최적화: 대비·선명도·전체 새로고침 간격·다크 모드. 새로고침 모드는 The Clearest · Quick · Quick Brush · Intelligent 넷(Good e-Reader).
+- 앱별 표시 최적화: 대비·선명도·전체 새로고침 간격·다크 모드. 새로고침 모드는 The Clearest · Quick · Quick Brush · Intelligent 넷(Good e-Reader). Musnap Ocean 리뷰(jpwhiteside)는 아래 오른쪽에서 끌어올려 열고, 검은색 강조·깜빡임 줄이기(약·강)·몇 쪽마다 새로고침·새로고침 모드(선명·빠름)가 있다며 "BOOX 처럼 앱별 DPI·대비 설정은 없다" 고 한다. 앱별 DPI 를 바꾸는 곳은 찾지 못했다. 예전 iReader 앱 장터가 받은 앱 폴더에 `dpilist`·`idlist` 파일을 두는데(知乎 설치 안내) 무엇인지는 **(미확인)**.
+- **Musnap Ocean C**(Kaleido 3 컬러판): iReader 가 만든 영문판(Good e-Reader). 7" 1264×1680, 흑백 300 · 컬러 150ppi, 안드로이드 14, 8코어 2.2GHz · 4GB · 64GB · 3000mAh, Google Play, 펜 따로(Notebookcheck·the-ebook-reader). Ocean 5C 와 같은 기기라는 댓글이 있다 **(미확인)**.
 
 ### 빠른 설정(제어 패널) 여는 법
 
@@ -262,6 +263,11 @@ Pebble Desk(1.2.x)를 기본 홈으로 쓰는 홈 화면. 책 1권(밀리의서�
 - **설정 값**: `screen_brightness` 255 → **1**, `EinkLightStep=0`, `down_key_long_function` 4 → **2**(아래 버튼 길게 누르기 동작으로 보인다 **(추정)**), `eink_wallpaper_name=系统默认`(전에는 `시스템 캘린더`. 고를 때의 언어로 저장되는 듯 **(추정)**), 새 키 `ireader_systemui_shutdown_pending=0`·`key_b…`(잘림).
 - **최근 화면**: `com.flyersoft.moonreader / ActivityTxt`, `com.flyersoft.moonreaderp / ActivityTxt`(기기 정보는 클래스의 마지막 이름만 보인다. 실제 클래스는 `com.flyersoft.moonreaderp.ActivityTxt` 로, 무료판과 패키지 부분이 다르다), `com.android.settings / SpaActivity`(안드로이드 14 설정의 새 앱 정보·권한 화면).
 - **화면 위**: 하위 화면 위에 SmartOS 상단 바 대신 안드로이드식 상태 줄(시각 `8:55`, BT · Wi-Fi · `91%`)이 보이고, 제목 왼쪽 `‹` 가 없다. 1.5.2 의 설정 › 화면 › 기기 상단 바를 켰는지, 펌웨어가 바뀐 것인지 **(미확인)**.
+
+### Musnap Ocean C 사용자 댓글 (2026-10-26, Reddit No_Mixture_2431, 판 미상)
+
+- 킨들 표지 문제(Kindle Unlimited·보낸 문서 표지가 안 나온다는 댓글)가 같다며 킨들 서재와 `기록 보기` 사진 두 장을 보냈다(imgur, 아직 보지 않음). 사진을 찍고 나니 킨들 책 하나가 홈에 표지 없이 들어왔고, 다른 책을 열었는데 그 책은 들어오지 않았다고 한다.
+- 홈에 `화면이 크게 보입니다`(DPI 가 354 여야 한다) 창이 뜬다. 사용자는 바꾼 것이 없고 화면도 괜찮아 보인다고 한다. Ocean 5 Pro 는 354 가 그대로 먹혔으니(위 기기 정보) 이 기기에서만 무언가가 앱 밀도를 덮어쓴다. 앱별 표시 최적화에는 DPI 가 없다는 리뷰라 원인은 **(미확인)**. 기기 정보(화면 줄의 `App uses …dpi` 와 `intended 354dpi not applied`) 사진을 부탁했다.
 
 ### 다음에 받을 것
 

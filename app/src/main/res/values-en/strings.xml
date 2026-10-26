@@ -308,6 +308,7 @@
     <string name="guide_n_yes24lib_title">For books opened from a library page, added when you open the menu</string>
     <string name="guide_n_moon_cover">For books opened from the Home tab or bookshelf view, added when Read book files is on</string>
     <string name="guide_n_moon_title">For books opened from the Home tab or bookshelf view, added when you open the menu</string>
+    <string name="guide_n_kindle_cover">For Send to Kindle documents, added when you return to the library after reading</string>
     <string name="guide_n_kindle_title">For books not yet downloaded, added when you open the menu</string>
     <string name="guide_n_bookers2_cover">Added only for books whose details you viewed</string>
     <string name="guide_n_epub">EPUB only</string>
