@@ -1,6 +1,7 @@
 package com.woody.pebbledesk
 
 import android.content.Context
+import android.graphics.Bitmap
 import com.woody.pebbledesk.readers.BookFiles
 import com.woody.pebbledesk.readers.isImageFile
 import com.woody.pebbledesk.readers.withoutBookFile
@@ -34,6 +35,11 @@ interface BookRecorder {
      * 기본: [cover] 와 같다(표지가 없을 때만)
      */
     fun replaceCover(bookId: String, jpeg: ByteArray) = cover(bookId, jpeg)
+    /**
+     * 붙어 있는 표지가 [placeholder](이북 앱이 표지 대신 그리는 빈 그림)면 지운다(예전 판이 그것을 표지로 잘라 붙인 책. 그러면 진짜 표지가 보일 때 다시 자른다).
+     * 지웠으면 true. 화면 스레드에서 부르지 않는다. 기본: 하지 않는다
+     */
+    fun dropPlaceholderCover(bookId: String, placeholder: (Bitmap) -> Boolean): Boolean = false
     /** 아직 목록에 없는 책의 잘라 둔 표지(그 책이 들어오면 [opened] 가 붙인다, 최근 [PENDING_MAX]권만). 열쇠는 정리한 제목 또는 파일 칸 열쇠 */
     fun pendingCover(key: String, jpeg: ByteArray)
     fun hasPendingCover(key: String): Boolean
@@ -153,6 +159,9 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
     override fun replaceCover(bookId: String, jpeg: ByteArray) {
         runCatching { BookShelf.setCover(context, bookId, jpeg) }
     }
+
+    override fun dropPlaceholderCover(bookId: String, placeholder: (Bitmap) -> Boolean) =
+        runCatching { BookShelf.dropCoverIf(context, bookId, placeholder) }.getOrDefault(false)
 
     override fun pendingCover(key: String, jpeg: ByteArray) { pendingCovers[key] = jpeg }
     override fun hasPendingCover(key: String) = key in pendingCovers

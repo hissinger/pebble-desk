@@ -1,6 +1,7 @@
 package com.woody.pebbledesk.readers
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
@@ -10,6 +11,7 @@ import com.woody.pebbledesk.sameTitle
 import java.io.File
 import java.util.zip.GZIPInputStream
 import java.util.zip.ZipFile
+import kotlin.math.abs
 
 /**
  * Mihon(만화 앱, 0.21.2)과 그 포크 Kahon(0.20.6, 패키지만 다르고 화면이 같다): 책 한 권은 만화 한 작품이다(화마다 따로 책을 만들지 않는다).
@@ -17,7 +19,8 @@ import java.util.zip.ZipFile
  * 작품은 서재 칸을 누르면 뜨는 작품 상세(표지([MihonApp.isCover]) 바로 뒤에 제목, 그 뒤 줄에 저자)에서 안다: 상세에서 화를 누르거나 `시작`·`이어 읽기`로
  * 읽는 화면(`ui.reader.ReaderActivity`)을 열면 그 작품([DetailReader]). 기록·업데이트 탭에서 바로 연 화는 책 모름으로 두고, 읽는 화면 가운데를 눌러
  * 메뉴를 띄우면 위 줄의 작품 제목으로 알아 읽는 화면을 연 때부터 그 작품에 붙인다([MihonReader]).
- * 표지는 서재 격자 칸(표지 위에 그린 제목·표시도 함께)·기록 탭 줄·작품 상세에서 자르고, 책 파일 읽기로 로컬 만화는 작품 폴더의 표지 그림으로 바꾼다.
+ * 표지는 서재 격자 칸(표지 위에 그린 제목·표시도 함께)·기록 탭 줄·작품 상세에서 자르고(표지를 불러오기 전·못 불러온 빈 표지는 자르지 않는다, [placeholderCover]),
+ * 책 파일 읽기로 로컬 만화는 작품 폴더의 표지 그림으로 바꾼다.
  * 저자는 화면에서는 작품 상세에만 있고, 책 파일 읽기로 로컬 만화 정보·받은 화·자동 백업에서도 찾는다([fileInfo]). 작품의 진행률(%)은 모르고(읽는 화면에는 그 화의 쪽만 있다)
  * 메뉴의 화 이름을 앱이 쓴 그대로 읽는 화로 둔다(`Ch. 12`·`12화`·`Vol.2 Ch.15 - …`, 소스마다 다르다).
  */
@@ -96,6 +99,27 @@ open class MihonApp(pkg: String) : ReaderApp(
             return Cell(title, author.orEmpty(), -1, -1, k.bounds(), Rect()) to k
         }
         return null
+    }
+
+    /**
+     * 위 막대의 제목: 뒤로 단추(설명이 붙은 요소를 품은 눌리는 묶음) 바로 뒤 묶음 안의 글자. 작품 상세를 아래로 넘기면 머리(표지·제목·저자)는 화면 밖에서
+     * 요소가 없어지고(화가 많은 작품, 2026-10-26 에뮬레이터 Mihon 0.21.3: 120화) 위 막대에 작품 제목이 나온다. 찾아보기의 소스 화면 등도 같은 모양이라
+     * 이것만으로 작품 상세라고 보지 않는다([MihonReader] 가 마지막으로 본 머리의 제목과 맞춘다). 없으면 null
+     */
+    fun barTitle(root: AccessibilityNodeInfo): String? {
+        val bottom = root.bounds().let { it.top + it.height() / TOP_PART }
+        fun bar(n: AccessibilityNodeInfo): String? {
+            if (n.childCount < 2) return null
+            val back = n.getChild(0)?.takeIf { b -> b.isClickable && (0 until b.childCount).any { b.getChild(it)?.contentDescription.isNullOrEmpty() == false } }
+                ?: return null
+            if (back.bounds().bottom > bottom) return null
+            val name = n.getChild(1)?.takeIf { !it.isClickable && it.childCount == 1 }?.getChild(0) ?: return null
+            return name.takeIf { it.className?.endsWith("TextView") == true }?.text?.let(::plain)?.takeIf { it.isNotEmpty() }
+        }
+        // 위 막대는 위 [TOP_PART] 안에 있다: 그 아래에서 시작하는 묶음(화 줄·서재 칸)은 들어가지 않는다
+        fun walk(n: AccessibilityNodeInfo, depth: Int): String? = if (n.bounds().top >= bottom) null
+            else bar(n) ?: if (depth < DEEP_WALK_DEPTH) (0 until n.childCount).firstNotNullOfOrNull { i -> n.getChild(i)?.let { walk(it, depth + 1) } } else null
+        return walk(root, 0)
     }
 
     /**
@@ -279,6 +303,43 @@ open class MihonApp(pkg: String) : ReaderApp(
     @Volatile private var found: List<File>? = null
     @Volatile private var foundAt = 0L
 
+    /**
+     * Mihon 이 표지 대신 그리는 빈 표지인가(소스 `MangaCover`): 불러오는 동안은 바탕 `0x1F888888` 한 가지 색, 못 불러왔으면(표지 없는 로컬 만화 등)
+     * 그 위 가운데에 같은 색을 한 번 더 칠한 그림 아이콘(`cover_error`). 서재 격자 칸은 그 위 아래쪽에 그늘·제목을, 위 모서리에 표시를 그려
+     * 가운데 부분(폭 10~90%·높이 15~60%)만 본다: 거의 모든 점이 한 밝기 가까이(아이콘은 바탕보다 조금 어둡다)이고 무채색이며, 흰색·검은색이 아니다
+     * (흰 바탕·검은 바탕 표지와 가른다). 2026-10-26 에뮬레이터: 서재 칸 바탕 238(아이콘 225), 찾아보기의 서재에 넣은 칸(옅게 그림) 247.
+     * 1.6.1 은 이것을 표지로 잘라 붙여, 그 뒤에 진짜 표지가 보여도 다시 찍지 않았다.
+     */
+    override fun placeholderCover(context: Context, crop: Bitmap): Boolean {
+        val w = crop.width
+        val h = crop.height
+        val px = IntArray(w * h).also { crop.getPixels(it, 0, w, 0, 0, w, h) }
+        return placeholder(px, w, h)
+    }
+
+    /** [placeholderCover] 의 판단: 폭 [w]·높이 [h] 의 ARGB 점들 [px] */
+    internal fun placeholder(px: IntArray, w: Int, h: Int): Boolean {
+        val left = (w * 0.1f).toInt()
+        val right = (w * 0.9f).toInt()
+        val top = (h * 0.15f).toInt()
+        val bottom = (h * 0.6f).toInt()
+        if (right <= left || bottom <= top) return false
+        val lum = FloatArray((right - left) * (bottom - top))
+        var chroma = 0L
+        var i = 0
+        for (y in top until bottom) for (x in left until right) {
+            val p = px[y * w + x]
+            val r = p shr 16 and 0xff
+            val g = p shr 8 and 0xff
+            val b = p and 0xff
+            lum[i++] = 0.299f * r + 0.587f * g + 0.114f * b
+            chroma += maxOf(r, g, b) - minOf(r, g, b)
+        }
+        val bg = lum.copyOf().apply { sort() }[lum.size / 2]
+        return bg in MIN_BG..MAX_BG && chroma / lum.size <= GRAY_CHROMA &&
+            lum.count { abs(it - bg) <= BG_SLACK }.toFloat() / lum.size >= MOSTLY
+    }
+
     /** 앱이 저자를 모를 때 보이는 글자(`작가 미상`, 앱 문자열 `unknown_author`. 기기 언어로, 못 읽으면 영어 그대로) */
     fun unknownAuthor(context: Context): Set<String> {
         val local = runCatching {
@@ -295,8 +356,12 @@ open class MihonApp(pkg: String) : ReaderApp(
  * 연 때부터 그 작품에 붙인다(읽는 화면 하나는 한 작품만 보여 준다: 다음 화로 넘어가도 같은 작품, 다른 작품은 서재로 돌아가 다시 연다).
  * 바탕은 사라진 상세를 잠깐(3초) 더 기억하지만(누르면 상세가 먼저 사라지는 앱), Mihon 은 화를 열어도 상세가 그대로 있고 읽는 화면이 위에 덮인다.
  * 그래서 상세가 사라졌는데 앞 화면이 읽는 화면이 아니면(뒤로 나가 기록 탭 등) 바로 잊는다: 그 사이 기록 탭에서 다른 작품을 열면 앞 작품에 붙었다.
+ * 상세를 아래로 넘겨 머리가 화면 밖이면 위 막대의 제목으로 그 상세를 이어 본다([MihonDetails]).
  */
-class MihonReader(private val mihon: MihonApp) : DetailReader(mihon, clickOnly = true, mihon::detail) {
+class MihonReader private constructor(private val mihon: MihonApp, private val details: MihonDetails) :
+    DetailReader(mihon, clickOnly = true, details::of) {
+    constructor(mihon: MihonApp) : this(mihon, MihonDetails(mihon))
+
     private var lastLeaveCheck = 0L
 
     /**
@@ -315,15 +380,33 @@ class MihonReader(private val mihon: MihonApp) : DetailReader(mihon, clickOnly =
     override fun onShelf(ctx: AppContext) {
         super.onShelf(ctx)
         val root = ctx.root ?: return
-        val web = mihon.detail(root)
+        val web = details.of(root)
         if (web == null) {
             if (remembers && root.count(ctx.pkg, READER) == 0) beforeOpened(ctx)
             return
         }
-        val book = ctx.recorder.lookup.byTitle(web.title)?.takeIf { it.author.isBlank() } ?: return
+        val book = ctx.recorder.lookup.byTitle(web.title) ?: return
+        checkCover(ctx, book, web)
+        if (book.author.isNotBlank()) return
         val author = web.author.takeIf { it.isNotEmpty() && it !in unknownAuthor(ctx) } ?: return
         ctx.recorder.status(book.id, -1, author = author)
     }
+
+    /**
+     * 1.6.1 이 표지로 잘라 붙인 빈 표지([MihonApp.placeholderCover])를 지운다: 작품을 펴거나 상세를 볼 때(서비스가 붙을 때마다 책마다 한 번) 뒤에서 보아,
+     * 빈 표지면 지우고 상세 [web] 가 있으면 그 표지를 바로 찍는다(아니면 다음에 서재·상세에 보일 때 바탕 규칙으로 찍는다)
+     */
+    private fun checkCover(ctx: AppContext, book: ShelfBook, web: Cell?) {
+        if (!ctx.recorder.lookup.hasCover(book.id) || !coverChecked.add(book.id)) return
+        val context = ctx.context
+        ctx.inBackground({ ctx.recorder.dropPlaceholderCover(book.id) { mihon.placeholderCover(context, it) } }) { result ->
+            val thumb = web?.thumb
+            if (result.getOrNull() == true && thumb != null) ctx.capture(listOf(CoverSpot(web.title, thumb, book.id)))
+        }
+    }
+
+    /** 붙은 표지가 빈 표지인지 본 책([checkCover]) */
+    private val coverChecked = mutableSetOf<String>()
 
     /**
      * 앞 화면에 상세가 없고 읽는 화면도 아니면(뒤로 나가 기록 탭 등) 기억한 상세를 잊는다. 상세 기억을 지우는 길은 [beforeOpened] 뿐이다
@@ -331,7 +414,7 @@ class MihonReader(private val mihon: MihonApp) : DetailReader(mihon, clickOnly =
      */
     private fun forgetLeftDetail(ctx: AppContext) {
         val root = ctx.root ?: return
-        if (root.count(ctx.pkg, READER) == 0 && mihon.detail(root) == null) beforeOpened(ctx)
+        if (root.count(ctx.pkg, READER) == 0 && details.of(root) == null) beforeOpened(ctx)
     }
 
     override fun onEnterViewer(ctx: AppContext, from: String?, again: Boolean) {
@@ -344,6 +427,7 @@ class MihonReader(private val mihon: MihonApp) : DetailReader(mihon, clickOnly =
      * 작고 서재 칸 것은 제목·표시가 든다), 저자가 비었으면 로컬 만화 정보·받은 화의 ComicInfo·자동 백업의 저자로 채운다(메뉴로 먼저 들어온 작품)
      */
     override fun afterOpened(ctx: AppContext, book: ShelfBook) {
+        checkCover(ctx, book, null)
         if (!BookFiles.canRead(ctx.context) || !fileLookups.add(book.id)) return
         val prefs = ctx.prefs
         val pref = "local_cover_${ctx.pkg}_${book.id}"
@@ -378,6 +462,22 @@ class MihonReader(private val mihon: MihonApp) : DetailReader(mihon, clickOnly =
     }
 }
 
+/**
+ * 지금 보이는 작품 상세: 머리(표지·제목·저자)가 보이면 그것([MihonApp.detail]). 화가 많은 작품을 아래로 넘겨 머리가 화면 밖이면 위 막대의 제목
+ * ([MihonApp.barTitle])이 마지막으로 본 머리의 제목과 같을 때 그 작품(표지 자리 없이). 1.6.1 은 넘긴 채 고른 화를 '책 모름'으로 두어,
+ * 읽던 화를 찾아 넘겨 연 작품(이미 읽고 있던 만화)이 들어오지 않았다(2026-10-26 Reddit 댓글, 에뮬레이터에서 재현)
+ */
+internal class MihonDetails(private val mihon: MihonApp) {
+    /** 마지막으로 본 머리 */
+    private var header: Cell? = null
+
+    fun of(root: AccessibilityNodeInfo): Cell? {
+        mihon.detail(root)?.let { header = it; return it }
+        val last = header ?: return null
+        return last.takeIf { mihon.barTitle(root)?.let { sameTitle(it, last.title) } == true }?.copy(thumb = null)
+    }
+}
+
 /** 책 파일 읽기로 아는 작품 정보: 로컬 만화의 표지 그림, 로컬 만화 정보·받은 화·자동 백업의 저자([MihonApp.fileInfo]) */
 class FileInfo(val cover: File?, val author: String?)
 
@@ -385,6 +485,19 @@ object Mihon : MihonApp("app.mihon")
 
 /** Kahon(Mihon 포크, F-Droid·GitHub 판 같은 패키지) */
 object Kahon : MihonApp("com.amanoteam.kahon")
+
+/**
+ * 빈 표지([MihonApp.placeholder]) 바탕으로 볼 수 있는 밝기(0~255): 어두운 테마의 바탕(약 32)부터, 흰 표지(255)는 아니게.
+ * 크레마 화면 대비가 캡처를 어둡게 해도(238 → 약 214) 들어온다
+ */
+private const val MIN_BG = 16f
+private const val MAX_BG = 251f
+/** 바탕 밝기에서 벗어날 수 있는 만큼(아이콘은 바탕보다 약 13, 크레마 화면 대비로 약 28 어둡다. 글자·그림 선은 훨씬 더) */
+private const val BG_SLACK = 40f
+/** 그래야 하는 점의 비율(빈 표지는 1. 바탕이 한 가지 색인 책 표지도 제목·그림 때문에 0.97 아래, 2026-10-26 에뮬레이터의 책 표지 16권) */
+private const val MOSTLY = 0.995f
+/** 무채색으로 볼 점마다 색 차이(가장 큰 채널 - 가장 작은 채널)의 평균(테마 바탕의 옅은 색은 3쯤) */
+private const val GRAY_CHROMA = 16
 
 /** 뒤로 나간 상세를 잊으려고 앞 화면을 다시 보는 최소 간격 */
 private const val LEAVE_CHECK_MS = 200L
