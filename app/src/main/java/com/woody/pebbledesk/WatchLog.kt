@@ -3,6 +3,7 @@ package com.woody.pebbledesk
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -14,7 +15,8 @@ import java.util.concurrent.Executors
  *   진행률·서재 칸 수는 쪽을 넘길 때마다 바뀌어 같은 앱(진행률은 같은 책)이 이어지면 그 줄의 값만 고친다([UPDATED]. 오래 읽으면 다른 줄이 밀려나지 않게).
  * - 요약(마지막 연결이나 지운 뒤 [Summary.since] 부터): 이북 앱별 받은 알림 수·마지막 때, 첫 알림, 화면을 못 읽은 횟수.
  *   글 내용이 바뀌는 알림은 너무 잦아 줄로 남기지 않고 여기서만 센다.
- * 서비스와 기록 화면은 같은 프로세스의 메인 스레드에서 부른다. 파일은 잠시 모았다가 한 번에 쓴다.
+ * 서비스와 기록 화면은 같은 프로세스의 메인 스레드에서 부른다. 파일은 잠시 모았다가 한 번에 쓴다: 새 줄은 [SAVE_DELAY_MS] 안에,
+ * 알림 수·이어진 줄(횟수·진행률)만 바뀌면 [COUNT_DELAY_MS] 안에(읽는 동안 글 내용 바뀜 알림이 쉬지 않고 와 몇 초마다 저장소에 쓰지 않게).
  */
 object WatchLog {
     enum class Kind {
@@ -58,6 +60,7 @@ object WatchLog {
     /** 한 화면에 들어가는 것보다 넉넉히(같은 것이 이어지면 한 줄이라 한 번 해 본 것은 한 화면에 든다) */
     private const val MAX = 60
     private const val SAVE_DELAY_MS = 3000L
+    private const val COUNT_DELAY_MS = 15_000L
     private const val FILE = "watch_log.txt"
     private const val PREFS = "watch_log"
 
@@ -73,6 +76,8 @@ object WatchLog {
     /** 쓰기는 하나씩 차례로(앞서 맡긴 것이 나중에 써지지 않게) */
     private val writer = Executors.newSingleThreadExecutor()
     private var saveQueued = false
+    /** 맡겨 둔 저장의 때([SystemClock.uptimeMillis]) */
+    private var saveDue = 0L
     /** 줄이 바뀌어 파일을 다시 써야 한다(알림 수만 바뀌면 요약만 쓴다) */
     private var entriesDirty = false
     private val saveLater = Runnable { save() }
@@ -90,7 +95,7 @@ object WatchLog {
         entries.clear()
         entriesDirty = true
         restart()
-        saveSoon()
+        saveSoon(SAVE_DELAY_MS)
     }
 
     private fun restart() {
@@ -101,7 +106,7 @@ object WatchLog {
 
     /**
      * 서비스가 이북 앱 알림을 마지막으로 받은 때(어느 앱이든, 없으면 0). 그때는 서비스가 살아 있었다([ReaderWatchService.stoppedAt]).
-     * 저장은 몇 초 늦게 하므로 프로세스가 죽었으면 그보다 조금 이를 수 있다(이른 쪽이라 '책 모름'이 넓어질 뿐 다른 책에 붙지는 않는다).
+     * 저장은 [COUNT_DELAY_MS] 까지 늦게 하므로 프로세스가 죽었으면 그보다 조금 이를 수 있다(이른 쪽이라 '책 모름'이 넓어질 뿐 다른 책에 붙지는 않는다).
      */
     @Synchronized
     fun lastEventAt(context: Context): Long {
@@ -118,7 +123,7 @@ object WatchLog {
         if (firstAt == 0L) {
             firstAt = now; firstPkg = pkg
             add(context, Kind.FIRST_EVENT, pkg)
-        } else saveSoon()
+        } else saveSoon(COUNT_DELAY_MS)
     }
 
     fun add(context: Context, kind: Kind, pkg: String = "", arg: String = "", detail: String = "") {
@@ -128,16 +133,19 @@ object WatchLog {
         val a = clean(arg)
         val d = clean(detail)
         val last = entries.lastOrNull()
-        if (last != null && last.kind == kind && last.pkg == pkg && last.detail == d && (last.arg == a || kind in UPDATED)) {
+        // 같은 줄이 이어져 그 줄만 고치면(쪽을 넘길 때마다의 진행률 등) 늦게 쓴다
+        val delay = if (last != null && last.kind == kind && last.pkg == pkg && last.detail == d && (last.arg == a || kind in UPDATED)) {
             last.repeat++
             last.at = now
             last.arg = a
+            COUNT_DELAY_MS
         } else {
             entries.addLast(Entry(now, kind, pkg, a, d))
             while (entries.size > MAX) entries.removeFirst()
+            SAVE_DELAY_MS
         }
         entriesDirty = true
-        saveSoon()
+        saveSoon(delay)
     }
 
     /** 최근 것부터 */
@@ -162,11 +170,14 @@ object WatchLog {
 
     private fun clean(s: String) = s.replace('\t', ' ').replace('\n', ' ')
 
-    /** 알림이 쉬지 않고 와도 [SAVE_DELAY_MS] 마다는 쓴다(미루기만 하면 앱이 끝날 때 잃는다). */
-    private fun saveSoon() {
-        if (saveQueued) return
+    /** 알림이 쉬지 않고 와도 [delayMs] 안에는 쓴다(미루기만 하면 앱이 끝날 때 잃는다). 더 늦게 맡겨 둔 저장이 있으면 앞당긴다. */
+    private fun saveSoon(delayMs: Long) {
+        val due = SystemClock.uptimeMillis() + delayMs
+        if (saveQueued && saveDue <= due) return
+        handler.removeCallbacks(saveLater)
         saveQueued = true
-        handler.postDelayed(saveLater, SAVE_DELAY_MS)
+        saveDue = due
+        handler.postAtTime(saveLater, due)
     }
 
     private fun load(context: Context) {
