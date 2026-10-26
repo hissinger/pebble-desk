@@ -119,16 +119,31 @@ class YearBooksActivity : EinkActivity() {
 
     override fun onResume() {
         super.onResume()
-        render()
+        recordState().let { if (it != shown) render(it) }
+    }
+
+    /**
+     * 지금 그려 둔 기록의 표(오늘·DB 순번·오늘 책별 시간). 돌아왔을 때 같으면(화면만 껐다 켬, 책 상세에서 아무것도 바꾸지 않음) 기록을 다시 모아
+     * 목록을 다시 만들지 않는다(같은 화면을 다시 그려 깜빡이지 않게). 보기·거르기·해 바꾸기는 [render] 를 바로 부른다.
+     */
+    private var shown: List<Any?>? = null
+
+    private fun recordState(): List<Any?> {
+        val today = LocalDate.now()
+        // 세기가 날이 바뀐 지난날을 저장하므로 DB 순번은 센 뒤에 본다
+        val todayMs = ReadingLog.days(this, ReadingLog.readerPackages(this))?.get(today)
+        return listOf(today, Db.changes(), todayMs)
     }
 
     private fun showPage() {
         pageText.text = pageLabel(rows)
     }
 
-    private fun render() {
+    /** [state] 는 이미 센 [recordState](돌아왔을 때) */
+    private fun render(state: List<Any?> = recordState()) {
+        shown = state
         val today = LocalDate.now()
-        // 기록은 한 번만 읽는다(읽은 시간 계산이 사용 기록을 읽는다).
+        // 기록은 한 번만 모은다(읽은 시간 계산이 사용 기록을 읽는다. 위 [recordState] 가 센 뒤라 여기서는 그 뒤의 것만 이어 센다).
         val records = BookRecord.all(this).filter { !it.hidden }
         val years = years(records, today)
         // 지난해의 마지막 책을 기록에서 지워 그해가 비면 올해로 돌아온다(빈 지난해에 `올해 읽은 책이 없습니다`가 뜨지 않게).

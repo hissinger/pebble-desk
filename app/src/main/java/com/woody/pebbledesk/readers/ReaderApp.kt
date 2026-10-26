@@ -220,9 +220,9 @@ open class ReaderApp(
             val path = pathTo(r, source, at) ?: continue
             // 누른 요소에서 위로: 제목이 처음 보이는 묶음이 그 칸(제목이 둘 이상이면 여러 권을 담은 목록이라 칸이 아니다).
             for (n in path.asReversed()) {
-                val titleCount = titles.sumOf { n.count(pkg, it) }
+                val titleCount = n.count(pkg, titles, stopAt = 1)
                 if (titleCount == 0) continue
-                if (titleCount == 1 && thumbs.sumOf { n.count(pkg, it) } > 0 && !titleInOtherList(n, at)) readCell(n)?.let { return it }
+                if (titleCount == 1 && n.count(pkg, thumbs, stopAt = 0) > 0 && !titleInOtherList(n, at)) readCell(n)?.let { return it }
                 break
             }
         }
@@ -263,12 +263,12 @@ open class ReaderApp(
         for (i in 0 until CELL_UP) {
             // 칸은 목록 안의 한 칸까지(책이 한 권이면 목록 밖까지 제목이 하나뿐이라 화면 전체가 칸이 되었다, 밀리 e-ink)
             val c = n?.takeUnless { it.isList() } ?: break
-            val titleCount = titles.sumOf { c.count(pkg, it) }
+            val titleCount = c.count(pkg, titles, stopAt = 1)
             if (titleCount > 1 || (titleCount == 1 && titleInOtherList(c, at))) break
             if (titleCount == 1) cell = c
             n = c.parent
         }
-        return cell?.takeIf { c -> thumbs.sumOf { c.count(pkg, it) } > 0 }
+        return cell?.takeIf { c -> c.count(pkg, thumbs, stopAt = 0) > 0 }
     }
 
     /**
@@ -277,7 +277,7 @@ open class ReaderApp(
      */
     private fun titleInOtherList(n: AccessibilityNodeInfo, at: Rect): Boolean {
         fun walk(c: AccessibilityNodeInfo, depth: Int): Boolean {
-            if (depth > 0 && c.isList() && !c.bounds().contains(at) && titles.any { c.count(pkg, it) > 0 }) return true
+            if (depth > 0 && c.isList() && !c.bounds().contains(at) && c.count(pkg, titles, stopAt = 0) > 0) return true
             if (depth < WALK_DEPTH) for (i in 0 until c.childCount) if (c.getChild(i)?.let { walk(it, depth + 1) } == true) return true
             return false
         }
