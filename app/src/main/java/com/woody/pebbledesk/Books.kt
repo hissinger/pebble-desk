@@ -613,6 +613,8 @@ object BookShelf {
     }
 
     private const val ID_PREFIX = "b-"
+    /** 표지가 빈 그림인지 볼 때 줄여 푸는 폭([dropCoverIf]) */
+    private const val TEST_PX = 256
     /** `책 추가` 로 직접 넣은 책의 id 머리([manual]) */
     const val MANUAL_PREFIX = "m-"
     /** 책 id(`book_id`)가 든 표: 책 id 를 바꾸면 모두 함께 바꾼다([migrateIds]) */
@@ -820,6 +822,28 @@ object BookShelf {
         if (books.none { it.id == id }) return
         val now = System.currentTimeMillis()
         withCover(context, id, bytes) { write(context, books.map { if (it.id == id) it.copy(updatedAt = now) else it }) }
+    }
+
+    /**
+     * 책 [id] 의 표지 그림이 [test](이북 앱이 표지 대신 그리는 빈 그림)에 맞으면 지운다(그러면 진짜 표지가 보일 때 다시 잘라 온다). 지웠으면 true.
+     * 표지 없는 모습으로 다시 그려지도록 updatedAt 도 새로. 화면 스레드에서 부르지 않는다.
+     * 큰 표지(책 파일에서 꺼낸 그림)도 폭 [TEST_PX] 쯤으로 줄여 풀어 본다(잠금을 오래 쥐지 않게).
+     */
+    @Synchronized fun dropCoverIf(context: Context, id: String, test: (Bitmap) -> Boolean): Boolean {
+        val books = list(context)
+        if (books.none { it.id == id }) return false
+        val file = coverFile(context, id).takeIf { it.length() > 0 } ?: return false
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= TEST_PX) sample *= 2
+        val bmp = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return false
+        val matches = try { test(bmp) } finally { bmp.recycle() }
+        if (!matches) return false
+        dropFiles(context, id)
+        val now = System.currentTimeMillis()
+        write(context, books.map { if (it.id == id) it.copy(updatedAt = now) else it })
+        return true
     }
 
     /**

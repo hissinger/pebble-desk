@@ -3,7 +3,9 @@ package com.woody.pebbledesk.readers
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -220,5 +222,68 @@ class MihonTest {
         val hidden = node("androidx.compose.ui.platform.ComposeView", 0, 0, 1072, 1456, null, null, false, "compose_overlay",
             text(509, 1430, 564, 1456, "1 / 8"))
         assertEquals(emptyList<String>(), Mihon.menuLines(hidden))
+    }
+
+    @Test fun `아래로 넘긴 작품 상세는 위 막대의 제목이 마지막으로 본 머리와 같을 때만 그 작품`() {
+        // 2026-10-26 에뮬레이터 Mihon 0.21.3: 120화 작품을 넘기면 머리 요소가 없어지고 위 막대에 `뒤로 · 제목 · 필터 · 기타 옵션`
+        fun bar(title: String) = view(0, 0, 1072, 1456,
+            view(0, 0, 1072, 1321, node("android.view.View", 0, 51, 1072, 178, null, null, true, null, text(99, 74, 179, 112, "Chapter 010"))),
+            view(0, 45, 1072, 165,
+                node("android.view.View", 9, 61, 99, 151, null, null, true, null,
+                    node("android.view.View", 31, 83, 76, 128, null, "위로 이동"), node("android.widget.Button", 16, 68, 91, 143)),
+                view(106, 60, 354, 150, text(106, 78, 354, 131, title)),
+                node("android.view.View", 885, 61, 975, 151, null, null, true, null, node("android.view.View", 907, 83, 952, 128, null, "필터")),
+            ),
+        )
+        assertEquals("Long Journey", Mihon.barTitle(bar("Long Journey")))
+        val details = MihonDetails(Mihon)
+        // 머리를 보기 전에는 위 막대만으로 작품 상세라고 보지 않는다(찾아보기의 소스 화면도 같은 모양)
+        assertNull(details.of(bar("Long Journey")))
+        assertEquals("Red Moon Story", details.of(detail("Red Moon Story", "Lee Writer"))?.title)
+        val scrolled = details.of(bar("Red Moon Story"))
+        assertEquals("Red Moon Story", scrolled?.title)
+        assertEquals("Lee Writer", scrolled?.author)
+        assertNull(scrolled?.thumb)
+        assertNull(details.of(bar("로컬 저장소")))
+    }
+
+    @Test fun `빈 표지를 알아본다(서재 격자 칸·상세·어두운 테마·크레마 화면 대비)`() {
+        // 2026-10-26 에뮬레이터: 바탕 238 가운데 아이콘 225, 서재 격자 칸은 아래 그늘·흰 제목과 위 모서리 표시
+        val grid = paint(0xEFEEF1) { x, y ->
+            when {
+                y > 0.65f -> if (y in 0.85f..0.92f && x in 0.06f..0.7f && (x * 40).toInt() % 2 == 0) 0xFFFFFF else 0x606060
+                y < 0.1f && x < 0.18f -> 0x1565C0
+                x in 0.38f..0.62f && y in 0.38f..0.54f -> 0xE1E1E3
+                else -> null
+            }
+        }
+        val detail = paint(0xEFEEF1) { x, y -> if (x in 0.38f..0.62f && y in 0.4f..0.56f) 0xE1E1E3 else null }
+        val dark = paint(0x212121) { x, y -> if (x in 0.38f..0.62f && y in 0.4f..0.56f) 0x2E2E2E else null }
+        for (px in listOf(grid, detail, dark, crema(grid))) assertTrue(Mihon.placeholder(px, W, H))
+    }
+
+    @Test fun `진짜 표지는 빈 표지가 아니다`() {
+        // 흰 바탕 가운데 검은 제목, 한 가지 옅은 색 바탕에 제목, 흰 표지, 그림이 가득한 표지
+        val whiteTitle = paint(0xFFFFFF) { x, y -> if (y in 0.3f..0.4f && x in 0.2f..0.8f && (x * 30).toInt() % 2 == 0) 0x101010 else null }
+        val pastel = paint(0xF6D5DC) { x, y -> if (y in 0.3f..0.36f && x in 0.3f..0.7f) 0xA03050 else null }
+        val white = paint(0xFFFFFF) { _, _ -> null }
+        val art = paint(0x000000) { x, y -> ((x * 255).toInt() shl 16) or ((y * 255).toInt() shl 8) or 0x80 }
+        for (px in listOf(whiteTitle, pastel, white, art)) assertFalse(Mihon.placeholder(px, W, H))
+    }
+
+    /** 바탕 [bg] 에 [at] 이 준 색(비율 자리마다, null 이면 바탕)을 칠한 그림 */
+    private fun paint(bg: Int, at: (Float, Float) -> Int?) = IntArray(W * H) { i ->
+        (0xFF000000.toInt()) or (at((i % W).toFloat() / W, (i / W).toFloat() / H) ?: bg)
+    }
+
+    /** 크레마 화면 대비 56 으로 어두워진 캡처: 채널마다 밝기^(1/0.37) */
+    private fun crema(px: IntArray) = px.map { p ->
+        (0..2).fold(0xFF000000.toInt()) { acc, i -> acc or ((Math.pow((p shr (i * 8) and 0xff) / 255.0, 1 / 0.37) * 255).toInt() shl (i * 8)) }
+    }.toIntArray()
+
+    private companion object {
+        /** 서재 격자 칸 표지 크기(페블) */
+        const val W = 238
+        const val H = 329
     }
 }
