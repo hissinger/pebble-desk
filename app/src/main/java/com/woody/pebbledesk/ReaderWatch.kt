@@ -15,6 +15,7 @@ import android.provider.Settings
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.woody.pebbledesk.readers.AppWindows
 import com.woody.pebbledesk.readers.Click
 import com.woody.pebbledesk.readers.ReaderApps
@@ -82,10 +83,16 @@ class ReaderWatchService : AccessibilityService(), WatchHost {
     /** 지금 앞에 있는 그 앱의 화면(다른 앱·시스템 창이면 null) */
     override fun root(pkg: String): AccessibilityNodeInfo? = rootInActiveWindow?.takeIf { it.packageName == pkg }
 
-    /** 화면에 떠 있는 그 앱의 창들(위에 뜬 메뉴·알림이 먼저, 화면 자체가 끝). 창 목록을 못 얻으면 맨 앞 창만. */
+    /**
+     * 화면에 떠 있는 그 앱의 창들(위에 뜬 메뉴·알림이 먼저, 화면 자체가 끝). 창 목록을 못 얻으면 맨 앞 창만.
+     * 이북 앱의 것일 수 없는 창(키보드·접근성 덧창·화면 나눔 막대)은 내용을 받아 오지 않는다(키보드가 떠 있으면 그 트리가 크다).
+     */
     override fun windows(pkg: String): AppWindows {
-        val all = runCatching { windows.sortedByDescending { it.layer }.mapNotNull { it.root }.filter { it.packageName == pkg } }.getOrDefault(emptyList())
-        return AppWindows(root(pkg), all.ifEmpty { listOfNotNull(root(pkg)) })
+        val active = root(pkg)
+        val all = runCatching {
+            windows.filter { it.type !in OTHER_WINDOWS }.sortedByDescending { it.layer }.mapNotNull { it.root }.filter { it.packageName == pkg }
+        }.getOrDefault(emptyList())
+        return AppWindows(active, all.ifEmpty { listOfNotNull(active) })
     }
 
     override val noActiveWindow: Boolean get() = rootInActiveWindow == null
@@ -124,6 +131,13 @@ class ReaderWatchService : AccessibilityService(), WatchHost {
     private val activities = HashMap<String, Pair<Long, Set<String>>>()
 
     companion object {
+        /** 이북 앱의 것일 수 없는 창([windows] 에서 내용을 받아 오지 않는다) */
+        private val OTHER_WINDOWS = setOf(
+            AccessibilityWindowInfo.TYPE_INPUT_METHOD,
+            AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY,
+            AccessibilityWindowInfo.TYPE_SPLIT_SCREEN_DIVIDER,
+        )
+
         /**
          * 서비스가 연결·끊긴 때와 끊긴 횟수(기기 정보에서 본다). 켜 둔 서비스가 저절로 꺼지는 기기(Moaan MIX7S)에서
          * 언제 끊겼는지 알려고. 이 앱 프로세스가 왜 끝났는지는 기기 정보가 안드로이드에서 따로 읽는다.

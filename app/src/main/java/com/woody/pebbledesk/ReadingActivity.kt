@@ -72,9 +72,20 @@ class ReadingActivity : EinkActivity() {
     /** 지금 화면에 달력이 있는가(사용 기록 권한이 없으면 안내 글뿐이라 높이를 재지 않는다) */
     private var hasCalendar = false
 
+    /**
+     * 지금 그려 둔 기록의 표(오늘·DB 순번·오늘 책별 시간·목표·한 주 시작 요일·달력과 그래프를 함께). 돌아왔을 때 같으면(화면만 껐다 켬, 올해 읽은 책에서 아무것도 바꾸지 않음)
+     * 다시 만들지 않는다: 같은 화면을 다시 그려 깜빡이지 않고, 넘겨 둔 달력 쪽도 그대로다.
+     */
+    private var shown: List<Any?>? = null
+
     private fun render() {
-        body.removeAllViews()
         val days = ReadingLog.days(this, ReadingLog.readerPackages(this))
+        val today = LocalDate.now()
+        // 지난날이 저장되거나 기록을 고치면 DB 순번이 바뀐다(세기가 날이 바뀐 지난날을 저장하므로 DB 순번은 센 뒤에 본다)
+        val state = listOf(days?.get(today), today, Db.changes(), prefs.readingGoalMin, prefs.firstDayOfWeek, both, days == null)
+        if (state == shown) return
+        shown = state
+        body.removeAllViews()
         hasCalendar = days != null
         if (days == null) {
             body.addView(text(getString(R.string.reading_no_access), 18f, color = Ui.GRAY, lines = 3).apply {
@@ -82,7 +93,6 @@ class ReadingActivity : EinkActivity() {
             })
             return
         }
-        val today = LocalDate.now()
         // 지난날은 그날 정해져 있던 목표로(목표를 바꿔도 지난 링은 그대로). 제목·오늘 링은 지금 목표.
         val goals = prefs.readingGoals()
         val goalMs = prefs.readingGoalMin * 60_000L

@@ -23,8 +23,8 @@ trap 'adb shell svc power stayon false </dev/null' EXIT
 home 3
 "$HERE/watch-snap.sh" "$OUT/before" >/dev/null
 source "$HERE/watch-flows/$FLOW.sh"
-# 자동 추가 기록은 몇 초 늦게 저장한다
-sleep 6
+# 자동 추가 기록은 늦게 저장한다(새 줄은 3초, 이어진 줄의 횟수·진행률만 바뀌면 15초 안에. WatchLog.COUNT_DELAY_MS)
+sleep 17
 "$HERE/watch-snap.sh" "$OUT/after" >/dev/null
 python3 "$HERE/watch-norm.py" "$OUT/after" "$OUT/before" > "$OUT/diff.txt"
 cat "$OUT/diff.txt"

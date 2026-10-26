@@ -118,7 +118,7 @@ class AppListActivity : EinkActivity() {
     }
 
     private fun refresh() {
-        AppIcons.clearIfPackagesChanged(this)
+        AppIcons.clearChangedPackages(this)
         val apps = AppStore.loadAndPrune(this, prefs)
         val hidden = prefs.hidden
         val favs = prefs.favorites

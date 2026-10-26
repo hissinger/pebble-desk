@@ -13,4 +13,4 @@ W, H = 200, 300
 src, dst = sys.argv[1], sys.argv[2]
 im = ImageOps.autocontrast(Image.open(src).convert("L"), cutoff=1)
 im = ImageOps.fit(im, (W, H), Image.LANCZOS)
-im.save(dst, quality=88, optimize=True)
+im.save(dst, quality=75, optimize=True)

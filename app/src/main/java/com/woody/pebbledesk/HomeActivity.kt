@@ -444,7 +444,7 @@ class HomeActivity : EinkActivity() {
 
     /** 앱 목록과 설정을 다시 읽어 그린다. 홈으로 돌아올 때마다 부른다. */
     private fun refresh() {
-        val iconsChanged = AppIcons.clearIfPackagesChanged(this)
+        val changedPkgs = AppIcons.clearChangedPackages(this)
         apps = AppStore.loadAndPrune(this, prefs)
         // 맨 앞 책은 크게, 나머지는 함께 읽는 책 줄에서 쪽으로 넘긴다.
         val books = BookShelf.list(this)
@@ -463,12 +463,13 @@ class HomeActivity : EinkActivity() {
         // 표지가 생겼는지(책 파일 표지는 뒤에서 꺼내 둔다: 압축 만화·만화 표지 도구를 받은 뒤. 책 목록이 그대로여도 다시 그리게)
         val covers = books.map { BookShelf.hasCover(this, it.id) }
         val heroState = listOf(books, reading, icons, heroHeight, watching, status, covers)
-        if (iconsChanged || heroState != shownHero) {
+        // 아이콘이 바뀌었을 수 있는 앱(그사이 업데이트된 앱)이 보이는 자리만 다시 그린다(다른 앱 업데이트로 홈 전체가 깜빡이지 않게).
+        if (reading?.pkg in changedPkgs || heroState != shownHero) {
             shownHero = heroState
             buildHero(books, reading)
         }
         val favState = listOf(favs, icons, grid)
-        if (!iconsChanged && favState == shownFavs) return
+        if (favs.none { it.pkg in changedPkgs } && favState == shownFavs) return
         shownFavs = favState
         favRows.setGrid(if (!grid) 0 else if (wide) PagedRows.GRID_AUTO else GRID_ROWS)
         favRows.setRows(
@@ -601,6 +602,9 @@ class HomeActivity : EinkActivity() {
         Sheet(this).header(getString(R.string.book_file_missing_title), getString(R.string.book_file_missing_desc, app.label)).centered().show()
     }
 
+    /** 함께 읽는 책 한 쪽의 잰 줄 높이: (표지 폭, 책 자리 폭, 그 쪽 책마다 제목·앱 이름·진행률 글자) → 높이([buildHero]) */
+    private val alsoHeights = HashMap<List<Any?>, Int>()
+
     /**
      * 읽고 있는 책 자리. 없으면 같은 모양의 스켈레톤, 한 권이면 남는 높이를 채우는 큰 표지,
      * 여러 권이면 남는 높이에 맞춘 맨 앞 책 + 아래 '함께 읽는 책' 줄.
@@ -665,7 +669,14 @@ class HomeActivity : EinkActivity() {
                     return measuredHeight
                 }
                 // 쪽마다 줄 높이(제목 줄 수·진행률)가 다를 수 있어 가장 높은 쪽으로 잰다(넘겨도 맨 앞 책 표지 크기가 그대로).
-                fun alsoHeight(coverW: Int) = frameText { pages.indices.maxOf { alsoRow(coverW, it, measureOnly = true).measuredIn() } }
+                // 쪽마다 잰 높이는 그 쪽에 보이는 글자로 기억해 둔다(진행률 하나가 바뀌어도 모든 쪽을 다시 만들어 재지 않게).
+                fun alsoHeight(coverW: Int) = frameText {
+                    if (alsoHeights.size > ALSO_HEIGHTS_MAX) alsoHeights.clear()
+                    pages.indices.maxOf { p ->
+                        val key = listOf(coverW, hero.width, pages[p].map { listOf(it.title, it.app?.let(::findApp)?.label, bookStatus(it)) })
+                        alsoHeights.getOrPut(key) { alsoRow(coverW, p, measureOnly = true).measuredIn() }
+                    }
+                }
                 // 함께 읽는 책 줄 높이를 먼저 재고(기준 크기 글자로), 남는 높이를 맨 앞 책 표지에 준다.
                 var textPart = 0
                 val alsoW = if (tall) {
@@ -848,6 +859,8 @@ class HomeActivity : EinkActivity() {
     companion object {
         /** 자주 쓰는 앱 고정 줄 수 */
         private const val FAV_ROWS = 3
+        /** 기억해 두는 함께 읽는 책 쪽 높이 수(넘으면 비운다) */
+        private const val ALSO_HEIGHTS_MAX = 200
         /** 켜져 있는데 안 붙은 서비스를 '멈춤'으로 보기까지 기다리는 때(앱이 막 뜨면 붙는 데 1~2초 걸린다) */
         private const val STALLED_WAIT_MS = 5_000L
         /** 맨 앞 책 표지는 남는 높이에 맞춰 COVER_DP~COVER_MAX_DP(여러 권이면 COVER_SMALLER_DP 부터) */

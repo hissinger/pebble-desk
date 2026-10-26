@@ -393,11 +393,16 @@ object AppIcons {
         file.parentFile?.listFiles { f -> f != file && f.name.startsWith(prefix) }?.forEach { it.delete() }
     }
 
-    /** 앱이 설치·업데이트·삭제됐을 때만 캐시를 비운다(아이콘이 바뀌었을 수 있으므로). 비웠으면 true. */
-    fun clearIfPackagesChanged(context: Context): Boolean {
-        val changed = context.packageManager.getChangedPackages(packageSequence) ?: return false
+    /**
+     * 그사이 설치·업데이트·삭제된 앱의 아이콘만 캐시에서 비우고(아이콘이 바뀌었을 수 있으므로) 그 패키지들을 돌려준다(없으면 빈 집합).
+     * 다른 앱이 뒤에서 업데이트될 때마다 모든 아이콘을 다시 읽고 홈 전체를 다시 그리지 않게, 부르는 쪽은 보이는 앱이 들었는지만 본다.
+     */
+    fun clearChangedPackages(context: Context): Set<String> {
+        val changed = context.packageManager.getChangedPackages(packageSequence) ?: return emptySet()
         packageSequence = changed.sequenceNumber
-        cache.evictAll()
-        return true
+        val pkgs = changed.packageNames.toSet()
+        // 키는 `<패키지>/<화면>@크기@흑백`
+        cache.snapshot().keys.filter { it.substringBefore('/') in pkgs }.forEach { cache.remove(it) }
+        return pkgs
     }
 }
