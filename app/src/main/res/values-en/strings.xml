@@ -77,6 +77,7 @@
     <string name="device_section_service">Auto-add service log</string>
     <string name="device_service_life">Connected %1$s · stopped %2$s · stops %3$d</string>
     <string name="device_service_exits">App exits %s</string>
+    <string name="device_service_crash">Last crash %s</string>
     <string name="device_service_battery">Battery opt. exempt</string>
     <string name="device_service_bucket">Standby</string>
     <string name="device_service_restricted">Background restricted</string>

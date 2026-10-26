@@ -81,6 +81,7 @@
     <string name="device_section_service">자동 추가 서비스 기록</string>
     <string name="device_service_life">연결 %1$s · 끊김 %2$s · 끊긴 횟수 %3$d</string>
     <string name="device_service_exits">앱 종료 %s</string>
+    <string name="device_service_crash">마지막 앱 오류 %s</string>
     <string name="device_service_battery">배터리 최적화 제외</string>
     <string name="device_service_bucket">대기 그룹</string>
     <string name="device_service_restricted">백그라운드 제한</string>
