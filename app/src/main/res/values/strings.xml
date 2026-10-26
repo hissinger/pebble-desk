@@ -306,6 +306,8 @@
     <string name="guide_added_search_open">검색에서 \'바로 읽기\'로 연 책만 들어옵니다</string>
     <string name="guide_added_expired">기간이 끝난 책만 들어옵니다</string>
     <string name="guide_added_epub">EPUB 만 들어옵니다</string>
+    <string name="guide_added_epub_comics">EPUB·만화만 들어옵니다</string>
+    <string name="guide_n_comic_archives">CBR·CB7 은 설정 › 독서 › 만화 표지 압축 해제용 도구를 받았을 때</string>
     <string name="guide_added_book_files">책 파일 읽기를 켜면 들어옵니다</string>
     <string name="guide_n_reading_menu">읽는 중에는 메뉴를 띄우면 들어옵니다</string>
     <string name="guide_n_kel_title">표지 보기로 연 책은 메뉴를 띄우면 들어옵니다</string>
@@ -326,7 +328,7 @@
     <string name="guide_r_own_file">내 파일이라 반납일이 없습니다</string>
     <string name="guide_r_android11">안드로이드 11 부터 됩니다</string>
     <string name="guide_n_moon_cover_before11">읽다가 메뉴를 띄우면 들어옵니다(EPUB 만)</string>
-    <string name="guide_n_ez_files">EPUB·그림 폴더만 들어옵니다</string>
+    <string name="guide_n_ez_files">EPUB·CBZ·그림 폴더만 들어옵니다</string>
     <string name="guide_added_readest_data">데이터를 옮기면 들어옵니다</string>
     <string name="guide_t_kyobo_bottom">뷰어 설정 › 뷰어 하단 정보 표시를 \'독서 진행률\'이 들어간 것으로 두세요. \'정보 표시 없음\'이면 읽는 중 진행률이 들어오지 않습니다.</string>
     <string name="guide_t_kel_list">서재는 목록 보기로 두세요. 표지 보기에는 제목이 없어 읽다가 메뉴를 띄워야 책이 들어옵니다.</string>
@@ -374,6 +376,15 @@
     <string name="book_files">책 파일 읽기</string>
     <string name="book_files_desc">KOReader 는 화면에 책 제목을 드러내지 않아, KOReader 가 남기는 기록(koreader 폴더, 책 옆 .sdr 폴더)으로 편 책과 진행률을 압니다. Readest 는 데이터 위치를 \u200B/\u2060sdcard\u2060/\u20600(SD 카드는 \u200B/\u2060sdcard\u2060/\u20601)으로 옮겼을 때 그 폴더(Readest/Books)에서 표지·저자·진행률을 읽습니다. 우주뷰어는 우주뷰어가 남기는 기록(Woojoo 폴더)으로 메뉴를 띄우지 않아도 연 책과 진행률을 알고, PDF·만화는 그 기록의 표지를 씁니다. 네오리더·문리더·우주뷰어는 연 책의 EPUB 파일에서 표지를 꺼냅니다(이지뷰어는 표지와 책 정보). Mihon·Kahon 은 로컬 만화 폴더의 표지 그림과, 로컬 만화 정보·받은 화·자동 백업의 저자를 씁니다. 책 파일에서는 제목·저자·표지만 꺼냅니다.\n\n안드로이드 설정의 모든 파일에 액세스에서 Pebble Desk 의 모든 파일 관리 허용을 켜 주세요. 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
     <string name="open_file_access">모든 파일에 액세스 열기</string>
+    <string name="comic_archives">만화 표지(CBR·CB7) 압축 해제용 도구</string>
+    <string name="comic_archives_get">받기</string>
+    <string name="comic_archives_ready">받음</string>
+    <string name="comic_archives_downloading">받는 중</string>
+    <string name="comic_archives_desc">CBR·CB7 만화 파일은 압축되어 있어, 표지를 꺼내려면 압축 해제 라이브러리(libarchive)를 받아야 합니다. 만화를 읽을 때만 필요하고, 책 파일 읽기를 켜야 씁니다.</string>
+    <string name="comic_archives_get_size">받기 (%s)</string>
+    <string name="comic_archives_ready_desc">압축 해제 라이브러리를 받아 두었습니다. CBR·CB7 만화 파일의 표지를 꺼냅니다.</string>
+    <string name="comic_archives_remove">지우기</string>
+    <string name="comic_archives_failed">받지 못했습니다. 잠시 뒤 다시 해 보세요.</string>
     <!-- 홈의 책 파일 읽기 안내 창(%s = 이북 앱 이름). '책 파일 읽기'는 줄에서 나뉘지 않게 붙인다 -->
     <string name="file_notice_title">%s 책 정보를 가져오려면 책\u00A0파일\u00A0읽기를 켜 주세요</string>
     <string name="file_notice_desc">책 표지, 책 이름 등의 정보를 파일에서 읽어 옵니다.</string>
@@ -384,7 +395,7 @@
     <string name="add_author">저자 입력</string>
     <string name="edit_author">저자 고치기</string>
     <string name="save">저장</string>
-    <string name="reader_watch_desc">교보도서관·교보eBook·밀리의서재·알라딘·북커스·리디·YES24(전자도서관·my YES·eBook)·문리더·이지뷰어·채리뷰어·킨들·Libby·네오리더·KOReader 서재·검색 화면의 책 제목·저자·진행률·반납일과 표지(파일 목록인 이지뷰어·채리뷰어는 파일 이름·위치도), 읽는 화면의 책 제목(이지뷰어·채리뷰어는 파일 이름)·진행률만 읽어 읽고 있는 책 목록에 넣습니다. 본문과 다른 앱 화면은 받지 않고, 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
+    <string name="reader_watch_desc">이북 앱에서 책 정보(제목·진행률·표지 등)만 읽어 읽는 책 목록을 채웁니다. 책 내용과 다른 앱은 보지 않고, 기기 밖으로 보내지 않습니다. 지원 앱: Pebble Desk 설정 › 독서 › 자동 추가 안내</string>
     <string name="open_app_info">앱 정보 열기</string>
     <string name="allow_hint">허용(allow)이 보이지 않으면 아래 단축키·바로가기(shortcut) 스위치를 켜세요.</string>
     <string name="restricted_hint">접근성에서 Pebble Desk 가 흐리게 막혀 있으면(제한된 설정) 먼저 그것을 한 번 눌러 안내 창을 닫은 뒤, 앱 정보 › 오른쪽 위 ⋮ › 제한된 설정 허용을 하고 다시 켜 주세요.</string>

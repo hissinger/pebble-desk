@@ -190,10 +190,10 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
 
     companion object {
         /**
-         * 책 파일(표지가 든 EPUB, 그림 폴더는 첫 그림)에서 표지를 꺼낼 수 있다([BookShelf.cover]): 화면에서 자른 작은 표지를 두지 않는다.
+         * 책 파일(표지가 든 EPUB, 만화 묶음은 첫 그림(CBR·CB7 등은 libarchive 를 받았을 때), 그림 폴더는 첫 그림)에서 표지를 꺼낼 수 있다([BookShelf.cover]): 화면에서 자른 작은 표지를 두지 않는다.
          * 표지가 없는 EPUB 이면 아니다(그 책은 화면에서 자른다)
          */
         fun coverFromFile(context: Context, path: String?) =
-            path != null && BookFiles.canRead(context) && (isImageFile(path) || (path.endsWith(".epub", ignoreCase = true) && BookFiles.hasEpubCover(path)))
+            path != null && BookFiles.canRead(context) && (isImageFile(path) || BookFiles.hasCover(context, path))
     }
 }

@@ -7,9 +7,11 @@ import android.graphics.Paint
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.format.Formatter
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
+import com.woody.pebbledesk.readers.ArchiveLib
 import com.woody.pebbledesk.readers.BookFiles
 import java.text.Collator
 import java.time.DayOfWeek
@@ -257,6 +259,16 @@ class SettingsActivity : EinkActivity() {
         // 책 파일 읽기 = 안드로이드 '모든 파일 액세스'(KOReader 의 기록, 내 파일 리더(KOReader·네오리더·문리더)의 책 파일과 표지). 늘 보인다.
         val files = BookFiles.canRead(this)
         row(getString(R.string.book_files), getString(if (files) R.string.on else R.string.off), on = files, next = true) { bookFilesSheet() }
+        // 만화 표지 압축 해제 = 받아 쓰는 libarchive(CBR·CB7 등, 필요한 사람만 받는다). 이 기기에서 쓸 수 없으면(x86) 두지 않는다.
+        if (ArchiveLib.supported()) {
+            val ready = ArchiveLib.installed(this)
+            val value = when {
+                ArchiveLib.downloading -> R.string.comic_archives_downloading
+                ready -> R.string.comic_archives_ready
+                else -> R.string.comic_archives_get
+            }
+            row(getString(R.string.comic_archives), getString(value), on = ready, next = !ArchiveLib.downloading, fitValue = true) { comicArchivesSheet() }
+        }
         // 오늘 읽은 시간 = 사용 기록 액세스 허용. 켜고 끄기 모두 그 시스템 화면에서 한다.
         col = right
         val access = ReadingLog.hasAccess(this)
@@ -446,6 +458,35 @@ class SettingsActivity : EinkActivity() {
             .item(getString(R.string.open_file_access), bold = true) { BookFiles.request(this) }.show()
     }
 
+    /** 만화 표지 압축 해제 창: 받지 않았으면 무엇인지 + `받기 (1.1 MB)`, 받았으면 `지우기`. 받는 중이면 띄우지 않는다 */
+    private fun comicArchivesSheet() {
+        if (ArchiveLib.downloading) return
+        val title = getString(R.string.comic_archives)
+        if (ArchiveLib.installed(this)) {
+            Sheet(this).header(title, getString(R.string.comic_archives_ready_desc))
+                .item(getString(R.string.comic_archives_remove)) { ArchiveLib.remove(this); renderReading() }.show()
+        } else {
+            val size = Formatter.formatShortFileSize(this, ArchiveLib.downloadSize())
+            Sheet(this).header(title, getString(R.string.comic_archives_desc))
+                .item(getString(R.string.comic_archives_get_size, size), bold = true) { getComicArchives() }.show()
+        }
+    }
+
+    /** libarchive 를 받는다(줄은 `받는 중`). 받으면 이미 넣은 책들의 표지를 뒤에서 채우고, 못 받으면 알린다 */
+    private fun getComicArchives() {
+        if (!Update.online(this)) {
+            Sheet(this).header(getString(R.string.update_offline), getString(R.string.update_offline_desc)).show()
+            return
+        }
+        ArchiveLib.download(this) { r ->
+            r.onSuccess { BookShelf.archiveLibChanged(applicationContext) }
+            if (isDestroyed) return@download
+            renderReading()
+            r.onFailure { Sheet(this).header(getString(R.string.comic_archives), getString(R.string.comic_archives_failed)).show() }
+        }
+        renderReading()
+    }
+
     override fun onSwipe(toLeft: Boolean): Boolean {
         if (!paged || guide.pageCount <= 1) return false
         if (toLeft) guide.next() else guide.prev()
@@ -497,14 +538,17 @@ class SettingsActivity : EinkActivity() {
      */
     private fun row(
         label: String, value: String?, on: Boolean = true, next: Boolean = false, last: Boolean = false,
-        hint: String? = null, tail: String? = null, into: LinearLayout = col, action: () -> Unit,
+        hint: String? = null, tail: String? = null, into: LinearLayout = col, fitValue: Boolean = false, action: () -> Unit,
     ) {
         val color = if (on) Ui.BLACK else Ui.GRAY
         val row = hbox().apply {
             setPadding(dp(Ui.MARGIN), 0, dp(Ui.MARGIN), 0)
-            addView(text(label, ROW_LABEL_SP))
+            // 보통은 이름을 먼저 다 보이고 값을 줄인다(`읽고 있는 책` 의 긴 제목). [fitValue] 면 거꾸로 짧은 값을 다 보이고 긴 이름을 줄인다
+            // (글자를 키워도 `받기 ›` 가 보이게)
+            addView(text(label, ROW_LABEL_SP), if (fitValue) lp(0, WRAP, 1f) else lp(WRAP, WRAP))
             if (hint != null) addView(text(hint, 15f, color = Ui.LIGHT_GRAY), lp(WRAP, WRAP).apply { marginStart = dp(10) })
-            addView(text(value.orEmpty(), 20f, Ui.medium, color).apply { gravity = Gravity.END }, lp(0, WRAP, 1f).apply { marginStart = dp(16) })
+            addView(text(value.orEmpty(), 20f, Ui.medium, color).apply { gravity = Gravity.END },
+                (if (fitValue) lp(WRAP, WRAP) else lp(0, WRAP, 1f)).apply { marginStart = dp(16) })
             // 값과의 사이는 전과 같은 글자 간격(`외 3권` 앞 한 칸, `›` 앞 두 칸)
             val end = buildString {
                 tail?.let { append(if (value.isNullOrEmpty()) it else " $it") }
