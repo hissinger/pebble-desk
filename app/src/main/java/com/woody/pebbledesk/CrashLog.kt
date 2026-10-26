@@ -39,9 +39,9 @@ object CrashLog {
     /**
      * 첫 줄: `10/26 09:48 · 1.6.1 · main · IllegalStateException: 메시지`. 둘째 줄: 실제로 던진 곳(가장 안쪽 원인, [CAUSES] 단계까지)의 이 앱 코드 자리
      * [FRAMES]개(`Db.kt:41 ← Reading.kt:300`, 이 앱 코드가 없으면 맨 위 자리). 원인이 다른 예외면 뒤에 그 이름(기기 정보에서 넘치면 끝이 잘려 자리를 앞에).
-     * 안드로이드·자바·코틀린·androidx([PLATFORM])가 아닌 자리를 이 앱 코드로 본다. 릴리스는 R8 이 이 앱 클래스(`a.f2`)와 코틀린·androidx 클래스(`d.…`)의
-     * 이름·패키지를 바꿔 라이브러리 자리도 섞일 수 있고(안드로이드·자바는 그대로라 걸러진다), 파일 이름도 그 빌드의 mapping 열쇠(`r8-map-id-…`)로 바뀌어
-     * 그때는 `a.f2.b:41`(클래스.메서드:줄)로 적는다: 그 판의 mapping.txt 로 되찾는다(retrace)
+     * 안드로이드·자바·코틀린·androidx([PLATFORM])가 아닌 자리를 이 앱 코드로 본다. 릴리스는 R8 이 이 앱 클래스(`h4`)와 코틀린·androidx 클래스(`n3`)를
+     * 패키지 없는 짧은 이름으로 바꿔(`-repackageclasses`) 라이브러리 자리도 섞일 수 있고(안드로이드·자바는 그대로라 걸러진다), 파일 이름도 그 빌드의 mapping 열쇠(`r8-map-id-…`)로 바뀌어
+     * 그때는 `h4.b:41`(클래스.메서드:줄)로 적는다: 그 판의 mapping.txt 로 되찾는다(retrace)
      */
     internal fun describe(at: Long, version: String, thread: String, e: Throwable): String {
         val root = generateSequence(e) { it.cause?.takeIf { c -> c !== it } }.take(CAUSES).last()

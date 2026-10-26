@@ -30,10 +30,10 @@ class CrashLogTest {
 
     @Test fun `릴리스(R8)에서 이름이 바뀐 이 앱 클래스도 이 앱 코드로 본다`() {
         val e = IllegalStateException("x").apply {
-            stackTrace = arrayOf(frame("java.util.ArrayList", "ArrayList.java", 1), frame("a.f2", "r8-map-id-7994", 41), frame("kotlin.collections.CollectionsKt", "Collections.kt", 2), frame("a.b7", "r8-map-id-7994", 88))
+            stackTrace = arrayOf(frame("java.util.ArrayList", "ArrayList.java", 1), frame("h4", "r8-map-id-7994", 41), frame("kotlin.collections.CollectionsKt", "Collections.kt", 2), frame("bg", "r8-map-id-7994", 88))
         }
         // 파일 이름이 mapping 열쇠라 클래스.메서드:줄(그 판의 mapping.txt 로 되찾는다)
-        assertEquals("10/26 09:48 · 1.6.1 · main · IllegalStateException: x\na.f2.run:41 ← a.b7.run:88", CrashLog.describe(at, "1.6.1", "main", e))
+        assertEquals("10/26 09:48 · 1.6.1 · main · IllegalStateException: x\nh4.run:41 ← bg.run:88", CrashLog.describe(at, "1.6.1", "main", e))
     }
 
     @Test(timeout = 5_000) fun `원인 사슬이 돌아도 멈추지 않는다`() {
