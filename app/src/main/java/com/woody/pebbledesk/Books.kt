@@ -828,9 +828,9 @@ object BookShelf {
     fun findByTitle(context: Context, title: String): ShelfBook? = list(context).firstOrNull { it.hasTitle(title) }
 
     /**
-     * 표지 그림이 없는 책: 이북 앱이 연 책 파일([filePath], KOReader·네오리더)이 EPUB 이면 그 표지를 꺼내 이 책의 표지로 둔다([BookFiles.cover]).
+     * 표지 그림이 없는 책: 이북 앱이 연 책 파일([filePath], KOReader·네오리더)이 EPUB·CBZ 면 그 표지를 꺼내 이 책의 표지로 둔다([BookFiles.cover]).
      * 그릴 때([cover]) 꺼내므로 책을 넣은 때와 상관없이 처음 그릴 때부터 보이고, 한 번 둔 표지는 책 파일을 지우거나 권한을 꺼도 남는다.
-     * 표지가 없는 파일(EPUB 이 아님 등)은 그 파일이 바뀔 때까지 다시 열지 않는다.
+     * 표지가 없는 파일(EPUB·CBZ 가 아님 등)은 그 파일이 바뀔 때까지 다시 열지 않는다.
      */
     private fun fileCover(context: Context, id: String) {
         val path = filePath(context, id) ?: return

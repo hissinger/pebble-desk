@@ -200,7 +200,7 @@ class WoojooReader : ScreenReader(Woojoo) {
     }
 
     /**
-     * 표지가 없는 책 [id] 에 우주가 남긴 책 파일 [path] 의 표지 그림을 붙인다(PDF·표지 없는 EPUB 등). 표지를 꺼낼 수 있는 EPUB·그림은 그릴 때 책 파일에서 꺼내므로 하지 않는다.
+     * 표지가 없는 책 [id] 에 우주가 남긴 책 파일 [path] 의 표지 그림을 붙인다(PDF·표지 없는 EPUB 등). 표지를 꺼낼 수 있는 EPUB·CBZ·그림은 그릴 때 책 파일에서 꺼내므로 하지 않는다.
      * 아직 없으면(우주가 책을 연 뒤 그림을 늦게 남긴다) 다음에 읽는 화면을 읽을 때 다시 본다.
      */
     private fun dataCover(ctx: AppContext, id: String, path: String) {

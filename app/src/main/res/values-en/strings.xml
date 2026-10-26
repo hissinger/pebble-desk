@@ -302,6 +302,7 @@
     <string name="guide_added_search_open">Added only for books opened with Read now in search</string>
     <string name="guide_added_expired">Added only for expired loans</string>
     <string name="guide_added_epub">Added for EPUB only</string>
+    <string name="guide_added_epub_cbz">Added for EPUB and CBZ only</string>
     <string name="guide_added_book_files">Added when Read book files is on</string>
     <string name="guide_n_reading_menu">While reading, added when you open the menu</string>
     <string name="guide_n_kel_title">For books opened in cover view, added when you open the menu</string>
@@ -322,7 +323,7 @@
     <string name="guide_r_own_file">Your own files have no due date</string>
     <string name="guide_r_android11">Available from Android 11</string>
     <string name="guide_n_moon_cover_before11">Added when you open the menu while reading (EPUB only)</string>
-    <string name="guide_n_ez_files">EPUB and image folders only</string>
+    <string name="guide_n_ez_files">EPUB, CBZ and image folders only</string>
     <string name="guide_added_readest_data">Added once you move the data</string>
     <string name="guide_t_kyobo_bottom">In the viewer settings, set the bottom info to one that includes reading progress. With no info, progress while reading does not come in.</string>
     <string name="guide_t_kel_list">Use list view for the shelf. Cover view shows no titles, so books come in only when you open the menu while reading.</string>

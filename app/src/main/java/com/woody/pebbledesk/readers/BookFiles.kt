@@ -20,6 +20,7 @@ import java.io.File
 import java.io.InputStream
 import java.net.URLDecoder
 import java.util.concurrent.ConcurrentHashMap
+import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 
 /**
@@ -87,14 +88,14 @@ object BookFiles {
         return one(near.filter { it.second == title }) ?: one(near.filter { subtitle(it.second).isEmpty() || subtitle(title).isEmpty() })
     }
 
-    /** EPUB [path] 에서 표지 그림을 꺼낼 수 있다(그 항목이 있고 그림으로 읽힌다. 파일마다 한 번 읽어 기억한다). 못 읽으면 아니다 */
-    fun hasEpubCover(path: String): Boolean {
-        if (!path.endsWith(".epub", ignoreCase = true)) return false
+    /** 책 파일 [path](EPUB·CBZ)에서 표지 그림을 꺼낼 수 있다(그 항목이 있고 그림으로 읽힌다. 파일마다 한 번 읽어 기억한다). 못 읽으면 아니다 */
+    fun hasCover(path: String): Boolean {
+        if (!path.endsWith(".epub", ignoreCase = true) && !isComicZip(path)) return false
         val f = File(path)
-        return epubCovers.getOrPut(fileKey(f)) {
+        return fileCovers.getOrPut(fileKey(f)) {
             runCatching {
                 ZipFile(path).use { zip ->
-                    val entry = readEpub(zip)?.cover?.let(zip::getEntry) ?: return@use false
+                    val entry = coverEntry(zip, path) ?: return@use false
                     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     zip.getInputStream(entry).use { BitmapFactory.decodeStream(it, null, bounds) }
                     bounds.outWidth > 0 && bounds.outHeight > 0
@@ -136,14 +137,14 @@ object BookFiles {
     /** 찾기에서 읽은 EPUB(경로·고친 때·길이)의 제목·저자([findEpub]. 못 읽은 파일은 빈 제목) */
     private val epubNames = ConcurrentHashMap<String, Pair<String, String>>()
     /** 파일(`경로@고친 때`)마다 표지가 있는지 */
-    private val epubCovers = ConcurrentHashMap<String, Boolean>()
+    private val fileCovers = ConcurrentHashMap<String, Boolean>()
 
     private const val SEARCH_ENTRIES = 5000
     private const val SEARCH_DEPTH = 6
 
     /**
-     * 책 파일의 표지(JPEG, 긴 변을 [COVER_PX] 안으로 줄임): EPUB 은 책 정보의 표지 그림, 그림 파일(그림 폴더 한 권, 이지뷰어)은 그 폴더의 첫 그림
-     * (이름 순, 숫자는 크기 순). 없거나 못 읽으면 null. 큰 그림을 다루므로 화면 스레드에서 부르지 않는다.
+     * 책 파일의 표지(JPEG, 긴 변을 [COVER_PX] 안으로 줄임): EPUB 은 책 정보의 표지 그림, CBZ 는 묶음 안 첫 그림, 그림 파일(그림 폴더 한 권, 이지뷰어)은
+     * 그 폴더의 첫 그림(이름 순, 숫자는 크기 순). 없거나 못 읽으면 null. 큰 그림을 다루므로 화면 스레드에서 부르지 않는다.
      */
     fun cover(path: String): ByteArray? = runCatching {
         if (isImageFile(path)) {
@@ -151,11 +152,24 @@ object BookFiles {
             return scaledJpeg { first.inputStream() }
         }
         ZipFile(path).use { zip ->
-            val href = readEpub(zip)?.cover ?: return null
-            val entry = zip.getEntry(href) ?: return null
+            val entry = coverEntry(zip, path) ?: return null
             scaledJpeg { zip.getInputStream(entry) }
         }
     }.getOrNull()
+
+    /** 만화 묶음(CBZ, 그림을 ZIP 으로 묶은 것)인가. CBR(RAR)은 풀 수 없어 표지가 없다 */
+    private fun isComicZip(path: String) = path.endsWith(".cbz", ignoreCase = true)
+
+    /** 묶음 [zip](책 파일 [path])에서 표지 그림 항목: CBZ 는 첫 그림, 그 밖은 EPUB 책 정보의 표지. 없으면 null */
+    private fun coverEntry(zip: ZipFile, path: String): ZipEntry? =
+        if (isComicZip(path)) comicCover(zip) else readEpub(zip)?.cover?.let(zip::getEntry)
+
+    /**
+     * CBZ 의 첫 그림(항목 경로 이름 순, 숫자는 크기 순. KOReader 가 쓰는 MuPDF 도 이 순서로 쪽을 놓는다). 숨긴 항목(`.`)·`__MACOSX` 아래는 뺀다
+     */
+    internal fun comicCover(zip: ZipFile): ZipEntry? = zip.entries().asSequence()
+        .filter { e -> !e.isDirectory && isImageFile(e.name) && e.name.split('/').none { it.startsWith('.') || it == "__MACOSX" } }
+        .minWithOrNull(compareBy(NATURAL) { it.name })
 
     /** 그림 파일 [file] 하나를 표지로(이북 앱이 따로 둔 표지 그림, Readest `cover.png`). 못 읽으면 null. 화면 스레드에서 부르지 않는다. */
     fun imageCover(file: File): ByteArray? = runCatching { scaledJpeg { file.inputStream() } }.getOrNull()

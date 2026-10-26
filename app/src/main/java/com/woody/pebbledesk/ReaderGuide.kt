@@ -164,7 +164,7 @@ internal object ReaderGuide {
         )),
         App(listOf(R.string.guide_ko), listOf(KOReader, KOReaderFdroid), Info(
             listOf(R.string.guide_t_ko_files),
-            cover = Field(R.string.guide_added_epub), title = YES, author = YES, progress = YES, due = OWN_FILE,
+            cover = Field(R.string.guide_added_epub_cbz), title = YES, author = YES, progress = YES, due = OWN_FILE,
             bookFiles = R.string.guide_files_required, note = R.string.guide_note_ko,
         )),
         App(listOf(R.string.guide_readest), listOf(Readest), Info(

@@ -306,6 +306,7 @@
     <string name="guide_added_search_open">검색에서 \'바로 읽기\'로 연 책만 들어옵니다</string>
     <string name="guide_added_expired">기간이 끝난 책만 들어옵니다</string>
     <string name="guide_added_epub">EPUB 만 들어옵니다</string>
+    <string name="guide_added_epub_cbz">EPUB·CBZ 만 들어옵니다</string>
     <string name="guide_added_book_files">책 파일 읽기를 켜면 들어옵니다</string>
     <string name="guide_n_reading_menu">읽는 중에는 메뉴를 띄우면 들어옵니다</string>
     <string name="guide_n_kel_title">표지 보기로 연 책은 메뉴를 띄우면 들어옵니다</string>
@@ -326,7 +327,7 @@
     <string name="guide_r_own_file">내 파일이라 반납일이 없습니다</string>
     <string name="guide_r_android11">안드로이드 11 부터 됩니다</string>
     <string name="guide_n_moon_cover_before11">읽다가 메뉴를 띄우면 들어옵니다(EPUB 만)</string>
-    <string name="guide_n_ez_files">EPUB·그림 폴더만 들어옵니다</string>
+    <string name="guide_n_ez_files">EPUB·CBZ·그림 폴더만 들어옵니다</string>
     <string name="guide_added_readest_data">데이터를 옮기면 들어옵니다</string>
     <string name="guide_t_kyobo_bottom">뷰어 설정 › 뷰어 하단 정보 표시를 \'독서 진행률\'이 들어간 것으로 두세요. \'정보 표시 없음\'이면 읽는 중 진행률이 들어오지 않습니다.</string>
     <string name="guide_t_kel_list">서재는 목록 보기로 두세요. 표지 보기에는 제목이 없어 읽다가 메뉴를 띄워야 책이 들어옵니다.</string>
