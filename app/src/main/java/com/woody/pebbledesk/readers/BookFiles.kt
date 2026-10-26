@@ -89,24 +89,70 @@ object BookFiles {
     }
 
     /**
-     * 책 파일 [path] 에서 표지 그림을 꺼낼 수 있다: EPUB·ZIP 만화(CBZ·ZIP)는 그 항목이 있고 그림으로 읽힌다(파일마다 한 번 읽어 기억한다).
-     * 압축 만화(CBR·CB7 등, [isArchiveComic])는 libarchive 를 받아 두었으면 그렇다고 본다(열어 보지 않는다: 솔리드 묶음은 훑기만 해도 오래 걸린다).
-     * 못 읽으면 아니다
+     * 책 파일에서 표지를 꺼내는 길. 어느 길을 쓸지는 이북 앱이 자기 파일에서 고른다([ReaderApp.fileCovers]): 기본은 [BOOKS](EPUB·그림 폴더),
+     * 만화를 여는 앱은 [WITH_COMICS](그 위에 만화 묶음의 첫 그림). 공통 흐름(홈이 그릴 때·화면에서 자를지)은 그 책을 넣은 앱의 길만 부른다.
      */
-    fun hasCover(context: Context, path: String): Boolean {
-        if (isArchiveComic(path)) return ArchiveLib.installed(context)
-        if (!path.endsWith(".epub", ignoreCase = true) && !isZipComic(path)) return false
-        val f = File(path)
-        return fileCovers.getOrPut(fileKey(f)) {
-            runCatching {
-                ZipFile(path).use { zip ->
-                    val entry = coverEntry(zip, path) ?: return@use false
-                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    zip.getInputStream(entry).use { BitmapFactory.decodeStream(it, null, bounds) }
-                    bounds.outWidth > 0 && bounds.outHeight > 0
-                }
-            }.getOrDefault(false)
+    interface Covers {
+        /** [path] 에서 표지를 꺼낼 수 있다(화면에서 자르지 않을지 정할 때라 가볍게: 파일마다 한 번 읽어 기억하거나 열지 않고 정한다) */
+        fun has(context: Context, path: String): Boolean
+        /** [path] 의 표지(JPEG, 긴 변을 [COVER_PX] 안으로 줄임). 없거나 못 읽으면 null. 큰 그림·압축을 다루므로 화면 스레드에서 부르지 않는다 */
+        fun cover(context: Context, path: String): ByteArray?
+        /** [path] 에서 꺼내는 데 오래 걸릴 수 있다(화면 스레드에서는 꺼내지 않고 뒤에서) */
+        fun slow(path: String): Boolean = false
+    }
+
+    /** EPUB 은 책 정보의 표지 그림, 그림 파일(그림 폴더 한 권, 이지뷰어)은 그 폴더의 첫 그림(이름 순, 숫자는 크기 순) */
+    val BOOKS: Covers = object : Covers {
+        override fun has(context: Context, path: String) =
+            isImageFile(path) || (path.endsWith(".epub", ignoreCase = true) && hasZipCover(path) { readEpub(it)?.cover?.let(it::getEntry) })
+
+        override fun cover(context: Context, path: String): ByteArray? = runCatching {
+            if (isImageFile(path)) {
+                val first = File(path).parentFile?.listFiles { f -> f.isFile && isImageFile(f.name) }?.minWithOrNull(compareBy(NATURAL) { it.name }) ?: return null
+                return scaledJpeg { first.inputStream() }
+            }
+            zipCover(path) { readEpub(it)?.cover?.let(it::getEntry) }
+        }.getOrNull()
+    }
+
+    /**
+     * [BOOKS] 에 더해 만화 묶음은 묶음 안 첫 그림: ZIP(CBZ·ZIP)은 안드로이드 기본으로, CBR·CB7 등은 받아 둔 [ArchiveLib] 로
+     * (받지 않았으면 없다. 받았으면 열어 보지 않고 있다고 본다: 솔리드 묶음은 훑기만 해도 오래 걸린다)
+     */
+    val WITH_COMICS: Covers = object : Covers {
+        override fun has(context: Context, path: String) = when {
+            isArchiveComic(path) -> ArchiveLib.installed(context)
+            isZipComic(path) -> hasZipCover(path, ::comicCover)
+            else -> BOOKS.has(context, path)
         }
+
+        override fun cover(context: Context, path: String): ByteArray? = when {
+            isArchiveComic(path) -> runCatching {
+                ArchiveLib.firstImage(context, path, fileKey(File(path)))?.let { bytes -> scaledJpeg { bytes.inputStream() } }
+            }.getOrNull()
+            isZipComic(path) -> runCatching { zipCover(path, ::comicCover) }.getOrNull()
+            else -> BOOKS.cover(context, path)
+        }
+
+        override fun slow(path: String) = isArchiveComic(path)
+    }
+
+    /** ZIP 묶음 [path] 의 [entry] 항목이 있고 그림으로 읽힌다(파일마다 한 번 읽어 기억한다). 못 읽으면 아니다 */
+    private fun hasZipCover(path: String, entry: (ZipFile) -> ZipEntry?): Boolean = fileCovers.getOrPut(fileKey(File(path))) {
+        runCatching {
+            ZipFile(path).use { zip ->
+                val e = entry(zip) ?: return@use false
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                zip.getInputStream(e).use { BitmapFactory.decodeStream(it, null, bounds) }
+                bounds.outWidth > 0 && bounds.outHeight > 0
+            }
+        }.getOrDefault(false)
+    }
+
+    /** ZIP 묶음 [path] 의 [entry] 항목을 표지로. 없으면 null */
+    private fun zipCover(path: String, entry: (ZipFile) -> ZipEntry?): ByteArray? = ZipFile(path).use { zip ->
+        val e = entry(zip) ?: return null
+        scaledJpeg { zip.getInputStream(e) }
     }
 
     /**
@@ -147,37 +193,13 @@ object BookFiles {
     private const val SEARCH_ENTRIES = 5000
     private const val SEARCH_DEPTH = 6
 
-    /**
-     * 책 파일의 표지(JPEG, 긴 변을 [COVER_PX] 안으로 줄임): EPUB 은 책 정보의 표지 그림, 만화 묶음은 묶음 안 첫 그림(ZIP 은 안드로이드 기본으로,
-     * CBR·CB7 등은 받아 둔 [ArchiveLib] 로), 그림 파일(그림 폴더 한 권, 이지뷰어)은 그 폴더의 첫 그림(이름 순, 숫자는 크기 순).
-     * 없거나 못 읽으면 null. 큰 그림·압축을 다루므로 화면 스레드에서 부르지 않는다.
-     */
-    fun cover(context: Context, path: String): ByteArray? = runCatching {
-        if (isImageFile(path)) {
-            val first = File(path).parentFile?.listFiles { f -> f.isFile && isImageFile(f.name) }?.minWithOrNull(compareBy(NATURAL) { it.name }) ?: return null
-            return scaledJpeg { first.inputStream() }
-        }
-        if (isArchiveComic(path)) {
-            val bytes = ArchiveLib.firstImage(context, path, fileKey(File(path))) ?: return null
-            return scaledJpeg { bytes.inputStream() }
-        }
-        ZipFile(path).use { zip ->
-            val entry = coverEntry(zip, path) ?: return null
-            scaledJpeg { zip.getInputStream(entry) }
-        }
-    }.getOrNull()
-
     /** ZIP 으로 묶은 만화(CBZ·ZIP. KOReader·이지뷰어는 ZIP 도 만화로 연다)인가: 안드로이드 기본으로 푼다 */
     private fun isZipComic(path: String) = ZIP_COMIC.containsMatchIn(path)
     private val ZIP_COMIC = Regex("""\.(cbz|zip)$""", RegexOption.IGNORE_CASE)
 
     /** 그 밖의 압축 만화(CBR·RAR·CB7·7z·CBT·TAR)인가: 받아 둔 [ArchiveLib] 로만 푼다 */
-    fun isArchiveComic(path: String) = ARCHIVE_COMIC.containsMatchIn(path)
+    internal fun isArchiveComic(path: String) = ARCHIVE_COMIC.containsMatchIn(path)
     private val ARCHIVE_COMIC = Regex("""\.(cbr|rar|cb7|7z|cbt|tar)$""", RegexOption.IGNORE_CASE)
-
-    /** 묶음 [zip](책 파일 [path])에서 표지 그림 항목: ZIP 만화는 첫 그림, 그 밖은 EPUB 책 정보의 표지. 없으면 null */
-    private fun coverEntry(zip: ZipFile, path: String): ZipEntry? =
-        if (isZipComic(path)) comicCover(zip) else readEpub(zip)?.cover?.let(zip::getEntry)
 
     /** ZIP 만화의 첫 그림([isComicPage] 가운데 이름 순, 숫자는 크기 순. KOReader 가 쓰는 MuPDF 도 이 순서로 쪽을 놓는다) */
     internal fun comicCover(zip: ZipFile): ZipEntry? = zip.entries().asSequence()

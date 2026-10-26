@@ -41,6 +41,9 @@ object NeoReader : ReaderApp(
     /** 같은 모르는 탭에 다시 오면(설정 화면에 갔다 옴 등) 처음 열린 때를 둔다(탭별 판단은 [NeoReaderReader]) */
     override val keepsUnknownOnReenter get() = true
 
+    /** 만화(CBZ·CBR)도 연다(CB7 은 열지 못함): 표지는 그 파일의 첫 그림 */
+    override val fileCovers get() = BookFiles.WITH_COMICS
+
     override fun newAdapter(): ReaderAdapter = NeoReaderReader()
 
     /** 그 책의 파일을 연다. 모르거나 없으면, 또는 열기에 실패하면 앱을 열지 않고(실행 화면이 없다) 뒤에서 다시 찾는다 */

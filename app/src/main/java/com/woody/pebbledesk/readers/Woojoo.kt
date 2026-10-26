@@ -41,6 +41,9 @@ object Woojoo : ReaderApp(
 ) {
     override fun newAdapter(): ReaderAdapter = WoojooReader()
 
+    /** 만화(CBZ·CBR, CB7 은 열지 못함)는 우주 기록의 그림 대신 그 파일의 첫 그림을 표지로 */
+    override val fileCovers get() = BookFiles.WITH_COMICS
+
     /** 홈에서 그 책의 파일을 연다(실행 화면은 파일 보기를 받지 않아 `OpenerActivity` 로). 파일을 모르거나 지워졌으면 앱을 연다 */
     override fun open(ctx: HomeContext, book: ShelfBook): OpenResult =
         ctx.bookFile(book)?.let { OpenResult.File(ComponentName(pkg, OPENER), it) } ?: OpenResult.Launch
@@ -200,11 +203,11 @@ class WoojooReader : ScreenReader(Woojoo) {
     }
 
     /**
-     * 표지가 없는 책 [id] 에 우주가 남긴 책 파일 [path] 의 표지 그림을 붙인다(PDF·표지 없는 EPUB 등). 표지를 꺼낼 수 있는 EPUB·CBZ·그림은 그릴 때 책 파일에서 꺼내므로 하지 않는다.
+     * 표지가 없는 책 [id] 에 우주가 남긴 책 파일 [path] 의 표지 그림을 붙인다(PDF·표지 없는 EPUB 등). 표지를 꺼낼 수 있는 EPUB·그림, 만화 묶음([fileCovers])은 그릴 때 책 파일에서 꺼내므로 하지 않는다.
      * 아직 없으면(우주가 책을 연 뒤 그림을 늦게 남긴다) 다음에 읽는 화면을 읽을 때 다시 본다.
      */
     private fun dataCover(ctx: AppContext, id: String, path: String) {
-        if (ctx.recorder.lookup.hasCover(id) || ShelfRecorder.coverFromFile(ctx.context, path) || !dataCovers.add(path)) return
+        if (ctx.recorder.lookup.hasCover(id) || ShelfRecorder.coverFromFile(ctx.context, path, app.fileCovers) || !dataCovers.add(path)) return
         ctx.inBackground({ Woojoo.dataCover(ctx.context, path) }) done@{ result ->
             dataCovers -= path
             ctx.recorder.cover(id, result.getOrNull() ?: return@done)

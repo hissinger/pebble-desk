@@ -93,8 +93,8 @@ class ArchiveLibTest {
 
     @Test fun `받지 않았으면 압축 만화는 표지가 없다고 본다`() {
         val cbr = File(tmp.root, "x.cbr").apply { writeBytes("Rar!".toByteArray()) }
-        assertFalse(BookFiles.hasCover(app, cbr.path))
-        assertNull(BookFiles.cover(app, cbr.path))
+        assertFalse(BookFiles.WITH_COMICS.has(app, cbr.path))
+        assertNull(BookFiles.WITH_COMICS.cover(app, cbr.path))
         assertTrue(BookFiles.isArchiveComic("a/B.CB7") && BookFiles.isArchiveComic("x.rar") && !BookFiles.isArchiveComic("x.cbz"))
     }
 }

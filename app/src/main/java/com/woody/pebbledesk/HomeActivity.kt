@@ -460,7 +460,9 @@ class HomeActivity : EinkActivity() {
         val watching = books.isEmpty() && ReaderWatchService.isEnabled(this)
         // 진행률·반납일 글자(반납일은 날이 바뀌면 달라진다)
         val status = books.map { bookStatus(it) }
-        val heroState = listOf(books, reading, icons, heroHeight, watching, status)
+        // 표지가 생겼는지(책 파일 표지는 뒤에서 꺼내 둔다: 압축 만화·만화 표지 도구를 받은 뒤. 책 목록이 그대로여도 다시 그리게)
+        val covers = books.map { BookShelf.hasCover(this, it.id) }
+        val heroState = listOf(books, reading, icons, heroHeight, watching, status, covers)
         if (iconsChanged || heroState != shownHero) {
             shownHero = heroState
             buildHero(books, reading)

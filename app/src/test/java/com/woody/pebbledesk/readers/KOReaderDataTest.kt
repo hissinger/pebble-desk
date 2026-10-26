@@ -223,12 +223,12 @@ class KOReaderDataTest {
     @Test fun `그림이 없는 CBZ·ZIP 이 아닌 cbz 는 표지가 없다`() {
         val noImage = File(tmp.root, "n.cbz")
         ZipOutputStream(noImage.outputStream()).use { z -> z.putNextEntry(ZipEntry("ComicInfo.xml")); z.closeEntry() }
-        assertFalse(BookFiles.hasCover(app, noImage.path))
-        assertNull(BookFiles.cover(app, noImage.path))
+        assertFalse(BookFiles.WITH_COMICS.has(app, noImage.path))
+        assertNull(BookFiles.WITH_COMICS.cover(app, noImage.path))
         // RAR 을 이름만 바꾼 것
         val rar = File(tmp.root, "r.cbz").apply { writeBytes("Rar!\u001a\u0007\u0000".toByteArray()) }
-        assertFalse(BookFiles.hasCover(app, rar.path))
-        assertNull(BookFiles.cover(app, rar.path))
+        assertFalse(BookFiles.WITH_COMICS.has(app, rar.path))
+        assertNull(BookFiles.WITH_COMICS.cover(app, rar.path))
     }
 
     private fun writeEpub(file: File, title: String, author: String, cover: Boolean = false) {
