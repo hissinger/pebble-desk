@@ -43,6 +43,8 @@ object WatchLog {
         FILE,
         /** 이북 앱 알림을 처리하다 난 오류(그 알림만 건너뛴다). [Entry.arg] 는 오류 종류, [Entry.detail] 은 내용 */
         ERROR,
+        /** 앱이 오류로 죽었다(다음에 뜰 때 [CrashLog] 가 남긴다, 때는 죽은 때). [Entry.arg] 는 예외, [Entry.detail] 은 이 앱 코드 자리 */
+        CRASH,
     }
 
     enum class Role { SHELF, VIEWER, OTHER }
@@ -126,10 +128,10 @@ object WatchLog {
         } else saveSoon(COUNT_DELAY_MS)
     }
 
-    fun add(context: Context, kind: Kind, pkg: String = "", arg: String = "", detail: String = "") {
+    /** 한 줄 남긴다. [now] 는 그 일이 있던 때(기본: 지금. 앱 오류는 다음에 뜰 때 죽은 때로 남긴다) */
+    fun add(context: Context, kind: Kind, pkg: String = "", arg: String = "", detail: String = "", now: Long = System.currentTimeMillis()) {
         load(context)
         if (kind == Kind.NO_WINDOW) noWindow++
-        val now = System.currentTimeMillis()
         val a = clean(arg)
         val d = clean(detail)
         val last = entries.lastOrNull()

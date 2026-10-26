@@ -11,8 +11,8 @@
 
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-./gradlew -q assembleRelease          # app/build/outputs/apk/release/PebbleDesk-1.6.1-release.apk
-adb install -r app/build/outputs/apk/release/PebbleDesk-1.6.1-release.apk </dev/null
+./gradlew -q assembleRelease          # app/build/outputs/apk/release/PebbleDesk-1.6.2-release.apk
+adb install -r app/build/outputs/apk/release/PebbleDesk-1.6.2-release.apk </dev/null
 ```
 
 - 릴리스는 R8 축소(약 690KB, 1.6.1 은 734KB·1.5.3 은 480KB. HTML 라이브러리 없이 YES24 검색 결과를 직접 읽는다. 릴리스만 Kotlin 널 검사 호출을 빼고(`-Xno-*-assertions`) `-repackageclasses`, 도장 그림은 16단계 투명도 4비트 PNG). dex 는 minSdk 28 이라 압축하지 않고 넣는다(설치 뒤 풀어 두지 않아 저장 공간·실행이 낫다). 덮어 설치하면 앱 데이터가 남는다.
@@ -23,6 +23,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.6.1-release.apk </dev/
   - 1.2.1 까지의 JSON(`reading.json`·`books/books.json`)은 이 실행에서 처음 DB를 열 때 옮기고 `.migrated`로 이름을 바꿔 둔다(읽지 못하면 `.bad`). DB 확인: `adb exec-out run-as … cat …/databases/pebble.db > x.db` 후 `sqlite3`(디버그 빌드).
 - **릴리스 설명**(GitHub 릴리스 본문): 앱의 설정 › 업데이트 창과 홈의 새 판 창에 **18줄까지** 보이고 넘으면 끝이 `…` 로 잘린다(`UpdateSheets.NOTES_LINES`). 크레마 페블에서 한 줄은 한국어 약 28자, 절 제목은 한 줄, 두 번째 절부터 위에 반 줄이 더 든다. 그래서 `## 새로 생긴 것` / `## 고친 것` 두 절, 항목(`- `)은 한두 줄짜리로 모두 합쳐 18줄 안에 쓴다(자세한 설명은 README·문서로). `**`·`` ` `` 는 앱에서 지워지니 써도 된다. 영어도 같은 본문에 쓴다: 한국어 두 절 아래 `## English` 제목 줄, 그 아래 `### New` / `### Fixed`. 앱은 앱 언어의 부분만 보여 주므로(`UpdateSheets.notesFor`, 한국어는 `## English` 위, 영어는 아래. 그 줄이 없으면 전체) 두 부분이 **각각** 18줄 안이면 된다. 1.5.8 까지의 앱은 본문 앞 18줄을 그대로 보여 주어 한국어 아래 남는 줄에 `English` 이하가 이어 보인다. 그래서 1.5.9(모두 1.5.8 이하에서 받는다)는 한국어만 쓰고, 두 언어는 1.5.10 부터 쓴다. 태그는 `v<판>`, 자산은 `PebbleDesk-<판>-release.apk`(APK 의 versionName 과 같아야 앱이 받는다).
 - 만화 표지 압축 해제용 libarchive(`readers/ArchiveLib.kt`)의 받을 파일은 앱 릴리스와 따로 GitHub 릴리스 `libarchive-<판>` 에 둔다(`tools/libarchive/make-assets.sh` 로 만들고, 찍힌 크기·SHA-256 을 `ArchiveLib` 에). **반드시 `--prerelease --latest=false`** 로 만든다: 앱 업데이트는 `releases/latest` 를 보므로 이 릴리스가 최신이 되면 모든 앱의 업데이트 확인이 깨진다. libarchive 판을 올리면 새 태그로 올리고 앱의 값을 바꾼다(옛 판 앱은 옛 태그를 계속 받는다. 지우지 않는다).
+- **R8 mapping 남기기**: 배포할 APK 를 만든 바로 뒤 `tools/release/save-mapping.sh` 로 `release-mappings/PebbleDesk-<판>-mapping.txt.gz` 를 만들어 커밋한다(GitHub 릴리스에는 올리지 않는다). 기기 정보 › 마지막 앱 오류의 `h4.b:41`(R8 이 바꾼 이름)을 `tools/release/retrace.sh <판> '<자리>'` 로 되찾는다. 1.6.1 까지는 없다.
 - 릴리스는 `run-as` 가 안 된다. 앱 데이터를 직접 고쳐야 하면 같은 키로 서명된 디버그 빌드를 잠깐 깔아 `run-as` 로 넣고 다시 릴리스를 깐다.
 - 성능은 꼭 **릴리스 빌드**로 잰다(디버그는 몇 배 느리다).
 
