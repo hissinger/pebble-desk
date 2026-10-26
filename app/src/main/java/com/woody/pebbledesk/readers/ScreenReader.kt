@@ -203,7 +203,9 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
     }
 
     protected fun logShown(ctx: AppContext, shown: ViewerInfo) {
-        if (shown.progress >= 0 || shown.title != null) ctx.log(WatchLog.Kind.PROGRESS, "${shown.progress}", shown.title.orEmpty())
+        if (shown.progress >= 0 || shown.title != null || shown.chapter.isNotEmpty()) {
+            ctx.log(WatchLog.Kind.PROGRESS, "${shown.progress}", listOfNotNull(shown.title, shown.chapter.ifEmpty { null }).joinToString(" · "))
+        }
     }
 
     /** 진행률을 아직 못 읽었으면 조금 뒤 다시 읽는다(재시도는 잠잠 예약마다 3번) */
@@ -215,18 +217,18 @@ open class ScreenReader(val app: ReaderApp) : ReaderAdapter {
      * 메뉴 제목·진행률을 바탕 규칙으로 적는다: 편 책 기록의 책이 이 제목의 읽고 있는 책이면 그 책을 읽는 중이고(같은 제목의 책이 여럿이어도
      * 목록 순서로 다른 책으로 바꾸지 않는다) 진행률만, 아니면(서비스가 꺼졌다 켜져 '책 모름'·다른 책·그 책이 목록에 없음) 이 제목의 책을
      * 편 것으로 다시 적는다(그래야 그 뒤 시간이 이 책에). [force] 면 같은 책이어도 편 것으로.
-     * 진행률은 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다).
+     * 진행률·읽는 화는 편 책 기록의 책에(서비스가 꺼진 동안 다른 책을 폈을 수 있다: '책 모름'이면 메뉴·서재에서 제목을 볼 때까지 적지 않는다).
      */
     protected fun recordShown(ctx: AppContext, info: ViewerInfo, force: Boolean = false) {
         info.title?.let { title ->
             if (force || ctx.recorder.recordedBook(ctx.pkg)?.hasTitle(title) != true) {
-                ctx.opened(Seen(title, info.author, info.progress), ctx.unknownOpenAt)
+                ctx.opened(Seen(title, info.author, info.progress, chapter = info.chapter), ctx.unknownOpenAt)
                 return
             }
         }
-        if (info.progress < 0) return
+        if (info.progress < 0 && info.chapter.isEmpty()) return
         val book = ctx.recorder.recordedBook(ctx.pkg) ?: return
-        ctx.recorder.status(book.id, info.progress)
+        ctx.recorder.status(book.id, info.progress, chapter = info.chapter)
     }
 
     override fun beforeOpened(ctx: AppContext) {

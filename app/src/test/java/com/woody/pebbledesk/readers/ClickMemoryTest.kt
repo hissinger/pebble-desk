@@ -82,7 +82,7 @@ class ClickMemoryTest {
         override val recorder: BookRecorder = object : BookRecorder {
             override fun opened(pkg: String, seen: Seen, at: Long?, target: Target, coverKey: String?, steps: OpenSteps?) = error("ctx 로만")
             override fun unknown(pkg: String, at: Long) {}
-            override fun status(bookId: String, progress: Int, due: Long, author: String) {}
+            override fun status(bookId: String, progress: Int, due: Long, author: String, chapter: String) {}
             override fun statuses(list: List<BookShelf.Status>) {}
             override fun setFile(bookId: String, path: String) {}
             override fun setTitle(bookId: String, title: String) {}

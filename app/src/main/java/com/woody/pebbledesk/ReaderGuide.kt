@@ -9,6 +9,7 @@ import com.woody.pebbledesk.readers.Bookers2
 import com.woody.pebbledesk.readers.CherieViewer
 import com.woody.pebbledesk.readers.EasyView
 import com.woody.pebbledesk.readers.EasyViewFree
+import com.woody.pebbledesk.readers.Kahon
 import com.woody.pebbledesk.readers.KOReader
 import com.woody.pebbledesk.readers.KOReaderFdroid
 import com.woody.pebbledesk.readers.Kindle
@@ -16,12 +17,14 @@ import com.woody.pebbledesk.readers.KyoboEbook
 import com.woody.pebbledesk.readers.KyoboEbookMobile
 import com.woody.pebbledesk.readers.KyoboLibrary
 import com.woody.pebbledesk.readers.Libby
+import com.woody.pebbledesk.readers.Mihon
 import com.woody.pebbledesk.readers.Millie
 import com.woody.pebbledesk.readers.MillieMobile
 import com.woody.pebbledesk.readers.MoonReader
 import com.woody.pebbledesk.readers.MoonReaderPro
 import com.woody.pebbledesk.readers.MyYes
 import com.woody.pebbledesk.readers.NeoReader
+import com.woody.pebbledesk.readers.PlayBooks
 import com.woody.pebbledesk.readers.ReaderApps
 import com.woody.pebbledesk.readers.ReaderApp
 import com.woody.pebbledesk.readers.Readest
@@ -180,6 +183,16 @@ internal object ReaderGuide {
             cover = yes(R.string.guide_n_woojoo_cover), title = YES, author = YES, progress = yes(R.string.guide_n_woojoo_progress), due = OWN_FILE,
             bookFiles = R.string.guide_files_woojoo, note = R.string.guide_note_woojoo,
             coverBefore11 = Field(R.string.guide_added_book_files, R.string.guide_n_epub),
+        )),
+        App(listOf(R.string.guide_playbooks), listOf(PlayBooks), Info(
+            emptyList(),
+            cover = yes(R.string.guide_n_playbooks_library), title = YES, author = yes(R.string.guide_n_playbooks_library), progress = YES, due = NO,
+        )),
+        App(listOf(R.string.guide_mihon, R.string.guide_kahon), listOf(Mihon, Kahon), Info(
+            listOf(R.string.guide_t_mihon_open),
+            cover = yes(R.string.guide_n_mihon_cover), title = MENU, author = yes(R.string.guide_n_mihon_detail),
+            progress = Field(R.string.guide_added_menu, R.string.guide_n_mihon_chapter), due = NO, bookFiles = R.string.guide_files_cover_info, note = R.string.guide_note_mihon,
+            coverBefore11 = Field(R.string.guide_added_book_files, R.string.guide_n_mihon_local),
         )),
     )
 }

@@ -88,7 +88,7 @@ class WatchCoreTest {
             return ShelfBook("id-${seen.title}", seen.title, "", null, 0)
         }
         override fun unknown(pkg: String, at: Long) { calls += "unknown:$pkg:$at"; opened[pkg] = null }
-        override fun status(bookId: String, progress: Int, due: Long, author: String) { calls += "status:$bookId:$progress" }
+        override fun status(bookId: String, progress: Int, due: Long, author: String, chapter: String) { calls += "status:$bookId:$progress" }
         override fun statuses(list: List<BookShelf.Status>) {}
         override fun setFile(bookId: String, path: String) {}
         override fun setTitle(bookId: String, title: String) {}

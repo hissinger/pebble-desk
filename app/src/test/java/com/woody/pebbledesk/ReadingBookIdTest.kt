@@ -52,7 +52,7 @@ class ReadingBookIdTest {
         "${it.getLong(0)}|${it.getString(1)}|$book|${it.getLong(3) / 60_000}"
     }
 
-    private fun shelf(pos: Int, id: String, title: String) = db.execSQL("INSERT INTO shelf VALUES ($pos, '$id', '$title', '', NULL, 0, -1, -1, '')")
+    private fun shelf(pos: Int, id: String, title: String) = db.execSQL("INSERT INTO shelf VALUES ($pos, '$id', '$title', '', NULL, 0, -1, -1, '', '')")
 
     private fun past(pos: Int, id: String, title: String, hidden: Boolean = false) =
         db.execSQL("INSERT INTO past VALUES ($pos, '$id', '$title', '', NULL, 0, -1, '', 0, ${if (hidden) 1 else 0})")

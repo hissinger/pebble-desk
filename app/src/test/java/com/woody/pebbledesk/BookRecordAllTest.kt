@@ -37,7 +37,7 @@ class BookRecordAllTest {
     private fun noon(s: String) = d(s).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() + 12 * 3_600_000L
 
     private fun shelf(pos: Int, id: String, title: String, seen: String = "") =
-        db.execSQL("INSERT INTO shelf VALUES ($pos, '$id', '$title', '', NULL, 0, 0, -1, '$seen')")
+        db.execSQL("INSERT INTO shelf VALUES ($pos, '$id', '$title', '', NULL, 0, 0, -1, '$seen', '')")
 
     private fun past(pos: Int, id: String, title: String, left: String, hidden: Boolean = false) =
         db.execSQL("INSERT INTO past VALUES ($pos, '$id', '$title', '', NULL, 0, 0, '', ${noon(left)}, ${if (hidden) 1 else 0})")
