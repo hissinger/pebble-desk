@@ -96,7 +96,7 @@ class DeviceInfoActivity : EinkActivity() {
         // 백그라운드에서 앱을 끄는 설정들. 서비스가 받은 알림·한 일은 따로 된 화면(`기록 보기 ›`, 이 화면에 더 넣을 자리가 없다).
         section(list, R.string.device_section_service) { startActivity(WatchLogActivity.intent(this)) }
         serviceLog().forEachIndexed { i, line ->
-            list.addView(text(line, 14f, lines = if (i == 2) 2 else 1).apply { setLineSpacing(0f, 1.15f) })
+            list.addView(text(line, 14f, lines = if (i >= 2) LOG_LINES[i - 2] else 1).apply { setLineSpacing(0f, 1.15f) })
         }
 
         // 버튼 시험: 페이지 버튼·화면 아래 버튼이 무슨 키를 보내는지. 뒤로 키는 화면을 닫으므로 다시 열면 보인다.
@@ -152,7 +152,7 @@ class DeviceInfoActivity : EinkActivity() {
     }
 
     /**
-     * 세 줄: 서비스 연결·끊김 때와 끊긴 횟수 / 이 앱이 최근에 끝난 때와 까닭(안드로이드 11+) /
+     * 네 줄: 서비스 연결·끊김 때와 끊긴 횟수 / 이 앱이 최근에 끝난 때와 까닭(안드로이드 11+) / 마지막 앱 오류([CrashLog]) /
      * 배터리 최적화 제외·대기 그룹·백그라운드 제한과 이 앱 이름이 든 기기 설정 값(제조사의 허용 목록일 수 있다).
      */
     private fun serviceLog(): List<String> {
@@ -177,6 +177,8 @@ class DeviceInfoActivity : EinkActivity() {
             }.getOrNull()
         } else null
         val exit = getString(R.string.device_service_exits, exits?.ifEmpty { "-" } ?: "-")
+        // 이 앱이 마지막으로 죽은 오류(CRASH 의 내용, [CrashLog])
+        val crash = getString(R.string.device_service_crash, CrashLog.last(this) ?: "-")
 
         val power = getSystemService(PowerManager::class.java)
         val bucket = getSystemService(UsageStatsManager::class.java)?.appStandbyBucket?.let { BUCKETS[it] ?: "$it" } ?: "-"
@@ -187,7 +189,7 @@ class DeviceInfoActivity : EinkActivity() {
             getString(R.string.device_service_bucket) + " " + bucket,
             getString(R.string.device_service_restricted) + " " + onOff(restricted),
         ).joinToString(" · ") + if (lists.isEmpty()) "" else " · " + lists.joinToString(" · ")
-        return listOf(life, exit, kill)
+        return listOf(life, exit, crash, kill)
     }
 
     /** `Settings.System`·`Secure`·`Global` 가운데 값에 [pkg] 가 든 기기 고유 키(접근성 켜짐 같은 안드로이드 기본 키는 뺀다). */
@@ -316,6 +318,8 @@ class DeviceInfoActivity : EinkActivity() {
         )
 
         private const val EXIT_COUNT = 3
+        /** 서비스 기록의 셋째 줄부터 넘칠 수 있는 줄 수: 마지막 앱 오류(때·예외 / 자리·원인, 메시지가 길면 각각 두 줄), 배터리·대기 그룹·기기 설정 키 */
+        private val LOG_LINES = intArrayOf(4, 2)
         private val WORD_START = Regex("(?<=[a-z])(?=[A-Z])")
 
         /** `ApplicationExitInfo` 의 까닭(세 개가 한 줄에 들게 줄인 이름). 상수는 안드로이드 11+ 에만 있어 숫자로 둔다. */
