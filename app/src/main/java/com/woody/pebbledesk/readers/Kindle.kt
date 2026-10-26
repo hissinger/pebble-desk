@@ -38,8 +38,19 @@ object Kindle : ReaderApp(
     /** 책 칸 설명에서 제목·저자와 상태를 가르는 곳: 산 책은 `, , `, 구독으로 빌린 책은 `, Kindle Unlimited, ` 등 */
     private val SEPS = (listOf("") + ORIGINS).map { ", $it, " }
 
-    /** 격자 보기·홈 탭 칸의 표지 위에 그리는 표시들 */
-    private val BADGES = setOf("top_right_badge", "top_right_corner_badge", "bottom_right_badge")
+    /** 시리즈 묶음 칸 설명의 머리(`speak_series_content_description_with_subscription*`) */
+    private const val SERIES = "Series: "
+
+    /**
+     * 격자 보기·홈 탭 칸의 표지 위에 그리는 표시들(킨들 8.158 `badgeable_cover_content`·`cover.badge.b`): 진행률 띠·오디오·`Read`·`Sample` 같은 띠,
+     * 받음 ✓·묶음 수, 아래 띠 자리의 구독(`kindle+`)·Wait for Free·광고 표시와 그 글자·날짜, 흐리게 덮는 판. 표시마다 처음 보일 때 만들어지고
+     * 칸을 다시 쓰면 숨겨 두므로 보이는 것만 센다. 구독 표시는 목록 보기에는 그리지 않는다.
+     */
+    private val BADGES = setOf(
+        "top_right_badge", "top_right_corner_badge", "top_right_sash_badge", "bottom_right_badge", "bottom_right_label",
+        "bottom_left_badge", "bottom_left_label", "bottom_label", "bottom_section_center_badge", "bottom_section_center_label",
+        "bottom_left_section_label", "dim_view",
+    )
 
     /** 서재(홈 탭 줄은 옆으로, Library 는 위아래로 넘긴다)가 움직이는 중에 찍으면 칸이 어긋나, 찍은 뒤에도 같은 자리에 있는 칸만 자른다. */
     override val cellsByPosition get() = true
@@ -91,8 +102,12 @@ object Kindle : ReaderApp(
         return Cell(name, personName(author), percent(state), -1, r, r)
     }
 
-    /** 책 칸 설명을 제목·저자와 상태로 가른다(가르는 곳이 [SEPS] 중 가장 앞의 것). 책 칸 설명이 아니면 null */
+    /**
+     * 책 칸 설명을 제목·저자와 상태로 가른다(가르는 곳이 [SEPS] 중 가장 앞의 것). 책 칸 설명이 아니면 null.
+     * 시리즈 묶음 칸(겹친 표지·권수 표시, 누르면 시리즈 화면)은 `Series: 제목, 2 items, (구독), 저자` 라 책이 아니다.
+     */
     internal fun splitDesc(desc: String): Pair<String, String>? {
+        if (desc.startsWith(SERIES)) return null
         val (at, sep) = SEPS.mapNotNull { s -> desc.indexOf(s).takeIf { it >= 0 }?.let { it to s } }.minByOrNull { it.first } ?: return null
         val head = desc.substring(0, at).takeIf { it.isNotBlank() } ?: return null
         return head to desc.substring(at + sep.length)
@@ -113,7 +128,7 @@ object Kindle : ReaderApp(
     /**
      * 설명이 `제목, 저자, (구독), 상태, 크기` 인 묶음 하나와 그 표지 자리. 목록 보기는 제목 글자가 따로 있어 그것을 쓰고, 격자 보기는 설명에서 가른다:
      * 저자는 `성, 이름` 이라 쉼표로 나눈 끝의 둘(둘뿐이면 끝 하나), 나머지가 제목(`Moby Dick: or, the White Whale`).
-     * 격자 보기·홈 탭 칸은 표지 위에 진행률 띠(`top_right_badge`)·받음 ✓(`bottom_right_badge`)·오디오 표시를 그려, 표시가 있는 칸의 표지는 자르지 않는다
+     * 격자 보기·홈 탭 칸은 표지 위에 진행률 띠(`top_right_badge`)·받음 ✓(`bottom_right_badge`)·구독(`kindle+`) 등 표시([BADGES])를 그려, 표시가 있는 칸의 표지는 자르지 않는다
      * (목록 보기 칸은 표시가 표지 밖에 있다).
      */
     private fun descCell(n: AccessibilityNodeInfo): Pair<Cell, Rect>? {
@@ -126,7 +141,7 @@ object Kindle : ReaderApp(
             when (c.viewIdResourceName?.substringAfter(":id/")) {
                 in titles -> if (title == null) title = c.text?.let(::plain)?.takeIf { it.isNotEmpty() }
                 in thumbs -> if (thumb == null) thumb = c.bounds()
-                in BADGES -> badged = true
+                in BADGES -> if (c.isVisibleToUser) badged = true
             }
             if (depth < WALK_DEPTH) for (i in 0 until c.childCount) c.getChild(i)?.let { walk(it, depth + 1) }
         }
@@ -195,9 +210,9 @@ object Kindle : ReaderApp(
         }
     }
 
-    /** `Brontë, Emily` → `Emily Brontë`(쉼표가 하나일 때만) */
-    private fun personName(author: String): String {
-        val parts = author.split(", ")
-        return if (parts.size == 2 && parts.all { it.isNotBlank() }) "${parts[1]} ${parts[0]}" else author.trim()
+    /** `Brontë, Emily` → `Emily Brontë`(쉼표가 하나일 때만). 저자가 여럿이면 `;` 로 이어져(`Shirtaloon; Deverell, Travis`) 한 사람씩 바꿔 `, ` 로 잇는다 */
+    internal fun personName(author: String): String = author.split(";").map { it.trim() }.filter { it.isNotEmpty() }.joinToString(", ") { one ->
+        val parts = one.split(", ")
+        if (parts.size == 2 && parts.all { it.isNotBlank() }) "${parts[1]} ${parts[0]}" else one
     }
 }

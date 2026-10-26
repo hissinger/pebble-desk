@@ -41,11 +41,36 @@ class KindleTest {
         assertNull(Kindle.splitDesc("The Ex by Shalini Boland"))
     }
 
+    @Test fun `시리즈 묶음 칸은 책 칸이 아니다`() {
+        assertNull(Kindle.splitDesc("Series: Death Stranding, 2 items, , Nojima, Hitori"))
+        assertNull(Kindle.splitDesc("Series: Defiance of the Fall, 2 items, Kindle+, TheFirstDefier;Brink, JF"))
+    }
+
+    @Test fun `저자가 여럿이면 한 사람씩 이름을 바꾼다`() {
+        assertEquals("Emily Brontë", Kindle.personName("Brontë, Emily"))
+        assertEquals("Shirtaloon, Travis Deverell", Kindle.personName("Shirtaloon; Deverell, Travis"))
+        assertEquals("TheFirstDefier, JF Brink", Kindle.personName("TheFirstDefier;Brink, JF"))
+        assertEquals("", Kindle.personName(""))
+        // 격자 보기 칸은 설명에서 제목과 저자(끝의 `성, 이름`)를 가른다
+        val cell = Kindle.shelfCells(seal(root(grid(100, "He Who Fights with Monsters, Shirtaloon; Deverell, Travis, Kindle+, Book downloaded.Reading is 2% completed.")))).single()
+        assertEquals("He Who Fights with Monsters", cell.title)
+        assertEquals("Shirtaloon, Travis Deverell", cell.author)
+    }
+
     @Test fun `격자 보기의 구독 책 칸`() {
         val cell = Kindle.shelfCells(seal(root(grid(100, "The Hating Game, Thorne, Sally, Kindle Unlimited, Book not downloaded.")))).single()
         assertEquals("The Hating Game", cell.title)
         assertEquals("Sally Thorne", cell.author)
         assertNotNull(cell.thumb)
+    }
+
+    @Test fun `kindle+ 띠가 덮은 표지는 자르지 않는다`() {
+        val desc = "The Hating Game, Thorne, Sally, Kindle+, Book not downloaded."
+        val band = node(200, 300, 370, 354, "bottom_section_center_badge").apply { isVisibleToUser = true }
+        assertNull(Kindle.shelfCells(seal(root(grid(100, desc, band)))).single().thumb)
+        // 칸을 다시 써 숨겨 둔 표시는 세지 않는다
+        val hidden = node(200, 300, 370, 354, "bottom_section_center_badge")
+        assertNotNull(Kindle.shelfCells(seal(root(grid(100, desc, hidden)))).single().thumb)
     }
 
     @Test fun `기본 표지를 알아본다`() {
@@ -71,8 +96,9 @@ class KindleTest {
         for (px in listOf(penguin, blackTitle, dark)) assertFalse(Kindle.placeholder(px, W, H))
     }
 
-    /** 격자 보기 칸: 설명을 단 단추 안에 표지 하나 */
-    private fun grid(top: Int, desc: String) = node(200, top, 370, top + 254, "badgeable_cover", desc, node(200, top, 370, top + 254, "cover_image"))
+    /** 격자 보기 칸: 설명을 단 단추 안에 표지 하나(와 표지 위 표시들 [badges]) */
+    private fun grid(top: Int, desc: String, vararg badges: AccessibilityNodeInfo) =
+        node(200, top, 370, top + 254, "badgeable_cover", desc, node(200, top, 370, top + 254, "cover_image"), *badges)
 
     private fun root(vararg kids: AccessibilityNodeInfo) = node(0, 0, 1072, 1456, null, null, *kids)
 
