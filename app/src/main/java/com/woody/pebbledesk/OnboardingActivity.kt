@@ -284,7 +284,9 @@ class OnboardingActivity : EinkActivity() {
         addView(hbox().apply {
             addView(text(getString(R.string.all_apps_link), 13f * scale, Ui.bold))
             addView(View(context), lp(0, 1, 1f))
-            addView(text(getString(R.string.reading_today, duration(42 * 60_000L)) + "  ·  " +
+            // 바형 화면은 홈처럼 `오늘` 없이
+            val time = duration(42 * 60_000L)
+            addView(text((if (Ui.tallScreen) time else getString(R.string.reading_today, time)) + "  ·  " +
                 getString(R.string.reading_streak, 5), 12f * scale, color = Ui.GRAY))
         }, lp(MATCH, dp(44)))
     }

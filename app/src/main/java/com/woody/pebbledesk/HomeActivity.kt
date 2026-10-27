@@ -92,6 +92,8 @@ class HomeActivity : EinkActivity() {
 
     /** 하단 가운데: 오늘 읽은 시간 · 연속 독서일(켜 두었고 권한이 있을 때만) */
     private lateinit var readingText: TextView
+    /** 하단 왼쪽 `모든 앱 ›`(가운데 글자가 닿는지 잰다) */
+    private lateinit var allAppsLink: TextView
 
     private var apps: List<AppEntry> = emptyList()
     /**
@@ -416,11 +418,12 @@ class HomeActivity : EinkActivity() {
 
         root.addView(hline(1, inset = false))
         val footer = FrameLayout(this)
-        footer.addView(text(getString(R.string.all_apps_link), 24f, Ui.bold).apply {
+        allAppsLink = text(getString(R.string.all_apps_link), 24f, Ui.bold).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(Ui.MARGIN), 0, dp(32), 0)
             setOnClickListener { startActivity(AppListActivity.intent(this@HomeActivity, AppListActivity.Mode.ALL)) }
-        }, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.START))
+        }
+        footer.addView(allAppsLink, FrameLayout.LayoutParams(WRAP, MATCH, Gravity.START))
         readingText = text("", 15f, color = Ui.GRAY).apply {
             gravity = Gravity.CENTER
             setPadding(dp(16), 0, dp(16), 0)
@@ -564,15 +567,35 @@ class HomeActivity : EinkActivity() {
 
     private fun findApp(key: String): AppEntry? = AppStore.find(this, key, apps)
 
-    /** 하단 가운데의 `오늘 42분 · 5일째`. 사용 기록 액세스가 없으면(= 오늘 읽은 시간 꺼짐) 비운다. */
+    /** 하단 가운데의 `오늘 42분 · 5일째`(바형 화면은 `오늘` 없이). 사용 기록 액세스가 없으면(= 오늘 읽은 시간 꺼짐) 비운다. */
     private fun updateReading() {
         // 어느 책인지는 알 수 없어 하루 합계만 센다. 권한이 없으면 null.
         val summary = ReadingLog.summary(this, ReadingLog.readerPackages(this))
-        val line = summary?.let {
-            val today = getString(R.string.reading_today, duration(it.todayMs))
-            // 연속일은 이틀째부터
-            if (it.streak >= 2) today + "  ·  " + getString(R.string.reading_streak, it.streak) else today
-        } ?: ""
+        // 긴 것부터: `오늘 42분 · 5일째` → `42분 · 5일째` → `42분`(연속일은 이틀째부터). 바형은 `42분 · 5일째` 부터
+        val lines = summary?.let {
+            val time = duration(it.todayMs)
+            fun withStreak(s: String) = if (it.streak >= 2) s + "  ·  " + getString(R.string.reading_streak, it.streak) else s
+            val full = if (Ui.tallScreen) null else withStreak(getString(R.string.reading_today, time))
+            listOfNotNull(full, withStreak(time), time).distinct()
+        } ?: listOf("")
+        fitReading(lines)
+    }
+
+    /**
+     * 하단 가운데 글자는 화면 가운데에 두되, `모든 앱 ›`·설정 아이콘에 닿으면 둘 사이 가운데로 옮기고 그래도 들지 않으면 짧은 글로 바꾼다
+     * (기기가 앱의 밀도를 덮어써 폭이 좁은 화면·키운 글자. HiBreak 에서 `모든 앱 ›` 에 겹쳤다). [lines] 는 긴 것부터.
+     */
+    private fun fitReading(lines: List<String>) {
+        val width = resources.displayMetrics.widthPixels
+        // 글자 폭만 잰다(뷰를 다시 measure 하면 TextView 가 세로 가운데를 그 높이로 잡아 `모든 앱 ›` 이 위로 붙는다)
+        val left = allAppsLink.paddingStart + allAppsLink.paint.measureText(allAppsLink.text.toString()).toInt() + dp(FOOTER_GAP_DP)
+        // 설정 아이콘 칸(24 + 32 + 여백)에서 왼쪽 24dp 는 누르는 자리
+        val right = width - dp(32 + Ui.MARGIN) - dp(FOOTER_GAP_DP)
+        val paint = readingText.paint
+        val line = lines.firstOrNull { paint.measureText(it) <= right - left } ?: lines.last()
+        val half = paint.measureText(line) / 2
+        val center = width / 2f
+        readingText.translationX = if (center - half >= left && center + half <= right) 0f else (left + right) / 2f - center
         if (readingText.text.toString() != line) readingText.text = line
     }
 
@@ -857,6 +880,8 @@ class HomeActivity : EinkActivity() {
     private fun showBookMenu(book: ShelfBook) = showBookDetail(BookRecord.of(this, book)) { refresh() }
 
     companion object {
+        /** 하단 가운데 글자와 양쪽(`모든 앱 ›`·설정 아이콘) 사이 최소 간격 */
+        private const val FOOTER_GAP_DP = 12
         /** 자주 쓰는 앱 고정 줄 수 */
         private const val FAV_ROWS = 3
         /** 기억해 두는 함께 읽는 책 쪽 높이 수(넘으면 비운다) */
