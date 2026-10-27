@@ -286,6 +286,7 @@
     <string name="guide_playbooks">Google Play 북</string>
     <string name="guide_mihon">Mihon</string>
     <string name="guide_kahon">Kahon</string>
+    <string name="guide_kobo">Kobo Books</string>
     <string name="guide_permissions">필요한 권한</string>
     <string name="guide_todo">앱에서 할 것</string>
     <string name="guide_todo_none">따로 바꿀 것은 없습니다.</string>
@@ -368,6 +369,8 @@
     <string name="guide_n_woojoo_cover">PDF·만화는 책 파일 읽기를 허용했을 때만 들어옵니다</string>
     <string name="guide_files_woojoo">연 책·표지·진행률</string>
     <string name="guide_note_woojoo">책 파일 읽기를 허용했으면 홈에서 책을 누를 때 그 파일을 우주뷰어로 바로 엽니다.</string>
+    <string name="guide_n_kobo_title">My Books·책 상세에서 연 책만 들어옵니다</string>
+    <string name="guide_t_kobo_open">책은 My Books 에서 눌러 열거나 책 상세의 단추로 여세요. My Books 에서 연 책은 읽고 My Books 로 돌아오면 들어옵니다. 읽는 화면에 제목이 없어 다른 길로 연 책은 알 수 없습니다.</string>
     <string name="guide_n_playbooks_library">라이브러리 화면에 그 책이 보이면 들어옵니다</string>
     <string name="guide_n_mihon_cover">서재나 기록 탭에 그 작품이 보이면 들어옵니다</string>
     <string name="guide_n_mihon_local">로컬 만화만 들어옵니다</string>

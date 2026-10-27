@@ -13,6 +13,7 @@ import com.woody.pebbledesk.readers.Kahon
 import com.woody.pebbledesk.readers.KOReader
 import com.woody.pebbledesk.readers.KOReaderFdroid
 import com.woody.pebbledesk.readers.Kindle
+import com.woody.pebbledesk.readers.Kobo
 import com.woody.pebbledesk.readers.KyoboEbook
 import com.woody.pebbledesk.readers.KyoboEbookMobile
 import com.woody.pebbledesk.readers.KyoboLibrary
@@ -193,6 +194,10 @@ internal object ReaderGuide {
             cover = yes(R.string.guide_n_mihon_cover), title = MENU, author = yes(R.string.guide_n_mihon_detail),
             progress = Field(R.string.guide_added_menu, R.string.guide_n_mihon_chapter), due = NO, bookFiles = R.string.guide_files_cover_info, note = R.string.guide_note_mihon,
             coverBefore11 = Field(R.string.guide_added_book_files, R.string.guide_n_mihon_local),
+        )),
+        App(listOf(R.string.guide_kobo), listOf(Kobo), Info(
+            listOf(R.string.guide_t_kobo_open, R.string.guide_t_progress_menu),
+            cover = YES, title = yes(R.string.guide_n_kobo_title), author = YES, progress = READING_MENU, due = NO,
         )),
     )
 }
