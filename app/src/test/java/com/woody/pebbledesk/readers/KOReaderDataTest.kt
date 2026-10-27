@@ -1,6 +1,7 @@
 package com.woody.pebbledesk.readers
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -19,6 +20,7 @@ import java.util.zip.ZipOutputStream
 @Config(sdk = [34])
 class KOReaderDataTest {
     @get:Rule val tmp = TemporaryFolder()
+    private val app get() = org.robolectric.RuntimeEnvironment.getApplication()
 
     private val ko get() = File(tmp.root, "koreader").apply { mkdirs() }
 
@@ -206,6 +208,27 @@ class KOReaderDataTest {
     @Test fun `EPUB 표지 경로 - 퍼센트 인코딩은 풀고 +는 그대로`() {
         val epub = File(tmp.root, "c.epub").also { writeEpub(it, "t", "a", cover = true) }
         assertEquals("OEBPS/images/cover+1.jpg", BookFiles.epub(epub.path)?.cover)
+    }
+
+    @Test fun `CBZ 표지는 첫 그림 - 숫자는 크기 순, 숨긴 항목·__MACOSX 는 뺀다`() {
+        val cbz = File(tmp.root, "c.cbz")
+        ZipOutputStream(cbz.outputStream()).use { z ->
+            for (name in listOf("ComicInfo.xml", "__MACOSX/v1/._p1.jpg", "v1/.thumb.jpg", "v1/p10.jpg", "v1/p2.JPG", "v1/")) {
+                z.putNextEntry(ZipEntry(name)); z.closeEntry()
+            }
+        }
+        assertEquals("v1/p2.JPG", java.util.zip.ZipFile(cbz).use { BookFiles.comicCover(it)?.name })
+    }
+
+    @Test fun `그림이 없는 CBZ·ZIP 이 아닌 cbz 는 표지가 없다`() {
+        val noImage = File(tmp.root, "n.cbz")
+        ZipOutputStream(noImage.outputStream()).use { z -> z.putNextEntry(ZipEntry("ComicInfo.xml")); z.closeEntry() }
+        assertFalse(BookFiles.WITH_COMICS.has(app, noImage.path))
+        assertNull(BookFiles.WITH_COMICS.cover(app, noImage.path))
+        // RAR 을 이름만 바꾼 것
+        val rar = File(tmp.root, "r.cbz").apply { writeBytes("Rar!\u001a\u0007\u0000".toByteArray()) }
+        assertFalse(BookFiles.WITH_COMICS.has(app, rar.path))
+        assertNull(BookFiles.WITH_COMICS.cover(app, rar.path))
     }
 
     private fun writeEpub(file: File, title: String, author: String, cover: Boolean = false) {

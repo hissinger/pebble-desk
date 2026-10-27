@@ -2,7 +2,8 @@
 
 원본: Pixabay TheDigitalArtist 'Approved Stamp'(https://pixabay.com/illustrations/approved-stamp-approval-business-5254258/,
 1280px PNG, Pixabay Content License). 둥근 테·질감은 그대로 두고 가운데 `APPROVED` 를 지우고 `COMPLETED` 를 넣은 뒤
-잉크 얼룩(작은 구멍)을 입히고, 검정 잉크(투명도만)로 −10° 기울여 420px 로 줄인다(화면에서 가장 큰 220dp = 413px). macOS 의 DIN Condensed Bold 를 쓴다.
+잉크 얼룩(작은 구멍)을 입히고, 검정 잉크(투명도만)로 −10° 기울여 420px 로 줄인다(화면에서 가장 큰 220dp = 413px).
+투명도는 전자잉크 화면의 회색 단계와 같은 16단계로 줄여 4비트 팔레트 PNG 로 저장한다(8비트 LA 의 절반 크기). macOS 의 DIN Condensed Bold 를 쓴다.
 """
 import sys
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
@@ -34,6 +35,7 @@ a.paste(ImageChops.lighter(a.crop((0, top, a.width, bottom)), word), (0, top))
 
 a = a.crop(a.getbbox()).rotate(-10, expand=True, resample=Image.BICUBIC)
 a = a.crop(a.getbbox()).resize((SIZE, SIZE), Image.LANCZOS)
-out = Image.new("LA", a.size, 0)
-out.putalpha(a)
-out.save(dst, optimize=True)
+out = Image.new("P", a.size)
+out.putdata([round(v / 17) for v in a.get_flattened_data()])
+out.putpalette([0, 0, 0] * 16)
+out.save(dst, optimize=True, bits=4, transparency=bytes(i * 17 for i in range(16)))

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""홈페이지 공유 미리보기 그림(site/img/og-ko.png·og-en.png, 1200×630)과 아이콘(site/img/icon-*.png)을 만든다.
+"""홈페이지 공유 미리보기 그림(site/img/og-ko.png·og-en.png, 1200×630), README 그림(첫 그림 docs/screenshots/hero-ko.png·hero-en.png(흑백),
+지원 앱 아이콘 docs/screenshots/app-icons/(site/img/apps/ 를 96px 로))과 아이콘(site/img/icon-*.png)을 만든다.
 
     python3 tools/site/og.py <Pebble Desk 아이콘 512px PNG>
 
 기기 그림은 페이지와 같다: 기기 틀(frame-*.webp) 화면 자리에 캡처를 곱하기로 얹는다(자리는 site/index.html 의 .shot 과 같다).
 아이콘은 에뮬에서 IconDump 로 com.woody.pebbledesk 를 그린 것.
 """
+import os
 import sys
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 IMG = "site/img"
 BG = (251, 251, 249)
@@ -59,9 +61,40 @@ def og(lang):
     im.save(f"{IMG}/og-{lang}.png", optimize=True)
 
 
+def hero(lang):
+    """README 첫 그림: 페이지 첫 화면처럼 바탕에 기기 두 대(사이 .devices gap, 둘레 여백, 옅은 그림자)"""
+    prefix = TEXT[lang][2]
+    h = 900
+    gap, side, top, bottom = round(h * 0.08), round(h * 0.18), round(h * 0.07), round(h * 0.12)
+    peb, bar = device("pebble", prefix, h), device("bar", prefix, h)
+    im = Image.new("RGBA", (side * 2 + peb.width + gap + bar.width, top + h + bottom), BG + (255,))
+    spots = ((peb, side), (bar, side + peb.width + gap))
+    shadow = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    for d, x in spots:
+        shadow.paste(Image.new("RGBA", d.size, (0, 0, 0, 255)), (x, top + 26), d.getchannel("A").point(lambda v: v * 0.16))
+    im = Image.alpha_composite(im, shadow.filter(ImageFilter.GaussianBlur(24)))
+    for d, x in spots:
+        im.alpha_composite(d, (x, top))
+    im.convert("L").save(f"docs/screenshots/hero-{lang}.png", optimize=True)
+
+
+def app_icons():
+    """README 지원 앱 표의 아이콘: 48px 로 보이므로 96px 로 줄여 저장소에(홈페이지 그림을 부르지 않게)"""
+    out = "docs/screenshots/app-icons"
+    icons = sorted(f for f in os.listdir(f"{IMG}/apps") if f.endswith(".png"))
+    os.makedirs(out, exist_ok=True)
+    for f in os.listdir(out):  # 홈페이지에서 빠진 앱의 아이콘을 남기지 않는다
+        if f.endswith(".png"):
+            os.remove(f"{out}/{f}")
+    for f in icons:
+        Image.open(f"{IMG}/apps/{f}").convert("RGBA").resize((96, 96), Image.LANCZOS).save(f"{out}/{f}", optimize=True)
+
+
 icon = Image.open(sys.argv[1]).convert("RGBA")
 for px in (32, 180, 512):
     icon.resize((px, px), Image.LANCZOS).save(f"{IMG}/icon-{px}.png", optimize=True)
 for lang in TEXT:
     og(lang)
+    hero(lang)
+app_icons()
 print("ok")

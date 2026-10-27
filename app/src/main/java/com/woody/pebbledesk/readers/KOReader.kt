@@ -40,6 +40,8 @@ open class KOReaderApp(pkg: String) : ReaderApp(
     override val readsContent get() = false
     /** 켜야 책이 들어오는 앱이라 시작하기에서 먼저 */
     override val fileOrder get() = 0
+    /** 만화(CBZ·CBR·CB7)도 연다: 표지는 그 파일의 첫 그림(KOReader 가 그리는 첫 쪽과 같다) */
+    override val fileCovers get() = BookFiles.WITH_COMICS
 
     override fun newAdapter(): ReaderAdapter = KOReaderReader(this)
 

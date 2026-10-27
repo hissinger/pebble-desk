@@ -16,9 +16,10 @@ data class Cell(
 
 /**
  * 읽는 화면에서 읽은 것. [title]·[author] 는 메뉴에 제목이 보일 때만(모르면 null), [progress] 는 모르면 -1.
- * [file] 은 제목 대신 파일 이름만 보이는 읽는 화면(이지뷰어)의 파일 이름(그 파일로 넣은 책을 찾는다, 모르면 null)
+ * [file] 은 제목 대신 파일 이름만 보이는 읽는 화면(이지뷰어)의 파일 이름(그 파일로 넣은 책을 찾는다, 모르면 null).
+ * [chapter] 는 진행률 대신 보이는 읽는 화(Mihon 메뉴의 화 이름, 모르면 "")
  */
-class ViewerInfo(val title: String?, val author: String, val progress: Int, val file: String? = null)
+class ViewerInfo(val title: String?, val author: String, val progress: Int, val file: String? = null, val chapter: String = "")
 
 /**
  * 실행 화면이 없어 파일로만 여는 이북 앱(네오리더). [activity] 는 파일(`ACTION_VIEW`)을 받는 화면, [label] 은 책의 앱 이름.
@@ -65,14 +66,24 @@ internal fun AccessibilityNodeInfo.byId(pkg: String, id: String): List<Accessibi
     findAccessibilityNodeInfosByViewId("$pkg:id/$id")
 
 /** 아래에 이름이 [id] 인 요소가 몇 개인가. 이벤트로 받은 요소에서는 이름으로 찾기가 안 되어 직접 훑는다. */
-internal fun AccessibilityNodeInfo.count(pkg: String, id: String): Int {
-    val full = "$pkg:id/$id"
-    fun walk(n: AccessibilityNodeInfo, depth: Int): Int {
-        var c = if (n.viewIdResourceName == full) 1 else 0
-        if (depth < WALK_DEPTH) for (i in 0 until n.childCount) n.getChild(i)?.let { c += walk(it, depth + 1) }
-        return c
+internal fun AccessibilityNodeInfo.count(pkg: String, id: String): Int = count(pkg, listOf(id))
+
+/**
+ * 아래에 이름이 [ids] 가운데 하나인 요소가 몇 개인가(이름마다 센 수의 합. 한 번만 훑는다).
+ * [stopAt] 개를 넘으면 더 세지 않고 그때까지 센 수를 돌려준다(있는지·하나뿐인지만 볼 때).
+ */
+internal fun AccessibilityNodeInfo.count(pkg: String, ids: List<String>, stopAt: Int = Int.MAX_VALUE): Int {
+    val full = ids.groupingBy { "$pkg:id/$it" }.eachCount()
+    var c = 0
+    fun walk(n: AccessibilityNodeInfo, depth: Int) {
+        n.viewIdResourceName?.let { c += full[it] ?: 0 }
+        if (depth < WALK_DEPTH) for (i in 0 until n.childCount) {
+            if (c > stopAt) return
+            n.getChild(i)?.let { walk(it, depth + 1) }
+        }
     }
-    return walk(this, 0)
+    walk(this, 0)
+    return c
 }
 
 /** 화면 글자를 보통 글자로(YES24 eBook 서재 제목은 띄어쓰기가 줄바꿈 없는 공백 U+00A0 이다) */

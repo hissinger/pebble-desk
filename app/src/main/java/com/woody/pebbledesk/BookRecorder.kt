@@ -1,6 +1,7 @@
 package com.woody.pebbledesk
 
 import android.content.Context
+import android.graphics.Bitmap
 import com.woody.pebbledesk.readers.BookFiles
 import com.woody.pebbledesk.readers.isImageFile
 import com.woody.pebbledesk.readers.withoutBookFile
@@ -20,8 +21,8 @@ interface BookRecorder {
     fun opened(pkg: String, seen: Seen, at: Long?, target: Target, coverKey: String? = null, steps: OpenSteps? = null): ShelfBook
     /** 여기부터 [pkg] 에서 어떤 책인지 모른다(앞서 편 책에 붙이지 않게) */
     fun unknown(pkg: String, at: Long)
-    /** 진행률·반납일·저자(음수·빈 값은 그대로 둔다) */
-    fun status(bookId: String, progress: Int, due: Long = -1, author: String = "")
+    /** 진행률·반납일·저자·읽는 화(음수·빈 값은 그대로 둔다) */
+    fun status(bookId: String, progress: Int, due: Long = -1, author: String = "", chapter: String = "")
     /** 서재 한 화면의 것을 한 번에 */
     fun statuses(list: List<BookShelf.Status>)
     fun setFile(bookId: String, path: String)
@@ -29,6 +30,16 @@ interface BookRecorder {
     fun setAuthor(bookId: String, author: String)
     /** 표지가 없을 때만 붙인다. 저장 실패는 삼킨다(못 넣은 책은 다음에 다시) */
     fun cover(bookId: String, jpeg: ByteArray)
+    /**
+     * 이북 앱 데이터의 표지 그림으로 바꾼다: 화면에서 자른 표지가 이미 붙어 있어도(그 표지에 앱이 그린 글자·표시가 든 경우). 저장 실패는 삼킨다.
+     * 기본: [cover] 와 같다(표지가 없을 때만)
+     */
+    fun replaceCover(bookId: String, jpeg: ByteArray) = cover(bookId, jpeg)
+    /**
+     * 붙어 있는 표지가 [placeholder](이북 앱이 표지 대신 그리는 빈 그림)면 지운다(예전 판이 그것을 표지로 잘라 붙인 책. 그러면 진짜 표지가 보일 때 다시 자른다).
+     * 지웠으면 true. 화면 스레드에서 부르지 않는다. 기본: 하지 않는다
+     */
+    fun dropPlaceholderCover(bookId: String, placeholder: (Bitmap) -> Boolean): Boolean = false
     /** 아직 목록에 없는 책의 잘라 둔 표지(그 책이 들어오면 [opened] 가 붙인다, 최근 [PENDING_MAX]권만). 열쇠는 정리한 제목 또는 파일 칸 열쇠 */
     fun pendingCover(key: String, jpeg: ByteArray)
     fun hasPendingCover(key: String): Boolean
@@ -47,8 +58,8 @@ interface BookRecorder {
     }
 }
 
-/** 화면·데이터에서 본 책: 앱이 보여 준 제목, 저자, 진행률·반납일(모르면 -1) */
-data class Seen(val title: String, val author: String = "", val progress: Int = -1, val due: Long = -1)
+/** 화면·데이터에서 본 책: 앱이 보여 준 제목, 저자, 진행률·반납일(모르면 -1), 읽는 화(화 이름 등, 모르면 "") */
+data class Seen(val title: String, val author: String = "", val progress: Int = -1, val due: Long = -1, val chapter: String = "")
 
 /** 편 책이 어떤 책인가 */
 sealed interface Target {
@@ -110,14 +121,14 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
         var result = WatchLog.Opened.FRONT
         val book = (if (exact) id?.let { BookShelf.get(context, it) } else BookShelf.findByTitle(context, title))?.also {
             BookShelf.moveToFront(context, it.id)
-            BookShelf.updateStatus(context, it.id, seen.progress, seen.due, seen.author)
+            BookShelf.updateStatus(context, it.id, seen.progress, seen.due, seen.author, seen.chapter)
         } ?: run {
             // 완독한 책도 펴면 들어온다(새 회차가 그날 시작, [BookShelf.addOpened]). 파일로만 여는 이북 앱(네오리더)은 그 항목([AppStore.fileReaders])으로
             val app = AppStore.readerKey(context, pkg)
             result = WatchLog.Opened.NEW
             // 앱이 정한 책은 그 책(나간 책)만 되살린다(같은 제목의 다른 파일을 되살리지 않게)
-            if (exact) BookShelf.addOpened(context, title, seen.author, app, seen.progress, seen.due, openedAt) { it.id == id }
-            else BookShelf.addOpened(context, title, seen.author, app, seen.progress, seen.due, openedAt)
+            if (exact) BookShelf.addOpened(context, title, seen.author, app, seen.progress, seen.due, openedAt, seen.chapter) { it.id == id }
+            else BookShelf.addOpened(context, title, seen.author, app, seen.progress, seen.due, openedAt, seen.chapter)
         }
         steps?.found(book)
         WatchLog.add(context, WatchLog.Kind.OPENED, pkg, title, result.name)
@@ -127,14 +138,15 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
         // 미리 잘라 둔 표지(검색 화면의 `바로 읽기`, 서재). 앱이 정한 책은 그 열쇠의 것만
         (if (exact) coverKey?.takeIf { it in pendingCovers } else pendingFor(book.title))?.let { key ->
             val bytes = pendingCovers.remove(key) ?: return@let
-            if (coverFromFile(context, BookShelf.filePath(context, book.id))) return@let
+            if (coverFromFile(context, BookShelf.filePath(context, book.id), BookShelf.fileCovers(context, book.id))) return@let
             cover(book.id, bytes)
         }
         return book
     }
 
     override fun unknown(pkg: String, at: Long) = ReadingLog.bookOpened(context, pkg, "", "", at)
-    override fun status(bookId: String, progress: Int, due: Long, author: String) = BookShelf.updateStatus(context, bookId, progress, due, author)
+    override fun status(bookId: String, progress: Int, due: Long, author: String, chapter: String) =
+        BookShelf.updateStatus(context, bookId, progress, due, author, chapter)
     override fun statuses(list: List<BookShelf.Status>) = BookShelf.updateStatuses(context, list)
     override fun setFile(bookId: String, path: String) = BookShelf.setFilePath(context, bookId, path)
     override fun setTitle(bookId: String, title: String) = BookShelf.setTitle(context, bookId, title)
@@ -143,6 +155,13 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
     override fun cover(bookId: String, jpeg: ByteArray) {
         if (!BookShelf.hasCover(context, bookId)) runCatching { BookShelf.setCover(context, bookId, jpeg) }
     }
+
+    override fun replaceCover(bookId: String, jpeg: ByteArray) {
+        runCatching { BookShelf.setCover(context, bookId, jpeg) }
+    }
+
+    override fun dropPlaceholderCover(bookId: String, placeholder: (Bitmap) -> Boolean) =
+        runCatching { BookShelf.dropCoverIf(context, bookId, placeholder) }.getOrDefault(false)
 
     override fun pendingCover(key: String, jpeg: ByteArray) { pendingCovers[key] = jpeg }
     override fun hasPendingCover(key: String) = key in pendingCovers
@@ -180,10 +199,10 @@ class ShelfRecorder(private val context: Context) : BookRecorder, BookLookup {
 
     companion object {
         /**
-         * 책 파일(표지가 든 EPUB, 그림 폴더는 첫 그림)에서 표지를 꺼낼 수 있다([BookShelf.cover]): 화면에서 자른 작은 표지를 두지 않는다.
-         * 표지가 없는 EPUB 이면 아니다(그 책은 화면에서 자른다)
+         * 책 파일 [path] 에서 그 책을 넣은 앱의 길 [covers]([com.woody.pebbledesk.readers.ReaderApp.fileCovers])로 표지를 꺼낼 수 있다([BookShelf.cover]):
+         * 화면에서 자른 작은 표지를 두지 않는다. 꺼낼 수 없으면(표지가 없는 EPUB 등) 아니다(그 책은 화면에서 자른다)
          */
-        fun coverFromFile(context: Context, path: String?) =
-            path != null && BookFiles.canRead(context) && (isImageFile(path) || (path.endsWith(".epub", ignoreCase = true) && BookFiles.hasEpubCover(path)))
+        fun coverFromFile(context: Context, path: String?, covers: BookFiles.Covers): Boolean =
+            path != null && BookFiles.canRead(context) && covers.has(context, path)
     }
 }

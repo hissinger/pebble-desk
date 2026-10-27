@@ -27,10 +27,12 @@ def load(folder):
     cv = os.path.join(folder, "covers.txt")
     if os.path.exists(cv):
         covers = {l.strip()[:-4] for l in open(cv) if l.strip().endswith(".jpg")}
+    # 읽는 화(`chapter`)는 DB 버전 5 부터(그 전 판의 결과와도 비교하게 없으면 빈 값)
+    chapter = "chapter" if any(c[1] == "chapter" for c in q("PRAGMA table_info(shelf)")) else "''"
     shelf = [
         dict(id=i, title=t, author=a or "", app=(app or "").split("/")[0], progress=p, due=d, seen=s or "",
-             file=os.path.basename(files.get(i, "")), cover=i in covers)
-        for (i, t, a, app, p, d, s) in q("SELECT id, title, author, app, progress, due, seen_title FROM shelf ORDER BY pos")
+             file=os.path.basename(files.get(i, "")), cover=i in covers, chapter=ch or "")
+        for (i, t, a, app, p, d, s, ch) in q(f"SELECT id, title, author, app, progress, due, seen_title, {chapter} FROM shelf ORDER BY pos")
     ]
     past = [dict(id=i, title=t, hidden=h) for (i, t, h) in q("SELECT id, title, hidden FROM past ORDER BY pos")]
     opens = q("SELECT at, pkg, title, book_id FROM book_open ORDER BY at, rowid")
@@ -62,8 +64,9 @@ def short(pkg):
 
 
 def book_line(s, b):
+    # 읽는 화는 있을 때만 붙인다(읽는 화가 없는 앱의 줄은 그 전 결과와 같게)
     return (f"{b['title']} | {b['author']} | {short(b['app'])} | {b['progress']}% | due {b['due']} | seen {b['seen']} | "
-            f"file {b['file'] or '-'} | cover {'O' if b['cover'] else '-'}")
+            f"file {b['file'] or '-'} | cover {'O' if b['cover'] else '-'}" + (f" | chapter {b['chapter']}" if b['chapter'] else ""))
 
 
 # 시험마다 달라 비교에서 빼는 기록(연결, 앱을 띄울 때 순서가 섞이는 대화상자 창)

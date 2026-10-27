@@ -15,6 +15,7 @@ import android.util.LruCache
 import com.woody.pebbledesk.Db.rows
 import com.woody.pebbledesk.Db.tx
 import com.woody.pebbledesk.readers.BookFiles
+import com.woody.pebbledesk.readers.ReaderApps
 import com.woody.pebbledesk.readers.isImageFile
 import com.woody.pebbledesk.readers.withoutBookFile
 import org.json.JSONObject
@@ -243,6 +244,8 @@ data class ShelfBook(
     val due: Long = -1,
     /** 자동으로 넣을 때 이북 앱이 보여 준 제목. 사용자가 제목을 고쳐도 다음에 펼 때 이 책으로 찾는다. 직접 넣은 책은 "" */
     val seenTitle: String = "",
+    /** 이북 앱이 보여 준 읽는 화(Mihon 의 화 이름 `Ch. 12` 등, 앱이 쓴 그대로). 모르면 "". 나간 책에는 남기지 않는다 */
+    val chapter: String = "",
 )
 
 /**
@@ -251,9 +254,10 @@ data class ShelfBook(
  */
 data class PastBook(val book: ShelfBook, val leftAt: Long, val hidden: Boolean = false)
 
-/** 홈·목록에 붙이는 진행률·반납일 `[47% 읽음, 반납 4일 남음]`. 모르는 값은 뺀다(홈은 한 줄씩, 목록은 이어서). */
+/** 홈·목록에 붙이는 읽는 화·진행률·반납일 `[Ch. 12, 47% 읽음, 반납 4일 남음]`. 모르는 값은 뺀다(홈은 한 줄씩, 목록은 이어서). */
 fun Context.bookStatus(book: ShelfBook, today: LocalDate = LocalDate.now()): List<String> {
     val parts = mutableListOf<String>()
+    if (book.chapter.isNotEmpty()) parts += book.chapter
     if (book.progress >= 0) parts += getString(R.string.progress_pct, book.progress)
     if (book.due >= 0) {
         val left = book.due - today.toEpochDay()
@@ -486,8 +490,8 @@ object BookShelf {
                 ))
             }
         }
-        // 나간 책은 반납일을 저장하지 않는다(DB 에 칸이 없다): 메모리 사본도 같게(다시 띄운 뒤와 다르지 않게. 되살리면 서재에서 다시 읽는다)
-        cachedHistory = past.map { if (it.book.due < 0) it else it.copy(book = it.book.copy(due = -1)) }
+        // 나간 책은 반납일·읽는 화를 저장하지 않는다(DB 에 칸이 없다): 메모리 사본도 같게(다시 띄운 뒤와 다르지 않게. 되살리면 이북 앱에서 다시 읽는다)
+        cachedHistory = past.map { if (it.book.due < 0 && it.book.chapter.isEmpty()) it else it.copy(book = it.book.copy(due = -1, chapter = "")) }
     }
 
     /**
@@ -609,6 +613,8 @@ object BookShelf {
     }
 
     private const val ID_PREFIX = "b-"
+    /** 표지가 빈 그림인지 볼 때 줄여 푸는 폭([dropCoverIf]) */
+    private const val TEST_PX = 256
     /** `책 추가` 로 직접 넣은 책의 id 머리([manual]) */
     const val MANUAL_PREFIX = "m-"
     /** 책 id(`book_id`)가 든 표: 책 id 를 바꾸면 모두 함께 바꾼다([migrateIds]) */
@@ -616,9 +622,9 @@ object BookShelf {
     private fun newId() = ID_PREFIX + UUID.randomUUID()
 
     private fun readIndex(context: Context): List<ShelfBook> =
-        Db.get(context).rows("SELECT id, title, author, app, updated_at, progress, due, seen_title FROM shelf ORDER BY pos") { c ->
+        Db.get(context).rows("SELECT id, title, author, app, updated_at, progress, due, seen_title, chapter FROM shelf ORDER BY pos") { c ->
             ShelfBook(c.getString(0), c.getString(1).orEmpty(), c.getString(2).orEmpty(), c.getString(3)?.ifEmpty { null },
-                c.getLong(4), c.getInt(5), c.getLong(6), c.getString(7).orEmpty())
+                c.getLong(4), c.getInt(5), c.getLong(6), c.getString(7).orEmpty(), c.getString(8).orEmpty())
         }
 
     /** 줄인 표지(흑백, 컬러 [Palette] 면 원래 색). 표지 그림이 없거나 읽지 못하면 제목·저자·앱 이름으로 그린 빈 표지([BlankCover]). */
@@ -732,16 +738,16 @@ object BookShelf {
      */
     @Synchronized fun addOpened(
         context: Context, title: String, author: String, app: String?, progress: Int, due: Long, at: Long = System.currentTimeMillis(),
-        revive: (ShelfBook) -> Boolean = { it.hasTitle(title) },
+        chapter: String = "", revive: (ShelfBook) -> Boolean = { it.hasTitle(title) },
     ): ShelfBook {
         val now = System.currentTimeMillis()
         val past = history(context).lastOrNull { !it.hidden && revive(it.book) }?.book
-        // 화면에서 모르는 진행률(-1)은 예전 값 그대로([updateStatus] 와 같게). 반납일은 나간 책에 남기지 않으니(writeHistory) 본 것으로
+        // 화면에서 모르는 진행률(-1)은 예전 값 그대로([updateStatus] 와 같게). 반납일·읽는 화는 나간 책에 남기지 않으니(writeHistory) 본 것으로
         val added = past?.copy(
             author = past.author.ifEmpty { author }, app = app ?: past.app, updatedAt = now,
-            progress = if (progress >= 0) progress else past.progress, due = due,
+            progress = if (progress >= 0) progress else past.progress, due = due, chapter = chapter,
         )
-            ?: ShelfBook(newId(), title, author, app, now, progress, due, seenTitle = title)
+            ?: ShelfBook(newId(), title, author, app, now, progress, due, seenTitle = title, chapter = chapter)
         // 마지막 회차가 완독으로 끝난 책이면 새 회차를 연다. 이미 진행 중이던 회차(다시 읽기·감상·완독 뒤 5분 넘게 읽음)면 이어진다.
         val newRound = past != null && startsRoundOnReturn(context, past.id)
         atomic(context) {
@@ -784,12 +790,12 @@ object BookShelf {
         }
     }
 
-    /** 이북 앱 서재에서 본 책 [id] 의 진행률·반납일(모르면 -1)·저자([updateStatuses]) */
-    data class Status(val id: String, val progress: Int, val due: Long, val author: String = "")
+    /** 이북 앱 서재에서 본 책 [id] 의 진행률·반납일(모르면 -1)·저자·읽는 화(모르면 "")([updateStatuses]) */
+    data class Status(val id: String, val progress: Int, val due: Long, val author: String = "", val chapter: String = "")
 
-    /** 이북 앱 서재에서 본 진행률·반납일(저자는 비어 있을 때만)을 적는다(순서는 그대로). 바뀐 게 없으면 쓰지 않는다. */
-    fun updateStatus(context: Context, id: String, progress: Int, due: Long, author: String = "") =
-        updateStatuses(context, listOf(Status(id, progress, due, author)))
+    /** 이북 앱 서재에서 본 진행률·반납일·읽는 화(저자는 비어 있을 때만)를 적는다(순서는 그대로). 바뀐 게 없으면 쓰지 않는다. */
+    fun updateStatus(context: Context, id: String, progress: Int, due: Long, author: String = "", chapter: String = "") =
+        updateStatuses(context, listOf(Status(id, progress, due, author, chapter)))
 
     /** 서재 한 화면에서 본 여러 책의 [updateStatus] 를 한 번에 쓴다. */
     @Synchronized fun updateStatuses(context: Context, statuses: List<Status>) {
@@ -799,9 +805,10 @@ object BookShelf {
             val d = if (s.due >= 0) s.due else due
             // 저자는 비어 있을 때만 채운다(읽는 화면 메뉴의 제목으로 먼저 들어온 책).
             val a = author.ifBlank { s.author }
-            if (p == progress && d == due && a == author) return this
+            val ch = s.chapter.ifEmpty { chapter }
+            if (p == progress && d == due && a == author && ch == chapter) return this
             // 저자가 채워지면 빈 표지를 다시 그리도록 updatedAt 도 새로.
-            return copy(progress = p, due = d, author = a, updatedAt = if (a != author) now else updatedAt)
+            return copy(progress = p, due = d, author = a, chapter = ch, updatedAt = if (a != author) now else updatedAt)
         }
         // 같은 책이 여러 칸이면 차례로(앞 칸에서 본 값을 뒤 칸의 모르는 값(-1)이 지우지 않게)
         write(context, statuses.fold(list(context)) { books, s -> books.map { if (it.id == s.id) it.with(s) else it } })
@@ -818,26 +825,80 @@ object BookShelf {
     }
 
     /**
+     * 책 [id] 의 표지 그림이 [test](이북 앱이 표지 대신 그리는 빈 그림)에 맞으면 지운다(그러면 진짜 표지가 보일 때 다시 잘라 온다). 지웠으면 true.
+     * 표지 없는 모습으로 다시 그려지도록 updatedAt 도 새로. 화면 스레드에서 부르지 않는다.
+     * 큰 표지(책 파일에서 꺼낸 그림)도 폭 [TEST_PX] 쯤으로 줄여 풀어 본다(잠금을 오래 쥐지 않게).
+     */
+    @Synchronized fun dropCoverIf(context: Context, id: String, test: (Bitmap) -> Boolean): Boolean {
+        val books = list(context)
+        if (books.none { it.id == id }) return false
+        val file = coverFile(context, id).takeIf { it.length() > 0 } ?: return false
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= TEST_PX) sample *= 2
+        val bmp = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return false
+        val matches = try { test(bmp) } finally { bmp.recycle() }
+        if (!matches) return false
+        dropFiles(context, id)
+        val now = System.currentTimeMillis()
+        write(context, books.map { if (it.id == id) it.copy(updatedAt = now) else it })
+        return true
+    }
+
+    /**
      * 제목이 같은 책(부제·공백 무시). 사용자가 제목을 고친 자동 추가 책은 앱이 보여 준 제목([ShelfBook.seenTitle])으로도 찾는다
      * (그러지 않으면 다음에 펼 때 새 책으로 들어간다).
      */
     fun findByTitle(context: Context, title: String): ShelfBook? = list(context).firstOrNull { it.hasTitle(title) }
 
     /**
-     * 표지 그림이 없는 책: 이북 앱이 연 책 파일([filePath], KOReader·네오리더)이 EPUB 이면 그 표지를 꺼내 이 책의 표지로 둔다([BookFiles.cover]).
-     * 그릴 때([cover]) 꺼내므로 책을 넣은 때와 상관없이 처음 그릴 때부터 보이고, 한 번 둔 표지는 책 파일을 지우거나 권한을 꺼도 남는다.
-     * 표지가 없는 파일(EPUB 이 아님 등)은 그 파일이 바뀔 때까지 다시 열지 않는다.
+     * 표지 그림이 없는 책: 이북 앱이 연 책 파일([filePath], 연 파일을 아는 앱: KOReader·네오리더·이지뷰어·우주·문리더)에서 그 책을 넣은 앱의 길([fileCovers])로 표지를 꺼내 이 책의 표지로 둔다.
+     * 파일을 적을 때 뒤에서 꺼내 두고([prefetchFileCover]), 그때 못 했으면(그 전에 넣은 책·책 파일 읽기를 나중에 허용) 그릴 때([cover]) 꺼낸다.
+     * 같은 책은 한 번만 꺼낸다(뒤에서 꺼내는 중에 그리면 끝나기를 기다린다). 한 번 둔 표지는 책 파일을 지우거나 권한을 꺼도 남는다.
+     * 표지가 없는 파일은 그 파일이 바뀔 때까지 다시 열지 않는다.
      */
     private fun fileCover(context: Context, id: String) {
         val path = filePath(context, id) ?: return
-        val tried = "$path@${File(path).lastModified()}"
-        if (tried in noFileCover) return
-        val bytes = BookFiles.cover(path) ?: run { noFileCover += tried; return }
-        runCatching { saveCover(context, id, bytes) }
+        // 그 책을 넣은 앱이 고른 길로만 꺼낸다. 오래 걸릴 수 있는 파일(압축 만화)은 화면 스레드에서 꺼내지 않고 뒤에서(다음에 그릴 때 보인다)
+        val covers = fileCovers(context, id)
+        if (Looper.myLooper() == Looper.getMainLooper() && covers.slow(path)) return prefetchFileCover(context, id)
+        synchronized(fileCoverLocks.getOrPut(id) { Any() }) {
+            if (hasCover(context, id)) return
+            val tried = "$path@${File(path).lastModified()}"
+            if (tried in noFileCover) return
+            val bytes = covers.cover(context, path) ?: run { noFileCover += tried; return }
+            runCatching { saveCover(context, id, bytes) }
+        }
+    }
+
+    /** 책 [id](읽고 있는 책, 없으면 나간 책)를 넣은 이북 앱이 책 파일에서 표지를 꺼내는 길([com.woody.pebbledesk.readers.ReaderApp.fileCovers]). 모르는 앱이면 기본 */
+    fun fileCovers(context: Context, id: String): BookFiles.Covers =
+        bookOf(context, setOf(id))?.app?.substringBefore('/')?.let { ReaderApps.forPackage(context, it) }?.fileCovers ?: BookFiles.BOOKS
+
+    /**
+     * 압축 만화를 푸는 libarchive 를 받았다([com.woody.pebbledesk.readers.ArchiveLib]): 받기 전에 표지가 없다고 기억한 파일을 잊고, 표지 그림이 없는
+     * 읽고 있는 책들의 파일 표지를 뒤에서 꺼내 둔다(받기 전에 넣은 CBR·CB7 책도 홈에 돌아오면 보이게).
+     */
+    fun archiveLibChanged(context: Context) {
+        noFileCover.clear()
+        list(context).forEach { prefetchFileCover(context, it.id) }
+    }
+
+    /**
+     * 표지 그림이 없는 책 [id] 의 책 파일 표지를 뒤에서 꺼내 둔다([fileCover]): 큰 그림·큰 EPUB 을 홈이 그릴 때 화면 스레드에서 꺼내지 않게.
+     * 책 파일 읽기가 꺼져 있으면 하지 않는다(못 읽은 파일을 표지 없는 파일로 기억하지 않게).
+     */
+    private fun prefetchFileCover(context: Context, id: String) {
+        if (hasCover(context, id) || !BookFiles.canRead(context)) return
+        val app = context.applicationContext
+        Bg.run({ fileCover(app, id) }) {}
     }
 
     /** 표지를 꺼내 봤지만 없던 책 파일(경로@수정 시각, [fileCover]) */
-    private val noFileCover = mutableSetOf<String>()
+    private val noFileCover: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    /** 책마다 표지 꺼내기를 한 번에 하나만([fileCover]) */
+    private val fileCoverLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
 
     @Throws(IOException::class)
     private fun saveCover(context: Context, id: String, bytes: ByteArray) {
@@ -944,10 +1005,11 @@ object BookShelf {
         list(context).firstOrNull { it.hasTitle(title) && accept(it) }?.id
             ?: history(context).lastOrNull { !it.hidden && it.book.hasTitle(title) && accept(it.book) }?.book?.id
 
-    /** 책이 나간 책이 되어도 남긴다(다시 읽을 때 그 파일을 연다). */
+    /** 책이 나간 책이 되어도 남긴다(다시 읽을 때 그 파일을 연다). 표지 그림이 없으면 그 파일의 표지를 뒤에서 꺼내 둔다([prefetchFileCover]). */
     fun setFilePath(context: Context, id: String, path: String) {
         if (filePath(context, id) == path) return
         Db.get(context).tx { insertWithOnConflict("book_file", null, Db.values("book_id" to id, "path" to path), SQLiteDatabase.CONFLICT_REPLACE) }
+        prefetchFileCover(context, id)
     }
 
     /** 책 빼기: 읽고 있는 책에서 빼서 나간 책으로 남긴다. [review] 가 있으면(빼기 메뉴에서 고친 별점·감상) 진행 중 회차의 것으로 같이 저장한다. */
@@ -968,7 +1030,7 @@ object BookShelf {
         if (books == before) return
         fun ShelfBook.values(pos: Int) = Db.values(
             "pos" to pos, "id" to id, "title" to title, "author" to author, "app" to app.orEmpty(),
-            "updated_at" to updatedAt, "progress" to progress, "due" to due, "seen_title" to seenTitle,
+            "updated_at" to updatedAt, "progress" to progress, "due" to due, "seen_title" to seenTitle, "chapter" to chapter,
         )
         Db.get(context).tx {
             if (books.map { it.id } == before.map { it.id }) {

@@ -14,8 +14,8 @@ android {
         applicationId = "com.woody.pebbledesk"
         minSdk = 28
         targetSdk = 34
-        versionCode = 24
-        versionName = "1.6.0"
+        versionCode = 27
+        versionName = "1.6.3"
     }
 
     buildTypes {
@@ -167,3 +167,10 @@ kotlin {
     }
 }
 
+// 릴리스는 Kotlin 의 널 검사 호출(매개변수 이름 문자열과 함께 모든 공개 함수 앞에 들어간다)을 빼서 dex 를 줄이고 호출마다 드는 검사를 없앤다.
+// 디버그는 그대로 두어 널이 들어온 자리를 바로 알 수 있게 한다.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    if (name.contains("Release")) {
+        compilerOptions.freeCompilerArgs.addAll("-Xno-param-assertions", "-Xno-call-assertions", "-Xno-receiver-assertions")
+    }
+}

@@ -4,11 +4,14 @@
 
     python3 tools/site/seo.py      # site/index.html · site/en/index.html 을 고쳐 쓴다(다시 돌려도 같다)
 
-글은 여기서 고친다. 사실(안드로이드 9+ = minSdk 28, 인터넷은 YES24 표지 검색·GitHub 새 버전 확인뿐, 기록은 기기 안)은
-코드와 docs/DEVICES.md 에서 확인한 것. 바뀌면 같이 고친다. 주소 BASE 는 GitHub Pages(pebbledesk/pebbledesk.github.io) 기준.
+글은 여기서 고친다(홈페이지에서 직접 고치면 다음에 돌릴 때 되돌아간다). 사실(안드로이드 9+ = minSdk 28,
+인터넷은 표지 검색(한국어 제목은 YES24, 그 밖은 Apple Books·Open Library)·GitHub 새 버전 확인·만화 표지 풀기 도구 받기뿐,
+기록은 기기 안)은 코드와 docs/DEVICES.md 에서 확인한 것. 바뀌면 같이 고친다. 판 번호·날짜는 app/build.gradle.kts 와 그 판의 git 태그에서.
+주소 BASE 는 GitHub Pages(pebbledesk/pebbledesk.github.io) 기준.
 """
 import json
 import re
+import subprocess
 
 BASE = "https://pebbledesk.github.io/"
 REPO = "https://github.com/hissinger/pebble-desk"
@@ -16,6 +19,20 @@ REPO = "https://github.com/hissinger/pebble-desk"
 CF_BEACON = "1896b35940664abaa335017941fc327d"
 RELEASES = REPO + "/releases/latest"
 LICENSE = REPO + "/blob/main/LICENSE"
+
+
+def git(*args):
+    return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout.strip()
+
+
+def tag_date(version):
+    return git("for-each-ref", f"refs/tags/v{version}", "--format=%(creatordate:short)")
+
+
+# 지금 판과 그 판을 낸 날(태그가 아직 없으면 판 번호를 바꾼 커밋의 날), 첫 판을 낸 날
+VERSION = re.search(r'versionName = "([^"]+)"', open("app/build.gradle.kts").read()).group(1)
+RELEASED = tag_date(VERSION) or git("log", "-1", "--format=%cs", "-G", "versionName", "--", "app/build.gradle.kts")
+FIRST = tag_date("1.0.0")
 
 PAGES = {
     "ko": {
@@ -36,7 +53,8 @@ PAGES = {
              "이북 앱에서 편 책을 알아보려고 씁니다. 지원하는 이북 앱의 화면만 받고, 다른 앱의 화면은 보지 않습니다. "
              "읽은 시간은 안드로이드의 '사용 기록 액세스'로 셉니다."),
             ("기록은 어디에 저장되나요?",
-             "기기 안에만 저장되고 어디로도 보내지 않습니다. 인터넷은 표지 검색(YES24)과 새 버전 확인(GitHub)에만 씁니다. "
+             "기기 안에만 저장되고 어디로도 보내지 않습니다. 인터넷은 표지 검색(한국어 제목은 YES24, 그 밖은 Apple Books·Open Library), "
+             "새 버전 확인과 만화 표지 풀기 도구 받기(둘 다 GitHub)에만 씁니다. "
              "앱을 지우면 기록도 함께 지워집니다."),
         ],
         "features": ["이북 앱에서 편 책을 홈 화면에 자동으로 추가(표지·제목·진행률·반납일)", "책마다 읽은 시간, 하루 목표, 연속일",
@@ -60,7 +78,8 @@ PAGES = {
              "To recognize the book you open in a reading app. It only receives the screens of supported reading apps and doesn’t look at any other app. "
              "Reading time comes from Android’s Usage access."),
             ("Where is my reading history stored?",
-             "Only on your device; nothing is sent anywhere. The internet is used only to search covers (YES24) and to check for new versions (GitHub). "
+             "Only on your device; nothing is sent anywhere. The internet is used only to search covers (Apple Books and Open Library, or YES24 for Korean titles), "
+             "to check for new versions and to download the comic cover unpacking tool (both from GitHub). "
              "Uninstalling the app deletes the history too."),
         ],
         "features": ["Books you open in reading apps are added to the home screen automatically (cover, title, progress, due date)",
@@ -69,9 +88,10 @@ PAGES = {
     },
 }
 
-# 검색용 기기 이름(화면에는 보이지 않는다: keywords 메타·JSON-LD keywords·llms.txt). (한글, 영어, 상태)
-# 상태는 기록용(used = 실제로 쓰고 있는 기기 docs/DEVICES.md·ISSUES.md, android = 그 밖의 안드로이드 기기, no = 안드로이드 앱을 깔 수 없는 기기).
-# 검색용이라 페이지·llms.txt 에는 가르지 않고 이름만 나열한다('지원한다'고 쓰지 않는다)
+# 기기 이름(화면에는 보이지 않는다: llms.txt, keywords 는 used 만). (한글, 영어, 상태)
+# 상태: used = 실제로 쓰고 있는 기기(docs/DEVICES.md·ISSUES.md), android = 그 밖의 안드로이드 기기, no = 안드로이드 앱을 깔 수 없는 기기.
+# llms.txt 는 used(쓴다)·android(안드로이드 9 이상인 기기면 쓸 수 있다, 옛 기기는 더 낮다)·no(쓸 수 없다)를 나눠 적는다. AI 가 킨들에서 된다고 답하지 않게.
+# 시험해 보지 않은 기기를 '지원한다'고 쓰지 않는다
 DEVICES = [
     # 크레마(YES24)
     ("크레마 페블", "Crema Pebble", "used"), ("크레마 S", "Crema S", "android"), ("크레마 모티프", "Crema Motif", "android"),
@@ -105,7 +125,7 @@ DEVICES = [
     ("빅미 B6", "Bigme B6", "android"), ("빅미 B751C", "Bigme B751C", "android"), ("빅미 잉크노트", "Bigme inkNote", "android"),
     ("하이센스 A9", "Hisense A9", "android"), ("하이센스 A9 프로", "Hisense A9 Pro", "android"), ("하이센스 A7", "Hisense A7", "android"),
     ("하이센스 A5", "Hisense A5", "android"), ("비우즈 AiPaper 미니", "Viwoods AiPaper Mini", "used"), ("비우즈 AiPaper", "Viwoods AiPaper", "android"),
-    ("비우즈 AiPaper 리더", "Viwoods AiPaper Reader", "android"), ("모안 MIX7S", "Moaan MIX7S", "used"), ("미니멀 폰", "Minimal Phone", "used"),
+    ("비우즈 AiPaper 리더", "Viwoods AiPaper Reader", "android"), ("모안 MIX7S", "Moaan MIX7S", "used"), ("미니멀 폰", "Minimal Phone", "used"), ("무디타 콤팩트", "Mudita Kompakt", "android"),
     ("라이크북 P78", "Likebook P78", "android"), ("라이크북 아레스", "Likebook Ares", "android"), ("무잉크 프로", "mooInk Pro", "android"),
     ("무잉크 플러스", "mooInk Plus", "android"), ("슈퍼노트 매타", "Supernote Manta", "android"), ("슈퍼노트 노마드", "Supernote Nomad", "android"),
     # 안드로이드 앱을 깔 수 없는 기기(또는 안드로이드 8 이하)
@@ -113,18 +133,13 @@ DEVICES = [
     ("킨들 스크라이브", "Kindle Scribe", "no"), ("킨들 컬러소프트", "Kindle Colorsoft", "no"), ("킨들 베이직", "Kindle Basic", "no"),
     ("코보 클라라", "Kobo Clara", "no"), ("코보 리브라", "Kobo Libra", "no"), ("코보 세이지", "Kobo Sage", "no"), ("코보 엘립사", "Kobo Elipsa", "no"),
     ("포켓북 버스", "PocketBook Verse", "no"), ("포켓북 에라", "PocketBook Era", "no"), ("포켓북 잉크패드", "PocketBook InkPad", "no"),
-    ("톨리노", "Tolino", "no"), ("리마커블", "reMarkable", "no"), ("무디타 콤팩트", "Mudita Kompakt", "no"), ("샤오미 잉크팜 5", "Xiaomi InkPalm 5", "no"),
+    ("톨리노", "Tolino", "no"), ("리마커블", "reMarkable", "no"), ("샤오미 잉크팜 5", "Xiaomi InkPalm 5", "no"),
 ]
 
 TERMS = {
-    "ko": ["이북리더기 런처", "이북리더 런처", "토탈런처", "전자잉크 런처", "eink 런처", "e잉크 런처", "이잉크 런처", "이북리더 홈 앱", "크레마 런처", "독서 기록", "읽은 시간", "전자책 리더기"],
+    "ko": ["이북리더기 런처", "이북리더 런처", "전자잉크 런처", "eink 런처", "e잉크 런처", "이잉크 런처", "이북리더 홈 앱", "크레마 런처", "독서 기록", "읽은 시간", "전자책 리더기"],
     "en": ["E Ink launcher", "e-reader launcher", "e-ink home screen", "Android e-reader", "reading tracker", "reading log"],
 }
-
-# 지원하는 이북 앱(자동 추가). 킨들은 앱만: 킨들 기기는 안드로이드 앱을 깔 수 없어 기기 이름으로는 넣지 않는다
-APPS = ["킨들", "킨들 앱", "Kindle", "Kindle app", "Libby", "리비", "KOReader", "코리더", "Readest", "Moon+ Reader", "문리더", "이지뷰어", "EzViewer", "채리뷰어", "CherieViewer", "교보도서관", "Kyobo Library",
-        "교보eBook", "Kyobo eBook", "밀리의서재", "millie", "알라딘 전자책", "Aladin eBook", "북커스", "Bookers", "리디", "RIDI",
-        "YES24 전자도서관", "YES24 Library", "my YES", "YES24 eBook", "네오리더", "NeoReader"]
 
 # 다른 런처 이름(검색용, '대안·비교'로만 쓴다. 관계가 있는 것처럼 쓰지 않는다): (한글, 영어)
 LAUNCHERS = [("토탈 런처", "Total Launcher"), ("노바 런처", "Nova Launcher"), ("나이아가라 런처", "Niagara Launcher"), ("오런처", "Olauncher"), ("키스 런처", "KISS Launcher"),
@@ -132,15 +147,16 @@ LAUNCHERS = [("토탈 런처", "Total Launcher"), ("노바 런처", "Nova Launch
              ("미니멀리스트 폰", "Minimalist Phone"), ("비포 런처", "Before Launcher"), ("미니멀 런처", "Minimal Launcher"),
              ("이잉크 런처", "E-Ink Launcher"), ("BOOX 런처", "BOOX Launcher"), ("크레마 기본 런처", "Crema Launcher")]
 
-# 우리말로 흔히 부르는 다른 이름(BOOX = 부크·오닉스 등)
-ALIAS = ["부크 팔마", "오닉스 팔마", "부크 리프", "오닉스 리프", "부크 포크", "오닉스 포크", "오닉스 부크", "Onyx BOOX", "아이리더 Tango",
-         "빅미 하이브레이크", "하이센스 A9", "비우즈 AiPaper", "모안 MIX7S", "미니멀 폰", "크레마", "Crema", "메이북", "Meebook", "아이리더", "iReader"]
+# keywords 에 넣는 기기 회사 이름(우리말로 흔히 부르는 이름 포함: BOOX = 부크·오닉스)
+BRANDS = {"ko": ["크레마", "부크", "오닉스 BOOX", "메이북", "아이리더", "교보 sam", "빅미"], "en": ["Crema", "Onyx BOOX", "Meebook", "iReader", "Bigme"]}
+# keywords 에 넣는 이북 앱(자동 추가를 지원하는 앱 가운데 많이 쓰는 것. 킨들은 앱만: 킨들 기기는 안드로이드 앱을 깔 수 없다)
+KEY_APPS = {"ko": ["교보도서관", "밀리의서재", "리디", "YES24 전자도서관", "킨들 앱", "KOReader"], "en": ["Kindle app", "Libby", "KOReader", "Moon+ Reader", "Google Play Books"]}
 
 
 def keywords(lang):
-    """이 언어의 말 + 기기 이름 한글·영어 모두(겹치는 건 한 번)"""
-    words = TERMS[lang] + [k for k, _, _ in DEVICES] + [e for _, e, _ in DEVICES] + ALIAS + APPS + \
-        [k for k, _ in LAUNCHERS] + [e for _, e in LAUNCHERS] + [f"{e} alternative" for _, e in LAUNCHERS[:6]] + [f"{k} 대안" for k, _ in LAUNCHERS[:4]]
+    """이 언어의 말·회사·실제로 쓰는 기기·많이 쓰는 이북 앱, 30개 안팎(긴 목록은 검색엔진이 스팸으로 볼 수 있다. 기기 전체는 llms.txt 에)"""
+    i = 0 if lang == "ko" else 1
+    words = TERMS[lang] + BRANDS[lang] + [d[i] for d in DEVICES if d[2] == "used"] + KEY_APPS[lang]
     return ", ".join(dict.fromkeys(words))
 
 
@@ -169,6 +185,8 @@ def head(lang, p):
             {"@type": "SoftwareApplication", "@id": p["url"] + "#app", "name": "Pebble Desk", "url": p["url"],
              "description": p["desc"], "inLanguage": lang,
              "applicationCategory": "UtilitiesApplication", "applicationSubCategory": "Launcher",
+             "softwareVersion": VERSION, "datePublished": FIRST, "dateModified": RELEASED,
+             "releaseNotes": f"{REPO}/releases/tag/v{VERSION}",
              "operatingSystem": "Android 9.0 or later",
              "offers": {"@type": "Offer", "price": "0", "priceCurrency": "KRW" if lang == "ko" else "USD"},
              "isAccessibleForFree": True, "downloadUrl": RELEASES, "installUrl": RELEASES, "codeRepository": REPO,
@@ -241,7 +259,7 @@ for lang, p in PAGES.items():
 open("site/robots.txt", "w").write(f"User-agent: *\nAllow: /\n\nSitemap: {BASE}sitemap.xml\n")
 alts = "".join(f'    <xhtml:link rel="alternate" hreflang="{l}" href="{q["url"]}"/>\n' for l, q in PAGES.items()) + \
     f'    <xhtml:link rel="alternate" hreflang="x-default" href="{BASE}"/>\n'
-urls = "".join(f"  <url>\n    <loc>{q['url']}</loc>\n{alts}  </url>\n" for q in PAGES.values())
+urls = "".join(f"  <url>\n    <loc>{q['url']}</loc>\n    <lastmod>{RELEASED}</lastmod>\n{alts}  </url>\n" for q in PAGES.values())
 open("site/sitemap.xml", "w").write(
     '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
     + urls + "</urlset>\n")
@@ -255,11 +273,12 @@ llms = f"""# Pebble Desk
 Pebble Desk (페블 데스크) is a home-screen app (launcher) for Android E Ink readers.
 The home screen shows the book you are reading, three more books you are reading, favorite apps and today’s reading time.
 It runs on Android 9 or later and is free with no ads (PolyForm Noncommercial 1.0.0).
+Latest version: {VERSION} ({RELEASED}), first released {FIRST}.
 
 ## Features
 
 {chr(10).join("- " + f for f in en["features"])}
-- Supported reading apps (auto-add): Kindle, Libby, KOReader, Readest, Moon+ Reader, EzViewer (이지뷰어), CherieViewer (채리뷰어), Kyobo Library, Kyobo eBook, millie (밀리의서재), Aladin, Bookers, RIDI, YES24 Library, my YES, YES24 eBook, NeoReader (BOOX)
+- Supported reading apps (auto-add): Kindle, Libby, KOReader, Readest, BookFusion, Moon+ Reader, EzViewer (이지뷰어), CherieViewer (채리뷰어), Woojoo (우주뷰어), Google Play Books, Mihon, Kahon, Kyobo Library, Kyobo eBook, millie (밀리의서재), Aladin, Bookers, RIDI, YES24 Library, my YES, YES24 eBook, NeoReader (BOOX)
 
 ## Compared with other launchers
 
@@ -269,7 +288,9 @@ It is an independent app and is not affiliated with any of these launchers, BOOX
 
 ## E-readers
 
-{", ".join(f"{e} ({k})" for k, e, _ in DEVICES)}
+Runs on Android E Ink readers with Android 9 or later. In use on: {", ".join(e for _, e, st in DEVICES if st == "used")}.
+Other Android E Ink readers (it runs on those with Android 9 or later; older models such as early Crema and RIDIPAPER run older Android; not tested): {", ".join(f"{e} ({k})" for k, e, st in DEVICES if st == "android")}.
+Does not run on (these can't install Android apps, or run Android 8 or older): {", ".join(f"{e} ({k})" for k, e, st in DEVICES if st == "no")}. On these, use the reading app’s own features instead.
 
 ## FAQ
 
@@ -279,8 +300,10 @@ It is an independent app and is not affiliated with any of these launchers, BOOX
 
 {ko["desc"]}
 
+- 최신 판: {VERSION}({RELEASED}), 첫 판 {FIRST}
 - 다른 런처와 비교: {", ".join(k for k, _ in LAUNCHERS[:11])} 같은 일반 안드로이드 런처는 휴대폰용(아이콘·위젯·스크롤·애니메이션)이다. Pebble Desk 는 이북리더기용 대안으로, 읽는 책이 홈에 있고 목록은 쪽으로 넘기며 움직임이 없고 읽은 시간이 책마다 남는다. 이 런처들, BOOX, 크레마와는 관계없는 독립 앱이다.
-- 이북리더기: {", ".join(k for k, _, _ in DEVICES)}
+- 쓸 수 있는 기기: 안드로이드 9 이상의 전자잉크 이북리더기. 실제로 쓰는 기기: {", ".join(k for k, _, st in DEVICES if st == "used")}. 그 밖의 안드로이드 이북리더기(안드로이드 9 이상인 기기에서 쓸 수 있다. 옛 크레마·리디페이퍼 등은 더 낮은 안드로이드다. 시험하지 않음): {", ".join(k for k, _, st in DEVICES if st == "android")}
+- 쓸 수 없는 기기(안드로이드 앱을 깔 수 없거나 안드로이드 8 이하): {", ".join(k for k, _, st in DEVICES if st == "no")}
 
 {chr(10).join(f"- **{q}** {a}" for q, a in ko["faq"])}
 

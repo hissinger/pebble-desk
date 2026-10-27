@@ -25,7 +25,7 @@ class BookShelfStoreTest {
     private val today = LocalDate.now()
 
     @Before fun setUp() {
-        db.execSQL("INSERT INTO shelf VALUES (0, 'b-1', '데미안', '', NULL, 0, 10, -1, '')")
+        db.execSQL("INSERT INTO shelf VALUES (0, 'b-1', '데미안', '', NULL, 0, 10, -1, '', '')")
         BookShelf.clearCaches()
     }
 
@@ -172,7 +172,7 @@ class BookShelfStoreTest {
 
     @Test fun `읽고 있는 책은 고치기 전 제목이 같아도 목록 앞쪽부터 찾는다`() {
         db.execSQL("UPDATE shelf SET pos = 1")
-        db.execSQL("INSERT INTO shelf VALUES (0, 'b-2', '헤세의 소설', '', NULL, 0, 0, -1, '데미안')")
+        db.execSQL("INSERT INTO shelf VALUES (0, 'b-2', '헤세의 소설', '', NULL, 0, 0, -1, '데미안', '')")
         BookShelf.clearCaches()
         assertEquals("b-2", BookShelf.findByTitle(app, "데미안")?.id)
     }
@@ -209,7 +209,7 @@ class BookShelfStoreTest {
         BookShelf.restore(app, "b-1", newRound = true)
         assertTrue(BookShelf.roundStarts(app).isEmpty())
         BookShelf.remove(app, "b-1")
-        repeat(12) { db.execSQL("INSERT INTO shelf VALUES ($it, 'b-x$it', '책 $it', '', NULL, 0, 0, -1, '')") }
+        repeat(12) { db.execSQL("INSERT INTO shelf VALUES ($it, 'b-x$it', '책 $it', '', NULL, 0, 0, -1, '', '')") }
         BookShelf.clearCaches()
         BookShelf.restore(app, "b-1", newRound = false)
         assertEquals(13, BookShelf.list(app).size)
@@ -226,7 +226,7 @@ class BookShelfStoreTest {
     }
 
     @Test fun `다른 책의 완독 줄은 고치지 못한다`() {
-        db.execSQL("INSERT INTO shelf VALUES (1, 'b-2', '싯다르타', '', NULL, 0, 0, -1, '')")
+        db.execSQL("INSERT INTO shelf VALUES (1, 'b-2', '싯다르타', '', NULL, 0, 0, -1, '', '')")
         BookShelf.clearCaches()
         BookShelf.finish(app, "b-1", Review(6))
         val other = BookShelf.finishList(app)["b-1"]!!.single()
@@ -406,7 +406,7 @@ class BookShelfStoreTest {
         assertTrue(BookShelf.list(app).none { it.id == "b-1" })
         assertEquals(1, BookShelf.history(app).count { it.book.id == "b-1" })
         // 빼기도
-        db.execSQL("INSERT INTO shelf VALUES (0, 'b-2', '싯다르타', '', NULL, 0, 10, -1, '')")
+        db.execSQL("INSERT INTO shelf VALUES (0, 'b-2', '싯다르타', '', NULL, 0, 10, -1, '', '')")
         db.execSQL("INSERT INTO past VALUES (1, 'b-2', '싯다르타', '', NULL, 0, -1, '', 1000, 0)")
         BookShelf.clearCaches()
         BookShelf.remove(app, "b-2")
@@ -433,6 +433,21 @@ class BookShelfStoreTest {
         assertEquals(60, BookShelf.addOpened(app, "데미안", "", null, 60, -1).progress)
         BookShelf.clearCaches()
         assertEquals(60, BookShelf.list(app).single().progress)
+    }
+
+    @Test fun `읽는 화는 보이면 새 값, 모르면(빈 값) 그대로이고 나간 책에는 남기지 않는다`() {
+        BookShelf.updateStatus(app, "b-1", -1, -1, chapter = "Ch. 3")
+        BookShelf.updateStatus(app, "b-1", -1, -1)
+        assertEquals("Ch. 3", BookShelf.list(app).single().chapter)
+        BookShelf.clearCaches()
+        assertEquals("Ch. 3", BookShelf.list(app).single().chapter)
+        assertEquals(10, BookShelf.list(app).single().progress)
+        BookShelf.remove(app, "b-1")
+        assertEquals("", BookShelf.history(app).single().book.chapter)
+        // 되살리면 그때 본 읽는 화
+        assertEquals("Ch. 5", BookShelf.addOpened(app, "데미안", "", null, -1, -1, chapter = "Ch. 5").chapter)
+        BookShelf.clearCaches()
+        assertEquals("Ch. 5", BookShelf.list(app).single().chapter)
     }
 
     @Test fun `나간 책의 반납일은 저장하지 않으니 메모리 사본에도 남기지 않는다(다시 띄운 뒤와 같게)`() {
@@ -544,8 +559,8 @@ class BookShelfStoreTest {
     }
 
     @Test fun `서재에서 본 여러 책의 진행률을 순서 그대로 한 번에 쓴다`() {
-        db.execSQL("INSERT INTO shelf VALUES (1, 'b-2', '싯다르타', '', NULL, 0, -1, -1, '')")
-        db.execSQL("INSERT INTO shelf VALUES (2, 'b-3', '모모', '', NULL, 0, 5, -1, '')")
+        db.execSQL("INSERT INTO shelf VALUES (1, 'b-2', '싯다르타', '', NULL, 0, -1, -1, '', '')")
+        db.execSQL("INSERT INTO shelf VALUES (2, 'b-3', '모모', '', NULL, 0, 5, -1, '', '')")
         BookShelf.clearCaches()
         val before = Db.changes()
         BookShelf.updateStatuses(app, listOf(
@@ -570,7 +585,7 @@ class BookShelfStoreTest {
     }
 
     @Test fun `순서가 바뀌면 표를 다시 쓴다`() {
-        db.execSQL("INSERT INTO shelf VALUES (1, 'b-2', '싯다르타', '', NULL, 0, -1, -1, '')")
+        db.execSQL("INSERT INTO shelf VALUES (1, 'b-2', '싯다르타', '', NULL, 0, -1, -1, '', '')")
         BookShelf.clearCaches()
         BookShelf.moveToFront(app, "b-2")
         assertEquals(listOf("b-2", "b-1"), dbShelf().map { it[1] })

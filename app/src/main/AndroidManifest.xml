@@ -29,6 +29,7 @@
         android:maxSdkVersion="29" />
 
     <application
+        android:name=".PebbleDeskApp"
         android:allowBackup="false"
         android:requestLegacyExternalStorage="true"
         android:icon="@mipmap/ic_launcher"

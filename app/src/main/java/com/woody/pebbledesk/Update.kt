@@ -265,9 +265,16 @@ object Update {
     }
 
     /** [file] 에 받는다(크기·SHA-256 이 다르면 실패. 지우는 것은 부르는 쪽) */
-    private fun download(release: Release, file: File) {
+    private fun download(release: Release, file: File) =
+        fetch(release.apkUrl, release.size, release.sha256, file) { downloaded = it }
+
+    /**
+     * [url] 을 [file] 에 받는다: 크기가 [size] 이고 SHA-256 이 [sha256] 이어야 한다(다르면 실패, 넘치면 바로 멈춘다. 지우는 것은 부르는 쪽).
+     * 받은 만큼(0~100)을 [progress] 로 알린다. 네트워크를 쓰므로 백그라운드에서.
+     */
+    fun fetch(url: String, size: Long, sha256: String, file: File, progress: (Int) -> Unit) {
         val digest = MessageDigest.getInstance("SHA-256")
-        open(release.apkUrl).use { r ->
+        open(url).use { r ->
             r.inputStream.use { input ->
                 file.outputStream().use { out ->
                     val buf = ByteArray(64 * 1024)
@@ -279,13 +286,13 @@ object Update {
                         out.write(buf, 0, n)
                         total += n
                         // 알려 준 크기를 넘으면 바로 멈춘다(끝없이 보내는 서버)
-                        if (total > release.size) throw IOException("larger than asset size")
-                        downloaded = (total * 100 / release.size).toInt()
+                        if (total > size) throw IOException("larger than asset size")
+                        progress((total * 100 / size).toInt())
                     }
                 }
             }
         }
-        if (file.length() != release.size || !digest.digest().hex().equals(release.sha256, ignoreCase = true)) {
+        if (file.length() != size || !digest.digest().hex().equals(sha256, ignoreCase = true)) {
             throw IOException("size or SHA-256 mismatch")
         }
     }
