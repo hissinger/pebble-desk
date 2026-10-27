@@ -587,7 +587,12 @@ e-ink 판이 따로 없다(킨들 단말기는 안드로이드가 아니다). �
 - **표지**: 받은 책은 격자 보기·홈 탭 칸에 늘 ✓ 가(읽은 책은 진행률 띠도) 표지의 큰 부분을 덮어 자르지 않는다. 1.5.10 까지는 목록 보기 칸에서만 표지가 들어왔다. 지금은 '이어 읽기' 표지도 그 책의 칸으로 읽어, 읽고 돌아오면 방금 읽은 책의 표지가 들어온다(페블에서 90×135px, 목록 보기 칸은 120×180). '이어 읽기' 그림 자리는 늘 세로로 길어 가로로 긴 표지는 자리 밖으로 넘쳐 그려지므로, 같은 책의 서재 칸 표지가 표지 모양이 아니면 자르지 않는다(그 칸이 안 보이면 알 수 없다).
 - **읽는 화면**: 본문·위 제목(`WUTHERING HEIGHTS`)·아래 `Learning reading speed`·`0%` 가 모두 직접 그리는 뷰(`KRFView`)라 드러나지 않는다. 가운데를 눌러 메뉴를 띄우면 제목 `command_bar_title_bottom`(`Wuthering Heights`)·진행률 `nln_text_secondary`(`Location 1 of 4559  •  0%`, 쪽이 있는 책은 `Page 15 of 325  •  4%`)·진행 막대 `krx_location_control`. 화면 캡처는 막혀 있지 않다.
 - **진행률**: 서재 칸 설명의 `Reading is 4% completed.` 는 읽는 화면을 닫고 돌아오면 바로 바뀐다.
-- **특정 책 바로 열기**: 매니페스트에 `kindle://` 링크가 있다 **(미확인)**. 내 파일(PDF·EPUB)도 `ACTION_VIEW` 로 받는다.
+- **특정 책 바로 열기**: **안 된다**(다른 서점 앱들처럼 그냥 앱을 연다). 2026-10-27 APK 8.158.0.100 을 풀어 보고 에뮬(`CremaPebble_A11`)에서 시험했다(사용자 댓글: 홈에서 고른 책이 아니라 마지막 책이 열린다).
+  - 링크는 있다: `kindle://book?action=open&asin=…`(`KindleProtocol`)·`https://read.amazon.com/application/home?action=open&asin=…`(`HomeDeeplinkHandler`, `ThirdPartyUpgradePage` 가 받는다). 둘 다 그 책의 **ASIN** 이 있어야 한다.
+  - ASIN 을 얻을 길이 없다: 서재 칸 설명·접근성에는 제목·저자·상태뿐(표지 칸 `BadgeableCover`·목록 줄 `LibraryBookRow` 의 접근성 대리자는 클래스 이름만 바꾼다). 책 목록을 내주는 공개 프로바이더가 없고, 책 파일은 `Android/data/com.amazon.kindle`(SD 카드에 받기도 그 앱 폴더)라 안드로이드 11 부터 모든 파일 액세스로도 못 읽는다. 보낸 문서는 스토어 ASIN 이 없다. '마지막으로 읽은 책' 위젯(`LastReadBookWidgetReceiver`)은 마지막 책만 연다. 제목으로 스토어를 검색해 ASIN 을 찾으면 다른 판(무료판·AmazonClassics 판)이 열릴 수 있어 쓰지 않는다.
+  - 제목 검색 링크 `kindle://application?action=search&searchTerms=제목` 은 된다: 검색 화면이 그 제목으로 열리고 `In your library` 에 그 책이 바로 나온다(한 번 더 눌러야 열리고 화면 키보드가 뜬다. 첫 실행에는 `Filter by language` 안내가 덮는다). 억지로 붙이지 않기로 했다.
+  - 홈에서 누르면 킨들 앱을 연다. 킨들이 읽는 화면에 머물러 있으면 안드로이드가 그 화면을 다시 띄워 마지막 책이 보이고, 킨들이 꺼져 있었으면 홈 탭이 열린다.
+  - 내 파일(PDF·EPUB)은 `ACTION_VIEW` 로 받는다.
 
 ### Libby `com.overdrive.mobile.android.libby` (2026-10-16, 갤럭시 A23 안드로이드 14 · WebView 154, 에뮬레이터 `CremaPebble_A11_Play`(안드로이드 11) · WebView 155, 옛 `CremaPebble_A11` · WebView 91, 9.5.0, **지원**)
 
