@@ -2,167 +2,80 @@
 
 **An E Ink launcher for Android e-readers.** Books you open in Kindle, Libby, KOReader and other reading apps appear on your home screen, and reading time is kept for every book. → [pebbledesk.github.io](https://pebbledesk.github.io/en/)
 
-크레마 페블 같은 6인치 전자잉크 기기를 위한 글자 중심 홈 앱(런처). 홈페이지: [pebbledesk.github.io](https://pebbledesk.github.io/)
-지금 읽는 책을 가장 크게 두고, 나머지는 자주 쓰는 앱과 모든 앱으로 나눈다.
+[한국어](README.ko.md)
 
-- 흑백·박스 없음·애니메이션 없음. 목록은 스크롤 대신 페이지로 넘긴다.
-- 바뀐 곳만 다시 그려 화면 깜빡임을 줄인다.
-- 기기가 잠금 해제되기 전에도 바로 뜬다(부팅 화면 직후 홈).
+<p align="center"><img src="docs/screenshots/hero-en.png" width="720" alt="Pebble Desk home screen on a Crema Pebble and a BOOX Palma: the book being read, three more books under Also reading, favorite apps, and Today 38 min · day 15"></p>
 
-| 홈 | 독서 기록 | 독서 기록(그래프) | 올해 읽은 책 |
+## Features
+
+- **The book you're reading, on Home**: cover, title, author, progress and due date, big. More books sit under `Also reading`. Tap a book to open its app.
+- **Auto-add books**: open a book in a [supported app](#supported-apps) and it's added to Home with its cover. Books from other apps can be added by hand, with cover search.
+- **Reading time for every book**: counts only the time the reading screen is up. Today's time and your streak on Home; a reading log with a four-week calendar or graph, a daily goal and weekly totals.
+- **Finish a book**: rate it in half stars and write a few words. Read it again and each round keeps its own record.
+- **Books this year**: every book you read or finished, as a list or a cover grid, for any year.
+- **Favorites and All apps**: your own order and names, list or grid. All apps by page with a letter index. Hide apps you don't use.
+- **Made for E Ink**: black and white, no animation, pages instead of scrolling, and only what changed is redrawn.
+- **Display**: text size 70–150% and line spacing 80–150%, an optional color theme for color E Ink, landscape and tall (bar-shaped) screens.
+- **Devices**: designed for the Crema Pebble; other Android E Ink devices (BOOX, Meebook and others) are scaled to the same width.
+- **Stays on the device**: your log is never sent anywhere. Updates install from inside the app.
+
+| Home | Reading log | Reading log (graph) | Books this year |
 |---|---|---|---|
 | <img src="docs/screenshots/home.png" width="180"> | <img src="docs/screenshots/reading.png" width="180"> | <img src="docs/screenshots/reading-graph.png" width="180"> | <img src="docs/screenshots/year.png" width="180"> |
-| **책 상세** | **모든 앱** | **숨긴 앱** | **설정** |
+| **Book details** | **All apps** | **Hidden apps** | **Settings** |
 | <img src="docs/screenshots/book-detail.png" width="180"> | <img src="docs/screenshots/apps.png" width="180"> | <img src="docs/screenshots/hidden.png" width="180"> | <img src="docs/screenshots/settings.png" width="180"> |
 
-## 설치
+## Supported apps
 
-[Releases](https://github.com/hissinger/pebble-desk/releases)에서 `PebbleDesk-<판>-release.apk` 를 받아 기기에 복사하고 파일 관리자에서 눌러 설치한다. 덮어 설치하면 책 목록·독서 기록·설정이 그대로 남는다. 1.5.0 까지는 이렇게 직접 받아 설치하고, 1.5.0 을 깐 뒤로는 설정 > 정보 > `업데이트`(1.5.0 은 설정 > 앱 관리 > `업데이트`)에서 다음 판을 받아 설치할 수 있다(처음 한 번 '알 수 없는 앱 설치'를 허용). 설치한 뒤 설정 > 앱 관리 > `기본 홈 앱`(1.5.0 은 `기본 홈 앱으로 설정`)에서 Pebble Desk를 홈 앱으로 고른다.
+What each app provides (cover, title, author, progress, due date) is shown in Settings › Reading › `How auto-add works` and in [docs/READER_APPS.md](docs/READER_APPS.md) (Korean).
 
-화면은 크레마 페블(폭 572dp) 기준으로 만들고, 다른 안드로이드 전자잉크 기기는 폭이 같아지도록 앱이 밀도를 맞춘다. 문제가 생기면 [문제가 생기면](docs/TROUBLESHOOTING.md)을 보고, 그래도 안 되면 설정 > `기기 정보` 화면을 사진으로 찍어 보내 주면 맞춘다.
+<table>
+<tr><td align="center" width="96"><img src="docs/screenshots/app-icons/kindle.png" width="48"><br><sub>Kindle</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/libby.png" width="48"><br><sub>Libby</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/koreader.png" width="48"><br><sub>KOReader</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/readest.png" width="48"><br><sub>Readest</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/bookfusion.png" width="48"><br><sub>BookFusion</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/playbooks.png" width="48"><br><sub>Google Play Books</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/mihon.png" width="48"><br><sub>Mihon</sub></td></tr>
+<tr><td align="center" width="96"><img src="docs/screenshots/app-icons/kahon.png" width="48"><br><sub>Kahon</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/moonreader.png" width="48"><br><sub>Moon+ Reader</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/ezviewer.png" width="48"><br><sub>EzViewer</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/cherieviewer.png" width="48"><br><sub>CherieViewer</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/woojoo.png" width="48"><br><sub>Woojoo</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/kyobo-library.png" width="48"><br><sub>Kyobo Library</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/kyobo-ebook.png" width="48"><br><sub>Kyobo eBook</sub></td></tr>
+<tr><td align="center" width="96"><img src="docs/screenshots/app-icons/millie.png" width="48"><br><sub>millie</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/aladin.png" width="48"><br><sub>Aladin</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/bookers.png" width="48"><br><sub>Bookers</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/ridi.png" width="48"><br><sub>RIDI</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/yes24-library.png" width="48"><br><sub>YES24 Library</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/myyes.png" width="48"><br><sub>my YES</sub></td><td align="center" width="96"><img src="docs/screenshots/app-icons/yes24-ebook.png" width="48"><br><sub>YES24 eBook</sub></td></tr>
+</table>
 
-## 처음 설치하면 (시작하기)
+NeoReader (BOOX) is supported too.
 
-홈이 처음 뜰 때 **시작하기** 두 쪽이 한 번 나온다. 이 앱의 기본 기능인 두 가지를 켜게 한다(둘 다 이미 켜져 있으면 나오지 않는다).
+## Install
 
-1. **읽는 책 자동 추가**(1/2): 무엇이 되는지와 켜면 홈에 생기는 모습, `켜는 방법` 단계와 그 시스템 화면을 여는 버튼(`접근성 열기 ›`). 안드로이드 13 이상은 파일로 깐 앱이 막혔을 때 푸는 단계(`제한된 설정` 창 닫기 → `앱 정보 열기 ›` › ⋮ › 제한된 설정 허용 → 다시 켜기)까지 보인다. 켜져야 `다음 ›` 이 눌린다.
-2. **오늘 읽은 시간**(2/2): 같은 모양으로 `사용 기록 액세스` 를 허용하게 한다. 켜져야 `시작하기 ›` 가 눌린다.
+1. Download `PebbleDesk-<version>-release.apk` from [Releases](https://github.com/hissinger/pebble-desk/releases) and tap it in a file manager on the device. Later versions install from Settings › About › `Update`.
+2. Choose Pebble Desk in Settings › Apps › `Default home app`.
+3. On first run, `Getting started` turns on the two core features: **Auto-add books** (Android Accessibility) and **Reading time** (Usage access). On Android 13 and later, an app installed from a file may need **Allow restricted settings** in its app info first.
 
-켜지 않고 넘어가려면 화면 아래 `나중에 하기`(뒤로 키도 같다). 켤 수 없는 기기에서도 나갈 수 있다. 다시 나오지 않으며, 나중에는 설정 › 독서에서 켜고 끈다.
+If something goes wrong, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) (Korean), or send a photo of Settings › `Device info`.
 
-## 홈 화면
+## Permissions
 
-위에서부터 네 구역으로 나뉜다.
-
-1. **상단 두 줄**: 크레마 로고(페블만)·시계, 그 아래 상태 줄(`10월 3일 토요일 · 100% · 와이파이 · BT · 조명 · ⑮`).
-   - 와이파이·블루투스·조명은 켜져 있을 때만, 충전 중이면 배터리 앞에 번개 표시, 마지막 원문자는 잔상 제거 횟수.
-   - 누르면 기기의 빠른 설정(와이파이·BT·조명·음량)이 열린다(크레마 빠른 설정 / 메이북 빠른 설정 패널).
-2. **지금 읽는 책**: 표지·제목·저자·진행률(`47% 읽음`)·반납일(`반납 4일 남음`)과 그 책을 읽는 앱. 누르면 그 앱이 열린다.
-   - 책 수에는 제한이 없고, 맨 앞 책이 홈에 크게, 나머지는 `함께 읽는 책` 줄에 작은 표지로 3권씩 보인다. 4권이 넘으면 제목 오른쪽 `‹ 1 / 2 ›` 를 누르거나 그 줄을 좌우로 밀어 넘긴다. 작은 표지를 누르면 그 책이 맨 앞으로 오고 앱이 열린다.
-   - 책이 없으면 회색 자리 표시(스켈레톤)가 보이고, 누르면 책을 넣는 법(이북 앱에서 펴면 저절로 들어온다, 자동 추가 켜기, 지원하지 않는 앱은 직접 추가)을 알려 준다.
-3. **자주 쓰는 앱**: 직접 고른 앱을 직접 정한 순서로. 이름을 따로 붙일 수 있다(모든 앱에는 원래 이름). 격자(4×2, 기본) 또는 목록(3줄) 보기. 넘치면 `‹ 1 / 2 ›` 로 쪽을 넘긴다.
-4. **하단 줄**: `모든 앱 ›` · 오늘 읽은 시간(`오늘 42분 · 5일째`) · 설정.
-
-앱이나 책을 길게 누르면 아래에서 메뉴가 올라온다.
-
-- 앱: (홈 자주 쓰는 앱) 이름 바꾸기, 자주 쓰는 앱에 넣기·빼기, 숨기기, 앱 정보
-- 책: 완독, 책 정보 고치기(읽고 있는 앱 바꾸기 · 제목 · 저자 · 표지 다시 찾기), 책 빼기. `완독`·`책 빼기`를 누르면 별점·감상 메뉴가 떠 확인을 겸한다(맨 아래 `취소` / `완독`·`책 빼기`. 비워 두고 눌러도 된다. 거의 읽지 않은 책의 빼기는 확인만). 올해 읽은 책에서 책을 누를 때와 같은 상세로, 머리에 표지·저자·앱·진행률과 마지막 회차의 기록·별점·감상
-
-## 모든 앱
-
-- 숨긴 앱을 뺀 모든 앱을 가나다순으로 페이지에 나눠 보여 준다. 오른쪽 색인 글자를 누르면 그 글자로 간다.
-- 자주 쓰는 앱은 `★`, 책에 연결된 앱은 `읽는 중` 으로 표시한다.
-- 숨긴 앱은 따로 모아 보고 다시 보이게 할 수 있다.
-- 앱 아이콘은 흑백으로 바꿔(컬러면 원래 색) 작게 붙인다(설정에서 끄면 이름만).
-- BOOX 가 얼려 둔(꺼 둔) 앱도 목록에 그대로 두고, 누르면 BOOX 런처가 풀고 연다.
-
-## 읽고 있는 책
-
-### 직접 추가
-
-제목을 입력하면 표지를 찾아 보여 준다(한국어 책은 YES24, 앱 언어가 영어이고 검색어에 한글이 없으면 Apple Books·Open Library). 표지를 고르고, 그 책을 읽는 앱을 고르면 홈에 들어간다.
-읽고 있는 책 목록에서 순서를 바꾸거나 빼고, 앱을 바꿀 수 있다.
-
-### 완독
-
-책 메뉴의 `완독`을 누르면 읽고 있는 책에서 빠지고 완독한 책으로 남는다(그날을 완독한 날로). 완독한 책은 [올해 읽은 책](#올해-읽은-책)에 표지에 `완독` 띠를 두르고 보이고, 이북 앱에서 다시 펴면 자동 추가가 다시 넣고 다시 읽는 새 회차가 그날 시작한다(`다시 읽기`를 눌러도 같다). `책 빼기`로 뺀 책도 기록은 남아, 읽은 시간이 있으면 올해 읽은 책에 보인다.
-
-### 자동 추가 (설정 > 독서)
-
-이북 앱의 서재에서 책을 누르거나 읽는 화면을 열면, 그 책을 홈 맨 앞으로 자동으로 넣는다. 안드로이드 접근성에서 Pebble Desk 를 켜면 켜진 것이다(설정 › 독서의 `켜짐`/`꺼짐` 은 접근성 상태 그대로이고, 누르면 안내 창에서 접근성을 연다).
-
-> 안드로이드 13 이상에서 APK 파일로 설치하면 접근성의 Pebble Desk 가 흐리게 막힐 수 있다(제한된 설정, Play 스토어로 깐 앱은 해당 없음). Pebble Desk 를 한 번 눌러 안내 창을 닫은 뒤, 앱 정보(설정 › 독서 › 읽는 책 자동 추가 › `앱 정보 열기`) › 오른쪽 위 ⋮ › **제한된 설정 허용** 을 하고 다시 켠다.
-
-- 지원하는 앱: 교보도서관 · 교보eBook(e-ink · 휴대폰) · 밀리의서재(e-ink · 휴대폰) · 알라딘 · 북커스 · 리디(원스토어판 포함) · YES24(전자도서관(휴대폰판 포함) · my YES · eBook) · 문리더(유료판 포함) · 이지뷰어 · 채리뷰어 · 킨들 · Libby · 네오리더(BOOX) · KOReader · Readest · BookFusion · 우주뷰어 · Google Play 북 · Mihon · Kahon
-- 서재·읽는 화면에 보이는 정보로 **제목·저자·진행률·반납일**을 채운다. 진행률은 뷰어 설정에서 화면 아래 정보(진행률·쪽)를 켜 두면 읽는 중에도 갱신된다.
-- 표지는 서재 화면에서 그 책 칸의 그림을 잘라 온다. 가져올 수 없으면 제목·저자를 넣은 **빈 표지**를 그리고, `표지 다시 찾기` 로 인터넷에서 찾은 표지를 고를 수 있다.
-- 완독한 책도 다시 펴면 들어오고, 다시 읽는 새 회차가 그날 시작한다.
-- 접근성 서비스는 위 이북 앱 화면만 받는다. 다른 앱의 화면은 보지 않는다.
-
-- **KOReader** 는 화면에 책 제목을 드러내지 않아, KOReader 가 남기는 기록(`koreader/history.lua`, 책 옆 `.sdr`)과 책 파일로 안다. 설정 › 독서 › **책 파일 읽기**에서 안드로이드 '모든 파일에 액세스'를 허용해야 한다. 책을 닫고 파일 목록에 있는 동안은 읽은 시간에 넣지 않고, 홈에서 책을 누르면 그 파일을 KOReader 로 바로 연다. EPUB 은 책 파일의 표지를 넣는다.
-- **Readest** 는 서재·읽는 화면이 모두 웹 화면이다. 읽는 화면에 늘 보이는 책 해시로 어떤 책인지 알고, 홈에서 책을 누르면 `readest://book/<해시>` 로 그 책을 바로 연다. Readest › 고급 설정 › `데이터 위치 변경` › `새 폴더 선택` 에서 `/sdcard/0`(내장 저장소, SD 카드는 `/sdcard/1`)으로 옮기고(권장) 책 파일 읽기를 켜면 표지·저자·진행률을 Readest 데이터(`Readest/Books/library.json`·책마다 `config.json`·`cover.png`)에서 가져온다. 옮기지 않으면 표지는 서재 화면에서 잘라 오고, 저자는 목차 창을, 진행률은 `읽기 진행 상황` 창을 열어야 들어온다(그 뒤로는 쪽을 넘길 때마다 센다).
-- **BookFusion** 은 읽는 화면에 책 제목이 없어 Bookshelf 화면에서 눌러 연 책만 안다(`You're currently reading` 줄·격자 보기 칸, 목록 보기 칸은 책 상세의 `Read`). 다른 길로 연 책은 '책 모름'으로 두어 앞서 읽던 책에 시간을 붙이지 않는다. 진행률은 읽는 중 가운데를 눌러 메뉴를 띄우면 들어오고, 표지는 서재에서 잘라 온다. 홈에서는 BookFusion 을 연다(특정 책 바로 열기는 없다).
-- **우주뷰어** 는 내 서재에서 눌러 연 책을 안다. 책 파일 읽기를 허용하면 우주가 남기는 최근 책 기록(`Woojoo/RecentBooks`)으로 다른 길로 연 책도 메뉴 없이 알고, 홈에서 그 파일을 우주로 바로 연다. PDF·만화는 서재 칸과 읽는 화면의 제목이 달라(읽는 화면은 파일 이름) 파일 이름으로 들어오고, 표지는 우주가 그려 둔 그림(책 파일 읽기)을 쓴다. 읽는 중 진행률은 우주가 쪽마다 적는 기록(책 파일 읽기)이나 메뉴에서 들어온다.
-- **Google Play 북** 은 읽는 화면의 제목으로 책을 메뉴 없이 알고, 진행률도 쪽으로 센다. 표지·저자는 라이브러리(`내 도서`)에 그 책이 보이면 들어온다(직접 올린 책도). 라이브러리에 들어가지 않는 무료 샘플은 스토어의 책 화면에서. 홈에서는 Play 북을 연다.
-- **Mihon · Kahon**(만화) 은 작품 하나를 책 한 권으로 본다. 작품 화면에서 화를 눌러 연 화는 바로 그 작품으로 들어오고, 기록·업데이트 탭에서 바로 연 화는 읽다가 가운데를 눌러 메뉴를 한 번 띄우면 들어온다(메뉴를 늦게 띄워도 읽는 화면을 연 때부터 그 작품의 시간으로 센다). 표지는 서재·기록 탭·작품 화면에서(서재에서 가져온 표지에는 Mihon 이 그 위에 그린 제목·표시가 함께 들어간다), 책 파일 읽기를 켜면 로컬 만화는 작품 폴더의 표지 그림으로 들어온다. 저자는 작품 화면에서, 책 파일 읽기를 켜면 로컬 만화 정보·받은 화·Mihon 자동 백업에서도 들어온다. 진행률(%) 대신 메뉴를 띄우면 보이는 화 이름(`Chapter 12`·`12화` 등 소스가 쓴 그대로)을 보여 준다.
-
-앱마다 되는 것과 안 되는 것은 설정 > 독서 > `자동 추가 안내`와 [docs/READER_APPS.md](docs/READER_APPS.md)에 있다.
-
-> 이북 앱이 특정 책을 바로 열어 주지는 않으므로, 책을 누르면 그 앱이 열린다.
-
-## 독서 기록 (설정 > 독서)
-
-이북 앱의 **읽는 화면**이 떠 있던 시간을 세어 하루 읽은 시간을 보여 준다. 안드로이드 **사용 기록 액세스**에서 Pebble Desk 를 허용하면 켜진 것이다(설정 › 독서 › 오늘 읽은 시간이 그 화면을 연다).
-
-- 서재·스토어 화면과 화면이 꺼진 시간은 세지 않는다.
-- **책별로 센다**: 읽는 책 자동 추가(접근성 서비스)가 그 앱에서 편 책을 알아 두고, 읽는 화면 시간을 그 앱에서 마지막으로 편 책으로 나눈다. 어떤 책인지 한 번도 몰랐던 앱의 시간은 합계에만 들어간다.
-- 하단 줄에 `오늘 42분 · 5일째`(연속일 = 하루 5분 이상 읽은 날이 이어진 수).
-- 누르면 **독서 기록** 화면:
-  - 연속일·최장 기록, 이번 달 목표 달성 일수(`10월 목표 달성 7 / 8일`), 오늘의 목표 링(`5분 / 30분`)
-  - 4주 링 달력(날마다 하루 목표 대비) 또는 막대그래프(날마다 읽은 시간, 목표선). `달력 · 그래프`로 바꾸고, `‹ ›`로 4주씩 지난 기간을 넘겨 본다.
-  - 읽은 시간(이번 주 · 이번 달 · 올해)과 **이번 주 읽은 책**(책 이름 · 시간, 다섯 권씩 쪽 넘기기)
-  - 제목 오른쪽 `올해 읽은 책 ›`
-- 하루 목표(없음 / 15분~1시간 / 직접 입력 1~300분, 기본 30분. 바꿔도 지난날은 그날의 목표로)와 한 주 시작 요일(월·일)을 고를 수 있다.
-- 처음 켤 때 사용 기록에서 7일 전까지 채운다. 기록은 지우지 않고 계속 남는다.
-
-### 올해 읽은 책
-
-그해 읽었거나 완독한 책을 모두 모아 보여 준다(읽는 중 · 완독한 책 · 뺀 책 · 목록에 넣지 못한 책).
-
-- 목록(표지 · 제목 · 저자) 또는 표지 격자(한 줄에 4권). 아래 `전체 · 완독`으로 그해 완독한 책만 볼 수 있다. 완독한 책은 표지 모서리에 `완독` 띠, 목록 줄과 상세에는 둥근 `COMPLETED` 도장.
-- 책을 누르면 홈의 책 메뉴와 같은 머리(표지·저자·앱)와 마지막 회차의 읽은 기간(`9월 2일 – 10월 6일`)·읽은 시간·별점·감상, 메뉴(`완독` · `다시 읽기` · `책 정보 고치기` · `기록에서 지우기`, 읽고 있는 책이면 홈과 같은 메뉴). 다 읽은 책도 제목·저자·표지를 고칠 수 있다. 완독한 책을 `다시 읽기`해도 완독 기록은 남고, 다시 완독하면 `1회`·`2회`처럼 회차가 쌓인다. 회차가 둘 이상이면 기록 칸을 눌러 전체 기록(회차마다 기간·시간·별점·감상, 누르면 완독한 날·별점·감상 고치기)을 본다.
-- 제목 오른쪽 `2026 ▾`으로 지난해를 고른다(`2025년 읽은 책`).
-
-## 설정
-
-| 묶음 | 항목 |
+| Permission | Used for |
 |---|---|
-| 독서 | 읽고 있는 책, 읽는 책 자동 추가, 자동 추가 안내, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 |
-| 화면 | 글자 · 간격(글자 크기 70~150%(기기 글꼴 크기에 곱한다), 줄 간격 80~150%를 10%씩 슬라이더로, 미리 보기), 색(흑백 · 컬러. 컬러 전자잉크용, 화면마다 색면), 앱 아이콘, 시계(24시간/12시간), 기기 상단 바(홈에서도 보이기. 교보 sam 7 처럼 상단 바 버튼이 곧 빠른 설정인 기기용) |
-| 언어 | 시스템(기기 언어를 따름)/한국어/English (첫 화면) |
-| 앱 관리 | 자주 쓰는 앱 관리(맨 위에서 보기 목록/격자, 이름을 누르면 이름 바꾸기), 숨긴 앱, 기본 홈 앱, 기기 설정 열기 |
-| 정보 | 기기 정보(모델·화면·권한·자동 추가 서비스 기록·누른 버튼·시스템 화면 시험을 한 화면에 모은 진단 화면), 업데이트 |
+| Accessibility service (optional) | Auto-add books. Only supported e-book apps are watched, and only book info (title, author, progress, due date, cover), never the book's text |
+| Usage access (optional) | Reading time |
+| All files access (optional) | `Read book files`: KOReader's records, covers from book files, Readest data. Read only |
+| Internet | Cover search, update check, and downloading the comic cover unpacking tool (libarchive) |
 
-## 권한
+## Build
 
-| 권한 | 쓰는 곳 |
-|---|---|
-| 앱 목록 조회 | 모든 앱·자주 쓰는 앱 |
-| 인터넷 | 책 추가·표지 다시 찾기의 표지 검색(YES24·Apple Books·Open Library) |
-| 와이파이·블루투스 상태 | 상단 상태 줄 |
-| 사용 기록 액세스 (선택) | 오늘 읽은 시간·독서 기록 |
-| 접근성 서비스 (선택) | 읽는 책 자동 추가 |
-| 모든 파일에 액세스 (선택, 안드로이드 10 까지는 저장소 읽기) | KOReader 자동 추가(KOReader 의 기록·책 옆 `.sdr` 읽기), 책 파일의 EPUB·CBZ 표지, Readest 데이터 폴더(표지·저자·진행률). 읽기만 하고 쓰지 않는다 |
-
-## 데이터
-
-앱 데이터는 기기 안에만 둔다(밖으로 보내지 않는다). 읽은 시간·편 책·읽고 있는 책·완독한 책은 앱 DB(SQLite), 표지는 파일, 설정은 앱 설정 파일. 예전 버전의 기록 파일은 처음 실행할 때 DB로 옮긴다. 앱을 지우면 기록도 지워진다.
-
-## 빌드
-
-Android Studio의 JDK로 빌드한다(minSdk 28, targetSdk 34).
+Build with Android Studio's JDK (minSdk 28, targetSdk 34).
 
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ./gradlew assembleRelease
-adb install -r app/build/outputs/apk/release/PebbleDesk-1.5.12-release.apk
+adb install -r app/build/outputs/apk/release/PebbleDesk-<version>-release.apk
 ```
 
-## 문서
+Design and behavior are specified in [DESIGN.md](DESIGN.md); device notes are in [docs/DEVICES.md](docs/DEVICES.md) (both Korean).
 
-- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md): 문제가 생기면(사용자용. 자동 추가가 꺼질 때, 접근성을 켤 수 없을 때 등)
-- [DESIGN.md](DESIGN.md): 화면 규격과 동작의 기준
-- [docs/READER_APPS.md](docs/READER_APPS.md): 이북 앱별로 알아낼 수 있는 것과 없는 것
-- [docs/DEVICES.md](docs/DEVICES.md): 기기별 호환 조사(크레마 페블, Meebook E6, Viwoods AiPaper Mini, iReader Ocean 5 Pro, Minimal Phone, Moaan MIX7S)
+## License
 
-## 라이선스
+[PolyForm Noncommercial 1.0.0](LICENSE). Individuals (hobby, study, research) and noncommercial organizations (schools, public institutions, charities, etc.) may use, modify and share it freely. When sharing, pass on this license and the `Required Notice` line.
 
-[PolyForm Noncommercial 1.0.0](LICENSE). 개인 용도(취미·공부·연구)와 비영리 단체(학교·공공기관·자선 단체 등)는 자유롭게 쓰고, 고치고, 나눌 수 있다. 나눌 때는 이 라이선스와 `Required Notice` 줄을 함께 전한다.
+Commercial use (selling it, including it in a paid product or service, using it for a company's for-profit work, etc.) is not allowed. If you need it, ask through [GitHub issues](https://github.com/hissinger/pebble-desk/issues).
 
-상업적 이용(판매, 유료 제품·서비스에 넣기, 회사의 영리 업무에 쓰기 등)은 허용하지 않는다. 필요하면 [GitHub 이슈](https://github.com/hissinger/pebble-desk/issues)로 따로 문의한다.
+The screen images in `docs/screenshots/` show book covers and other apps' icons, and the device frames in `hero-*.png` are product photos of the Crema Pebble (YES24) and the BOOX Palma (Onyx BOOX). These are not under the license above and belong to their owners.
 
-완독 도장 그림(`app/src/main/res/drawable-nodpi/stamp_completed.png`)은 위 라이선스가 아니다. Pixabay의 [TheDigitalArtist 'Approved Stamp'](https://pixabay.com/illustrations/approved-stamp-approval-business-5254258/)([Pixabay Content License](https://pixabay.com/service/license-summary/))를 고친 것이다(가운데 글자를 `COMPLETED`로, 흑백, `tools/stamp_completed.py`).
+The completed stamp (`app/src/main/res/drawable-nodpi/stamp_completed.png`) is not under the license above. It is a modified version of [TheDigitalArtist's 'Approved Stamp'](https://pixabay.com/illustrations/approved-stamp-approval-business-5254258/) on Pixabay ([Pixabay Content License](https://pixabay.com/service/license-summary/)) (center text changed to `COMPLETED`, black and white, `tools/stamp_completed.py`).
 
-만화 표지 압축 해제용 libarchive 의 Java 부분(`app/src/main/java/me/zhanghai/android/libarchive/`)은 [libarchive-android](https://github.com/zhanghai/libarchive-android)(Apache-2.0)를 가져와 네이티브 라이브러리를 부르는 한 줄만 고친 것이다. 네이티브 라이브러리 `libarchive-jni.so` 는 앱에 넣지 않고 사용자가 설정에서 받는다(이 저장소의 릴리스 [`libarchive-1.1.7`](https://github.com/hissinger/pebble-desk/releases/tag/libarchive-1.1.7), 그 안의 libarchive·bzip2·xz·lz4·zstd·Mbed TLS·zlib 라이선스는 같은 릴리스의 `NOTICE.txt`, 만드는 법은 `tools/libarchive/make-assets.sh`).
+The Java part of libarchive for unpacking comic covers (`app/src/main/java/me/zhanghai/android/libarchive/`) is taken from [libarchive-android](https://github.com/zhanghai/libarchive-android) (Apache-2.0) with one line changed where it loads the native library. The native library `libarchive-jni.so` is not bundled; users download it in Settings (this repository's release [`libarchive-1.1.7`](https://github.com/hissinger/pebble-desk/releases/tag/libarchive-1.1.7); licenses for libarchive, bzip2, xz, lz4, zstd, Mbed TLS and zlib are in that release's `NOTICE.txt`; built with `tools/libarchive/make-assets.sh`).
 
-시작하기 화면의 예시 책 표지(`app/src/main/res/drawable-nodpi/sample_cover.jpg`)는 윤동주 『하늘과 바람과 별과 시』(정음사, 1948) 초판 표지로, 국립한글박물관 아카이브의 스캔을 Wikimedia Commons 에 올린 [퍼블릭 도메인 파일](https://commons.wikimedia.org/wiki/File:%EC%9C%A4%EB%8F%99%EC%A3%BC_%ED%95%98%EB%8A%98%EA%B3%BC_%EB%B0%94%EB%9E%8C%EA%B3%BC_%EB%B3%84%EA%B3%BC_%EC%8B%9C_(%EC%B4%88%ED%8C%90%EB%B3%B8,_1948).pdf)을 흑백으로 줄인 것이다(`tools/sample_cover.py`).
+The sample book cover on the Getting started screens (`app/src/main/res/drawable-nodpi/sample_cover.jpg`) is the first-edition cover of Yun Dong-ju's *Sky, Wind, Stars and Poems* (Jeongeumsa, 1948), a black-and-white reduction of the [public domain file](https://commons.wikimedia.org/wiki/File:%EC%9C%A4%EB%8F%99%EC%A3%BC_%ED%95%98%EB%8A%98%EA%B3%BC_%EB%B0%94%EB%9E%8C%EA%B3%BC_%EB%B3%84%EA%B3%BC_%EC%8B%9C_(%EC%B4%88%ED%8C%90%EB%B3%B8,_1948).pdf) on Wikimedia Commons, scanned by the National Hangeul Museum archive (`tools/sample_cover.py`).
