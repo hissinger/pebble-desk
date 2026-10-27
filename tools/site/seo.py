@@ -278,7 +278,7 @@ Latest version: {VERSION} ({RELEASED}), first released {FIRST}.
 ## Features
 
 {chr(10).join("- " + f for f in en["features"])}
-- Supported reading apps (auto-add): Kindle, Libby, KOReader, Readest, BookFusion, Moon+ Reader, EzViewer (이지뷰어), CherieViewer (채리뷰어), Woojoo (우주뷰어), Google Play Books, Mihon, Kahon, Kyobo Library, Kyobo eBook, millie (밀리의서재), Aladin, Bookers, RIDI, YES24 Library, my YES, YES24 eBook, NeoReader (BOOX)
+- Supported reading apps (auto-add): Kindle, Kobo Books, Libby, KOReader, Readest, BookFusion, Moon+ Reader, EzViewer (이지뷰어), CherieViewer (채리뷰어), Woojoo (우주뷰어), Google Play Books, Mihon, Kahon, Kyobo Library, Kyobo eBook, millie (밀리의서재), Aladin, Bookers, RIDI, YES24 Library, my YES, YES24 eBook, NeoReader (BOOX)
 
 ## Compared with other launchers
 
