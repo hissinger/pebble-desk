@@ -29,7 +29,7 @@ import kotlin.math.sqrt
 /**
  * ⑫ 독서 기록: 연속일과 오늘 링, 최근 4주 목표 링 달력(애플 활동 앱처럼), 이번 달 목표 달성, 이번 주·이번 달·올해 합계, 이번 주 책별 시간.
  * 제목 오른쪽 `올해 읽은 책 ›` 은 올해 읽은 책([YearBooksActivity]).
- * 홈 하단의 `오늘 42분`이나 설정 > 독서 기록으로 연다. 숫자는 [ReadingLog] 에서 온다.
+ * 홈 하단의 `오늘 42분`(바형은 `42분`)이나 설정 > 독서 기록으로 연다. 숫자는 [ReadingLog] 에서 온다.
  */
 class ReadingActivity : EinkActivity() {
     private lateinit var body: LinearLayout
@@ -48,10 +48,18 @@ class ReadingActivity : EinkActivity() {
         root.addView(titleRow(getString(R.string.reading_stats), Palette.Area.READING) { finish() }.apply {
             addView(View(context), lp(0, 0, 1f))
             // 올해 읽은 책
-            addView(text(getString(R.string.year_books_link), 17f, Ui.bold).apply {
+            val link = text(getString(R.string.year_books_link), 17f, Ui.bold).apply {
                 setPadding(dp(16), dp(20), 0, dp(20))
                 setOnClickListener { startActivity(YearBooksActivity.intent(this@ReadingActivity)) }
-            }, lp(WRAP, WRAP))
+            }
+            addView(link, lp(WRAP, WRAP))
+            // 제목 줄에 다 들지 않으면(기기가 밀도를 덮어써 폭이 좁은 화면·키운 글자) 오른쪽 끝이 잘리지 않게 링크 글자를 줄인다
+            measure(0, 0)
+            val over = measuredWidth - resources.displayMetrics.widthPixels
+            if (over > 0) {
+                val w = link.paint.measureText(link.text.toString())
+                link.setTextSize(TypedValue.COMPLEX_UNIT_PX, link.textSize * maxOf((w - over - dp(1)) / w, LINK_MIN_RATIO))
+            }
         })
         root.addView(hline(2))
         body = vbox()
@@ -108,11 +116,24 @@ class ReadingActivity : EinkActivity() {
             renderWide(days, today, since, goalMs, ::frac)
             return
         }
-        body.addView(hero(days, today, goalMs, frac(today), monthGoal(days, today, since, goalMs, ::frac)))
+        val month = monthGoal(days, today, since, goalMs, ::frac)
+        // 가운데 글자가 숫자와 링 사이에 다 들지 않으면(좁은 화면) 가로 화면처럼 숫자를 `일 연속` 옆에 둔다
+        body.addView(hero(days, today, goalMs, frac(today), month) ?: heroCompact(days, today, goalMs, frac(today), month))
         // 연속일 줄과 달력 사이는 조금 띄운다(달력 제목 줄이 오늘 링 바로 밑에 붙지 않게).
         body.addView(calendar(days, today, since, goalMs, ::frac), lp(MATCH, WRAP).apply {
             topMargin = dp(HERO_GAP_DP - if (Palette.current.color) FIELD_BOTTOM_DP else 0)
         })
+        val inner = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN)
+        val narrow = inner - dp(TOTALS_W * Ui.textGrow) - dp(BOOKS_GAP) < dp(BOOKS_MIN_DP)
+        if (narrow || Ui.tallScreen) {
+            // 바형·좁은 화면: 합계를 한 줄 세 칸으로, 그 아래 이번 주 읽은 책을 전체 폭으로.
+            // 좁은 화면은 책을 남는 높이에 들어가는 만큼 한 쪽에(세로도 모자라다), 바형은 다섯 권씩(남는 높이에 그래프가 들게, [checkRoom])
+            body.addView(section(getString(R.string.read_time), totalsRow(days, today)), lp(MATCH, WRAP).inset().apply { topMargin = dp(10) })
+            val page = text("", 13f, Ui.bold, Ui.GRAY)
+            body.addView(section(getString(R.string.books_this_week), byBook(days, today, page, fill = narrow), page, fill = narrow),
+                lp(MATCH, if (narrow) 0 else WRAP, if (narrow) 1f else 0f).inset().apply { topMargin = dp(STACK_GAP_DP); bottomMargin = dp(12) })
+            return
+        }
         // 아래: 왼쪽 합계 · 오른쪽 이번 주 읽은 책. 칸마다 달력처럼 제목과 그 아래 선(두 칸 모두 위에 맞춘다).
         body.addView(hbox().apply {
             gravity = Gravity.TOP
@@ -122,6 +143,9 @@ class ReadingActivity : EinkActivity() {
             addView(section(getString(R.string.books_this_week), byBook(days, today, page), page), lp(0, WRAP, 1f).apply { marginStart = dp(BOOKS_GAP) })
         })
     }
+
+    /** 좌우 여백만큼 들인다 */
+    private fun LinearLayout.LayoutParams.inset() = apply { marginStart = dp(Ui.MARGIN); marginEnd = dp(Ui.MARGIN) }
 
     /** 가로 화면 왼쪽 요약 칸 폭(좌우 여백 포함). 홈처럼 글자 · 간격과 상관없이 같다(칸 자리가 움직이지 않게). */
     private fun summaryWidth() = dp(SUMMARY_DP) + 2 * dp(Ui.MARGIN)
@@ -139,11 +163,10 @@ class ReadingActivity : EinkActivity() {
             // 글자를 키워 칸 높이를 넘으면 다 들지 않는 칸은 그리지 않는다(반쯤 잘린 줄이 보이지 않게)
             addView(FitColumn(context, unbounded = false).apply {
                 addView(heroCompact(days, today, goalMs, frac(today), month, heroH), lp(MATCH, heroH))
-                fun LinearLayout.LayoutParams.inset() = apply { marginStart = dp(Ui.MARGIN); marginEnd = dp(Ui.MARGIN) }
                 addView(section(getString(R.string.read_time), totalsCompact(days, today), titleTopDp = 12), lp(MATCH, WRAP).inset())
                 val page = text("", 13f, Ui.bold, Ui.GRAY)
                 // 이번 주 읽은 책은 남는 높이에 들어가는 만큼 한 쪽에
-                addView(section(getString(R.string.books_this_week), byBook(days, today, page), page, fill = true, titleTopDp = 14),
+                addView(section(getString(R.string.books_this_week), byBook(days, today, page, fill = true), page, fill = true, titleTopDp = 14),
                     lp(MATCH, 0, 1f).inset().apply { bottomMargin = dp(12) })
             }, lp(summaryWidth(), MATCH))
             addView(vline(16))
@@ -181,23 +204,34 @@ class ReadingActivity : EinkActivity() {
         addView(content, lp(MATCH, if (fill) 0 else WRAP, if (fill) 1f else 0f).apply { topMargin = dp(4) })
     }
 
-    /** 왼쪽 큰 연속일과 이번 달 목표 달성([month]: 제목 to 값), 오른쪽 오늘 링(가운데 오늘 읽은 시간) */
-    private fun hero(days: ReadingDays, today: LocalDate, goalMs: Long, todayFrac: Float, month: Pair<String, String>) = hbox().apply {
-        // 컬러면 독서 기록 색면(파랑)을 깔고 아래를 조금 넓힌다(달력과의 사이에서 뺀다).
-        val field = Palette.current.field(Palette.Area.READING)
-        field?.let { setBackgroundColor(it) }
-        setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), if (field != null) dp(FIELD_BOTTOM_DP) else 0)
-        addView(text(ReadingLog.streak(days, today).toString(), 80f, Ui.heavy, Palette.current.goal))
-        addView(vbox().apply {
+    /**
+     * 왼쪽 큰 연속일과 이번 달 목표 달성([month]: 제목 to 값), 오른쪽 오늘 링(가운데 오늘 읽은 시간).
+     * 가운데 글자가 숫자와 링 사이에 다 들지 않으면(기기가 밀도를 덮어써 폭이 좁은 화면·키운 글자) null: [heroCompact] 를 쓴다.
+     */
+    private fun hero(days: ReadingDays, today: LocalDate, goalMs: Long, todayFrac: Float, month: Pair<String, String>): LinearLayout? {
+        val number = text(ReadingLog.streak(days, today).toString(), 80f, Ui.heavy, Palette.current.goal)
+        val column = vbox().apply {
             addView(text(getString(R.string.streak_sub, ReadingLog.longestStreak(days)), 15f, Ui.medium, Ui.GRAY))
             addView(text(getString(R.string.streak_days), 28f, Ui.bold), lp(WRAP, WRAP).apply { topMargin = dp(4) })
             addView(monthLine(month), lp(WRAP, WRAP).apply { topMargin = dp(8) })
-        }, lp(0, WRAP, 1f).apply { marginStart = dp(10) })
-        addView(todayRing(days, today, goalMs, todayFrac), lp(dp(RING), dp(RING)))
+        }
+        number.measure(0, 0)
+        column.measure(0, 0)
+        val room = resources.displayMetrics.widthPixels - 2 * dp(Ui.MARGIN) - number.measuredWidth - dp(10) - dp(RING)
+        if (column.measuredWidth > room) return null
+        return hbox().apply {
+            // 컬러면 독서 기록 색면(파랑)을 깔고 아래를 조금 넓힌다(달력과의 사이에서 뺀다).
+            val field = Palette.current.field(Palette.Area.READING)
+            field?.let { setBackgroundColor(it) }
+            setPadding(dp(Ui.MARGIN), dp(8), dp(Ui.MARGIN), if (field != null) dp(FIELD_BOTTOM_DP) else 0)
+            addView(number)
+            addView(column, lp(0, WRAP, 1f).apply { marginStart = dp(10) })
+            addView(todayRing(days, today, goalMs, todayFrac), lp(dp(RING), dp(RING)))
+        }
     }
 
     /**
-     * 가로 화면 왼쪽 위: 왼쪽에 `읽는 중 · 최장 N일` · 큰 연속일과 `일 연속` · 이번 달 목표 달성을 위아래로, 오른쪽 오늘 링.
+     * 가로 화면 왼쪽 위(세로 화면도 [hero] 가 들지 않으면): 왼쪽에 `읽는 중 · 최장 N일` · 큰 연속일과 `일 연속` · 이번 달 목표 달성을 위아래로, 오른쪽 오늘 링.
      * 세로 화면([hero])은 큰 숫자가 글자 왼쪽에 있어 좁은 칸에 들지 않는다.
      */
     private fun heroCompact(days: ReadingDays, today: LocalDate, goalMs: Long, todayFrac: Float, month: Pair<String, String>, frameH: Int? = null) = hbox().apply {
@@ -369,28 +403,40 @@ class ReadingActivity : EinkActivity() {
         return getString(if (goalMs > 0) R.string.month_goal else R.string.month_read, month) to getString(R.string.days_of, hits, monthDays.size)
     }
 
-    /** 왼쪽 칸: 이번 주 · 이번 달 · 올해 읽은 시간(위아래로) */
-    private fun totals(days: ReadingDays, today: LocalDate) = vbox().apply {
-        setPadding(0, dp(6), 0, 0)
+    /** 이번 주 · 이번 달 · 올해 읽은 시간(이름 to 시간) */
+    private fun sums(days: ReadingDays, today: LocalDate): List<Pair<String, String>> {
         fun sum(from: LocalDate) = days.filterKeys { it in from..today }.keys.sumOf { days.total(it) }
-        listOf(
+        return listOf(
             getString(R.string.this_week) to duration(sum(startOfWeek(today))),
             getString(R.string.this_month) to duration(sum(today.withDayOfMonth(1))),
             getString(R.string.this_year) to duration(sum(today.withDayOfYear(1))),
-        ).forEachIndexed { i, (label, value) ->
+        )
+    }
+
+    /** 왼쪽 칸: 이번 주 · 이번 달 · 올해 읽은 시간(위아래로) */
+    private fun totals(days: ReadingDays, today: LocalDate) = vbox().apply {
+        setPadding(0, dp(6), 0, 0)
+        sums(days, today).forEachIndexed { i, (label, value) ->
             addView(text(label, 13f, Ui.medium, Ui.GRAY), lp(WRAP, WRAP).apply { if (i > 0) topMargin = dp(14) })
             addView(text(value, 20f, Ui.bold), lp(WRAP, WRAP).apply { topMargin = dp(4) })
         }
     }
 
+    /** 바형·좁은 화면: 이번 주 · 이번 달 · 올해 읽은 시간을 한 줄에 세 칸으로(칸마다 이름 아래 시간) */
+    private fun totalsRow(days: ReadingDays, today: LocalDate) = hbox().apply {
+        gravity = Gravity.TOP
+        setPadding(0, dp(6), 0, 0)
+        sums(days, today).forEach { (label, value) ->
+            addView(vbox().apply {
+                addView(text(label, 13f, Ui.medium, Ui.GRAY))
+                addView(text(value, 20f, Ui.bold), lp(WRAP, WRAP).apply { topMargin = dp(4) })
+            }, lp(0, WRAP, 1f))
+        }
+    }
+
     /** 가로 화면 왼쪽 칸: 이번 주 · 이번 달 · 올해 읽은 시간을 한 줄씩(이름 왼쪽, 시간 오른쪽. 줄 높이는 글자 · 간격과 상관없이 같다) */
     private fun totalsCompact(days: ReadingDays, today: LocalDate) = vbox().apply {
-        fun sum(from: LocalDate) = days.filterKeys { it in from..today }.keys.sumOf { days.total(it) }
-        listOf(
-            getString(R.string.this_week) to duration(sum(startOfWeek(today))),
-            getString(R.string.this_month) to duration(sum(today.withDayOfMonth(1))),
-            getString(R.string.this_year) to duration(sum(today.withDayOfYear(1))),
-        ).forEach { (label, value) ->
+        sums(days, today).forEach { (label, value) ->
             addView(hbox().apply {
                 addView(text(label, 14f, Ui.medium, Ui.GRAY), lp(0, WRAP, 1f))
                 addView(text(value, 19f, Ui.bold), lp(WRAP, WRAP).apply { marginStart = dp(12) })
@@ -399,11 +445,11 @@ class ReadingActivity : EinkActivity() {
     }
 
     /**
-     * 오른쪽 칸: 이번 주 책별 시간(많은 순, 한 쪽에 [BOOKS]권. 가로 화면은 남는 높이에 들어가는 만큼). 한 줄에 책 이름(그 책의 지금 제목, 목록에 없던 책은 편 책 제목) · 시간, 줄 사이에 옅은 선.
+     * 오른쪽 칸: 이번 주 책별 시간(많은 순, 한 쪽에 [BOOKS]권. [fill] 이면(가로 화면·좁은 화면) 남는 높이에 들어가는 만큼). 한 줄에 책 이름(그 책의 지금 제목, 목록에 없던 책은 편 책 제목) · 시간, 줄 사이에 옅은 선.
      * 책은 읽은 시간 칸에 정해 둔 책 id 로 모은다(같은 제목의 두 책은 두 줄). 어떤 책인지 모르는 시간(이 기능 전, 그 앱에서 편 책을 한 번도
      * 몰랐을 때)은 합계에만 들어가고 여기에는 보이지 않는다.
      */
-    private fun byBook(days: ReadingDays, today: LocalDate, page: TextView): View {
+    private fun byBook(days: ReadingDays, today: LocalDate, page: TextView, fill: Boolean = false): View {
         bookRows = null
         val week = days.filterKeys { it in startOfWeek(today)..today }.values
         val known = BookShelf.list(this).associateBy { it.id } + BookShelf.history(this).associate { it.book.id to it.book }
@@ -426,9 +472,9 @@ class ReadingActivity : EinkActivity() {
             }
         }
         // 자주 쓰는 앱처럼 [BOOKS]줄씩, 넘치면 제목 오른쪽 `‹ 1 / 2 ›`(누르거나 밀면 다음 쪽). 덜 찬 쪽도 높이는 같다.
-        // 가로 화면은 홈처럼 줄 높이를 글자 · 간격과 상관없이 두고 남는 높이에 들어가는 만큼
-        val rows = if (wide) PagedRows(this, dp(BOOK_ROW), insetDividers = false)
-        else PagedRows(this, rowDp(BOOK_ROW * Ui.textGrow), fixedRows = BOOKS, insetDividers = false)
+        // 가로 화면은 홈처럼 줄 높이를 글자 · 간격과 상관없이 둔다. [fill] 이면 남는 높이에 들어가는 만큼
+        val rowH = if (wide) dp(BOOK_ROW) else rowDp(BOOK_ROW * Ui.textGrow)
+        val rows = if (fill) PagedRows(this, rowH, insetDividers = false) else PagedRows(this, rowH, fixedRows = BOOKS, insetDividers = false)
         rows.onPageChanged = { page.text = pageLabel(rows) }
         page.pagesClick(rows)
         rows.setRows(books.map { (label, ms) -> {
@@ -459,6 +505,12 @@ class ReadingActivity : EinkActivity() {
         private const val TOTALS_W = 150
         /** 왼쪽 합계 칸과 오른쪽 책 칸 사이(dp) */
         private const val BOOKS_GAP = 24
+        /** 오른쪽 책 칸이 이보다 좁아지면(dp) 합계를 한 줄로, 책을 그 아래 전체 폭으로 둔다 */
+        private const val BOOKS_MIN_DP = 200
+        /** 바형·좁은 화면: 합계 줄과 이번 주 읽은 책 사이(dp) */
+        private const val STACK_GAP_DP = 20
+        /** 제목 줄의 `올해 읽은 책 ›` 을 줄일 때 가장 작은 비율 */
+        private const val LINK_MIN_RATIO = 0.7f
         /** 이번 주 읽은 책 한 쪽의 줄 수와 줄 높이(dp) */
         private const val BOOKS = 5
         private const val BOOK_ROW = 36
