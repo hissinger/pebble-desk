@@ -282,6 +282,7 @@
     <string name="guide_playbooks">Google Play Books</string>
     <string name="guide_mihon">Mihon</string>
     <string name="guide_kahon">Kahon</string>
+    <string name="guide_kobo">Kobo Books</string>
     <string name="guide_permissions">Permissions</string>
     <string name="guide_todo">In the app</string>
     <string name="guide_todo_none">Nothing to change.</string>
@@ -363,6 +364,8 @@
     <string name="guide_n_woojoo_cover">PDFs and comics only if you allow reading book files</string>
     <string name="guide_files_woojoo">opened book, covers, progress</string>
     <string name="guide_note_woojoo">If you allow reading book files, tapping the book on the home screen opens its file in Woojoo.</string>
+    <string name="guide_n_kobo_title">Only for books opened from My Books or a book\'s details page</string>
+    <string name="guide_t_kobo_open">Open books from My Books or with the button on a book\'s details page. A book opened from My Books comes in when you go back to My Books after reading. The reading screen shows no title, so books opened another way can\'t be recognized.</string>
     <string name="guide_n_playbooks_library">Added when the book shows in your Play Books library</string>
     <string name="guide_n_mihon_cover">Added when the series shows in your library or History</string>
     <string name="guide_n_mihon_local">Local manga only</string>

@@ -84,6 +84,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 우주 | 서재·파일 | 서재·메뉴·파일 | 서재·파일 | 서재·메뉴·파일 | X |
 | Google Play 북 | 서재·스토어 상세 | 읽는 화면 | 서재·스토어 상세 | 읽는 화면·메뉴 | X |
 | Mihon·Kahon | 작품 상세 | 작품 상세·메뉴 | 작품 상세 | 메뉴(화 이름) | X |
+| Kobo Books | 서재·책 상세 | 서재(돌아왔을 때 맨 위 칸)·책 상세 | 서재·책 상세 | 메뉴 | X |
 
 ### 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -320,6 +321,16 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **진행률**: % 는 없다(읽는 화면에 그 화의 쪽만 있다). 대신 메뉴 위 줄 아래의 화 이름(`Chapter 12`·`12화`, 소스가 쓴 그대로)을 % 자리에 보인다(DB `shelf.chapter`). 메뉴를 띄울 때만 바뀐다.
 - **반납일**: 없다.
 - **제약**: 작품 하나를 책 한 권으로 본다(화마다 따로 책을 만들지 않는다). 홈에서 책을 누르면 앱을 연다. 메뉴로 안 작품은 읽는 화면을 연 때부터 그 작품의 시간으로 센다(그 전까지 '책 모름').
+
+### Kobo Books `com.kobobooks.android`
+
+- **권한**: 공통.
+- **할 것**: 책은 My Books(eBooks 탭, 정렬 `Recent Activity`)에서 눌러 열거나 책 상세의 `Read Preview`·`Save Preview` 같은 단추로 연다. 읽는 중 진행률은 가운데를 눌러 메뉴를 띄워야 들어온다.
+- **표지**: My Books 칸·책 상세에서 잘라 온다(목록 위·아래 끝에 걸린 표지는 자르지 않는다). 홈의 스토어 줄은 읽지 않는다.
+- **제목·저자**: 읽는 화면에는 제목이 어디에도 없고(메뉴·목차에도), My Books 칸은 Compose 라 눌러도 알림이 없다. 그래서 책 상세에서 단추로 연 책은 그 상세의 책, My Books 에서 연 책은 읽고 My Books 로 돌아왔을 때 맨 위 칸(최근 활동 순이면 방금 읽은 책이 맨 위로 온다)을 읽는 화면을 연 때부터의 책으로 적는다. 그 사이는 '책 모름'이고, 돌아와 처음 멈춘 서재가 그 화면(eBooks 탭·최근 활동 순·목록 맨 위)이 아니면 그 책을 알 수 없다.
+- **진행률**: 메뉴 아래의 쪽(`13 of 41` → 31%). 화면 아래 `1 of 1 in chapter` 는 장 안의 쪽이라 쓰지 않는다. 서재에는 없다. My Books 로 연 책은 '책 모름'인 동안 메뉴로 읽은 진행률을 기억해 두었다가 책을 정할 때 함께 적는다.
+- **반납일**: 없다.
+- **제약**: 홈에서 책을 누르면 Kobo 를 연다(책 바로 열기는 조사하지 않았다). 앱에 한국어가 없어 한국어 기기에서도 영어다. 탭·정렬 이름은 Kobo 의 문자열을 기기 언어로 읽어 맞춘다(다른 언어는 시험하지 않았다).
 
 ## 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -785,3 +796,17 @@ Bilingify 의 오픈소스 리더(https://github.com/readest/readest, Tauri). �
   - 파일의 저자(2026-10-26, 책 파일 읽기를 adb 로 켜고 시험 뒤 되돌림): 저자가 빈 `Long Story` 의 작품 폴더에 `details.json`(author `Long Writer`)을 두고 기록 탭에서 열어 메뉴를 띄우자 저자가 채워졌다. 저자가 빈 `Green Leaf` 는 Mihon 이 받은 화에 넣는 모양 그대로 `downloads/Test Source (EN)/Green Leaf/Chapter 1/ComicInfo.xml`(Writer `Green Writer`)을 만들어 두고 같은 길로 열자 채워졌다(시험 뒤 지움). 자동 백업은 에뮬레이터에 아직 백업이 없어(설치 뒤 12시간 안) 단위 테스트로만 확인했다.
   - 처음 한 번은 상세를 거쳤는데도 '책 모름'이 적혔다. 서재 필터 창을 닫은 직후였고, 같은 순서로 다시 해도 재현되지 않았다(그 뒤로는 모두 그 작품으로 들어왔다).
 
+### Kobo Books `com.kobobooks.android` (2026-10-27, 에뮬레이터 `CremaPebble_A11_Play`(안드로이드 11) · WebView 155, Play 스토어 11.1.2 (40389), minSdk 29, **지원**)
+
+- **받기·시험 책**: Play 스토어(무료, 236MB). Reddit 댓글로 요청받음. 처음 열면 로그인 화면(`ui.SignInOptionsActivity`)의 `Continue as Guest` 로 계정 없이 쓸 수 있다. 게스트도 책 상세의 `Save Preview` 로 미리보기를 My Books 에 넣고 읽을 수 있어, `The Hollow`(Michael Connelly)·`Pride and Prejudice`(Jane Austen, 검색)의 미리보기로 시험했다. 산 책(계정)은 보지 못했다.
+- **화면**: `SplashActivity` → `MainActivity`(아래 탭 Home·Search·My Books·Wishlist·Account, 책 상세도 이 안. 모두 Compose 라 요소 이름이 없고 눌러도 `TYPE_VIEW_CLICKED` 가 없다. Search 결과는 웹 화면) → 읽는 화면 `com.kobobooks.reader.ui.ReaderActivity`(React Native, 요소 이름이 패키지 없는 testID `epub-reader-…`). 그 밖에 `manga_reader.ui.MangaReaderActivity`·`pdf_reader.ui.PDFReaderActivity`·`audiobook_player.ui.AudiobookPlayerActivity`·`itemdetails.ItemDetailsActivity`. 앱에 한국어 문자열이 없다(기본 영어만, 언어는 분할 APK).
+- **My Books**: 위 탭 `eBooks`(고른 탭은 눌리지 않는 글자, 다른 탭은 누를 수 있는 묶음)·`Audiobooks`·`Authors`·`Series`·`Collections`, `Sort: Recent Activity`(Kobo 문자열 `core_ui_sort` `Sort: %s` + `core_ui_sort_recent`)·`Filter` 단추, `2 Books`, 칸(누를 수 있는 묶음: 표지 자리(글자 없음)·제목·`By 저자`·`PREVIEW`, 오른쪽 위 `Menu options` 단추. 메뉴는 `Item Details`·`Add to Collection`·`Rate & Review`·`Share`·`Remove`, 게스트에서 `Item Details` 는 아무것도 안 했다). 칸을 누르면 바로 읽는 화면. 정렬이 최근 활동 순이면 읽고 돌아오는 순간(1초 안) 그 책이 맨 위로 온다.
+- **홈**: 게스트는 `Browse Catalogue`·`New Releases`·`Popular Audiobooks` 줄(칸: 표지 자리·제목·`By 저자`, 메뉴 단추 없음, 누르면 책 상세). 미리보기를 넣으면 `Latest Purchases` 줄이 생긴다(누르면 책 상세. 바로 다시 정렬되지는 않는다).
+- **책 상세**: 넘기는 묶음 안에 가운데 표지 자리 · 제목 · 부제 · 시리즈 링크(`Book 6.0 - A Court of Thorns and Roses`, 눌리는 글자) · `by ` + 저자 링크(눌리는 글자, 같은 줄) · 별점 · `Buy the eBook`·가격 · 단추(`Add To Cart`·`Buy Now`·`Save Preview`/`Read Preview`·`Add To Wishlist`, 글자 + `Button` 요소). `Save Preview` 는 My Books 에 넣고 바로 연다(그 뒤 `Read Preview`). 넣지 않은 책도 `Read Preview` 가 나오기도 한다(그렇게 연 미리보기는 My Books 에 들어가지 않는다).
+- **읽는 화면**: 본문은 웹 화면(`BookView`·`ReadingOrderView` 아래 장마다 `<무작위 id>-<장 이름>` 요소, 연 때마다 id 가 바뀐다). 아래에 `page-footer-text`(`1 of 1 in chapter`). 가운데를 누르면 위 줄에 단추만(`Close the book`·`Open table of contents`·`Search in book`·`Open reading settings`·`Create bookmark`·`Open more options`), 아래에 장 이름 `epub-reader-rx-scrubber-headerText`·쪽 `epub-reader-rx-scrubber-bookLocation`(`13 of 41`). 목차 창에도 책 제목은 없다. 창 제목·최근 앱 이름도 앱 이름이다. 처음 열면 사용법 안내(`Skip`).
+- **Pebble Desk**(`readers/Kobo.kt`): 서재는 `MainActivity`·`ItemDetailsActivity`, 읽는 화면은 EPUB·만화·PDF 셋. 책 상세는 1초마다 기억해 단추로 연 책을 안다(`DetailReader`, `clickOnly`). 상세 없이 서재에서 넘어오면 '책 모름'으로 적고 연 때를 기억했다가, 읽고 돌아와 처음 멈춘 서재가 eBooks 탭·`Sort: Recent Activity`(Kobo 문자열을 기기 언어로) 단추가 보이는 My Books 면 그 아래 첫 칸을 연 때에 편 것으로 적는다(멈추기 전이라도 맨 위 칸이 열기 전과 달라졌으면 바로, 같으면 돌아오고 1초가 지나면. `KoboReader`, 편 책 기록은 때 순이라 '책 모름' 뒤에 같은 때로 들어가 그 뒤 시간이 그 책에). My Books 칸은 메뉴 단추가 있는 칸만(홈 스토어 줄의 표지를 잘라 두지 않게). 진행률은 메뉴 아래 쪽의 비율(버림).
+  - 에뮬레이터에서 확인: My Books 둘째 칸을 열고 메뉴(14%)를 띄운 뒤 돌아오자 맨 위로 온 `Pride and Prejudice · Jane Austen` 이 새 책으로, `The Hollow` 도 같은 길로(둘을 번갈아 네 번 모두 연 책). 책 상세(`Save Preview`·`Read Preview`)로 연 `The Hollow · Michael Connelly`·`Pride and Prejudice` 는 읽는 화면이 열릴 때 바로 그 책. 표지는 My Books 칸(146×219)·상세(266×399)에서 잘려 붙었다.
+  - 처음 판은 홈을 넘긴 화면(왼쪽 위 빈 자리 + `New Releases` + `View More` 단추)을 책 상세로 읽어 `New Releases` 가 책으로 들어갔다 → 상세 표지는 가운데에 놓인 것만 본다. 시리즈 링크가 저자로 들어가지 않게 저자는 `by ` 와 같은 줄의 링크로 본다.
+  - 처음 판은 My Books 로 연 책의 진행률을 버렸다('책 모름'인 동안 메뉴로 읽은 14% 가 적히지 않아 `Pride and Prejudice` 가 진행률 없이 들어옴). 고친 뒤 `The Hollow` 가 48% 로 들어왔다.
+  - 돌아오자마자(2초 안) 뒤로 키로 홈 탭에 가면 서재가 멈추기 전이라 처음에는 '책 모름'으로 남았다 → 열기 전의 맨 위 칸과 달라졌으면 바로 정하게 고친 뒤 같은 순서에서 그 책으로 들어왔다.
+  - `uiautomator dump` 를 한 직후에는 서비스가 새로 붙어 상세 기억이 비어, 상세에서 연 책도 '책 모름'이 된다(시험할 때 주의, 실제 사용과 무관).
