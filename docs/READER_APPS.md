@@ -28,6 +28,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 우주 `com.inno.woojoo`(우주뷰어, 이노스페이스원. Librera Reader 를 고친 내 파일 리더) | `HorizontalViewActivity`(책 넘김)·`VerticalViewActivity`(스크롤) | O (`file://` 를 `com.inno.OpenerActivity` 로, 읽던 쪽으로) | O (그냥 열면 내 서재) | X | 사용자가 둔 곳(공유 저장소). 우주 기록은 `/sdcard/Woojoo` |
 | Google Play 북 `com.google.android.apps.books`(구글, 휴대폰 판 하나) | `com.google.android.apps.play.books.ebook.activity.ReadingActivity` | ? | 그냥 열면 홈 탭(읽던 책이 떠 있었으면 그 책) | ? | 앱 전용 저장소 (미확인) |
 | Mihon `app.mihon`·Kahon `com.amanoteam.kahon`(만화, 오픈소스. Kahon 은 Mihon 포크) | `eu.kanade.tachiyomi.ui.reader.ReaderActivity` | ? | 그냥 열면 마지막 화면 | X | 사용자가 고른 저장 폴더(로컬 만화 `<폴더>/local/<작품>/<화>.cbz`) |
+| Futon `io.github.landwarderer.futon`·Kotatsu `org.koitharu.kotatsu`(만화·소설, 오픈소스. Futon 은 Kotatsu 포크, Kotatsu 는 2025-11 저장소 보관·GitHub 릴리스·F-Droid 에서 내려감) | `<이름공간>.reader.ui.ReaderActivity`(Futon 은 소설·PDF `novel.ui.reader.NovelReaderActivity`·`…pdf.PdfReaderActivity` 도) | ? | 그냥 열면 마지막 화면 | X | 앱 전용 폴더(`Android/data/…/files/manga`, 불러오기로 복사) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
 - 사용 기록에는 **앱·화면 이름과 시각만** 남는다. 어떤 책인지는 알 수 없다.
@@ -85,6 +86,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | Google Play 북 | 서재·스토어 상세 | 읽는 화면 | 서재·스토어 상세 | 읽는 화면·메뉴 | X |
 | Mihon·Kahon | 작품 상세 | 작품 상세·메뉴 | 작품 상세 | 메뉴(화 이름) | X |
 | Kobo Books | 서재·책 상세 | 서재(돌아왔을 때 맨 위 칸)·책 상세 | 서재·책 상세 | 메뉴 | X |
+| Futon·Kotatsu | 작품 상세 | 서재·작품 상세·메뉴 | 작품 상세 | 작품 상세(%)·메뉴(화 이름) | X |
 
 ### 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -331,6 +333,17 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **진행률**: 메뉴 아래의 쪽(`13 of 41` → 31%). 화면 아래 `1 of 1 in chapter` 는 장 안의 쪽이라 쓰지 않는다. 서재에는 없다. My Books 로 연 책은 '책 모름'인 동안 메뉴로 읽은 진행률을 기억해 두었다가 책을 정할 때 함께 적는다.
 - **반납일**: 없다.
 - **제약**: 홈에서 책을 누르면 Kobo 를 연다(책 바로 열기는 조사하지 않았다). 앱에 한국어가 없어 한국어 기기에서도 영어다. 탭·정렬 이름은 Kobo 의 문자열을 기기 언어로 읽어 맞춘다(다른 언어는 시험하지 않았다).
+
+### Futon `io.github.landwarderer.futon`·Kotatsu `org.koitharu.kotatsu`
+
+- **권한**: 공통.
+- **할 것**: 화는 작품 화면의 `지금 읽기`·`계속`이나 화 목록으로 연다. 다른 길(최근에 본 만화 탭의 `계속` 단추)로 연 화는 가운데를 눌러 메뉴를 한 번 띄운다.
+- **표지**: 작품 화면의 표지를 잘라 온다(넘겨서 위 막대 밑으로 들어가면 자르지 않는다). 서재·목록 격자 칸은 표지 위에 진행 고리·읽지 않은 화 수를 그려 자르지 않는다.
+- **제목**: 서재·목록 칸, 작품 화면, 읽는 화면 메뉴 위 막대.
+- **저자**: 작품 화면 표의 저자(로컬 만화는 없다).
+- **진행률**: 작품 화면 표의 진행률(`33%`, 앱이 읽은 화·쪽으로 셈). 읽는 화면에는 진행률이 없고, 메뉴 위 막대의 화 이름(`Unnamed chapter`·`1화`)을 읽는 화로 둔다(Mihon 과 같다). 화 이름을 알면 홈·목록·상세에는 % 대신 화 이름만 보인다.
+- **반납일**: 없다.
+- **제약**: 작품 하나를 책 한 권으로 본다. 홈에서 책을 누르면 앱을 연다. Kotatsu 는 두 소스의 레이아웃·읽는 화면 코드가 같아 같은 규칙을 쓴다(에뮬레이터에서도 확인). 시크릿 모드면 메뉴의 화 이름 자리에 `시크릿 모드` 가 보인다(그대로 들어간다).
 
 ## 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -810,3 +823,17 @@ Bilingify 의 오픈소스 리더(https://github.com/readest/readest, Tauri). �
   - 처음 판은 My Books 로 연 책의 진행률을 버렸다('책 모름'인 동안 메뉴로 읽은 14% 가 적히지 않아 `Pride and Prejudice` 가 진행률 없이 들어옴). 고친 뒤 `The Hollow` 가 48% 로 들어왔다.
   - 돌아오자마자(2초 안) 뒤로 키로 홈 탭에 가면 서재가 멈추기 전이라 처음에는 '책 모름'으로 남았다 → 열기 전의 맨 위 칸과 달라졌으면 바로 정하게 고친 뒤 같은 순서에서 그 책으로 들어왔다.
   - `uiautomator dump` 를 한 직후에는 서비스가 새로 붙어 상세 기억이 비어, 상세에서 연 책도 '책 모름'이 된다(시험할 때 주의, 실제 사용과 무관).
+
+### Futon `io.github.landwarderer.futon` (2026-10-28, 에뮬레이터 `CremaPebble_A11`(안드로이드 11), GitHub 릴리스 v9.9 (90900), minSdk 23, **지원**)
+
+- **앱**: Kotatsu(2025-11 보관) 포크. 만화·소설(웹 소설 소스)을 읽고, 위 막대 오른쪽 단추로 만화·소설 모드를 바꾼다. 처음 열면 안내(`Skip`), 탐색 탭에서 맞춤 추천 묻기(`No thanks`). 화면은 XML 뷰라 요소 이름이 있다(Kotatsu 와 같은 이름. 두 소스(Futon devel·Kotatsu v9.4.1)의 `activity_details`·`layout_details_table`·`item_manga_grid`·`item_manga_list`·`activity_reader` 를 맞춰 봤다: 다른 것은 Futon 상세의 흐린 배경 하나).
+- **시험 만화**: 직접 만든 만화 두 편(`Sea Song`·`별빛 도서관`, 6쪽 JPEG 를 묶은 `.zip`. `.cbz` 는 시스템 파일 선택 화면에서 고를 수 없었다). 탐색 › 내장 메모리 › 불러오기 › 코믹스 모음. 파일 선택 화면은 에뮬레이터에서 탭을 받지 않아 방향키·Enter 로 골랐다. 앱 폴더(`Android/data/…/files/manga`)에는 adb 로 넣을 수 없었다(권한 없음).
+- **화면**: 최근에 본 만화 탭·내장 메모리 목록(`search.ui.MangaListActivity`)의 격자 칸 `imageView_cover`·`textView_title`·표지 위 진행 고리 `progressView`(`33%`). 탐색 탭의 소스 칸은 `imageView_icon`. 작품 상세(`details.ui.DetailsActivity`) `imageView_cover`·`textView_title`·표 `card_details`(`textView_author`·`textView_chapters` `1화 중 1화`·`textView_progress` `33%`), 아래 시트에 `button_read`(`지금 읽기`, 읽던 화가 있으면 `계속`)와 화 목록. 읽는 화면(`reader.ui.ReaderActivity`)은 처음엔 그림뿐이고 가운데를 누르면 위 막대 `appbar_top` › `toolbar` 에 이름 없는 글자 둘(`Sea Song` · `Unnamed chapter`), 불러오는 동안은 `불러오는 중…` 하나뿐(소스 `onUiStateChanged`). 아래 정보 줄 `infoBar` 는 그림으로 그려 글자가 없다.
+- **Pebble Desk**(`readers/Kotatsu.kt`): 요소 이름으로 칸을 읽고, 상세는 `DetailReader` 로 기억해 그 뒤 열린 읽는 화면을 그 작품으로. 처음엔 바탕(칸을 누르면 바로 편 것)으로 두었더니 상세가 뜨기만 해도 편 것으로 적고, 상세의 `지금 읽기` 는 아래 시트의 화 목록 `textView_title` 들 때문에 누른 칸으로 잡히지 않아 4.5초 뒤 읽는 화면이 열릴 때 '책 모름'이 되었다 → `openOnViewer` + `DetailReader`.
+  - 에뮬레이터에서 확인: 내장 메모리 → `Sea Song` 상세 → `계속` 으로 읽는 화면이 열린 때에 `Sea Song` 이 맨 앞(표지는 상세에서, 진행률 33%). 최근에 본 만화 탭의 `계속` 단추로 바로 연 화는 '책 모름' 뒤 메뉴로 같은 때부터 `Sea Song`, 읽는 화 `Unnamed chapter`. `별빛 도서관` 은 상세의 진행률 16% 로. 시험 순서 `tools/emu/watch-flows/futon.sh`.
+
+### Kotatsu `org.koitharu.kotatsu` (2026-10-28, 에뮬레이터 `CremaPebble_A11`(안드로이드 11), 9.4.1 (1033), **지원**)
+
+- **받기**: 2025-11 저장소가 보관되며 GitHub 릴리스·F-Droid 에서 내려갔다. 사용자가 Uptodown 에서 받은 APK(SHA-256 `79b5698c…376be184`)의 서명 인증서가 Kotatsu README 의 지문(SHA-1 `2C:19:C7:E8:07:61:2B:8E:94:51:1B:FD:72:67:07:64:5D:C2:58:AE`, `CN=Vasily Nikitin`)과 같아 깔았다.
+- **화면**: 처음 열면 `환영합니다` 시트(소스 언어·종류 고르기, 뒤로 닫음), 탐색 탭에서 맞춤 추천 묻기(`No thanks`). 소설 모드 단추가 없는 것 말고는 Futon 과 같다: 내장 메모리 격자 칸·작품 상세·읽는 화면 위 막대의 요소 이름과 자리까지 같았다(같은 시험 만화를 같은 길로 불러옴).
+- 에뮬레이터에서 확인: 내장 메모리 → `별빛 도서관` 상세 → `지금 읽기` 로 읽는 화면이 열린 때에 그 작품으로(편 책 기록에 같은 때 '책 모름' 다음 `별빛 도서관`), 메뉴의 화 이름 `Unnamed chapter`. Futon 으로 먼저 넣은 같은 제목의 책에 이어 붙었다(제목이 같으면 앱이 달라도 같은 책, #4).
