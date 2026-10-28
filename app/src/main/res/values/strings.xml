@@ -29,6 +29,17 @@
     <string name="none">없음</string>
     <string name="now_reading">읽고 있는 책</string>
     <string name="app_icons">앱 아이콘</string>
+    <string name="icon_style">아이콘 모양</string>
+    <string name="icon_style_default">기본</string>
+    <string name="icon_pack">아이콘 팩</string>
+    <string name="icon_pack_none">Play 스토어나 F-Droid 에서 아이콘 팩(예: Arcticons)을 깔면 여기서 고를 수 있습니다.</string>
+    <string name="change_icon">아이콘 바꾸기</string>
+    <string name="icon_default_now">기본 아이콘</string>
+    <string name="icon_reset">원래 아이콘으로</string>
+    <string name="icon_search_hint">아이콘 이름 찾기(영어)</string>
+    <string name="icons_all">모든 아이콘 · %1$s개</string>
+    <string name="icons_found">%1$s · %2$s개</string>
+    <string name="icons_none">찾은 아이콘이 없습니다</string>
     <string name="clock">시계</string>
     <string name="clock24">24시간</string>
     <string name="clock12">12시간</string>

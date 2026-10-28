@@ -132,12 +132,16 @@ abstract class EinkActivity : Activity() {
         @Suppress("DEPRECATION") overridePendingTransition(0, 0)
     }
 
-    /** 앱 길게 누르기 메뉴(④). 무엇이 바뀌면 [changed] 를 부른다. [rename] 이면(홈 자주 쓰는 앱) 맨 위에 `이름 바꾸기`. */
+    /**
+     * 앱 길게 누르기 메뉴(④). 무엇이 바뀌면 [changed] 를 부른다. [rename] 이면(홈 자주 쓰는 앱) 맨 위에 `이름 바꾸기`.
+     * 아이콘 팩이 깔려 있으면 `아이콘 바꾸기`(그 앱에만 팩의 다른 그림, [IconPickActivity]. 돌아오면 화면이 다시 그린다).
+     */
     protected fun showAppMenu(app: AppEntry, rename: Boolean = false, changed: () -> Unit) {
         // 읽고 있는 앱은 책에 딸린 설정이라 책 메뉴·책 목록에서만 바꾼다.
         val fav = app.key in prefs.favorites
         val sheet = Sheet(this).header(app.label, app = app)
         if (rename && fav) sheet.item(getString(R.string.rename)) { renameFavorite(app, changed) }
+        if (IconPacks.anyInstalled(this)) sheet.item(getString(R.string.change_icon)) { startActivity(IconPickActivity.intent(this, app)) }
         sheet.item(getString(if (fav) R.string.fav_remove else R.string.fav_add)) { prefs.toggleFavorite(app.key); changed() }
             .item(getString(R.string.hide)) { prefs.hide(app.key); changed() }
             .item(getString(R.string.app_info)) { AppStore.openAppInfo(this, app) }
