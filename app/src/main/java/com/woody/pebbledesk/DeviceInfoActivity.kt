@@ -28,6 +28,8 @@ class DeviceInfoActivity : EinkActivity() {
     override val fixedTextSize get() = true
     private lateinit var keyValue: TextView
     private lateinit var recentValue: TextView
+    private lateinit var permsValue: TextView
+    private lateinit var radiosValue: TextView
 
     /** 시스템 화면 시험에서 연 화면: 결과를 쓸 곳, 화면 이름, 연 때. 돌아오면([onResume]) 걸린 시간을 쓴다. */
     private var opened: Triple<TextView, String, Long>? = null
@@ -78,19 +80,12 @@ class DeviceInfoActivity : EinkActivity() {
             list.addView(text(it.ifEmpty { "-" }, 14f, lines = 2).apply { setLineSpacing(0f, 1.15f) })
         }
 
+        // 권한과 상태 줄의 와이파이·블루투스 지금 값(빠른 설정에서 바꾸고 돌아오면 다시 읽는다)
         section(list, R.string.device_section_perms)
-        val home = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
-            ?.activityInfo?.packageName == packageName
-        // BOOX 면 이 앱이 자동 얼리기 대상인지(켜짐이면 다른 앱으로 넘어간 30초 뒤 꺼져 자동 추가가 멈춘다). 물을 수 없으면 `?`.
-        val freeze = if (Device.hasBooxLauncher(this))
-            getString(R.string.device_perm_boox_freeze) to (Device.booxAutoFreeze(this)?.let { onOff(it) } ?: "?")
-        else null
-        list.addView(text(listOfNotNull(
-            getString(R.string.auto_books_short) to onOff(ReaderWatchService.isEnabled(this)),
-            getString(R.string.reading_time) to onOff(ReadingLog.hasAccess(this)),
-            getString(R.string.device_perm_home) to onOff(home),
-            freeze,
-        ).joinToString("  ·  ") { (label, value) -> "$label $value" }, 16f, lines = 2))
+        permsValue = text("", 16f, lines = 2)
+        list.addView(permsValue)
+        radiosValue = text("", 14f)
+        list.addView(radiosValue)
 
         // 자동 추가(접근성 서비스)가 저절로 꺼지는 기기에서 언제·왜 끊겼는지: 서비스 연결·끊김, 이 앱이 끝난 까닭(안드로이드 11+),
         // 백그라운드에서 앱을 끄는 설정들. 서비스가 받은 알림·한 일은 따로 된 화면(`기록 보기 ›`, 이 화면에 더 넣을 자리가 없다).
@@ -130,6 +125,8 @@ class DeviceInfoActivity : EinkActivity() {
     override fun onResume() {
         super.onResume()
         recentValue.text = recentScreens()
+        permsValue.text = permsText()
+        radiosValue.text = radiosText()
         opened?.let { (result, name, at) ->
             result.text = getString(R.string.device_system_back, name, ((SystemClock.elapsedRealtime() - at) / 1000).toInt())
             opened = null
@@ -266,6 +263,32 @@ class DeviceInfoActivity : EinkActivity() {
     }
 
     private fun short(value: String) = if (value.length > VALUE_MAX) value.take(VALUE_MAX) + "…" else value
+
+    /** 자동 추가·오늘 읽은 시간·기본 홈(BOOX 면 자동 얼리기, 물을 수 없으면 `?`) */
+    private fun permsText(): String {
+        val home = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            ?.activityInfo?.packageName == packageName
+        // BOOX 면 이 앱이 자동 얼리기 대상인지(켜짐이면 다른 앱으로 넘어간 30초 뒤 꺼져 자동 추가가 멈춘다)
+        val freeze = if (Device.hasBooxLauncher(this))
+            getString(R.string.device_perm_boox_freeze) to (Device.booxAutoFreeze(this)?.let { onOff(it) } ?: "?")
+        else null
+        return listOfNotNull(
+            getString(R.string.auto_books_short) to onOff(ReaderWatchService.isEnabled(this)),
+            getString(R.string.reading_time) to onOff(ReadingLog.hasAccess(this)),
+            getString(R.string.device_perm_home) to onOff(home),
+            freeze,
+        ).joinToString("  ·  ") { (label, value) -> "$label $value" }
+    }
+
+    /** `와이파이 켜짐·연결 없음 · 블루투스 켜짐 A2DP0 HFP0 HID?`(프로필 0 끊김·2 연결됨, ? 는 물을 수 없음(안드로이드 12+ 권한)) */
+    private fun radiosText(): String {
+        val r = DeviceStatus.radios(this)
+        val wifi = if (!r.wifiOn) onOff(false)
+            else getString(if (r.wifiLinked) R.string.device_linked else R.string.device_unlinked, onOff(true))
+        val bt = if (!r.btOn) onOff(false) else onOff(true) +
+            r.profiles.joinToString("") { (name, v) -> " $name${if (v < 0) "?" else v}" }
+        return "${getString(R.string.device_wifi)} $wifi · ${getString(R.string.device_bt)} $bt"
+    }
 
     private fun onOff(on: Boolean) = getString(if (on) R.string.on else R.string.off)
 

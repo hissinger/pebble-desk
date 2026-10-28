@@ -69,7 +69,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.6.5-release.apk </dev/
 | Books / BooksActivity / BookSearchActivity | 읽고 있는 책(권수 제한 없음, 홈에는 맨 앞 책 + 함께 읽는 책 3권씩 쪽으로, 표지 검색 `BookSearch`(한국어는 YES24, 그 밖은 Apple Books·Open Library). `책 추가`는 지원하지 않는 이북 앱용: 늘 새 책(id `m-`)이고 제목으로 다른 책·읽은 시간과 잇지 않는다)과 나간 책(완독·뺀 책, `BookShelf.history`), 책 목록 관리 |
 | Apps / IconPacks | `AppStore`(앱 목록 캐시·디스크 캐시), `AppIcons`(흑백 아이콘 캐시, 디스크 캐시는 앱을 업데이트하면 다시 그림. 그사이 바뀐 앱의 아이콘만 비우고 홈은 그 앱이 보일 때만 다시 그린다) / 런처 아이콘 팩(설정 › 화면 › 아이콘 모양: 깔린 팩 찾기·appfilter 읽기, 팩에 없는 앱은 기본 아이콘, 앱마다 고를 그림 목록·찾기) |
 | IconPickActivity | 길게 누르기 › 아이콘 바꾸기: 앱 하나에만 팩의 다른 그림(`HomePrefs.iconOverrides`), 영어 이름 찾기·4열 격자 |
-| AppListActivity / FavoritesActivity / SettingsActivity / DeviceInfoActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 / 기기 정보(사진으로 찍어 보내는 진단 화면: 속성·권한·자동 추가 서비스 기록·누른 키·시스템 화면 시험) |
+| AppListActivity / FavoritesActivity / SettingsActivity / DeviceInfoActivity | 모든 앱·고르기·숨긴 앱 / 자주 쓰는 앱 관리 / 설정 / 기기 정보(사진으로 찍어 보내는 진단 화면: 속성·권한·와이파이·블루투스·자동 추가 서비스 기록·누른 키·시스템 화면 시험) |
 | ReaderGuide | 설정 › 독서 › 자동 추가 안내의 앱별 내용(필요한 권한·앱에서 할 것·자동으로 들어오는 책 정보 다섯 가지·알아 둘 것, 화면은 SettingsActivity 의 앱 목록 → 앱별 안내). 근거는 docs/READER_APPS.md `자동 추가: 앱별로 가져오는 것` |
 | OnboardingActivity | ⑭ 시작하기: 처음 한 번, 읽는 책 자동 추가·오늘 읽은 시간을 설명하고 켜게 한다(안드로이드 13+ 제한된 설정 안내 포함) |
 | PagedRows | 스크롤 없는 페이지 목록(목록·격자, fixedRows), 높이가 제각각인 묶음을 쪽으로 나누는 `PagedBlocks`(자동 추가 안내), 쪽 표시 `pageLabel`·`pagesClick`(`Paged`) |
