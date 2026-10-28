@@ -20,6 +20,13 @@ interface Paged {
     fun prev()
 }
 
+/** 한 쪽 넘긴다(페이지 버튼). 한 쪽뿐이면 넘길 것이 없다(false). */
+fun Paged.turn(next: Boolean): Boolean {
+    if (pageCount <= 1) return false
+    if (next) next() else prev()
+    return true
+}
+
 /**
  * 스크롤 없이 페이지 단위로 넘기는 목록. 주어진 높이에 들어가는 만큼만 줄을 그리고, 줄 사이에 가는 회색 선을 둔다.
  * 전자잉크라 넘길 때 애니메이션을 쓰지 않는다.

@@ -488,6 +488,7 @@ private fun Context.showHistory(r: BookRecord, sub: String?, onChange: () -> Uni
     timeline.onPageChanged = { pageText.text = pageLabel(timeline) }
     pageText.text = pageLabel(timeline)
     pageText.pagesClick(timeline)
+    sheet.pages(timeline)
     sheet.note(vbox().apply {
         addView(summary)
         addView(timeline, lp(MATCH, WRAP).apply { topMargin = dp(TIMELINE_TOP_DP) })

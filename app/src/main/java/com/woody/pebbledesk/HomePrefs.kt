@@ -208,6 +208,20 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("show_status_bar", false)
         set(v) = sp.edit().putBoolean("show_status_bar", v).apply()
 
+    /** 앞 쪽·다음 쪽 페이지 버튼의 키 코드([PageKeys]). 0 이면 정하지 않음(처음은 둘 다 없음). */
+    var pageKeyPrev: Int
+        get() = sp.getInt("page_key_prev", 0)
+        set(v) = sp.edit().putInt("page_key_prev", v).apply()
+
+    var pageKeyNext: Int
+        get() = sp.getInt("page_key_next", 0)
+        set(v) = sp.edit().putInt("page_key_next", v).apply()
+
+    /** 홈에서 페이지 버튼이 넘길 줄: true 면 함께 읽는 책, false 면 자주 쓰는 앱(처음) */
+    var pageKeysAlso: Boolean
+        get() = sp.getBoolean("page_keys_also", false)
+        set(v) = sp.edit().putBoolean("page_keys_also", v).apply()
+
     fun toggleFavorite(key: String) {
         favorites = if (key in favorites) favorites - key else favorites + key
     }

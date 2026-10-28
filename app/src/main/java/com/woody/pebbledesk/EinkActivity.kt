@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import java.util.Locale
@@ -104,6 +105,17 @@ abstract class EinkActivity : Activity() {
 
     /** [toLeft] 가 true 면 왼쪽으로 민 것(다음 페이지). 처리했으면 true. */
     protected open fun onSwipe(toLeft: Boolean): Boolean = false
+
+    /**
+     * 페이지 버튼([PageKeys])을 눌렀을 때. [next] 면 다음 쪽. 넘길 목록이 있으면 true(키를 먹는다).
+     * 기본은 밀기와 같은 목록. 넘기는 목록이 둘인 화면(홈)은 설정에서 고른 하나로.
+     */
+    protected open fun onPageKey(next: Boolean): Boolean = onSwipe(next)
+
+    private val pageKeys = PageKeyHandler(this) { onPageKey(it) }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        pageKeys.onKey(event) || super.dispatchKeyEvent(event)
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
