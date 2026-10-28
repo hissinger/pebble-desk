@@ -79,7 +79,11 @@
     <string name="device_photo_hint">If something doesn\'t work, take a photo of this screen and send it.</string>
     <string name="device_section_device">Device</string>
     <string name="device_section_values">System properties · settings</string>
-    <string name="device_section_perms">Permissions</string>
+    <string name="device_section_perms">Permissions · Wi-Fi · Bluetooth</string>
+    <string name="device_wifi">Wi-Fi</string>
+    <string name="device_bt">Bluetooth</string>
+    <string name="device_linked">%s, connected</string>
+    <string name="device_unlinked">%s, not connected</string>
     <string name="device_section_keys">Last button pressed</string>
     <string name="device_key_hint">Press the page buttons and the button below the screen</string>
     <string name="device_perm_home">Default home</string>

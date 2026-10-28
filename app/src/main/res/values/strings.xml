@@ -83,7 +83,11 @@
     <string name="device_photo_hint">문제가 있으면 이 화면을 사진으로 찍어 보내 주세요.</string>
     <string name="device_section_device">기기</string>
     <string name="device_section_values">시스템 속성 · 설정 값</string>
-    <string name="device_section_perms">권한</string>
+    <string name="device_section_perms">권한 · 와이파이 · 블루투스</string>
+    <string name="device_wifi">와이파이</string>
+    <string name="device_bt">블루투스</string>
+    <string name="device_linked">%s·연결됨</string>
+    <string name="device_unlinked">%s·연결 없음</string>
     <string name="device_section_keys">마지막으로 누른 버튼</string>
     <string name="device_key_hint">페이지 버튼·화면 아래 버튼을 눌러 보세요</string>
     <string name="device_perm_home">기본 홈</string>

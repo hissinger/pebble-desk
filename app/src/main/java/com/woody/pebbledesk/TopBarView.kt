@@ -2,6 +2,7 @@ package com.woody.pebbledesk
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -9,8 +10,11 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
+import android.os.Build
 import android.view.View
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -20,8 +24,11 @@ import java.util.Locale
 data class DeviceStatus(
     val battery: Int,
     val charging: Boolean,
+    /** 와이파이에 연결돼 있다(켜져 있기만 하면 아니다) */
     val wifi: Boolean,
     val bluetooth: Boolean,
+    /** 블루투스 기기(이어폰·리모컨 등)가 연결돼 있다. 안드로이드 12+ 는 '근처 기기' 권한이 없어 늘 false */
+    val bluetoothConnected: Boolean,
     val light: Boolean,
     /** 잔상 제거(전체 새로고침) 주기. 0 이면 표시하지 않는다. */
     val refreshEvery: Int,
@@ -35,10 +42,9 @@ data class DeviceStatus(
             return DeviceStatus(
                 battery = if (level >= 0 && scale > 0) level * 100 / scale else -1,
                 charging = plugged,
-                wifi = runCatching {
-                    (context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).isWifiEnabled
-                }.getOrDefault(false),
+                wifi = wifiConnected(context),
                 bluetooth = bluetoothOn(),
+                bluetoothConnected = bluetoothConnected(),
                 light = Device.lightOn(context),
                 refreshEvery = refreshEvery(),
             )
@@ -49,11 +55,52 @@ data class DeviceStatus(
         private fun bluetoothOn() = runCatching { BluetoothAdapter.getDefaultAdapter()?.isEnabled == true }
             .getOrDefault(false)
 
+        @Suppress("DEPRECATION")
+        private fun wifiConnected(context: Context) = runCatching {
+            val cm = context.getSystemService(ConnectivityManager::class.java)
+            cm.allNetworks.any { cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true }
+        }.getOrDefault(false)
+
+        /** 이어폰(A2DP·헤드셋)·키보드·리모컨(HID, 숨은 상수 4) 중 하나라도 연결돼 있으면 */
+        private fun bluetoothConnected() = profileStates().any { it.second == BluetoothProfile.STATE_CONNECTED }
+
+        /**
+         * [BT_PROFILES] 마다 (이름, 연결 상태 0 끊김·1 연결 중·2 연결됨·3 끊는 중). 꺼져 있으면 빈 목록, 물을 수 없으면 -1:
+         * 안드로이드 12+ 는 '근처 기기'(BLUETOOTH_CONNECT) 권한이 있어야 하는데 이 앱은 선언하지 않아 묻지 않는다(홈은 1분마다 읽는다).
+         */
+        @SuppressLint("MissingPermission")
+        @Suppress("DEPRECATION")
+        private fun profileStates(): List<Pair<String, Int>> {
+            val bt = runCatching { BluetoothAdapter.getDefaultAdapter()?.takeIf { it.isEnabled } }.getOrNull() ?: return emptyList()
+            val allowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+            return BT_PROFILES.map { (name, profile) ->
+                name to if (allowed) runCatching { bt.getProfileConnectionState(profile) }.getOrDefault(-1) else -1
+            }
+        }
+
+        private val BT_PROFILES = listOf("A2DP" to BluetoothProfile.A2DP, "HFP" to BluetoothProfile.HEADSET, "HID" to 4)
+
+        /**
+         * 기기 정보에 보이는 와이파이·블루투스 지금 값: 와이파이 켜짐·연결, 블루투스 켜짐, [BT_PROFILES] 연결 상태.
+         * 상태 줄이 기기에서 맞게 보이는지 사진으로 보려고 둔다(크레마 팬톤에서 연결 없는 와이파이가 보인다는 댓글, 2026-10-28).
+         */
+        fun radios(context: Context) = Radios(
+            wifiOn = runCatching {
+                (context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).isWifiEnabled
+            }.getOrDefault(false),
+            wifiLinked = wifiConnected(context),
+            btOn = bluetoothOn(),
+            profiles = profileStates(),
+        )
+
         /** 크레마 상단바와 같은 값(persist.vendor.fullmode_cnt). */
         private fun refreshEvery(): Int =
             Device.prop("persist.vendor.fullmode_cnt").toIntOrNull()?.takeIf { it in 1..99 } ?: 0
     }
 }
+
+/** [DeviceStatus.radios]. [profiles] 는 (A2DP·HFP·HID, 연결 상태 0 끊김·1 연결 중·2 연결됨·3 끊는 중, -1 물을 수 없음) */
+class Radios(val wifiOn: Boolean, val wifiLinked: Boolean, val btOn: Boolean, val profiles: List<Pair<String, Int>>)
 
 /**
  * 홈 맨 위 두 줄.
@@ -89,6 +136,7 @@ class TopBarView(context: Context, private val fixedFrame: Boolean = true) : Vie
     private val icons = mapOf(
         "wifi" to context.getDrawable(R.drawable.ic_wifi)!!,
         "bt" to context.getDrawable(R.drawable.ic_bluetooth)!!,
+        "btOn" to context.getDrawable(R.drawable.ic_bluetooth_connected)!!,
         "light" to context.getDrawable(R.drawable.ic_light)!!,
         "bolt" to context.getDrawable(R.drawable.ic_bolt)!!,
     )
@@ -214,7 +262,7 @@ class TopBarView(context: Context, private val fixedFrame: Boolean = true) : Vie
                 if (s.charging) drawIcon(canvas, "bolt", textLeft - context.dpf(1), mid, iconSize * 0.8f) else textLeft
             }
             if (s.wifi) add { x -> drawIcon(canvas, "wifi", x, mid) }
-            if (s.bluetooth) add { x -> drawIcon(canvas, "bt", x, mid) }
+            if (s.bluetooth) add { x -> drawIcon(canvas, if (s.bluetoothConnected) "btOn" else "bt", x, mid) }
             if (s.light) add { x -> drawIcon(canvas, "light", x, mid) }
             if (s.refreshEvery > 0) add { x -> drawRing(canvas, s.refreshEvery, x, mid) }
         }
