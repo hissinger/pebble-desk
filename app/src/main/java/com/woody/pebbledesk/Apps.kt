@@ -10,6 +10,7 @@ import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -358,30 +359,49 @@ object AppIcons {
 
     fun icon(context: Context, app: AppEntry, px: Int): Bitmap {
         val gray = !Palette.current.color
-        val key = "${app.key}@$px@$gray"
+        val packPkg = HomePrefs.iconPack(context)
+        // 이 앱에 따로 고른 아이콘(`<아이콘 팩>/<그림 이름>`)
+        val own = HomePrefs.iconOverrides(context)[app.key]
+        val key = "${app.key}@$px@$gray@$packPkg@$own"
         cache.get(key)?.let { return it }
         val pm = context.packageManager
         val updated = runCatching { pm.getPackageInfo(app.pkg, MATCH_ALL_BOOT_STATES).lastUpdateTime }.getOrNull()
-        // 같은 앱·크기·색의 파일 이름 머리(뒤에 앱을 업데이트한 때)
+        // 따로 고른 아이콘의 팩, 고른 아이콘 팩(지웠으면 null: 다음 것으로)
+        val ownPkg = own?.substringBefore('/')
+        val ownName = own?.substringAfter('/')
+        val ownStamp = IconPacks.stamp(context, ownPkg)
+        val pack = IconPacks.stamp(context, packPkg)
+        // 같은 앱·크기·색의 파일 이름 머리(뒤에 앱을 업데이트한 때와 아이콘 팩 또는 따로 고른 아이콘)
         val prefix = "${app.key.replace(UNSAFE_NAME, "_")}@$px${if (gray) "g" else "c"}@"
-        val file = updated?.let { File(dir(context), "$prefix$it.png") }
+        val source = if (ownStamp != null) "@$ownStamp.$ownName" else pack?.let { "@$it" }.orEmpty()
+        val file = updated?.let { File(dir(context), "$prefix$it${source.replace(UNSAFE_NAME, "_")}.png") }
         file?.takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.path) }?.let { cache.put(key, it); return it }
-        // 못 찾으면 기본 아이콘을 쓰되 기억하지 않는다(다음에 다시 찾는다).
-        val found = runCatching {
-            pm.getActivityInfo(app.component, MATCH_ALL_BOOT_STATES or PackageManager.MATCH_DISABLED_COMPONENTS).loadIcon(pm)
-        }.getOrNull()
-        val drawable = found ?: pm.defaultActivityIcon
-        val color = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        Canvas(color).let { drawable.setBounds(0, 0, px, px); drawable.draw(it) }
-        val out = if (!gray) color else Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888).also {
-            Canvas(it).drawBitmap(color, 0f, 0f, grayPaint)
-            color.recycle()
-        }
+        // 따로 고른 아이콘 → 팩의 아이콘 → 그 앱의 아이콘. 못 찾으면 기본 아이콘을 쓰되 기억하지 않는다(다음에 다시 찾는다).
+        val found = (if (ownPkg != null && ownName != null && ownStamp != null) IconPacks.drawable(context, ownPkg, ownName) else null)
+            ?: (if (packPkg != null && pack != null) IconPacks.icon(context, packPkg, pack, app.component) else null)
+            ?: runCatching {
+                pm.getActivityInfo(app.component, MATCH_ALL_BOOT_STATES or PackageManager.MATCH_DISABLED_COMPONENTS).loadIcon(pm)
+            }.getOrNull()
+        val out = draw(found ?: pm.defaultActivityIcon, px, gray)
         if (found != null) {
             cache.put(key, out)
             if (file != null) Bg.run({ save(file, prefix, out) }) {}
         }
         return out
+    }
+
+    /** 아이콘 팩의 그림 [name] 을 [px] 크기로(아이콘 바꾸기의 칸, 기억하지 않는다). 없으면 null. */
+    fun packIcon(context: Context, pkg: String, name: String, px: Int): Bitmap? =
+        IconPacks.drawable(context, pkg, name)?.let { draw(it, px, !Palette.current.color) }
+
+    /** [drawable] 을 [px] 크기 그림으로. [gray] 면 흑백으로 바꾼다. */
+    private fun draw(drawable: Drawable, px: Int, gray: Boolean): Bitmap {
+        val color = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+        Canvas(color).let { drawable.setBounds(0, 0, px, px); drawable.draw(it) }
+        return if (!gray) color else Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888).also {
+            Canvas(it).drawBitmap(color, 0f, 0f, grayPaint)
+            color.recycle()
+        }
     }
 
     /** 그린 아이콘을 [file] 로 두고 같은 앱·크기·색의 예전 파일([prefix], 앱을 업데이트하기 전)은 지운다. */
@@ -401,8 +421,15 @@ object AppIcons {
         val changed = context.packageManager.getChangedPackages(packageSequence) ?: return emptySet()
         packageSequence = changed.sequenceNumber
         val pkgs = changed.packageNames.toSet()
-        // 키는 `<패키지>/<화면>@크기@흑백`
-        cache.snapshot().keys.filter { it.substringBefore('/') in pkgs }.forEach { cache.remove(it) }
+        // 쓰는 아이콘 팩(고른 팩·앱마다 고른 아이콘의 팩)이 바뀌었으면(업데이트·삭제) 모든 아이콘을 비운다.
+        // 홈은 팩의 표시([IconPacks.stamp])로 다시 그린다.
+        if (usedPacks(context).any { it in pkgs }) cache.evictAll()
+        // 키는 `<패키지>/<화면>@크기@흑백@아이콘 팩@따로 고른 아이콘`
+        else cache.snapshot().keys.filter { it.substringBefore('/') in pkgs }.forEach { cache.remove(it) }
         return pkgs
     }
+
+    /** 아이콘을 가져오는 팩들: 설정에서 고른 팩과 앱마다 고른 아이콘의 팩 */
+    fun usedPacks(context: Context): Set<String> =
+        HomePrefs.iconOverrides(context).values.map { it.substringBefore('/') }.toSet() + listOfNotNull(HomePrefs.iconPack(context))
 }

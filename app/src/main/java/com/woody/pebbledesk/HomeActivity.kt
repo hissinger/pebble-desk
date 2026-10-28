@@ -456,6 +456,10 @@ class HomeActivity : EinkActivity() {
         // 자주 쓰는 앱은 직접 넣고 뺀 그대로 보인다(위의 책·앱과 상관없다).
         val favs = favoriteApps(apps, prefs)
         val icons = prefs.showIcons
+        // 설정에서 고른 팩과 아이콘을 가져오는 팩들(바꾸거나 업데이트하면 달라진다), 앱마다 고른 아이콘(그 앱이 보이는 자리만 다시 그린다).
+        // 고른 팩을 따로 넣는다: 앱마다 고른 아이콘이 같은 팩이면 `기본` 으로 바꿔도 쓰는 팩들은 그대로다.
+        val packs = prefs.iconPack to AppIcons.usedPacks(this).associateWith { IconPacks.stamp(this, it) }
+        val ownIcons = prefs.iconOverrides
         val grid = prefs.favGrid
 
         heroHeight = hero.height
@@ -465,13 +469,13 @@ class HomeActivity : EinkActivity() {
         val status = books.map { bookStatus(it) }
         // 표지가 생겼는지(책 파일 표지는 뒤에서 꺼내 둔다: 압축 만화·만화 표지 도구를 받은 뒤. 책 목록이 그대로여도 다시 그리게)
         val covers = books.map { BookShelf.hasCover(this, it.id) }
-        val heroState = listOf(books, reading, icons, heroHeight, watching, status, covers)
+        val heroState = listOf(books, reading, icons, packs, ownIcons[reading?.key], heroHeight, watching, status, covers)
         // 아이콘이 바뀌었을 수 있는 앱(그사이 업데이트된 앱)이 보이는 자리만 다시 그린다(다른 앱 업데이트로 홈 전체가 깜빡이지 않게).
         if (reading?.pkg in changedPkgs || heroState != shownHero) {
             shownHero = heroState
             buildHero(books, reading)
         }
-        val favState = listOf(favs, icons, grid)
+        val favState = listOf(favs, icons, packs, favs.map { ownIcons[it.key] }, grid)
         if (favs.none { it.pkg in changedPkgs } && favState == shownFavs) return
         shownFavs = favState
         favRows.setGrid(if (!grid) 0 else if (wide) PagedRows.GRID_AUTO else GRID_ROWS)

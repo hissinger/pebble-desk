@@ -188,6 +188,21 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("show_icons", true)
         set(v) = sp.edit().putBoolean("show_icons", v).apply()
 
+    /** 앱 아이콘을 가져올 아이콘 팩의 패키지(설정 › 화면 › 아이콘 모양, [IconPacks]). 없으면 기본(각 앱의 아이콘). */
+    var iconPack: String?
+        get() = sp.getString(KEY_ICON_PACK, null)
+        set(v) = sp.edit().putString(KEY_ICON_PACK, v).apply()
+
+    /** 앱마다 고른 아이콘(앱 키 → `<아이콘 팩>/<그림 이름>`, 길게 누르기 › 아이콘 바꾸기). [iconPack] 보다 먼저 쓴다. */
+    var iconOverrides: Map<String, String>
+        get() = iconOverrides(sp)
+        set(v) = sp.edit().putString(KEY_ICON_OVERRIDES, JSONObject(v).toString()).apply()
+
+    /** [key] 의 아이콘을 [icon](`<아이콘 팩>/<그림 이름>`)으로. null 이면 원래 아이콘으로. */
+    fun setIconOverride(key: String, icon: String?) {
+        iconOverrides = if (icon == null) iconOverrides - key else iconOverrides + (key to icon)
+    }
+
     /** 홈에서도 기기 상단 바를 보인다. 처음은 꺼짐(홈은 상단 바를 숨기고 자체 상단을 그린다). */
     var showStatusBar: Boolean
         get() = sp.getBoolean("show_status_bar", false)
@@ -212,6 +227,7 @@ class HomePrefs(context: Context) {
         favoriteNames.let { names -> names.mapNotNull { (k, v) -> fix(k)?.let { it to v } }.toMap().let { if (it != names) favoriteNames = it } }
         favoriteList.let { list -> list.mapNotNull(fix).distinct().let { if (it != list) favoriteList = it } }
         hidden.let { set -> set.mapNotNull(fix).toSet().let { if (it != set) hidden = it } }
+        iconOverrides.let { icons -> icons.mapNotNull { (k, v) -> fix(k)?.let { it to v } }.toMap().let { if (it != icons) iconOverrides = it } }
     }
 
     companion object {
@@ -224,6 +240,8 @@ class HomePrefs(context: Context) {
         private const val KEY_TEXT_SCALE = "text_scale"
         private const val KEY_ROW_SCALE = "row_scale"
         private const val KEY_PALETTE = "palette"
+        private const val KEY_ICON_PACK = "icon_pack"
+        private const val KEY_ICON_OVERRIDES = "icon_overrides"
 
         /** 설정 › 글자 · 간격의 단계(%): 글자 크기는 70~150(기기 글꼴 크기에 곱한다), 줄 간격은 80~150, 10% 씩 */
         val TEXT_SCALES = (70..150 step 10).toList()
@@ -240,6 +258,25 @@ class HomePrefs(context: Context) {
 
         /** 화면을 만들기 전에(attachBaseContext) 색을 정하려고 쓴다. */
         fun palette(context: Context) = Palette.of(prefs(context).getString(KEY_PALETTE, null))
+
+        /** 아이콘을 그릴 때마다 설정 객체를 만들지 않으려고 쓴다. */
+        fun iconPack(context: Context): String? = prefs(context).getString(KEY_ICON_PACK, null)
+
+        /** 앱마다 고른 아이콘([iconOverrides]). 아이콘을 그릴 때마다 읽으므로 같은 값이면 읽어 둔 표를 쓴다. */
+        fun iconOverrides(context: Context): Map<String, String> = iconOverrides(prefs(context))
+
+        private var overridesRaw: String? = null
+        private var overridesMap: Map<String, String> = emptyMap()
+
+        @Synchronized
+        private fun iconOverrides(sp: android.content.SharedPreferences): Map<String, String> {
+            val raw = sp.getString(KEY_ICON_OVERRIDES, null) ?: return emptyMap()
+            if (raw != overridesRaw) {
+                overridesMap = runCatching { JSONObject(raw).let { o -> o.keys().asSequence().associateWith { o.getString(it) } } }.getOrDefault(emptyMap())
+                overridesRaw = raw
+            }
+            return overridesMap
+        }
 
         /** 화면을 만들기 전에(attachBaseContext) 언어를 정하려고 쓴다. 기기 언어를 따르면 지금 기기 언어로 가른다. */
         fun isEnglish(context: Context) = language(prefs(context)).isEnglish(systemLanguage())

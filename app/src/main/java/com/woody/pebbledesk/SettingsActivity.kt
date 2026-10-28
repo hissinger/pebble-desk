@@ -208,7 +208,7 @@ class SettingsActivity : EinkActivity() {
 
     private fun open(page: String) = startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, page))
 
-    /** 화면: 글자 · 간격, 색, 앱 아이콘, 시계, 기기 상단 바 */
+    /** 화면: 글자 · 간격, 색, 앱 아이콘, 아이콘 모양, 시계, 기기 상단 바 */
     private fun renderDisplay() {
         list.removeAllViews()
         // 글자 크기·줄 간격은 한 화면에서 슬라이더로 보며 고른다.
@@ -223,6 +223,7 @@ class SettingsActivity : EinkActivity() {
             }
         }
         toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint), redraw = ::renderDisplay) { prefs.showIcons = it }
+        iconStyleRow()
         val clocks = listOf(getString(R.string.clock24), getString(R.string.clock12))
         row(getString(R.string.clock), clocks[if (prefs.clock24h) 0 else 1], next = true) {
             choose(getString(R.string.clock), clocks, if (prefs.clock24h) 0 else 1) {
@@ -230,6 +231,30 @@ class SettingsActivity : EinkActivity() {
             }
         }
         toggle(getString(R.string.status_bar), prefs.showStatusBar, hint = getString(R.string.status_bar_hint), redraw = ::renderDisplay) { prefs.showStatusBar = it }
+    }
+
+    /**
+     * 아이콘 모양: 기본(각 앱의 아이콘) / 깔린 아이콘 팩([IconPacks]). 격자에는 늘 아이콘이 보여 `앱 아이콘` 이 꺼져도 보인다.
+     * 깔린 팩이 없으면 팩을 까는 곳을 알린다(이 앱이 받지 않는다).
+     */
+    private fun iconStyleRow() {
+        val packs = IconPacks.installed(this)
+        val chosen = packs.indexOfFirst { it.pkg == prefs.iconPack }
+        val title = getString(R.string.icon_style)
+        row(title, packs.getOrNull(chosen)?.label ?: getString(R.string.icon_style_default), next = true) {
+            if (packs.isEmpty()) {
+                Sheet(this).header(title, getString(R.string.icon_pack_none)).show()
+                return@row
+            }
+            choose(title, listOf(getString(R.string.icon_style_default)) + packs.map { it.label }, chosen + 1) {
+                val pkg = packs.getOrNull(it - 1)?.pkg
+                if (pkg != prefs.iconPack) {
+                    prefs.iconPack = pkg
+                    pkg?.let { p -> Bg.run({ IconPacks.warm(applicationContext, p) }) {} }
+                    renderDisplay()
+                }
+            }
+        }
     }
 
     /** 독서 화면: 읽고 있는 책, 읽는 책 자동 추가, 오늘 읽은 시간, 하루 목표, 한 주 시작, 독서 기록 */

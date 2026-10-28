@@ -25,6 +25,17 @@
     <string name="none">None</string>
     <string name="now_reading">Books I\'m reading</string>
     <string name="app_icons">App icons</string>
+    <string name="icon_style">Icon style</string>
+    <string name="icon_style_default">Default</string>
+    <string name="icon_pack">Icon pack</string>
+    <string name="icon_pack_none">Install an icon pack (such as Arcticons) from the Play Store or F-Droid to choose it here.</string>
+    <string name="change_icon">Change icon</string>
+    <string name="icon_default_now">Default icon</string>
+    <string name="icon_reset">Original icon</string>
+    <string name="icon_search_hint">Search icon names</string>
+    <string name="icons_all">All icons · %1$s</string>
+    <string name="icons_found">%1$s · %2$s</string>
+    <string name="icons_none">No icons found</string>
     <string name="clock">Clock</string>
     <string name="clock24">24-hour</string>
     <string name="clock12">12-hour</string>
