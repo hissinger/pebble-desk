@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.format.Formatter
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.widget.LinearLayout
 import com.woody.pebbledesk.readers.ArchiveLib
@@ -33,7 +34,7 @@ class SettingsActivity : EinkActivity() {
     private lateinit var guide: PagedBlocks
     /**
      * 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]), 그 앱 하나의 안내([PAGE_GUIDE_APP]),
-     * 화면([PAGE_DISPLAY]), 글자 · 간격([PAGE_TEXT])
+     * 화면([PAGE_DISPLAY]), 글자 · 간격([PAGE_TEXT]), 페이지 버튼([PAGE_KEYS])
      */
     private val page by lazy { intent.getStringExtra(EXTRA_PAGE) }
     /** 앱 안내 화면의 앱 */
@@ -50,6 +51,7 @@ class SettingsActivity : EinkActivity() {
             PAGE_READING -> getString(R.string.reading_settings)
             PAGE_DISPLAY -> getString(R.string.section_display)
             PAGE_TEXT -> getString(R.string.text_spacing)
+            PAGE_KEYS -> getString(R.string.page_keys)
             else -> getString(R.string.settings)
         }
         val titleRow = titleRow(title) { finish() }
@@ -92,6 +94,7 @@ class SettingsActivity : EinkActivity() {
             PAGE_READING -> renderReading()
             PAGE_DISPLAY -> renderDisplay()
             PAGE_TEXT -> renderText()
+            PAGE_KEYS -> renderPageKeys()
             else -> {
                 render()
                 Update.onChange = { renderUpdate(); updates.onChange(); showLatest() }
@@ -231,6 +234,65 @@ class SettingsActivity : EinkActivity() {
             }
         }
         toggle(getString(R.string.status_bar), prefs.showStatusBar, hint = getString(R.string.status_bar_hint), redraw = ::renderDisplay) { prefs.showStatusBar = it }
+        // 페이지 버튼: 앞 쪽 · 다음 쪽 키(`음량 위 · 음량 아래`, 한쪽만 정했으면 다른 쪽은 `없음`), 둘 다 없으면 `없음`
+        val keys = listOf(prefs.pageKeyPrev, prefs.pageKeyNext)
+        val anyKey = keys.any { it != 0 }
+        val keysText = if (!anyKey) getString(R.string.none) else keys.joinToString(" · ", transform = ::keyText)
+        row(getString(R.string.page_keys), keysText, on = anyKey, next = true) { open(PAGE_KEYS) }
+    }
+
+    /**
+     * 페이지 버튼 화면: 앞 쪽·다음 쪽 버튼(누르면 [askKey]), 홈에서 넘길 곳, 모두 지우기, 아래에 설명.
+     * 버튼을 하나도 정하지 않았으면 아래 두 줄은 흐리게(누를 수는 있다).
+     */
+    private fun renderPageKeys() {
+        list.removeAllViews()
+        col = list
+        val prev = prefs.pageKeyPrev
+        val next = prefs.pageKeyNext
+        row(getString(R.string.page_key_prev), keyText(prev), on = prev != 0, next = true) { askKey(false) }
+        row(getString(R.string.page_key_next), keyText(next), on = next != 0, next = true) { askKey(true) }
+        val any = prev != 0 || next != 0
+        val homeRows = listOf(getString(R.string.favorites), getString(R.string.also_reading))
+        val home = if (prefs.pageKeysAlso) 1 else 0
+        row(getString(R.string.page_keys_home), homeRows[home], on = any, next = true) {
+            choose(getString(R.string.page_keys_home), homeRows, home) { prefs.pageKeysAlso = it == 1; renderPageKeys() }
+        }
+        row(getString(R.string.page_keys_clear), null, on = any) {
+            prefs.pageKeyPrev = 0; prefs.pageKeyNext = 0; renderPageKeys()
+        }
+        col.addView(text(getString(R.string.page_keys_desc), 16f, color = Ui.GRAY, lines = GUIDE_LINES).apply {
+            setPadding(dp(Ui.MARGIN), dp(16), dp(Ui.MARGIN), 0)
+        })
+    }
+
+    /** 페이지 버튼 키 이름, 정하지 않았으면(0) `없음` */
+    private fun keyText(code: Int) = if (code == 0) getString(R.string.none) else PageKeys.name(this, code)
+
+    /**
+     * 버튼 받기 창: 다음에 누른 키를 [next] 쪽(앞 쪽이면 false) 버튼으로 정하고 닫는다. 뒤로 키는 창을 닫고, 홈·전원 등은 받지 않는다.
+     * 다른 쪽에 이미 정한 키면 그쪽은 지운다(한 키가 두 쪽을 넘기지 않게).
+     */
+    private fun askKey(next: Boolean) {
+        val title = getString(if (next) R.string.page_key_next else R.string.page_key_prev)
+        val dialog = Sheet(this).header(title, getString(if (next) R.string.page_key_ask_next else R.string.page_key_ask_prev))
+            .centered().keepOnChange().show()
+        dialog.setOnKeyListener { _, _, event ->
+            val code = event.keyCode
+            if (!PageKeys.assignable(code)) return@setOnKeyListener false
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 && dialog.isShowing) {
+                if (next) {
+                    prefs.pageKeyNext = code
+                    if (prefs.pageKeyPrev == code) prefs.pageKeyPrev = 0
+                } else {
+                    prefs.pageKeyPrev = code
+                    if (prefs.pageKeyNext == code) prefs.pageKeyNext = 0
+                }
+                dialog.dismiss()
+                renderPageKeys()
+            }
+            true
+        }
     }
 
     /**
@@ -606,6 +668,7 @@ class SettingsActivity : EinkActivity() {
         private const val EXTRA_PAGE = "page"
         private const val PAGE_TEXT = "text"
         private const val PAGE_DISPLAY = "display"
+        private const val PAGE_KEYS = "page_keys"
         /** 설정 줄 이름 글자(sp) */
         private const val ROW_LABEL_SP = 22f
         private const val PAGE_READING = "reading"

@@ -354,15 +354,30 @@ class HomeActivity : EinkActivity() {
         return true
     }
 
+    /**
+     * 페이지 버튼은 설정 `홈에서 넘길 곳` 의 줄만 넘긴다(마지막으로 만진 줄을 따라가지 않는다).
+     * 그 줄이 한 쪽뿐이거나 그려져 있지 않으면(칸에 들지 않음) 키를 먹지 않는다.
+     */
+    override fun onPageKey(next: Boolean): Boolean = when {
+        prefs.pageKeysAlso -> alsoView?.let(::drawn) == true && alsoPaged.turn(next)
+        ::favRows.isInitialized -> favRows.turn(next)
+        else -> false
+    }
+
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) touchOnAlso = alsoView?.let { touches(it, ev) } == true
         return super.dispatchTouchEvent(ev)
     }
 
-    /** [view] 가 그려져 있고(칸에 다 들지 않아 그리지 않은 줄은 빼고) 손가락이 그 안에서 눌렸는가 */
-    private fun touches(view: View, ev: MotionEvent): Boolean {
+    /** [view] 가 그려져 있는가(칸에 다 들지 않아 그리지 않은 줄([FitColumn])은 보이게 둬도 빼고) */
+    private fun drawn(view: View): Boolean {
         val parent = view.parent as? View ?: return false
-        if (!view.isShown || view.bottom > parent.height) return false
+        return view.isShown && view.bottom <= parent.height
+    }
+
+    /** [view] 가 그려져 있고 손가락이 그 안에서 눌렸는가 */
+    private fun touches(view: View, ev: MotionEvent): Boolean {
+        if (!drawn(view)) return false
         val at = IntArray(2).also { view.getLocationInWindow(it) }
         return ev.x >= at[0] && ev.x < at[0] + view.width && ev.y >= at[1] && ev.y < at[1] + view.height
     }

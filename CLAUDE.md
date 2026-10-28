@@ -74,6 +74,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.6.5-release.apk </dev/
 | OnboardingActivity | ⑭ 시작하기: 처음 한 번, 읽는 책 자동 추가·오늘 읽은 시간을 설명하고 켜게 한다(안드로이드 13+ 제한된 설정 안내 포함) |
 | PagedRows | 스크롤 없는 페이지 목록(목록·격자, fixedRows), 높이가 제각각인 묶음을 쪽으로 나누는 `PagedBlocks`(자동 추가 안내), 쪽 표시 `pageLabel`·`pagesClick`(`Paged`) |
 | EinkActivity / Sheet / Ui / TopBarView / HomePrefs | 공통 화면(밀기·언어·밀도 맞춤)·아래 메뉴(돌아왔을 때 그사이 DB 가 바뀌었으면 떠 있던 메뉴를 닫는 `Sheet.dismissStale`)·규격(`PictureView`, 완독 도장을 찍는 줄 `StampedRow`, 기준 폭 572dp 포함)·상단·설정 저장 |
+| PageKeys | 페이지 버튼(설정 › 화면 › 페이지 버튼): 정한 앞 쪽·다음 쪽 키 판단(`direction`, 소리가 나는 동안의 음량 키는 빼고)·키 이름, 화면·메뉴마다 키 받기 `PageKeyHandler`(넘길 목록이 있을 때만 먹는다. 화면은 `EinkActivity.onPageKey`, 메뉴는 `Sheet.pages`) |
 | Palette | 색(설정 › 화면 › 색): 흑백·컬러('색면의 서가'). 표지·아이콘 컬러 여부, 화면 묶음(`Area`)마다 색면·큰 제목 색, 완독(띠·도장)·큰 별 색. `Palette.current` 는 EinkActivity 가 정한다 |
 | Device / Crema | 기기 종류(크레마·메이북·기타)와 기기마다 다른 동작(빠른 설정·조명·시스템 속성·BOOX 얼린 앱 열기·이 앱이 BOOX 얼리기 대상인지 `booxAutoFreeze`) / 크레마 전용 화면 보정(대비·가려지는 아래·로고) |
 | Update / UpdateSheets | 설정 › 업데이트·홈의 새 판 알림: GitHub 최신 릴리스 확인, APK 받기·확인(크기·SHA-256·서명 이력), 설치 세션·설치 창, 설치 뒤 홈 다시 띄우기 / 두 화면이 같이 쓰는 창(바뀐 점·`설치`·허용 안내·받는 중·실패, 홈의 `새 버전이 나왔습니다`) |
@@ -121,4 +122,4 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.6.5-release.apk </dev/
   - 알라딘·리디·교보eBook은 "홈 화면에 바로가기 추가"를 보내므로, 런처가 핀 바로가기(`ACTION_CONFIRM_PIN_SHORTCUT`)를 받으면 제목·앱·바로 열기 링크를 얻는다. 표지는 알라딘만 쓸 만하고(리디는 아래가 잘림, 교보는 찌그러짐) YES24 검색으로 보완.
   - 받아 둔 책 파일은 다른 앱 저장소(안드로이드 11 제한)·DRM 이라 읽을 수 없다.
 - 첫 설치 개선 후보: 빈 자주 쓰는 앱의 추가 동작, 크레마 기본 앱 기본 숨김, 기본 홈 앱 안내. (자동 추가·읽은 시간 켜기는 ⑭ 시작하기로 했다)
-- 기기 버튼으로 쪽 넘기기: 기기마다 키가 달라(메이북 291·292, iReader Ocean·Moaan 은 음량 키) 앱의 키 처리를 모두 지웠다. 나중에 설정에서 사용자가 앞 쪽·다음 쪽 버튼을 직접 정하는 안(기본 키 없음, 시안 `design-review/pagekeys.png`)을 검토한다. 그때 화면(액티비티)도 아래 메뉴처럼 초점을 막아야 한다(터치 뒤 첫 키가 터치 모드를 벗어나는 데 쓰여 버려지고 회색 초점이 남는다, 2026-10-18 에뮬에서 확인).
+- 기기 버튼으로 쪽 넘기기(이슈 #9): 설정 › 화면 › 페이지 버튼으로 구현했다(다음 판, `PageKeys`, 동작·한계는 DESIGN.md 설정 절). 남은 것: 메이북(291·292)·음량 키 기기 실기기 확인, 크레마 페블에 영향 없는지 확인.

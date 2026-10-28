@@ -92,6 +92,11 @@ class Sheet(private val context: Context) {
 
     fun note(view: View, onClick: (() -> Unit)? = null) = apply { notes += Note(view, onClick) }
 
+    /** 페이지 버튼([PageKeys])으로 넘길 메뉴 안의 목록(전체 기록). 없으면 메뉴가 떠 있는 동안 페이지 버튼은 아무것도 넘기지 않는다. */
+    private var pages: Paged? = null
+
+    fun pages(rows: Paged) = apply { pages = rows }
+
     /** 별점·감상 칸(지금 값, 아래 오른쪽 굵은 글자, 누르면 부를 일). 있으면 머리 아래에 두고 맨 아래 `취소` / 할 일 한 줄. */
     private var review: Triple<Review, String, (Review) -> Unit>? = null
 
@@ -202,6 +207,10 @@ class Sheet(private val context: Context) {
         // 감상을 쓰다 바깥을 잘못 눌러 글이 날아가지 않게(뒤로 가기·`취소`로 닫는다).
         if (review != null) dialog.setCanceledOnTouchOutside(false)
         if (locked) dialog.setCancelable(false)
+        pages?.let { rows ->
+            val keys = PageKeyHandler(context) { rows.turn(it) }
+            dialog.setOnKeyListener { _, _, event -> keys.onKey(event) }
+        }
         dialog.show()
         return dialog
     }
