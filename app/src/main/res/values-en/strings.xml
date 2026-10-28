@@ -294,6 +294,8 @@
     <string name="guide_mihon">Mihon</string>
     <string name="guide_kahon">Kahon</string>
     <string name="guide_kobo">Kobo Books</string>
+    <string name="guide_futon">Futon</string>
+    <string name="guide_kotatsu">Kotatsu</string>
     <string name="guide_permissions">Permissions</string>
     <string name="guide_todo">In the app</string>
     <string name="guide_todo_none">Nothing to change.</string>
@@ -384,6 +386,10 @@
     <string name="guide_n_mihon_chapter">Shows the chapter name from the menu instead of a percentage</string>
     <string name="guide_t_mihon_open">When you open a chapter, tap the middle once to open the menu.</string>
     <string name="guide_note_mihon">Each series counts as one book (chapters don\'t become separate books). A cover taken from the library includes the title and badges (such as the unread count) Mihon draws on it. With reading book files on, local manga use the cover image in the series folder.</string>
+    <string name="guide_t_kotatsu_open">Open a chapter from the series page with Read now, Continue or the chapter list. For a chapter opened another way, tap the middle once to open the menu.</string>
+    <string name="guide_n_kotatsu_author">Only for series that list an author</string>
+    <string name="guide_n_kotatsu_progress">Once you open the menu, the chapter name shows instead of a percentage</string>
+    <string name="guide_note_kotatsu">Each series counts as one book (chapters don\'t become separate books).</string>
     <string name="book_files">Read book files</string>
     <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For Readest, the cover, author and progress are read from its data folder (Readest/Books) once you move its data location to \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601). For Woojoo, the book you open and your progress are known from the records Woojoo keeps (the Woojoo folder) without opening the menu, and PDFs and comics take their cover from there. For NeoReader, Moon+ Reader and Woojoo, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Mihon and Kahon use the cover image in a local manga\'s folder, and the author from local manga info, downloaded chapters and automatic backups. Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
     <string name="open_file_access">Open All files access</string>

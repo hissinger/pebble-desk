@@ -254,11 +254,14 @@ data class ShelfBook(
  */
 data class PastBook(val book: ShelfBook, val leftAt: Long, val hidden: Boolean = false)
 
-/** 홈·목록에 붙이는 읽는 화·진행률·반납일 `[Ch. 12, 47% 읽음, 반납 4일 남음]`. 모르는 값은 뺀다(홈은 한 줄씩, 목록은 이어서). */
+/**
+ * 홈·목록·상세에 붙이는 읽는 화 또는 진행률, 반납일 `[Ch. 12, 반납 4일 남음]`·`[47% 읽음]`. 읽는 화(만화 앱 메뉴의 화 이름)를 알면 % 대신 그것만
+ * (Futon 은 작품 화면의 % 도 들어오지만 읽는 화가 더 알기 쉽다, 사용자가 정함). 모르는 값은 뺀다(홈은 한 줄씩, 목록은 이어서).
+ */
 fun Context.bookStatus(book: ShelfBook, today: LocalDate = LocalDate.now()): List<String> {
     val parts = mutableListOf<String>()
     if (book.chapter.isNotEmpty()) parts += book.chapter
-    if (book.progress >= 0) parts += getString(R.string.progress_pct, book.progress)
+    else if (book.progress >= 0) parts += getString(R.string.progress_pct, book.progress)
     if (book.due >= 0) {
         val left = book.due - today.toEpochDay()
         parts += when {
