@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 블루투스 기기가 연결됨: 검은 원 안에 흰 룬(켜짐만이면 룬만, ic_bluetooth). 안드로이드처럼 양옆 점을 두면 상태 줄의 가운데 점과 헷갈린다. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#000000" android:pathData="M12,0.5 a11.5,11.5 0 1 0 0.001,0 Z" />
+    <group android:scaleX="0.66" android:scaleY="0.66" android:pivotX="12" android:pivotY="12">
+        <path android:strokeColor="#FFFFFF" android:strokeWidth="2.6" android:strokeLineJoin="round" android:strokeLineCap="round"
+            android:pathData="M6.5,7.5 L17,16.5 L12,21.5 V2.5 L17,7.5 L6.5,16.5" />
+    </group>
+</vector>
