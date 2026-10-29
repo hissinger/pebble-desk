@@ -29,6 +29,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | Google Play 북 `com.google.android.apps.books`(구글, 휴대폰 판 하나) | `com.google.android.apps.play.books.ebook.activity.ReadingActivity` | ? | 그냥 열면 홈 탭(읽던 책이 떠 있었으면 그 책) | ? | 앱 전용 저장소 (미확인) |
 | Mihon `app.mihon`·Kahon `com.amanoteam.kahon`(만화, 오픈소스. Kahon 은 Mihon 포크) | `eu.kanade.tachiyomi.ui.reader.ReaderActivity` | ? | 그냥 열면 마지막 화면 | X | 사용자가 고른 저장 폴더(로컬 만화 `<폴더>/local/<작품>/<화>.cbz`) |
 | Futon `io.github.landwarderer.futon`·Kotatsu `org.koitharu.kotatsu`(만화·소설, 오픈소스. Futon 은 Kotatsu 포크, Kotatsu 는 2025-11 저장소 보관·GitHub 릴리스·F-Droid 에서 내려감) | `<이름공간>.reader.ui.ReaderActivity`(Futon 은 소설·PDF `novel.ui.reader.NovelReaderActivity`·`…pdf.PdfReaderActivity` 도) | ? | 그냥 열면 마지막 화면 | X | 앱 전용 폴더(`Android/data/…/files/manga`, 불러오기로 복사) |
+| Librera `com.foobnix.pdf.reader`(무료, 광고)·Librera Pro `com.foobnix.pro.pdf.reader`(Play 유료, GitHub·F-Droid 판도 이 패키지. 오픈소스 내 파일 리더, 우주의 원본) | `com.foobnix.pdf.search.activity.HorizontalViewActivity`(책 넘김)·`org.ebookdroid.ui.viewer.VerticalViewActivity`(스크롤) | O (`file://` 를 `com.foobnix.OpenerActivity` 로, 읽던 쪽으로) | O (그냥 열면 라이브러리) | ? | 사용자가 둔 곳(공유 저장소). Librera 기록은 `/sdcard/Librera`(모든 파일 액세스가 없으면 `Download/Librera`) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
 - 사용 기록에는 **앱·화면 이름과 시각만** 남는다. 어떤 책인지는 알 수 없다.
@@ -87,6 +88,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | Mihon·Kahon | 작품 상세 | 작품 상세·메뉴 | 작품 상세 | 메뉴(화 이름) | X |
 | Kobo Books | 서재·책 상세 | 서재(돌아왔을 때 맨 위 칸)·책 상세 | 서재·책 상세 | 메뉴 | X |
 | Futon·Kotatsu | 작품 상세 | 서재·작품 상세·메뉴 | 작품 상세 | 작품 상세(%)·메뉴(화 이름) | X |
+| Librera·Librera Pro | 서재·파일 | 서재·메뉴·파일 | 서재·파일 | 서재·메뉴·파일 | X |
 
 ### 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -344,6 +346,16 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **진행률**: 작품 화면 표의 진행률(`33%`, 앱이 읽은 화·쪽으로 셈). 읽는 화면에는 진행률이 없고, 메뉴 위 막대의 화 이름(`Unnamed chapter`·`1화`)을 읽는 화로 둔다(Mihon 과 같다). 화 이름을 알면 홈·목록·상세에는 % 대신 화 이름만 보인다.
 - **반납일**: 없다.
 - **제약**: 작품 하나를 책 한 권으로 본다. 홈에서 책을 누르면 앱을 연다. Kotatsu 는 두 소스의 레이아웃·읽는 화면 코드가 같아 같은 규칙을 쓴다(에뮬레이터에서도 확인). 시크릿 모드면 메뉴의 화 이름 자리에 `시크릿 모드` 가 보인다(그대로 들어간다).
+
+### Librera `com.foobnix.pdf.reader`·Librera Pro `com.foobnix.pro.pdf.reader`
+
+- **권한**: 공통 + 책 파일 읽기(있으면 다른 길로 연 책도 메뉴 없이 알고, 메뉴 없이 읽는 동안의 진행률도 들어오고, 홈에서 그 파일을 바로 연다).
+- **할 것**: 책은 라이브러리에서 눌러 연다. 책 파일 읽기가 없으면 다른 길로 연 책과 PDF 는 읽다가 가운데를 눌러 메뉴를 띄워야 들어온다. Librera 의 최근 탭을 감추면 Librera 가 연 책을 적지 않아(`app-Recent.json`) 책 파일 읽기가 있어도 메뉴를 띄워야 한다.
+- **표지**: 라이브러리 칸에서 잘라 온다(EPUB 등). 파일을 알면 EPUB 파일의 표지, 만화(CBZ, CBR 은 압축 해제용 도구를 받았을 때)는 묶음 안 첫 그림. PDF 는 파일을 알면 첫 쪽을 그린 그림(안드로이드 `PdfRenderer`. 암호 등으로 못 그리면 서재 칸으로 넘어간다). 그 밖의 PDF·DjVu 는 라이브러리 칸이 이 앱의 책과 맞을 때만 그 칸에서 잘라 온다: 칸 제목, 없으면 칸의 저자·제목을 이은 것이 책 제목(파일 이름)과 같을 때(책 안 제목이 없는 파일. `저자 - 제목` 꼴 이름도. 칸을 누른 것으로는 책을 정하지 않는다). 위 막대·아래 탭 줄에 걸린 칸은 자르지 않는다. DjVu 는 첫 쪽을 그리려면 DjVuLibre 가 필요해 하지 않는다.
+- **제목·저자**: 라이브러리에서 누른 칸(`title1`·`title2`), 메뉴 제목, 책 파일 읽기가 있으면 Librera 기록으로 안 책 파일(EPUB 은 책 정보, 그 밖은 파일 이름). PDF·XPS·TIFF·DjVu 는 읽는 화면 제목이 파일 이름이라 파일 이름(확장자 뗌)으로 들어온다.
+- **진행률**: 라이브러리 칸(`3%`), 메뉴의 쪽(`3` / `72`), 아래 상태 줄을 % 가 든 모양으로 바꿨으면 그 %(기본은 장 안의 쪽이라 쓰지 않는다), 읽는 동안 쪽마다 적히는 `app-Progress.json`(책 파일 읽기).
+- **반납일**: 없다(내 파일).
+- **제약**: 홈에서 책을 누르면 파일을 아는 책은 `OpenerActivity` 로 그 파일을 읽던 쪽에서 연다(모르면 앱). 스크롤 방식 읽는 화면(`VerticalViewActivity`)은 시험하지 않았다(**미확인**). Play 무료판은 모든 파일 액세스 권한이 없어 Librera 기록을 `Download/Librera` 에 두고(읽을 수 있다), 책은 Librera 전용 폴더(데모 책)나 폴더 허용(SAF)으로 읽어 기록의 경로가 읽을 수 없는 곳·`content:` 주소다: 그 책은 책 파일 읽기가 있어도 서재 칸·메뉴로만 들어오고(메뉴 없이 진행률·홈에서 파일 열기 없음) 표지는 서재 칸에서 자른다.
 
 ## 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -837,3 +849,18 @@ Bilingify 의 오픈소스 리더(https://github.com/readest/readest, Tauri). �
 - **받기**: 2025-11 저장소가 보관되며 GitHub 릴리스·F-Droid 에서 내려갔다. 사용자가 Uptodown 에서 받은 APK(SHA-256 `79b5698c…376be184`)의 서명 인증서가 Kotatsu README 의 지문(SHA-1 `2C:19:C7:E8:07:61:2B:8E:94:51:1B:FD:72:67:07:64:5D:C2:58:AE`, `CN=Vasily Nikitin`)과 같아 깔았다.
 - **화면**: 처음 열면 `환영합니다` 시트(소스 언어·종류 고르기, 뒤로 닫음), 탐색 탭에서 맞춤 추천 묻기(`No thanks`). 소설 모드 단추가 없는 것 말고는 Futon 과 같다: 내장 메모리 격자 칸·작품 상세·읽는 화면 위 막대의 요소 이름과 자리까지 같았다(같은 시험 만화를 같은 길로 불러옴).
 - 에뮬레이터에서 확인: 내장 메모리 → `별빛 도서관` 상세 → `지금 읽기` 로 읽는 화면이 열린 때에 그 작품으로(편 책 기록에 같은 때 '책 모름' 다음 `별빛 도서관`), 메뉴의 화 이름 `Unnamed chapter`. Futon 으로 먼저 넣은 같은 제목의 책에 이어 붙었다(제목이 같으면 앱이 달라도 같은 책, #4).
+
+### Librera `com.foobnix.pro.pdf.reader` (2026-10-29, 에뮬레이터 `CremaPebble_A11_Play`(안드로이드 11) · WebView 155, GitHub 릴리스 Librera.Pro-10.0.7-mupdf-arm64(versionCode 7476)·Play 무료판 `com.foobnix.pdf.reader` 10.0.11(7492), **지원**)
+
+- **받기·판**: 사용자 메일(독일, Librera Pro 10.0.7 mupdf 를 GitHub 에서 받아 씀)로 조사했다. 소스 foobnix/LibreraReader 의 `app/build.gradle` 은 한 코드에서 패키지만 바꿔 판을 만든다: `librera` → `com.foobnix.pdf.reader`(Play 무료판, AdMob 광고), `pro`·`fdroid`·`fdroidJS`·`proJS` → `com.foobnix.pro.pdf.reader`(GitHub 릴리스의 Pro·Fdroid·JS 판이 모두 이 패키지). 그 밖에 이름을 바꾼 판(`pdf.pdf.reader`·`epub.reader` 등)도 정의돼 있다(배포 여부는 보지 않음). LibreraX 는 따로 떨어진 새 앱이다. 우주(`com.inno.woojoo`)는 이 코드를 고친 것이다.
+- **서재** `com.foobnix.ui2.MainTabs2`: 라이브러리·폴더·최근(한국어 `최근 폴더`)·즐겨찾기·북마크 탭(아래), 격자 보기는 저장소를 훑은 책 칸을 스크롤로 보인다. 칸 `card_view`(설명 `도서 <저자> <제목> <확장자>`) 안에 `browserItemIcon`·`title1`·`title2`(저자)·`browserExt`·`idPercentText`(읽지 않은 책은 빈 글자)·`starIcon`·`itemMenu`. 우주와 이름이 같다.
+- **읽는 화면** `com.foobnix.pdf.search.activity.HorizontalViewActivity`(책 넘김, 기본)·`org.ebookdroid.ui.viewer.VerticalViewActivity`(스크롤). 10.0 부터 EPUB 등은 foliate-js 를 돌리는 웹 화면이 화면 밖에서 쪽을 그림으로 그려(`FoliateRenderer`, 창에 붙이되 액티비티 밖에 둔다) 접근성에는 웹 화면이 나오지 않았다. 처음 열면 메뉴가 떠 있다: 위 `title`(제목)·`chapter`(`1장`), 아래 최근 책 줄(`playListName` `최근 폴더`), `currentSeek` `1`·`maxSeek` `72`(전체 쪽), `modeName` `페이지 넘김`. 메뉴가 없을 때도 아래 상태 줄 `pagesCountIndicator` 가 보이는데, 글자 모양은 Librera 설정 `chapterFormat` 을 따른다(`OutlineHelper.getForamtingInfo`): 기본은 장 안의 쪽 `1장 – 2 ∕ 6`(장이 없으면 전체 쪽 `3 ∕ 5`), 다른 모양은 `12%  3 ∕ 72  (5)`·`12%  3 ∕ 72`·`3 ∕ 72`. 빗금은 나눗셈 빗금(U+2215)이다. 스크롤 방식은 상태 줄 `currentPageIndex`·제목 `bookName`(설정 `isShowPanelBookNameScrollMode` 면 메뉴 없이도 보인다, 소스로만 확인).
+- **제목**: `HorizontalModeController.getTitle` 은 `BookType.hasTitle` 이면 Librera DB 의 책 정보 제목, 아니면 파일 이름(확장자 포함). 10.0.7 에서 거짓인 것은 PDF·XPS·TIFF·DjVu(·OKULAR·폴더)이고 CBZ·CBR 은 참이다(우주 1.0.22 와 다르다).
+- **Librera 기록**: 모든 파일 액세스가 있으면 `/sdcard/Librera/profile.<프로필>/device.<Build.MODEL, 빈칸은 _>/`, 없으면 `Download/Librera/…`(Librera 가 만든 파일은 Librera 만 쓴다), 그것도 안 되면 앱 전용 폴더. 프로필 이름은 릴리스가 `Librera`, 로그를 켠 빌드는 `BETA`(GitHub 10.0.7 은 `profile.BETA` 였다). `app-Recent.json` 은 `[{"path":"internal-storage:/Download/a.epub","time":…}]`(저장소 뿌리를 `internal-storage:` 로, 그 밖의 경로는 그대로 `/sdcard/…`): 책을 불러온 뒤(`AppDB.addRecent`) 그 책을 지우고 끝에 다시 적는다. 닫을 때는 적지 않는다. 최근 탭을 감추면(`UITab.isShowRecent`) 적지 않는다. `app-Progress.json` 은 파일 이름 → `{p: 진행 비율, t: 때, pt: 쪽 글자 …}`(쪽을 넘길 때마다). 우주의 `RecentBooks.json`(제목·저자·표지 그림)은 없다.
+- **책 바로 열기**: `com.foobnix.OpenerActivity` 가 `ACTION_VIEW`(`file`·`content`, 책 형식들)를 받는다. `MainTabs2` 는 파일 보기를 받지 않는다.
+- **Pebble Desk**(`readers/Librera.kt`, 우주와 코드를 나눔): 서재 칸·메뉴·Librera 기록(`LibreraApp.dataBook`, 책 파일 읽기). 홈에서는 파일을 아는 책을 `OpenerActivity` 로(`LibreraApp.open`).
+  - 에뮬레이터에서 확인(책 파일 읽기 없이): 라이브러리 칸 `코리더 새 책 갑` 을 눌러 새 책으로(저자 `정갑동`, 칸에서 자른 표지), 메뉴의 `1` / `72` 로 1%.
+  - 책 파일 읽기를 켜고: 다른 앱처럼 `OpenerActivity` 로 연 `ko-n.epub` 이 메뉴 없이 `코리더 새 책 을 · 정을동` 으로 들어와 읽는 화면이 열린 때부터 그 책, 파일·EPUB 표지가 붙고 메뉴 없이 쪽을 넘긴 진행률 4%(`app-Progress.json`). 홈에서 그 책을 누르면 읽던 3쪽으로 열렸다. 읽는 화면 아래 최근 책 줄에서 `ko-p.epub` 으로 바꾸자 앞서 칸으로 넣은 `코리더 새 책 갑` 이 맨 앞으로 오고 파일이 붙었다. PDF(`ezview_doc.pdf`)는 메뉴 없이 `ezview_doc` 으로 들어오고 메뉴 제목 `ezview_doc.pdf` 와 같은 책으로 남았다(2/5쪽 40%, 표지 없음). 그 PDF 를 `Download` 에 복사해 라이브러리에 보이자 칸 제목이 파일 이름 `ezview_doc`(PDF 속 제목 없음)이라, 서재가 멈췄을 때 그 칸의 첫 쪽 그림이 표지로, 칸의 `60%` 가 진행률로 붙었다(`LibreraReader.onShelf`). 같은 PDF 를 다른 이름(`pdf-cover-test.pdf`, PDF 속 제목 `우주 사용가이드_v3.0`, 10MB)으로 복사해 다른 앱처럼 열자 서재 칸 없이 첫 쪽(우주 사용가이드 표지)이 표지로 붙었다(`BookFiles.withPdf`).
+  - **DjVu**(2026-10-29, 예제는 djvu.js 저장소 `library/assets` 의 `boy.djvu`·`DjVu3Spec_bundled.djvu`·`czech_1-3.djvu` 를 이름을 바꿔 `Download` 에): Librera 의 라이브러리 칸 제목은 책 안 제목(DjVu 메타데이터 `title`, `DjvuExtract`)이 있으면 그것, 없으면 파일 이름을 손본 것이다(`TxtUtils.getTitleAuthorByPath`: 확장자를 떼고, ` - `·` _ ` 등이 있으면 앞은 저자·뒤는 제목, 끝의 `(…)`(10자 넘음)도 저자, 첫 글자를 대문자로, `-`·`—`·`_` 은 빈칸으로. PDF 도 이름에 ` - ` 가 있으면 같다). 그래서 `djvu-notitle.djvu` 는 `Djvu notitle`, `djvu-spec.djvu` 는 `Djvu spec` 로 보였고, 읽는 화면 제목(파일 이름)으로 넣은 책 `djvu-notitle`·`djvu-spec` 과 정리한 제목(`normTitle`, 대소문자·빈칸·기호 무시)이 같아 서재 칸의 첫 쪽이 표지로 붙었다. `Kim Author - Czech Pages.djvu` 는 칸이 제목 `Czech Pages`·저자 `Kim Author` 라 칸 제목만으로는 책 `Kim Author - Czech Pages` 와 맞지 않아, 칸의 저자·제목을 이은 것으로도 맞춘다(제목·저자 순서도. 고친 뒤 `Park Writer - Boy Again.djvu` 에 표지와 저자 `Park Writer` 가 붙었다). 라이브러리 격자는 위 막대(`filterLayout`)·아래 탭 줄(`slidingTabs2`) 밑까지 이어져, 넘긴 서재의 첫 줄 칸을 자르면 위 막대가 표지에 찍혔다(`Czech Pages`): 막대에 걸린 칸은 자르지 않는다(걸린 동안 `Boy Again` 은 표지 없음 → 맨 위로 올리자 붙음). 한 가지 색(검은 첫 쪽 `Czech Again`)은 공통 규칙대로 표지로 두지 않는다. 책 안 제목이 든 DjVu 는 시험하지 못했다(직접 `ANTa` 묶음으로 제목을 넣은 한 쪽짜리 파일은 Librera 가 제목으로 읽지 않았다. 문서 전체 메타데이터는 공유 주석 파일에 두는 것으로 보인다).
+  - Librera 를 뒤로 나올 때 Play 스토어 평가 창(`InAppReviewActivity`)이 한 번 떴다(Librera 동작).
+  - **무료판**(Play 10.0.11, 광고 포함, minSdk 24): 매니페스트에 저장소 권한이 없다. 처음 열면 라이브러리에 데모 책 둘(`Alice's Adventures in Wonderland`·`The Count of Monte Cristo`, Librera 전용 폴더 `Android/data/com.foobnix.pdf.reader/files/TempDownloads/`)과 `다운로드 폴더를 검색하도록 허용` 띠(폴더 허용, SAF)가 보인다. 기록은 `Download/Librera/profile.BETA/device.<기기>/` 에 적힌다(`app-Recent.json` 경로가 `internal-storage:/Android/data/…`). 화면 요소 이름은 Pro 와 같다. 칸을 눌러 연 `The Count of Monte Cristo` 가 저자 `Alexandre Dumas, Auguste Maquet` 와 함께 들어왔다. 그 전에 `uiautomator` 를 돌린 바로 뒤 연 `Alice's Adventures in Wonderland` 는 누름을 놓쳐 메뉴 제목으로 저자 없이 들어왔다가, 서재를 다시 볼 때 칸의 저자 `Lewis Carroll` 이 채워졌다(시험 도구 탓). 기록의 책 파일을 Pebble Desk 가 읽을 수 없어 메뉴 없이 쪽을 넘긴 진행률은 들어오지 않는다(예상대로).

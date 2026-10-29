@@ -321,6 +321,8 @@
     <string name="guide_kobo">Kobo Books</string>
     <string name="guide_futon">Futon</string>
     <string name="guide_kotatsu">Kotatsu</string>
+    <string name="guide_librera">Librera</string>
+    <string name="guide_librera_pro">Librera Pro</string>
     <string name="guide_permissions">필요한 권한</string>
     <string name="guide_todo">앱에서 할 것</string>
     <string name="guide_todo_none">따로 바꿀 것은 없습니다.</string>
@@ -416,8 +418,12 @@
     <string name="guide_n_kotatsu_author">저자가 있는 작품만 들어옵니다</string>
     <string name="guide_n_kotatsu_progress">메뉴를 띄우면 % 대신 읽는 화 이름이 보입니다</string>
     <string name="guide_note_kotatsu">작품 하나를 책 한 권으로 봅니다(화마다 따로 책을 만들지 않습니다).</string>
+    <string name="guide_t_librera_open">라이브러리에서 책을 눌러 여세요. 다른 길로 연 책과 PDF 는 읽다가 가운데를 눌러 메뉴를 띄우면 들어옵니다(책 파일 읽기를 허용했으면 바로).</string>
+    <string name="guide_n_librera_cover_files">EPUB·만화·PDF 만 들어옵니다</string>
+    <string name="guide_files_librera">연 책·표지·진행률</string>
+    <string name="guide_note_librera">Play 스토어 무료판은 라이브러리에서 연 책과 메뉴를 띄운 책만 들어옵니다.</string>
     <string name="book_files">책 파일 읽기</string>
-    <string name="book_files_desc">KOReader 는 화면에 책 제목을 드러내지 않아, KOReader 가 남기는 기록(koreader 폴더, 책 옆 .sdr 폴더)으로 편 책과 진행률을 압니다. Readest 는 데이터 위치를 \u200B/\u2060sdcard\u2060/\u20600(SD 카드는 \u200B/\u2060sdcard\u2060/\u20601)으로 옮겼을 때 그 폴더(Readest/Books)에서 표지·저자·진행률을 읽습니다. 우주뷰어는 우주뷰어가 남기는 기록(Woojoo 폴더)으로 메뉴를 띄우지 않아도 연 책과 진행률을 알고, PDF·만화는 그 기록의 표지를 씁니다. 네오리더·문리더·우주뷰어는 연 책의 EPUB 파일에서 표지를 꺼냅니다(이지뷰어는 표지와 책 정보). Mihon·Kahon 은 로컬 만화 폴더의 표지 그림과, 로컬 만화 정보·받은 화·자동 백업의 저자를 씁니다. 책 파일에서는 제목·저자·표지만 꺼냅니다.\n\n안드로이드 설정의 모든 파일에 액세스에서 Pebble Desk 의 모든 파일 관리 허용을 켜 주세요. 읽은 내용은 기기 밖으로 보내지 않습니다.</string>
+    <string name="book_files_desc">책 정보를 가져오는 데 필요합니다.</string>
     <string name="open_file_access">모든 파일에 액세스 열기</string>
     <string name="comic_archives">만화 표지(CBR·CB7) 압축 해제용 도구</string>
     <string name="comic_archives_get">받기</string>

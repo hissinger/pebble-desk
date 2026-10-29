@@ -317,6 +317,8 @@
     <string name="guide_kobo">Kobo Books</string>
     <string name="guide_futon">Futon</string>
     <string name="guide_kotatsu">Kotatsu</string>
+    <string name="guide_librera">Librera</string>
+    <string name="guide_librera_pro">Librera Pro</string>
     <string name="guide_permissions">Permissions</string>
     <string name="guide_todo">In the app</string>
     <string name="guide_todo_none">Nothing to change.</string>
@@ -411,8 +413,12 @@
     <string name="guide_n_kotatsu_author">Only for series that list an author</string>
     <string name="guide_n_kotatsu_progress">Once you open the menu, the chapter name shows instead of a percentage</string>
     <string name="guide_note_kotatsu">Each series counts as one book (chapters don\'t become separate books).</string>
+    <string name="guide_t_librera_open">Open books from the Library. Books opened another way, and PDFs, come in when you tap the middle to open the menu while reading (right away if you allow reading book files).</string>
+    <string name="guide_n_librera_cover_files">EPUB, comics and PDF only</string>
+    <string name="guide_files_librera">opened book, covers, progress</string>
+    <string name="guide_note_librera">The free version from the Play Store adds only books opened from the Library or with the menu open.</string>
     <string name="book_files">Read book files</string>
-    <string name="book_files_desc">KOReader doesn\'t show book titles on screen, so the book you open and your progress are read from the records KOReader keeps (the koreader folder and the .sdr folder next to each book). For Readest, the cover, author and progress are read from its data folder (Readest/Books) once you move its data location to \u200B/\u2060sdcard\u2060/\u20600 (SD card: \u200B/\u2060sdcard\u2060/\u20601). For Woojoo, the book you open and your progress are known from the records Woojoo keeps (the Woojoo folder) without opening the menu, and PDFs and comics take their cover from there. For NeoReader, Moon+ Reader and Woojoo, covers are taken from the EPUB file of the book you open (EzViewer: the cover and book info). Mihon and Kahon use the cover image in a local manga\'s folder, and the author from local manga info, downloaded chapters and automatic backups. Only the title, author and cover are taken from book files.\n\nAllow Pebble Desk in Android\'s All files access. Nothing leaves the device.</string>
+    <string name="book_files_desc">Needed to get book info.</string>
     <string name="open_file_access">Open All files access</string>
     <string name="comic_archives">Comic cover (CBR/CB7) unpacking tool</string>
     <string name="comic_archives_get">Get</string>
