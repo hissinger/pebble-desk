@@ -9,6 +9,9 @@
         <item name="android:textColorPrimary">#000000</item>
         <item name="android:statusBarColor">#FFFFFF</item>
         <item name="android:windowLightStatusBar">true</item>
+        <!-- 화면 아래 내비게이션 바가 있는 기기(LCD 안드로이드 13 등)에서 기본 검은 띠 대신 흰 바탕·어두운 단추 -->
+        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:windowDisablePreview">true</item>
     </style>
