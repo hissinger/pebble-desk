@@ -129,6 +129,7 @@
     <string name="wl_crash">App crashed %2$s · %1$s</string>
     <string name="wl_progress">Progress %s</string>
     <string name="device_section_system">System screen test (opened by this app)</string>
+    <string name="device_rotation_lock">Rotation lock %1$s</string>
     <string name="device_system_a11y">Accessibility</string>
     <string name="device_system_usage">Usage access</string>
     <string name="device_system_usage_app">This app</string>

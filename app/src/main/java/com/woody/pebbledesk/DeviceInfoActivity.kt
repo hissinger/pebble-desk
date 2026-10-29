@@ -89,7 +89,7 @@ class DeviceInfoActivity : EinkActivity() {
 
         // 자동 추가(접근성 서비스)가 저절로 꺼지는 기기에서 언제·왜 끊겼는지: 서비스 연결·끊김, 이 앱이 끝난 까닭(안드로이드 11+),
         // 백그라운드에서 앱을 끄는 설정들. 서비스가 받은 알림·한 일은 따로 된 화면(`기록 보기 ›`, 이 화면에 더 넣을 자리가 없다).
-        section(list, R.string.device_section_service) { startActivity(WatchLogActivity.intent(this)) }
+        section(list, R.string.device_section_service, getString(R.string.watch_log_open)) { startActivity(WatchLogActivity.intent(this)) }
         serviceLog().forEachIndexed { i, line ->
             list.addView(text(line, 14f, lines = if (i >= 2) LOG_LINES[i - 2] else 1).apply { setLineSpacing(0f, 1.15f) })
         }
@@ -106,7 +106,11 @@ class DeviceInfoActivity : EinkActivity() {
         list.addView(recentValue)
 
         // 이 앱이 여는 시스템 화면이 열리는지(설정 앱이 멈추는 기기, Moaan MIX7S 의 사용 기록 화면). 연 화면 이름과 돌아오기까지 걸린 시간을 쓴다.
-        section(list, R.string.device_section_system)
+        // 제목 줄 오른쪽은 회전 고정 시험(누르면 켜고 끈다. 다음에 여는 화면부터, [EinkActivity]): 줄을 늘리지 않으려고 여기에 둔다.
+        section(list, R.string.device_section_system, rotationLockText()) {
+            prefs.rotationLock = !prefs.rotationLock
+            it.text = rotationLockText()
+        }
         list.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             SYSTEM_SCREENS.forEach { (label, intentOf) ->
@@ -292,13 +296,16 @@ class DeviceInfoActivity : EinkActivity() {
 
     private fun onOff(on: Boolean) = getString(if (on) R.string.on else R.string.off)
 
-    /** 절 제목. [more] 가 있으면 같은 줄 오른쪽 끝에 `기록 보기 ›`(줄을 늘리지 않는다). */
-    private fun section(list: LinearLayout, title: Int, more: (() -> Unit)? = null) {
+    private fun rotationLockText() = getString(R.string.device_rotation_lock, onOff(prefs.rotationLock))
+
+    /** 절 제목. [moreText] 가 있으면 같은 줄 오른쪽 끝에 굵게 쓰고(줄을 늘리지 않는다) 줄을 누르면 그 글자 뷰로 [more] 를 부른다. */
+    private fun section(list: LinearLayout, title: Int, moreText: String? = null, more: (TextView) -> Unit = {}) {
         val head = text(getString(title), 15f, color = Ui.LIGHT_GRAY)
-        val row = if (more == null) head else hbox().apply {
+        val row = if (moreText == null) head else hbox().apply {
             addView(head, lp(0, WRAP, 1f))
-            addView(text(getString(R.string.watch_log_open), 15f, Ui.bold))
-            setOnClickListener { more() }
+            val right = text(moreText, 15f, Ui.bold)
+            addView(right)
+            setOnClickListener { more(right) }
         }
         list.addView(row, lp(MATCH, WRAP).apply { topMargin = dp(9); bottomMargin = dp(2) })
     }
@@ -310,8 +317,11 @@ class DeviceInfoActivity : EinkActivity() {
         private const val RECENT_MS = 10 * 60 * 1000L
         private const val RECENT_COUNT = 3
 
-        /** 이미 아는 기기의 키(크레마·메이북). 없는 기기에서는 보이지 않는다. */
-        private val PROPS = listOf("ro.haoqing.brand", "persist.haoqing.updatemodel", "persist.haoqing.pagekeys", "persist.vendor.fullmode_cnt")
+        /**
+         * 이미 아는 기기의 키(크레마·메이북·Bigme). 없는 기기에서는 보이지 않는다. `ro.build.versionCode` 는 Bigme OTA 서버가 묻는 기기 코드
+         * (HiBreak Pro BW `B651 EEA_M2`, 펌웨어를 받아 보려고. docs/DEVICES.md Bigme B7 Pro).
+         */
+        private val PROPS = listOf("ro.build.versionCode", "ro.haoqing.brand", "persist.haoqing.updatemodel", "persist.haoqing.pagekeys", "persist.vendor.fullmode_cnt")
         private val SETTINGS = listOf("screen_brightness", "warm_light", "isLightOn", "light_mode", "haoqing_warm_light", "hq_contrast")
 
         /** 처음 보는 기기의 고유 값을 이름으로 찾는다: 전자잉크·화면 갱신·조명·버튼 낱말, 알려진 펌웨어 회사 이름. */
