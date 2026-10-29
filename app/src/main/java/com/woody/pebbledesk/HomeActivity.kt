@@ -892,10 +892,11 @@ class HomeActivity : EinkActivity() {
         addView(if (measureOnly) View(context) else coverView(book, w), lp(w + dp(2), w * 3 / 2 + dp(2)))
         val info = column()
         info.addView(text(book.title, 16f, Ui.bold, lines = 2))
+        // 글자 칸은 칸 폭으로(글자 폭에 딱 맞추면 글자 크기가 소수점일 때 마지막 글자 끝이 잘렸다: 90% 에서 `15% read` 의 d)
         book.app?.let(::findApp)?.let {
-            info.addView(text(it.label, 13f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = dp(4) })
+            info.addView(text(it.label, 13f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(4) })
         }
-        bookStatus(book).forEach { info.addView(text(it, 12f, color = Ui.GRAY), lp(WRAP, WRAP).apply { topMargin = dp(2) }) }
+        bookStatus(book).forEach { info.addView(text(it, 12f, color = Ui.GRAY), lp(MATCH, WRAP).apply { topMargin = dp(2) }) }
         if (tall) addView(info.apply {
             gravity = Gravity.CENTER_HORIZONTAL
             for (i in 0 until childCount) (getChildAt(i) as? TextView)?.gravity = Gravity.CENTER_HORIZONTAL
