@@ -607,10 +607,11 @@ jadx --no-res -d src/framework fs/system/system/framework/framework.jar
 - **원인 (추정)**: 180° 에서 새 창(액티비티)이 뜰 때 펌웨어가 돌리지 않은 첫 장면을 그린다. 액티비티 하나 안에서 화면을 바꾸는 앱(KOReader·Mihon 둘러보기)은 안 생기는 것과 맞다. Bigme 펌웨어는 회전 버그가 잦다(eWritable 펌웨어 4.6 리뷰: 노트 앱 필기가 180° 로 뒤집힘, 여러 판의 노트에 '일부 상황의 회전' 고침). 같은 증상의 보고는 찾지 못했다.
 - **다른 런처 (2026-10-29 코드 확인)**: 180° 를 따로 다루는 런처는 없다. Niagara 1.16.35(디컴파일): 휴대폰 크기(`is_tablet` = sw600dp 미만)면 홈·설정을 `NOSENSOR`, `Always allow landscape mode` 를 켜면 `UNSPECIFIED`. inkOS: 액티비티 하나 + 프래그먼트 14개, 태블릿이 아니면 `PORTRAIT`(거꾸로 들어도 돌지 않음). Olauncher·mLauncher: 액티비티 하나, 방향 정하지 않음. KISS: 기본 `USER_PORTRAIT`. Launcher3(Lawnchair `RotationHelper`): 휴대폰은 `NOSENSOR`, 회전 허용이면 `UNSPECIFIED`, **전환 중에는 `LOCKED`**.
 - **할 수 있는 것 (나중에)**:
-  1. 하위 화면(`EinkActivity`)을 열 때만 `SCREEN_ORIENTATION_LOCKED`(그때 회전을 그대로 쓰고 다시 정하지 않는다)로 두고 첫 그리기 뒤 `UNSPECIFIED` 로 푼다(Launcher3 방식). 깜빡임이 '새 창에서 회전을 다시 정하는 것' 때문이면 없어지고, 펌웨어가 회전과 상관없이 첫 장면을 돌리지 않는 것이면 그대로다. 에뮬레이터로는 전자잉크 깜빡임을 볼 수 없어 사용자에게 시험 APK 를 보내야 한다.
+  1. 하위 화면(`EinkActivity`)을 `SCREEN_ORIENTATION_LOCKED`(그때 회전을 그대로 쓰고 다시 정하지 않는다)로 연다. 깜빡임이 '새 창에서 회전을 다시 정하는 것' 때문이면 없어지고, 펌웨어가 회전과 상관없이 첫 장면을 돌리지 않는 것이면 그대로다. 에뮬레이터로는 전자잉크 깜빡임을 볼 수 없어 사용자 기기에서만 가린다 → 아래 **시험 스위치**로 릴리스에 넣었다(따로 된 시험 APK 대신).
   2. 펌웨어 보기: 공개 다운로드는 없다. [bigme-ota-client](https://github.com/marek-vybiral/bigme-ota-client) 가 Bigme OTA 서버(`ereader.bigme.vip:8090`, 기기 업데이트 앱 `xSettings.apk` 의 요청을 흉내)에서 전체 OTA 주소를 받는데, 요청에 시리얼(`sn`)·기기 코드 `osName`(= `ro.build.versionCode`, HiBreak Pro BW 는 `B651 EEA_M2`)이 든다. B7 Pro 의 값은 공개된 곳에 없다(FCC ID `2A8EM-B7PRO`·모델 `GY-US-B7 Pro` 는 형식이 다르다). 기기 정보 시스템 속성에 `ro.build.versionCode` 를 보이면 다음 사진으로 얻는다. 받으면 `services.jar`(`DisplayRotation`)와 XRZ 전자잉크 쪽을 본다.
   3. 액티비티 하나로 바꾸기: 화면 13개·뒤로 가기·`Sheet`·결과 받는 화면을 다시 짜야 해 보류.
-- **다음**: 다른 기기에서도 그런지 물었다(답 기다림). 거꾸로 든 채 Mihon 에서 만화를 열 때(읽는 화면은 따로 된 액티비티)도 그런지 물으면 '액티비티가 바뀔 때'인지 굳힐 수 있다.
+- **시험 스위치 (다음 판)**: 1 을 기기 정보 `시스템 화면 시험` 제목 줄 오른쪽 `회전 고정 꺼짐`(누르면 켜짐, 다음에 여는 화면부터)으로 넣었다. 홈을 뺀 화면은 매니페스트에서 `locked` 로 열리고, 꺼져 있으면 `EinkActivity.onCreate` 가 바로 `UNSPECIFIED` 로 푼다(연 뒤에 잠그면 시스템이 이미 회전을 정한 뒤라 매니페스트에 둔다). 켜면 그 화면이 떠 있는 동안 계속 잠근다(첫 그리기 뒤 푸는 Launcher3 방식은 원인이 '0° 로 정했다가 고침'이면 풀 때 같은 일이 생길 수 있어, 먼저 확실히 가르는 쪽으로). `Ocean5Pro_A14` 에뮬(2026-10-30): 꺼짐이면 하위 화면에서 `user_rotation` 을 바꾸면 따라 돌고, 켜짐이면 새로 연 화면(설정)은 돌지 않으며 뒤로 가 꺼짐 때 연 화면으로 돌아오면 따라 돈다. 180° 에서 열면 180° 그대로 열린다. 같은 판에 2 를 위해 시스템 속성 맨 앞에 `ro.build.versionCode` 를 보인다.
+- **다음**: 다음 판이 나오면 사용자에게 `회전 고정` 을 켜고 거꾸로 든 채 모든 앱·독서 기록을 열어 보게 하고, 기기 정보 사진(versionCode)을 부탁한다. 다른 기기에서도 그런지 물었다(답 기다림). 거꾸로 든 채 Mihon 에서 만화를 열 때(읽는 화면은 따로 된 액티비티)도 그런지 물으면 '액티비티가 바뀔 때'인지 굳힐 수 있다.
 
 ## Bigme HiBreak 사용자 이슈 (2026-10-27, GitHub #6 abhifx)
 

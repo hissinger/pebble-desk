@@ -58,59 +58,72 @@
             </intent-filter>
         </activity>
 
+        <!-- 하위 화면은 연 때의 회전 그대로(locked) 열고, 기기 정보의 회전 고정 시험을 켜지 않았으면 EinkActivity.onCreate 가 바로 풀어
+             시스템이 방향을 정하게 한다(홈은 정하지 않는다). 연 뒤에 잠그면 시스템이 이미 회전을 정한 뒤라 시험이 되지 않는다. -->
         <activity
             android:name=".AppListActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false" />
 
         <activity
             android:name=".FavoritesActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false" />
 
         <activity
             android:name=".BooksActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false" />
 
         <activity
             android:name=".BookSearchActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".IconPickActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ReadingActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false" />
 
         <activity
             android:name=".YearBooksActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false" />
 
         <activity
             android:name=".OnboardingActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false" />
 
         <activity
             android:name=".SettingsActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false" />
 
         <activity
             android:name=".DeviceInfoActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false" />
         <activity
             android:name=".WatchLogActivity"
+            android:screenOrientation="locked"
             android:excludeFromRecents="true"
             android:exported="false" />
 

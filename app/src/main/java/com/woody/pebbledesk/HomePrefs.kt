@@ -222,6 +222,11 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("page_keys_also", false)
         set(v) = sp.edit().putBoolean("page_keys_also", v).apply()
 
+    /** 기기 정보의 회전 고정 시험: 하위 화면이 연 때의 회전을 그대로 두고 다시 정하지 않는다([EinkActivity]). 처음은 꺼짐. */
+    var rotationLock: Boolean
+        get() = sp.getBoolean("rotation_lock", false)
+        set(v) = sp.edit().putBoolean("rotation_lock", v).apply()
+
     fun toggleFavorite(key: String) {
         favorites = if (key in favorites) favorites - key else favorites + key
     }

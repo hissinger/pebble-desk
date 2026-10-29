@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.res.Configuration
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -72,6 +73,10 @@ abstract class EinkActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = HomePrefs(this)
+        // 하위 화면은 매니페스트에서 연 때의 회전 그대로(locked) 열린다. 기기 정보의 회전 고정 시험을 켜지 않았으면 바로 풀어
+        // 지금처럼 시스템이 방향을 정한다(Bigme B7 Pro: 거꾸로 들면 새 화면마다 잠깐 뒤집혀 보이는 것을 가르는 시험).
+        if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_LOCKED && !prefs.rotationLock)
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     }
 
     override fun onPostResume() {
