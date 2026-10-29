@@ -597,6 +597,21 @@ jadx --no-res -d src/framework fs/system/system/framework/framework.jar
 - **재현 시도 (2026-10-26, `Tango_A14` 에뮬레이터, 안드로이드 14)**: 배포판 1.6.0 을 깔고 접근성·사용 기록을 켠 뒤 홈의 `새 버전이 나왔습니다` › `설치` › 알 수 없는 앱 설치 허용 › 시스템 `업데이트` 로 1.6.1 을 받았다. 업데이트 뒤 서비스가 바로 다시 붙었고 앱 오류는 없었다(앱이 끝난 까닭은 `OTHER`(INVALID START) 하나, Dapper 의 `PKG_UPDATED · CRASH` 와 다르다). `am crash` 로 앱 오류를 내도 서비스는 저절로 다시 붙었다. 재현 안 됨: 이 기기에서 무엇이 오류를 냈는지는 오류 내용이 있어야 안다.
 - **다음**: 1.6.2 부터 기기 정보에 `마지막 앱 오류`(예외 이름·이 앱 코드 자리)가 나오고 기록 보기에도 한 줄 남는다(`CrashLog`). 다시 멈추면 껐다 켜기 전에 기기 정보 사진을 부탁한다.
 
+## Bigme B7 Pro 거꾸로 들면 새 화면마다 뒤집혀 보인다 (2026-10-29, Reddit Dapper-Researcher299)
+
+- **근거**: 영상 2개(캡처로 받음)와 기기 정보 사진 1장(Pebble Desk 1.6.6, 거꾸로 든 채). 같은 사용자의 페이지 버튼 댓글에 이어 왔다.
+- **증상**: 기기를 위아래 뒤집어 들면(180°, 사용자는 손을 자주 바꿔 든다) 새 화면을 열 때마다 화면이 1~2초 거꾸로 보였다가 돌아온다. 모든 앱·독서 기록을 열 때, 홈으로 돌아갈 때. 똑바로 들면 괜찮고 페이지 버튼은 방향을 따라 바뀐다. 첫 영상에는 회전 뒤 모든 앱이 왼쪽으로 밀리고 오른쪽에 잔상 띠가 남아 손으로 다시 그려야 했는데, Bigme 전자잉크 센터에서 갱신 방식을 낮추니 이것은 없어졌다. 거꾸로 보이는 것은 갱신 방식과 상관없이 남는다.
+- **사용자가 확인한 것**: KOReader·Mihon 에서는 새 화면을 열어도 안 생긴다. **Niagara 런처에서도 생긴다**(Pebble Desk 는 새 화면을 더 자주 열어 더 거슬린다).
+- **기기 정보 사진 (2026-10-29)**: 기기·펌웨어는 10-26 과 같다. 자동 추가 마지막 연결 `10/29 11:12` · 멈춤 없음. 앱이 끝난 까닭 `10/29 11:10 CRASH · 11:10 PKG_UPDATED`(1.6.6 업데이트, 이번에는 2분 뒤 다시 붙었다) · 마지막 앱 오류 `-`. 사진에서도 내용이 왼쪽으로 밀려(`evice info`) 오른쪽에 빈 띠가 보인다. 회전 직후 덜 갱신된 장면인지, 180° 에서 비워 둘 자리를 돌리지 않은 것인지는 **(미확인)**(사진 왼쪽이 잘려 찍혔을 수도 있다).
+- **이 앱 쪽**: 전자잉크 갱신 명령을 보내지 않고(뷰를 다시 그릴 뿐), 매니페스트·코드 어디서도 방향을 정하지 않는다(`screenOrientation`·`configChanges` 없음, 회전을 보는 곳은 크레마 전용 `Crema.reserveHiddenBottom` 뿐). 창 전환 애니메이션·미리 보기 창은 이미 끈다(`windowAnimationStyle @null`·`windowDisablePreview`·`overridePendingTransition(0, 0)`). cutout·insets 도 다루지 않는다.
+- **원인 (추정)**: 180° 에서 새 창(액티비티)이 뜰 때 펌웨어가 돌리지 않은 첫 장면을 그린다. 액티비티 하나 안에서 화면을 바꾸는 앱(KOReader·Mihon 둘러보기)은 안 생기는 것과 맞다. Bigme 펌웨어는 회전 버그가 잦다(eWritable 펌웨어 4.6 리뷰: 노트 앱 필기가 180° 로 뒤집힘, 여러 판의 노트에 '일부 상황의 회전' 고침). 같은 증상의 보고는 찾지 못했다.
+- **다른 런처 (2026-10-29 코드 확인)**: 180° 를 따로 다루는 런처는 없다. Niagara 1.16.35(디컴파일): 휴대폰 크기(`is_tablet` = sw600dp 미만)면 홈·설정을 `NOSENSOR`, `Always allow landscape mode` 를 켜면 `UNSPECIFIED`. inkOS: 액티비티 하나 + 프래그먼트 14개, 태블릿이 아니면 `PORTRAIT`(거꾸로 들어도 돌지 않음). Olauncher·mLauncher: 액티비티 하나, 방향 정하지 않음. KISS: 기본 `USER_PORTRAIT`. Launcher3(Lawnchair `RotationHelper`): 휴대폰은 `NOSENSOR`, 회전 허용이면 `UNSPECIFIED`, **전환 중에는 `LOCKED`**.
+- **할 수 있는 것 (나중에)**:
+  1. 하위 화면(`EinkActivity`)을 열 때만 `SCREEN_ORIENTATION_LOCKED`(그때 회전을 그대로 쓰고 다시 정하지 않는다)로 두고 첫 그리기 뒤 `UNSPECIFIED` 로 푼다(Launcher3 방식). 깜빡임이 '새 창에서 회전을 다시 정하는 것' 때문이면 없어지고, 펌웨어가 회전과 상관없이 첫 장면을 돌리지 않는 것이면 그대로다. 에뮬레이터로는 전자잉크 깜빡임을 볼 수 없어 사용자에게 시험 APK 를 보내야 한다.
+  2. 펌웨어 보기: 공개 다운로드는 없다. [bigme-ota-client](https://github.com/marek-vybiral/bigme-ota-client) 가 Bigme OTA 서버(`ereader.bigme.vip:8090`, 기기 업데이트 앱 `xSettings.apk` 의 요청을 흉내)에서 전체 OTA 주소를 받는데, 요청에 시리얼(`sn`)·기기 코드 `osName`(= `ro.build.versionCode`, HiBreak Pro BW 는 `B651 EEA_M2`)이 든다. B7 Pro 의 값은 공개된 곳에 없다(FCC ID `2A8EM-B7PRO`·모델 `GY-US-B7 Pro` 는 형식이 다르다). 기기 정보 시스템 속성에 `ro.build.versionCode` 를 보이면 다음 사진으로 얻는다. 받으면 `services.jar`(`DisplayRotation`)와 XRZ 전자잉크 쪽을 본다.
+  3. 액티비티 하나로 바꾸기: 화면 13개·뒤로 가기·`Sheet`·결과 받는 화면을 다시 짜야 해 보류.
+- **다음**: 다른 기기에서도 그런지 물었다(답 기다림). 거꾸로 든 채 Mihon 에서 만화를 열 때(읽는 화면은 따로 된 액티비티)도 그런지 물으면 '액티비티가 바뀔 때'인지 굳힐 수 있다.
+
 ## Bigme HiBreak 사용자 이슈 (2026-10-27, GitHub #6 abhifx)
 
 - **근거**: 홈 캡처 1장(720×1440)과 독서 기록 시안 1장(사용자가 고친 그림, 실제 화면을 바탕으로 한 것으로 보인다). 기기 정보 사진은 없다. 판·안드로이드 **(미확인)**.
