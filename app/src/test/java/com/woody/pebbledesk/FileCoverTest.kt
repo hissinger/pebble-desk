@@ -79,6 +79,26 @@ class FileCoverTest {
             "com.ezne.easyview.pro", "com.inno.woojoo"), on)
     }
 
+    @Test fun `PDF 는 열지 않고 머리로만 있다고 보고, 못 그린 PDF 는 그 뒤 없다고 답한다`() {
+        val covers = com.woody.pebbledesk.readers.BookFiles.withPdf(com.woody.pebbledesk.readers.BookFiles.BOOKS)
+        val pdf = File(tmp.root, "a.pdf").apply { writeText("%PDF-1.4\n%âãÏÓ\n1 0 obj") }.path
+        // 머리 앞에 다른 바이트가 붙어도 PDF 리더들처럼 PDF 로 본다
+        val junk = File(tmp.root, "b.pdf").apply { writeBytes(ByteArray(100) { 0x20 } + "%PDF-1.7".toByteArray()) }.path
+        val notPdf = File(tmp.root, "c.pdf").apply { writeText("<html>not a pdf</html>") }.path
+        assertTrue(covers.has(app, pdf))
+        assertTrue(covers.has(app, junk))
+        assertFalse(covers.has(app, notPdf))
+        // 쪽이 없는 가짜 PDF 는 그리지 못한다: 그 뒤로는 없다고 답해 화면에서 자르게
+        assertEquals(null, covers.cover(app, pdf))
+        assertFalse(covers.has(app, pdf))
+    }
+
+    @Test fun `PDF 첫 쪽까지 쓰는 앱은 Librera 둘뿐이다`() {
+        val pdf = File(tmp.root, "a.pdf").apply { writeText("x") }.path
+        val on = com.woody.pebbledesk.readers.ReaderApps.ALL.filter { it.fileCovers.slow(pdf) }.map { it.pkg }.toSet()
+        assertEquals(setOf("com.foobnix.pdf.reader", "com.foobnix.pro.pdf.reader"), on)
+    }
+
     @Test fun `책 파일 읽기가 꺼져 있을 때 적은 파일도 허용한 뒤 그릴 때 꺼낸다`() {
         // 권한이 없으면 뒤에서 꺼내지 않는다(그 자리에서 끝난다)
         BookShelf.setFilePath(app, "b-1", cbz().path)

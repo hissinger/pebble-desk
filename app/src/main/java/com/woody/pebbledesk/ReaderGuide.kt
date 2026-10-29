@@ -20,6 +20,8 @@ import com.woody.pebbledesk.readers.KyoboEbook
 import com.woody.pebbledesk.readers.KyoboEbookMobile
 import com.woody.pebbledesk.readers.KyoboLibrary
 import com.woody.pebbledesk.readers.Libby
+import com.woody.pebbledesk.readers.Librera
+import com.woody.pebbledesk.readers.LibreraPro
 import com.woody.pebbledesk.readers.Mihon
 import com.woody.pebbledesk.readers.Millie
 import com.woody.pebbledesk.readers.MillieMobile
@@ -205,6 +207,12 @@ internal object ReaderGuide {
             listOf(R.string.guide_t_kotatsu_open),
             cover = YES, title = YES, author = yes(R.string.guide_n_kotatsu_author),
             progress = yes(R.string.guide_n_kotatsu_progress), due = NO, note = R.string.guide_note_kotatsu,
+        )),
+        App(listOf(R.string.guide_librera, R.string.guide_librera_pro), listOf(Librera, LibreraPro), Info(
+            listOf(R.string.guide_t_librera_open),
+            cover = YES, title = YES, author = YES, progress = READING_MENU, due = OWN_FILE,
+            bookFiles = R.string.guide_files_librera, note = R.string.guide_note_librera,
+            coverBefore11 = Field(R.string.guide_added_book_files, R.string.guide_n_librera_cover_files),
         )),
     )
 }

@@ -7,9 +7,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.provider.Settings
 import android.util.Xml
 import com.woody.pebbledesk.Storage
@@ -90,7 +93,7 @@ object BookFiles {
 
     /**
      * 책 파일에서 표지를 꺼내는 길. 어느 길을 쓸지는 이북 앱이 자기 파일에서 고른다([ReaderApp.fileCovers]): 기본은 [BOOKS](EPUB·그림 폴더),
-     * 만화를 여는 앱은 [WITH_COMICS](그 위에 만화 묶음의 첫 그림). 공통 흐름(홈이 그릴 때·화면에서 자를지)은 그 책을 넣은 앱의 길만 부른다.
+     * 만화를 여는 앱은 [WITH_COMICS](그 위에 만화 묶음의 첫 그림), PDF 첫 쪽도 쓰는 앱은 [withPdf] 로 감싼 것. 공통 흐름(홈이 그릴 때·화면에서 자를지)은 그 책을 넣은 앱의 길만 부른다.
      */
     interface Covers {
         /** [path] 에서 표지를 꺼낼 수 있다(화면에서 자르지 않을지 정할 때라 가볍게: 파일마다 한 번 읽어 기억하거나 열지 않고 정한다) */
@@ -136,6 +139,63 @@ object BookFiles {
 
         override fun slow(path: String) = isArchiveComic(path)
     }
+
+    /**
+     * [base] 에 더해 PDF 는 첫 쪽을 그린 그림(안드로이드 기본 `PdfRenderer`). 쓰는 앱: Librera.
+     * 있는지는 열지 않고 파일 머리(앞 1024바이트 안의 `%PDF-`)로만 본다(화면 스레드에서 묻는다). 그려 보다 못 그린 PDF(암호 등)는 기억해 두고 그 뒤로는 없다고 답한다
+     * (그 책은 화면에서 자른다). 큰 PDF 는 여는 데 오래 걸릴 수 있어 늘 뒤에서 꺼낸다
+     */
+    fun withPdf(base: Covers): Covers = object : Covers {
+        override fun has(context: Context, path: String) = if (isPdf(path)) hasPdfCover(path) else base.has(context, path)
+        override fun cover(context: Context, path: String): ByteArray? = if (isPdf(path)) pdfCover(path) else base.cover(context, path)
+        override fun slow(path: String) = isPdf(path) || base.slow(path)
+    }
+
+    private fun isPdf(path: String) = path.endsWith(".pdf", ignoreCase = true)
+
+    /**
+     * PDF [path] 의 앞 [PDF_HEAD] 바이트 안에 `%PDF-` 가 있다(PDF 리더들도 머리 앞에 다른 바이트가 붙은 파일을 연다).
+     * 파일마다 한 번 읽어 기억한다. 못 그린 PDF 는 [pdfCover] 가 거짓으로 바꿔 둔다
+     */
+    private fun hasPdfCover(path: String): Boolean = fileCovers.getOrPut(fileKey(File(path))) {
+        runCatching {
+            val head = ByteArray(PDF_HEAD)
+            // `readNBytes` 는 안드로이드 13 부터라 끝이나 다 찰 때까지 직접 읽는다
+            val n = File(path).inputStream().use { s ->
+                var read = 0
+                while (read < head.size) { val r = s.read(head, read, head.size - read); if (r < 0) break; read += r }
+                read
+            }
+            String(head, 0, n, Charsets.ISO_8859_1).contains("%PDF-")
+        }.getOrDefault(false)
+    }
+    private const val PDF_HEAD = 1024
+
+    /** PDF [path] 의 첫 쪽을 긴 변 [COVER_PX] 안으로 흰 바탕에 그린 JPEG. 못 그리면(쪽이 없음·암호·깨진 파일) null 이고 표지가 없다고 기억한다 */
+    private fun pdfCover(path: String): ByteArray? = runCatching {
+        openPdf(path) { pdf ->
+            if (pdf.pageCount <= 0) return@openPdf null
+            pdf.openPage(0).use { page ->
+                if (page.width <= 0 || page.height <= 0) return@openPdf null
+                val scale = COVER_PX.toFloat() / maxOf(page.width, page.height)
+                val bitmap = Bitmap.createBitmap((page.width * scale).toInt().coerceAtLeast(1), (page.height * scale).toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+                try {
+                    // PDF 바탕은 투명이라 흰 종이로 깐다
+                    bitmap.eraseColor(Color.WHITE)
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
+                } finally {
+                    bitmap.recycle()
+                }
+            }
+        }
+    }.getOrNull().also { if (it == null) fileCovers[fileKey(File(path))] = false }
+
+    /** PDF [path] 를 열어 [block] 에 준다. `PdfRenderer` 는 여러 스레드에서 함께 쓰지 않는다(한 번에 하나) */
+    private fun <T> openPdf(path: String, block: (PdfRenderer) -> T): T = synchronized(pdfLock) {
+        ParcelFileDescriptor.open(File(path), ParcelFileDescriptor.MODE_READ_ONLY).use { fd -> PdfRenderer(fd).use(block) }
+    }
+    private val pdfLock = Any()
 
     /** ZIP 묶음 [path] 의 [entry] 항목이 있고 그림으로 읽힌다(파일마다 한 번 읽어 기억한다). 못 읽으면 아니다 */
     private fun hasZipCover(path: String, entry: (ZipFile) -> ZipEntry?): Boolean = fileCovers.getOrPut(fileKey(File(path))) {
