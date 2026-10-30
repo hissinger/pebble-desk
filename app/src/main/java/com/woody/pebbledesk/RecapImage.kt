@@ -33,7 +33,7 @@ object RecapImage {
     /** 위 카드가 시작하는 높이, 맨 아래 글줄(기준선)이 그림 아래 끝에서 떨어진 만큼, 크게 보기에서 내용 둘레에 남기는 여백 */
     private const val TOP = 40f
     private const val BOTTOM = 44f
-    private const val CONTENT_PAD = 6f
+    private const val CONTENT_PAD = 24f
     /** 아래 올해 잔디가 시작하는 높이 */
     private const val YEAR_Y = 1084f
 
