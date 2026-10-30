@@ -12,8 +12,8 @@ README 는 영어(`README.md`)와 한국어(`README.ko.md`) 두 벌이다. 하�
 
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-./gradlew -q assembleRelease          # app/build/outputs/apk/release/PebbleDesk-1.7.1-release.apk
-adb install -r app/build/outputs/apk/release/PebbleDesk-1.7.1-release.apk </dev/null
+./gradlew -q assembleRelease          # app/build/outputs/apk/release/PebbleDesk-1.7.2-release.apk
+adb install -r app/build/outputs/apk/release/PebbleDesk-1.7.2-release.apk </dev/null
 ```
 
 - 릴리스는 R8 축소(약 740KB, 1.6.5 는 720KB·1.6.4 는 705KB·1.6.1 은 734KB·1.5.3 은 480KB. HTML 라이브러리 없이 YES24 검색 결과를 직접 읽는다. 릴리스만 Kotlin 널 검사 호출을 빼고(`-Xno-*-assertions`) `-repackageclasses`, 도장 그림은 16단계 투명도 4비트 PNG). dex 는 minSdk 28 이라 압축하지 않고 넣는다(설치 뒤 풀어 두지 않아 저장 공간·실행이 낫다). 덮어 설치하면 앱 데이터가 남는다.
@@ -60,7 +60,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.7.1-release.apk </dev/
 | HomeActivity | 홈: 상단 · 책 자리(스켈레톤/한 권/여러 권) · 자주 쓰는 앱(고정 3줄) · 하단 줄(모든 앱 · 오늘 읽은 시간 · 설정) |
 | ReadingActivity | ⑫ 독서 기록: 연속일·오늘 링, 4주 링 달력·막대그래프(각각 뷰 하나로 그림, 같은 높이), 합계, 이번 주 읽은 책 |
 | YearBooksActivity | ⑬ 올해 읽은 책(목록·격자, 해 고르기): 읽는 중·완독한 책(표지에 띠)·뺀 책, 완독·다시 읽기·기록에서 지우기 |
-| Recap / RecapImage / RecapActivity | ⑮ 월간 결산: 한 달 데이터와 배치(막대 끊기·주마다 줄 채우기·오른쪽 칸 모양 `Recap`), 1080×1350 그림(`RecapImage`, 표지는 `BookShelf.shareCover`), 화면(올해 읽은 책 제목 오른쪽 `10월 결산 ›`, `‹ 9월 · 공유 · 11월 ›`, 그림을 누르면 크게, 공유 = 파일로 저장·다른 앱으로 보내기, 보내는 그림은 `RecapFiles` 가 내준다) |
+| Recap / RecapImage / RecapActivity | ⑮ 월간 결산: 한 달 데이터와 배치(막대 끊기·주마다 줄 채우기·오른쪽 칸 모양 `Recap`), 1080×1350 그림(`RecapImage`, 표지는 `BookShelf.shareCover`), 화면(올해 읽은 책 아래 줄 오른쪽 `10월 결산 ›`, `‹ 9월 · 공유 · 11월 ›`, 그림을 누르면 크게, 공유 = 파일로 저장·다른 앱으로 보내기, 보내는 그림은 `RecapFiles` 가 내준다) |
 | BookRecord / BookDetail | 책 한 권의 기록(읽은 날·회차 `rounds`(읽기 시작해 완독까지, 회차마다 별점·감상), `BookRecord.all`) / 홈·올해 읽은 책이 같은 책 상세 `showBookDetail`(머리·마지막 회차 기록·마지막 회차 별점·감상·메뉴·`책 정보 고치기`, 메뉴만 상태로 갈림. 회차가 둘 이상이면 기록 칸을 누르면 전체 기록 `showHistory`(세로 타임라인, 줄을 누르면 회차 메뉴 `editRound`: 완독한 날·별점·감상, 닫으면 상세로). 완독은 늘 오늘, 완독한 날은 회차 메뉴에서만 고친다) |
 | Review | 회차마다 별점·감상(`Review`, 완독하지 않은 회차는 `BookShelf.setReview`, 완독한 회차는 완독한 날과 함께 `setFinish`, 완독할 때 `BookShelf.finish` 가 옮김), 별 다섯 `StarBar`(반 개, 누르기·밀기), 별점·감상 메뉴 `reviewSheet`(완독·책 빼기의 확인을 겸함), 상세의 칸 `reviewBlock` |
 | Reading | `ReadingLog`: 사용 기록에서 이북 앱 **읽는 화면** 시간을 책별로 계산(편 책 `book_open`, Libby 는 읽는 화면이 보인 동안, KOReader 는 책이 열려 있던 동안 `viewer_mark` 로 자름), DB `reading_day` 저장(칸 `ReadKey`, 책을 모르는 칸은 `bookFor` 로 정하고 목록에 없던 책이 책이 되면 `adopt`), 연속일 |

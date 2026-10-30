@@ -108,9 +108,7 @@ object RecapImage {
         /** 표지의 색 있는 픽셀을 색상 칸에 나눠 읽은 시간만큼 센 가장 많은 칸([Recap.dominantHue])의 색 */
         fun coverTheme(): IntArray? {
             val samples = m.books.mapNotNull { b ->
-                if (b.ms <= 0) return@mapNotNull null
-                val small = Bitmap.createScaledBitmap(coverBitmap(b.book, 60), 24, 36, true)
-                IntArray(small.width * small.height).also { small.getPixels(it, 0, small.width, 0, 0, small.width, small.height) } to b.ms
+                if (b.ms <= 0) null else coverPixels(b.book) to b.ms
             }
             val (hue, sat) = Recap.dominantHue(samples) ?: return null
             return theme(hue, sat)
@@ -224,15 +222,20 @@ object RecapImage {
                 ?: BlankCover.draw(b.title, b.author, b.app?.let { AppStore.find(ctx, it)?.label }, w * 2)
         }
 
+        /** 표지 색을 볼 작은 그림(24×36)의 픽셀: 막대 색·카드 색 */
+        val pixels = HashMap<String, IntArray>()
+        fun coverPixels(b: ShelfBook): IntArray = pixels.getOrPut(b.id) {
+            val small = Bitmap.createScaledBitmap(coverBitmap(b, 60), 24, 36, true)
+            IntArray(small.width * small.height).also { small.getPixels(it, 0, small.width, 0, 0, small.width, small.height) }
+        }
+
         /** 막대 색(컬러만): 표지에서 채도 있는 픽셀의 평균(없으면 전체 평균), 너무 밝으면 어둡게 */
         val barColors = HashMap<String, Int>()
         fun barColor(b: ShelfBook): Int = barColors.getOrPut(b.id) {
-            val small = Bitmap.createScaledBitmap(coverBitmap(b, 60), 20, 30, true)
             var n = 0; var r = 0L; var g = 0L; var bl = 0L
             var an = 0; var ar = 0L; var ag = 0L; var ab = 0L
             val hsv = FloatArray(3)
-            for (y in 0 until small.height) for (x in 0 until small.width) {
-                val px = small.getPixel(x, y)
+            for (px in coverPixels(b)) {
                 ar += Color.red(px); ag += Color.green(px); ab += Color.blue(px); an++
                 Color.colorToHSV(px, hsv)
                 if (hsv[1] > 0.28f && hsv[2] in 0.18f..0.95f) { r += Color.red(px); g += Color.green(px); bl += Color.blue(px); n++ }
