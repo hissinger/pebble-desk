@@ -37,7 +37,27 @@ object RecapImage {
     /** 아래 올해 잔디가 시작하는 높이 */
     private const val YEAR_Y = 1084f
 
-    private class Colors(mono: Boolean) {
+    /**
+     * 달마다 위 카드 색(옅은 그라데이션 두 색)과 강조색(큰 숫자·책 읽은 시간). 계절에 맞춰 1월부터:
+     * 겨울 하늘 · 매화 · 새싹 · 벚꽃 · 신록 · 수국 · 바다 · 해바라기 · 가을 하늘 · 단풍 · 낙엽 · 겨울 붉은빛.
+     */
+    private val MONTHS = arrayOf(
+        intArrayOf(0xFFE3ECF7.toInt(), 0xFFC9DAF0.toInt(), 0xFF2F5D9A.toInt()),
+        intArrayOf(0xFFF6E4EA.toInt(), 0xFFEBC9D5.toInt(), 0xFFA33E66.toInt()),
+        intArrayOf(0xFFE9F3DF.toInt(), 0xFFCFE6BC.toInt(), 0xFF4E8A2E.toInt()),
+        intArrayOf(0xFFFBE6EE.toInt(), 0xFFF4CADB.toInt(), 0xFFC2477A.toInt()),
+        intArrayOf(0xFFDFF2E4.toInt(), 0xFFBFE3C8.toInt(), 0xFF2E7D4F.toInt()),
+        intArrayOf(0xFFE0EEF6.toInt(), 0xFFC4DDEE.toInt(), 0xFF2D6E9E.toInt()),
+        intArrayOf(0xFFDDF1F3.toInt(), 0xFFBBE2E8.toInt(), 0xFF1F7A86.toInt()),
+        intArrayOf(0xFFFFF1D6.toInt(), 0xFFFADFA6.toInt(), 0xFFB7791F.toInt()),
+        intArrayOf(0xFFECE6F6.toInt(), 0xFFD8CCEE.toInt(), 0xFF6A4FA3.toInt()),
+        intArrayOf(0xFFFBE7DA.toInt(), 0xFFF3CDB3.toInt(), 0xFFC2571A.toInt()),
+        intArrayOf(0xFFF1E7DA.toInt(), 0xFFE2D0B8.toInt(), 0xFF8A5A2B.toInt()),
+        intArrayOf(0xFFF8E4E4.toInt(), 0xFFEFC8C8.toInt(), 0xFFA83232.toInt()),
+    )
+
+    private class Colors(mono: Boolean, month: Int) {
+        private val m = MONTHS[month - 1]
         val ink = Color.BLACK
         val gray = Color.rgb(110, 110, 110)
         val dark = Color.rgb(55, 55, 55)
@@ -45,12 +65,12 @@ object RecapImage {
         val line = Color.rgb(234, 234, 234)
         val head = Color.rgb(200, 200, 200)
         val coverLine = Color.rgb(215, 215, 215)
-        val accent = if (mono) Color.BLACK else 0xFF1565C0.toInt()
+        val accent = if (mono) Color.BLACK else m[2]
         val done = if (mono) Color.rgb(85, 85, 85) else Palette.DONE
         val star = if (mono) Color.BLACK else Palette.STAR
         val starOff = Color.rgb(215, 215, 215)
         val band = if (mono) intArrayOf(Color.rgb(242, 242, 242), Color.rgb(228, 228, 228))
-            else intArrayOf(0xFFE4EFFB.toInt(), 0xFFCFE2F5.toInt())
+            else intArrayOf(m[0], m[1])
         val empty = if (mono) Color.rgb(236, 236, 236) else 0xFFEBEDF0.toInt()
         val future = if (mono) Color.rgb(246, 246, 246) else 0xFFF6F7F8.toInt()
         val levels = if (mono) intArrayOf(Color.rgb(200, 200, 200), Color.rgb(140, 140, 140), Color.rgb(80, 80, 80), Color.rgb(17, 17, 17))
@@ -73,7 +93,7 @@ object RecapImage {
 
     private class Painter(val ctx: Context, val c: Canvas, val m: Recap.Month, palette: Palette) {
         val mono = !palette.color
-        val k = Colors(mono)
+        val k = Colors(mono, m.month.monthValue)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val locale = ctx.resources.configuration.locales[0]
         fun fmt(res: Int): DateTimeFormatter = DateTimeFormatter.ofPattern(ctx.getString(res), locale)
