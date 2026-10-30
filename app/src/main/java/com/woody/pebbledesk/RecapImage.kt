@@ -38,7 +38,7 @@ object RecapImage {
     private const val YEAR_Y = 1084f
 
     /**
-     * 달마다 위 카드 색(옅은 그라데이션 두 색)과 강조색(큰 숫자·책 읽은 시간). 계절에 맞춰 1월부터:
+     * 그달 표지에서 색을 못 고를 때(표지가 없거나 흑백 표지뿐, 빈 달) 쓰는 달마다 위 카드 색(옅은 그라데이션 두 색)과 강조색. 계절에 맞춰 1월부터:
      * 겨울 하늘 · 매화 · 새싹 · 벚꽃 · 신록 · 수국 · 바다 · 해바라기 · 가을 하늘 · 단풍 · 낙엽 · 겨울 붉은빛.
      */
     private val MONTHS = arrayOf(
@@ -56,8 +56,15 @@ object RecapImage {
         intArrayOf(0xFFF8E4E4.toInt(), 0xFFEFC8C8.toInt(), 0xFFA83232.toInt()),
     )
 
-    private class Colors(mono: Boolean, month: Int) {
-        private val m = MONTHS[month - 1]
+    /** 표지 색으로 만든 카드 색: 색상 [hue](0~1), 채도 [sat] → 옅은 두 색과 진한 강조색 */
+    internal fun theme(hue: Float, sat: Float): IntArray {
+        val s = sat.coerceIn(0.25f, 0.65f)
+        fun hsv(sv: Float, v: Float) = Color.HSVToColor(floatArrayOf(hue * 360f, sv.coerceIn(0f, 1f), v))
+        return intArrayOf(hsv(s * 0.18f, 0.98f), hsv(s * 0.38f, 0.94f), hsv(maxOf(0.55f, s), 0.55f))
+    }
+
+    /** 위 카드 색과 강조색 [m](옅은 색 두 개·강조색) */
+    private class Colors(mono: Boolean, private val m: IntArray) {
         val ink = Color.BLACK
         val gray = Color.rgb(110, 110, 110)
         val dark = Color.rgb(55, 55, 55)
@@ -93,7 +100,21 @@ object RecapImage {
 
     private class Painter(val ctx: Context, val c: Canvas, val m: Recap.Month, palette: Palette) {
         val mono = !palette.color
-        val k = Colors(mono, m.month.monthValue)
+        /** 색: 컬러면 그달 읽은 책 표지에서 가장 많이 보인 색(읽은 시간만큼 센다), 못 고르면 그달 계절 색 */
+        val k by lazy {
+            Colors(mono, if (mono) MONTHS[0] else coverTheme() ?: MONTHS[m.month.monthValue - 1])
+        }
+
+        /** 표지의 색 있는 픽셀을 색상 칸에 나눠 읽은 시간만큼 센 가장 많은 칸([Recap.dominantHue])의 색 */
+        fun coverTheme(): IntArray? {
+            val samples = m.books.mapNotNull { b ->
+                if (b.ms <= 0) return@mapNotNull null
+                val small = Bitmap.createScaledBitmap(coverBitmap(b.book, 60), 24, 36, true)
+                IntArray(small.width * small.height).also { small.getPixels(it, 0, small.width, 0, 0, small.width, small.height) } to b.ms
+            }
+            val (hue, sat) = Recap.dominantHue(samples) ?: return null
+            return theme(hue, sat)
+        }
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val locale = ctx.resources.configuration.locales[0]
         fun fmt(res: Int): DateTimeFormatter = DateTimeFormatter.ofPattern(ctx.getString(res), locale)
