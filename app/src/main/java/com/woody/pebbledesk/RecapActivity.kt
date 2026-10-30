@@ -21,7 +21,7 @@ import java.time.format.DateTimeFormatter
  * ⑮ 월간 결산(올해 읽은 책 제목 오른쪽 `10월 결산 ›`). 그달의 독서를 한 장으로 그린 그림([RecapImage])을 보여 주고,
  * 아래 줄 `‹ 9월` · `공유` · `11월 ›`(밀기·페이지 버튼도)로 달을 넘긴다. 기록을 시작한 달보다 앞, 이번 달보다 뒤로는 가지 않는다.
  * 그림을 누르면 화면 가득 크게(상단바·제목·아래 줄·그림 바깥 여백 없이), 다시 누르거나 뒤로 가면 돌아온다. 크게 본 채로도 밀어서 달을 넘긴다.
- * `공유`는 아래 메뉴: 파일로 저장(위치 고르기) · 다른 앱으로 보내기.
+ * `공유`는 아래 메뉴: 파일로 저장(위치 고르기) · 다른 앱으로 보내기. 저장·보내는 그림은 휴대폰에서 볼 그림이라 화면이 흑백이어도 늘 컬러.
  */
 class RecapActivity : EinkActivity() {
     private var month: YearMonth = YearMonth.now()
@@ -31,8 +31,10 @@ class RecapActivity : EinkActivity() {
     private lateinit var full: PictureView
     private lateinit var prev: TextView
     private lateinit var next: TextView
-    /** 지금 그달의 그림(저장·보내기에 쓴다) */
-    private var image: Bitmap? = null
+    /** 지금 그달의 데이터(저장·보내기 그림을 컬러로 다시 그릴 때) */
+    private var data: Recap.Month? = null
+    /** 저장·보내기에 쓰는 컬러 그림(휴대폰에서 볼 그림이라 화면이 흑백이어도 늘 컬러, 처음 쓸 때 그린다) */
+    private var shareImage: Bitmap? = null
     /** 보낼 PNG 를 뒤에서 쓰는 중(두 번 눌러 같은 파일을 함께 쓰지 않게) */
     private var writing = false
     /** 그려 둔 달과 기록 상태(돌아왔을 때 같으면 다시 그리지 않는다) */
@@ -122,10 +124,12 @@ class RecapActivity : EinkActivity() {
 
     private fun render() {
         val data = Recap.load(this, month, prefs)
+        this.data = data
         shown = state()
+        // 화면에는 화면 색 설정대로. 컬러면 그 그림을 그대로 저장·보내기에 쓴다.
         val bmp = RecapImage.draw(this, data, Palette.current)
-        image = bmp
-        // 화면에는 크레마 화면 대비만큼 밝힌 사본(그림 뷰는 크레마가 다시 밝히지 않는다). 저장·보내기는 원본.
+        shareImage = if (Palette.current.color) bmp else null
+        // 화면에는 크레마 화면 대비만큼 밝힌 사본(그림 뷰는 크레마가 다시 밝히지 않는다). 저장·보내기는 컬러 원본([sharedImage]).
         val shownBmp = bmp.copy(Bitmap.Config.ARGB_8888, true).also { Crema.undoContrast(it, Crema.contrastTone(this)) }
         preview.bitmap = shownBmp
         full.bitmap = RecapImage.content(shownBmp)
@@ -142,8 +146,11 @@ class RecapActivity : EinkActivity() {
     /** 파일 이름 `PebbleDesk-2026-10.png` */
     private fun fileName() = "PebbleDesk-$month.png"
 
+    /** 저장·보내기 그림: 늘 컬러(화면이 흑백이면 컬러로 한 번 더 그린다) */
+    private fun sharedImage(): Bitmap? = shareImage ?: data?.let { RecapImage.draw(this, it, Palette.COLOR) }?.also { shareImage = it }
+
     private fun share() {
-        val bmp = image ?: return
+        val bmp = sharedImage() ?: return
         val sheet = Sheet(this).header(titleText.text.toString())
         sheet.item(getString(R.string.recap_save_file)) { saveAsFile() }
             .item(getString(R.string.recap_send)) { send(bmp) }
@@ -170,7 +177,7 @@ class RecapActivity : EinkActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != PICK_FILE || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
-        val bmp = image ?: return
+        val bmp = sharedImage() ?: return
         // PNG 압축은 느린 기기에서 화면을 멈추게 하니 뒤에서. 고르기 창이 이미 파일을 만들었으니 늘 쓴다(건너뛰면 빈 파일이 남는다).
         Bg.run({ contentResolver.openOutputStream(uri, "wt")?.use { writePng(bmp, it) } ?: error("no stream") }) { done(it.isSuccess) }
     }
