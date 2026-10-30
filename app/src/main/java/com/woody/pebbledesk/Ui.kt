@@ -1,5 +1,6 @@
 package com.woody.pebbledesk
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -14,12 +15,15 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.text.StaticLayout
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.widget.LinearLayout
 import android.widget.TextView
 import kotlin.math.roundToInt
@@ -236,6 +240,34 @@ fun Context.titleRow(title: String, area: Palette.Area = Palette.Area.SETTINGS, 
     addView(text("‹", 34f, color = color), lp(WRAP, WRAP).apply { marginEnd = dp(10) })
     addView(text(title, 33f, Ui.heavy, color))
     setOnClickListener { onBack() }
+}
+
+/**
+ * 제목 줄 [row] 가 화면 폭에 다 들지 않으면(기기가 밀도를 덮어써 폭이 좁은 화면·키운 글자) 오른쪽 끝이 잘리지 않게 [link] 글자를 줄인다.
+ * 원래 크기의 [LINK_MIN_RATIO] 아래로는 줄이지 않는다(독서 기록 `올해 읽은 책 ›`, 올해 읽은 책 `10월 결산 ›`).
+ */
+fun Context.fitTitleLink(row: View, link: TextView) {
+    row.measure(0, 0)
+    val over = row.measuredWidth - resources.displayMetrics.widthPixels
+    if (over <= 0) return
+    val w = link.paint.measureText(link.text.toString())
+    link.setTextSize(TypedValue.COMPLEX_UNIT_PX, link.textSize * maxOf((w - over - dp(1)) / w, LINK_MIN_RATIO))
+}
+
+private const val LINK_MIN_RATIO = 0.7f
+
+/** 안드로이드 상단바를 보이거나 숨긴다(숨기면 위에서 아래로 쓸 때 잠깐 나온다). 홈과 월간 결산 크게 보기. */
+fun Activity.setStatusBarVisible(show: Boolean) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        window.insetsController?.let {
+            if (show) it.show(WindowInsets.Type.statusBars()) else it.hide(WindowInsets.Type.statusBars())
+            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    } else {
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility =
+            if (show) 0 else View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+    }
 }
 
 /** 순서 바꾸기 버튼(↑/↓). 끝에 있어 못 옮기면 흐리게 두고 누르지 않게 한다. 누르는 폭은 48dp. */

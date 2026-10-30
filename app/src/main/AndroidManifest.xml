@@ -105,6 +105,12 @@
             android:exported="false" />
 
         <activity
+            android:name=".RecapActivity"
+            android:screenOrientation="locked"
+            android:excludeFromRecents="true"
+            android:exported="false" />
+
+        <activity
             android:name=".OnboardingActivity"
             android:screenOrientation="locked"
             android:excludeFromRecents="true"
@@ -153,5 +159,11 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/reader_watch" />
         </service>
+        <!-- 월간 결산 그림을 다른 앱에 보낼 때만 읽기로 내준다(RecapActivity) -->
+        <provider
+            android:name=".RecapFiles"
+            android:authorities="${applicationId}.recap"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

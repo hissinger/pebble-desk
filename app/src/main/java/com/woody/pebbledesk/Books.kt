@@ -819,6 +819,17 @@ object BookShelf {
 
     fun hasCover(context: Context, id: String) = coverFile(context, id).length() > 0
 
+    /**
+     * 기기 밖으로 보내는 그림(월간 결산 [RecapImage])에 넣는 표지: 원본을 폭 [widthPx] 로 줄인 것. 화면 대비 보정·완독 띠 없이, [gray] 면 흑백.
+     * 표지 그림이 없으면(책 파일에서 꺼낼 수 있으면 꺼내 보고) null.
+     */
+    fun shareCover(context: Context, book: ShelfBook, widthPx: Int, gray: Boolean): Bitmap? {
+        val file = coverFile(context, book.id)
+        if (file.length() <= 0 && BookFiles.canRead(context) && filePath(context, book.id) != null) fileCover(context, book.id)
+        if (file.length() <= 0) return null
+        return runCatching { BookSearch.scaledCover(file.readBytes(), widthPx, gray) }.getOrNull()
+    }
+
     /** 표지만 바꾼다(이북 앱 화면에서 잘라 온 표지). 바뀐 표지가 다시 그려지도록 updatedAt 도 새로. */
     @Synchronized fun setCover(context: Context, id: String, bytes: ByteArray) {
         val books = list(context)
