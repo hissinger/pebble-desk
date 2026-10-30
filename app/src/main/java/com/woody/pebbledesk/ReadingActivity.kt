@@ -53,13 +53,7 @@ class ReadingActivity : EinkActivity() {
                 setOnClickListener { startActivity(YearBooksActivity.intent(this@ReadingActivity)) }
             }
             addView(link, lp(WRAP, WRAP))
-            // 제목 줄에 다 들지 않으면(기기가 밀도를 덮어써 폭이 좁은 화면·키운 글자) 오른쪽 끝이 잘리지 않게 링크 글자를 줄인다
-            measure(0, 0)
-            val over = measuredWidth - resources.displayMetrics.widthPixels
-            if (over > 0) {
-                val w = link.paint.measureText(link.text.toString())
-                link.setTextSize(TypedValue.COMPLEX_UNIT_PX, link.textSize * maxOf((w - over - dp(1)) / w, LINK_MIN_RATIO))
-            }
+            fitTitleLink(this, link)
         })
         root.addView(hline(2))
         body = vbox()
@@ -509,8 +503,6 @@ class ReadingActivity : EinkActivity() {
         private const val BOOKS_MIN_DP = 200
         /** 바형·좁은 화면: 합계 줄과 이번 주 읽은 책 사이(dp) */
         private const val STACK_GAP_DP = 20
-        /** 제목 줄의 `올해 읽은 책 ›` 을 줄일 때 가장 작은 비율 */
-        private const val LINK_MIN_RATIO = 0.7f
         /** 이번 주 읽은 책 한 쪽의 줄 수와 줄 높이(dp) */
         private const val BOOKS = 5
         private const val BOOK_ROW = 36

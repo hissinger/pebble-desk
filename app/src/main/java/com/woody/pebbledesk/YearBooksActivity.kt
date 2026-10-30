@@ -12,6 +12,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import java.time.LocalDate
+import java.time.YearMonth
 
 /**
  * ⑬ 올해 읽은 책(독서 기록 제목 오른쪽 `올해 읽은 책 ›`). 제목 오른쪽 `2026 ▾` 로 지난해를 고르면 `2025년 읽은 책`.
@@ -21,6 +22,7 @@ import java.time.LocalDate
  * 한 번이라도 완독한 책은 표지가 어디에 놓이든(격자·목록·상세) 오른쪽 위 모서리를 가로지르는 `완독` 띠. 완독한 날은 모두 남고
  * 상세에 회차마다 기간이 나온다. 다시 읽어도 완독 기록은 그대로다.
  * 하단 왼쪽 `목록 · 격자`, 가운데 `전체 · 완독`(그해 완독한 책만)으로 바꾸고 기억한다. 책을 누르면 홈과 같은 책 상세([showBookDetail]).
+ * 제목 오른쪽 `10월 결산 ›`(지난해를 보고 있으면 그해 12월)은 ⑮ 월간 결산([RecapActivity]).
  */
 class YearBooksActivity : EinkActivity() {
     /** 목록·격자(줄 높이가 달라 따로 두고 하나만 보인다) */
@@ -47,6 +49,9 @@ class YearBooksActivity : EinkActivity() {
     /** 제목 옆 권수(모든 앱의 앱 수와 같은 꼴). 지금 거른 목록의 수 */
     private lateinit var titleCount: TextView
     private lateinit var yearPick: TextView
+    /** 제목 줄과 그 오른쪽 `10월 결산 ›`(제목 줄에 다 들지 않으면 글자를 줄인다) */
+    private lateinit var titleBar: android.widget.LinearLayout
+    private lateinit var recapLink: TextView
 
     /** 한 줄: 책의 기록, 그해 마지막으로 읽은 날과 완독한 날 중 늦은 날(목록 순서), 그해 완독했는가(`완독` 거르기) */
     internal class Row(val record: BookRecord, val sortDay: LocalDate, val doneInYear: Boolean) {
@@ -63,8 +68,11 @@ class YearBooksActivity : EinkActivity() {
             titleCount = text("", 21f, color = Ui.GRAY)
             addView(titleCount, lp(WRAP, WRAP).apply { marginStart = dp(14); topMargin = dp(6) })
             addView(View(context), lp(0, 0, 1f))
+            recapLink = text("", 17f, Ui.bold).apply { setPadding(dp(16), dp(20), 0, dp(20)) }
+            addView(recapLink, lp(WRAP, WRAP))
             yearPick = text("", 21f, Ui.bold).apply { setPadding(dp(16), dp(20), 0, dp(20)) }
             addView(yearPick, lp(WRAP, WRAP))
+            titleBar = this
         })
         root.addView(hline(2))
         empty = text(getString(R.string.year_books_empty), 18f, color = Ui.GRAY, lines = 3).apply {
@@ -155,6 +163,13 @@ class YearBooksActivity : EinkActivity() {
         titleCount.text = if (list.isEmpty()) "" else getString(R.string.year_books_count, list.size)
         yearPick.text = "$year ▾"
         yearPick.visibility = if (years.size > 1) View.VISIBLE else View.GONE
+        // 월간 결산: 올해면 이번 달, 지난해면 그해 12월
+        val recapMonth = if (year == today.year) YearMonth.from(today) else YearMonth.of(year, 12)
+        recapLink.text = RecapActivity.link(this, recapMonth)
+        recapLink.setOnClickListener { startActivity(RecapActivity.intent(this, recapMonth)) }
+        // 제목 줄에 다 들지 않으면(좁은 화면·키운 글자·영어 제목과 `2026 ▾`) 글자를 줄인다. 해·언어가 바뀌면 다시 재므로 처음 크기부터.
+        recapLink.setSp(17f)
+        fitTitleLink(titleBar, recapLink)
         yearPick.setOnClickListener {
             choose(getString(R.string.pick_year), years.map { it.toString() }, years.indexOf(year)) {
                 year = years[it]
