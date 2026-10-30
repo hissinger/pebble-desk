@@ -152,8 +152,8 @@ class RecapTest {
     @Test fun `크게 보기는 바깥 흰 여백을 잘라 내용 둘레만 남긴다`() {
         val full = android.graphics.Bitmap.createBitmap(1080, 1350, android.graphics.Bitmap.Config.ARGB_8888)
         val c = RecapImage.content(full)
-        // 좌우 72-6, 위 40-6, 아래 44-6 을 뺀 크기
-        assertEquals(1080 - 2 * 66, c.width)
-        assertEquals(1350 - 34 - 38, c.height)
+        // 좌우 72-24, 위 40-24, 아래 44-24 를 뺀 크기
+        assertEquals(1080 - 2 * 48, c.width)
+        assertEquals(1350 - 16 - 20, c.height)
     }
 }
