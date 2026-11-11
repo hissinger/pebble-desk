@@ -79,6 +79,13 @@
     <string name="device_kind_crema">크레마</string>
     <string name="device_kind_meebook">메이북</string>
     <string name="device_kind_other">기타</string>
+    <string name="drop_time_title">읽은 시간 지우기</string>
+    <string name="drop_time_hint">고른 달의 읽은 시간을 모두 지웁니다. 어떤 책인지 모르는 시간까지 지웁니다.</string>
+    <string name="drop_time_none">지울 읽은 시간이 없습니다.</string>
+    <string name="drop_time_confirm_title">%1$s 읽은 시간 지우기</string>
+    <string name="drop_time_confirm">%1$s을 지웁니다. 책마다 읽은 시간에서도 빠지고 되돌릴 수 없습니다.</string>
+    <string name="drop_time_today">오늘 읽은 시간은 사용 기록으로 다시 셉니다.</string>
+    <string name="drop_time_action">지우기</string>
     <string name="device_photo_hint">문제가 있으면 이 화면을 사진으로 찍어 보내 주세요.</string>
     <string name="device_section_device">기기</string>
     <string name="device_section_values">시스템 속성 · 설정 값</string>
