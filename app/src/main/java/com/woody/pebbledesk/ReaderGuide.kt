@@ -24,6 +24,7 @@ import com.woody.pebbledesk.readers.KyoboLibrary
 import com.woody.pebbledesk.readers.Libby
 import com.woody.pebbledesk.readers.Librera
 import com.woody.pebbledesk.readers.LibreraPro
+import com.woody.pebbledesk.readers.LibreraX
 import com.woody.pebbledesk.readers.Mihon
 import com.woody.pebbledesk.readers.Millie
 import com.woody.pebbledesk.readers.MillieMobile
@@ -220,6 +221,11 @@ internal object ReaderGuide {
             cover = YES, title = YES, author = YES, progress = READING_MENU, due = OWN_FILE,
             bookFiles = R.string.guide_files_librera, note = R.string.guide_note_librera,
             coverBefore11 = Field(R.string.guide_added_book_files, R.string.guide_n_librera_cover_files),
+        )),
+        App(listOf(R.string.guide_librerax), listOf(LibreraX), Info(
+            emptyList(),
+            cover = YES, title = YES, author = YES, progress = YES, due = OWN_FILE,
+            appCover = true,
         )),
         App(listOf(R.string.guide_wattpad), listOf(Wattpad), Info(
             listOf(R.string.guide_t_wattpad_open),
