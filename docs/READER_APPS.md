@@ -30,6 +30,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | Mihon `app.mihon`·Kahon `com.amanoteam.kahon`(만화, 오픈소스. Kahon 은 Mihon 포크) | `eu.kanade.tachiyomi.ui.reader.ReaderActivity` | ? | 그냥 열면 마지막 화면 | X | 사용자가 고른 저장 폴더(로컬 만화 `<폴더>/local/<작품>/<화>.cbz`) |
 | Futon `io.github.landwarderer.futon`·Kotatsu `org.koitharu.kotatsu`(만화·소설, 오픈소스. Futon 은 Kotatsu 포크, Kotatsu 는 2025-11 저장소 보관·GitHub 릴리스·F-Droid 에서 내려감) | `<이름공간>.reader.ui.ReaderActivity`(Futon 은 소설·PDF `novel.ui.reader.NovelReaderActivity`·`…pdf.PdfReaderActivity` 도) | ? | 그냥 열면 마지막 화면 | X | 앱 전용 폴더(`Android/data/…/files/manga`, 불러오기로 복사) |
 | Librera `com.foobnix.pdf.reader`(무료, 광고)·Librera Pro `com.foobnix.pro.pdf.reader`(Play 유료, GitHub·F-Droid 판도 이 패키지. 오픈소스 내 파일 리더, 우주의 원본) | `com.foobnix.pdf.search.activity.HorizontalViewActivity`(책 넘김)·`org.ebookdroid.ui.viewer.VerticalViewActivity`(스크롤) | O (`file://` 를 `com.foobnix.OpenerActivity` 로, 읽던 쪽으로) | O (그냥 열면 라이브러리) | ? | 사용자가 둔 곳(공유 저장소). Librera 기록은 `/sdcard/Librera`(모든 파일 액세스가 없으면 `Download/Librera`) |
+| LibreraX `com.librerax`(Librera 개발자가 새로 만든 내 파일 리더, Compose) | X (액티비티 하나 `ComposeMainActivity`. 읽는 화면은 쪽 막대가 있는 메뉴가 보이거나 누를 수 있는 것이 없는 동안) | O (LibreraX 가 쓰는 경로로: 허용한 폴더의 문서 주소, 다른 앱이 열어 준 책은 LibreraX 폴더의 사본 `file://`. 사용자 저장소의 `file://` 는 못 연다) | O (그냥 열면 라이브러리, 읽던 책이 있으면 읽는 화면) | ? | 사용자가 허용한 폴더(SAF). 기록은 앱 전용이라 읽을 수 없다 |
 | 아이리더 기본 리더 `com.zhangyue.iReader.Eink`(掌阅 iReader SmartOS 기기의 시스템 앱. Tango·Ocean 5C 에서 확인) | `com.zhangyue.iReader.Eink.Activity.ActivityRead`·`ActivityReadP1` | O (`ActivityAliasOpenBook` 에 파일 경로 `file`) | O (`ActivityAliasBookShelf`. 실행 화면은 기기에 따라 서점 별칭) | X | 앱 전용 DB |
 | Wattpad `wp.wattpad`(웹 소설, 로그인 필요. 한국 Play 스토어에 없음) | `wp.wattpad.reader.ReaderActivity` | O `wattpad://story/<이야기 번호>`(읽던 자리. 번호는 공개 검색으로) | 그냥 열면 이어 보기 | ? | 앱 전용 저장소 (미확인) |
 | 이씨오 범용뷰어 3.0 `com.mackerly.eco.ecobookviewer3`(도서관 전자책 대출. Play 라이선스 확인이 있어 Play 스토어 없는 기기에서는 열리지 않음) | `com.mackerly.eco.viewer.ViewerActivity` | X (책 정보를 앱 안 화면끼리만 넘긴다) | 그냥 열면 내 서재(로그인한 도서관) | X | 없음(웹 뷰어 `epub.eco.co.kr` 로 그때그때 받는다) |
@@ -92,6 +93,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | Kobo Books | 서재·책 상세 | 서재(돌아왔을 때 맨 위 칸)·책 상세 | 서재·책 상세 | 메뉴 | X |
 | Futon·Kotatsu | 작품 상세 | 서재·작품 상세·메뉴 | 작품 상세 | 작품 상세(%)·메뉴(화 이름) | X |
 | Librera·Librera Pro | 서재·파일 | 서재·메뉴·파일 | 서재·파일 | 서재·메뉴·파일 | X |
+| LibreraX | LibreraX 가 내주는 표지(미디어 서비스의 최근 책) | 메뉴 | 메뉴·서재 | 메뉴·상태 줄·서재(리스트 보기) | X |
 | iReader 기기 내장판 4.1.0 | 공개 Provider 의 표지 | 최근 책 Provider(펌웨어 식별자로 맞추거나, 없으면 맨 위 줄) | 최근 책 Provider | 저장한 진행률(`readpercent`, 읽는 화면을 나올 때) | X |
 | Wattpad | 서재·이야기 화면 | 서재·이야기 화면·읽는 화면(화 처음의 툴바) | 서재(목록 보기)·이야기 화면 | 읽는 화면(화 이름) | X |
 | 이씨오 범용뷰어 3.0(EPUB 책만) | 서재 | 읽는 화면(옆 메뉴 표지 단추) | 읽는 화면(옆 메뉴 표지 단추) | 읽는 화면(장 순서) | 서재 |
@@ -137,6 +139,16 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **반납일**: 서재 칸의 `반납예정일`.
 - **PDF 책**: 지원하지 않는다(안내의 알아 둘 것). PDF 는 다른 웹 뷰어(앱 안의 pdf.js)로 열리는데, 문서 제목이 `PDF 뷰어` 로 고정이고 화면에는 쪽(`1` `/ 348`)·목차·도구 단추뿐이라 어느 책인지 알 길이 없다. PDF 파일은 DRM(드림인사이드 OPS)으로 암호화돼 앱 전용 저장소에 있고, 뷰어가 서버에서 받은 책 정보도 웹뷰 저장소에만 있다. 그래서 PDF 읽는 화면(쪽 수 요소 `numPages`)이 보이면 그 화면이 열린 때부터 책 모름으로 적는다(앞서 편 책에 시간이 붙지 않게, 시간은 하루 합계·연속일에만).
 - **제약**: 서재·읽는 화면이 Compose 라 칸을 눌러도 누름 알림이 오지 않는다(편 책은 읽는 화면으로만 안다). 읽는 화면의 웹 화면은 창에서 훑어 닿지 않고 웹 화면이 보내는 내용 바뀜 알림의 요소로만 닿는다(공통 자리 `ReaderAdapter.onContent`). 뒤로를 2초 안에 두 번 눌러야 닫힌다.
+
+### LibreraX `com.librerax`
+
+- **권한**: 공통.
+- **할 것**: 없다. 책을 열면 메뉴가 떠 있어 그 제목으로 들어온다.
+- **표지**: LibreraX 가 내주는 그림(600×900px)을 받는다. 책을 열면 바로 붙고, 그때 LibreraX 가 표지를 아직 만들지 않았으면 읽는 동안·서재를 볼 때 다시 받는다. 서재 보기 방식과 상관없고 안드로이드 9·10 에서도 들어온다. 표지 그림이 없는 책은 LibreraX 가 그린 그림(바탕색에 제목, PDF 는 첫 쪽)이 들어온다. LibreraX 의 최근 책에서 빠진 책(오래전에 읽은 책)은 다시 열 때 들어온다.
+- **제목·저자**: 메뉴 맨 위의 제목·저자. 책 정보가 없는 책은 제목이 파일 이름이고 저자 자리의 폴더(`[Download]`)는 넣지 않는다. PDF 는 파일 이름.
+- **진행률**: 메뉴의 쪽(`3` · 막대 · `81`), 메뉴 없이 읽는 동안은 아래 상태 줄 `3 / 81`(LibreraX 설정 › 상태 표시줄에서 끄면 메뉴를 띄울 때만), 리스트 보기 칸의 `3%`.
+- **반납일**: 없다(내 파일).
+- **제약**: 홈에서 책을 누르면 그 책을 읽던 곳에서 연다. 경로는 LibreraX 의 최근 책에서 받아 두므로, 자동 추가가 꺼져 있던 동안 연 책·최근 책에서 밀려난 뒤 처음 보는 책은 경로를 몰라 앱을 연다(다시 열면 받는다). LibreraX 에서 그 책을 지웠거나 폴더 허용을 거두면 LibreraX 가 `이 책을 더 이상 열 수 없습니다` 를 보인다. 요소 이름이 없어 모양으로 가리므로 LibreraX 화면이 바뀌면 다시 맞춰야 한다. 스크롤 방식·2단 보기와 상태 줄을 위에 둔 모양은 시험하지 않았다(**미확인**).
 
 ## 교보도서관 `kr.co.kyobobook.KEL`
 
@@ -983,3 +995,27 @@ Bilingify 의 오픈소스 리더(https://github.com/readest/readest, Tauri). �
   - Blorb 가 아닌 작품의 표지(`GameData/<IFID>/cover.png`)는 IFID 가 있어야 하는데 파일에서 IFID 를 셈하는 규칙(Babel)이 형식마다 달라 하지 않는다. 포크가 `glk.log` 에 IFID 를 매번 적어 주면 된다.
   - 어긋나는 경우: CREATE 탭 시험 실행의 시간이 마지막으로 편 작품에 붙는다(로그의 경로가 다르면 거를 수 있다), 제목이 같은 작품 둘은 한 책이 된다, `Get metadata` 로 제목 글자가 바뀌면 다른 책이 된다.
 - 시험에 쓴 작품: IF Archive 의 `LostPig.z8`(메타데이터 없음)·`Bronze.zblorb`(표지·메타데이터 있음).
+
+### LibreraX `com.librerax` (2026-11-13, 에뮬레이터 `CremaPebble_A11_Play`(안드로이드 11) · WebView 155, GitHub 릴리스 LibreraX-PRO-1.2.87 (10287), minSdk 24·targetSdk 36, **지원**)
+
+이슈 #15(sw1002)의 요청. 먼저 접근성 서비스에 패키지를 넣지 않은 채 화면 구조·알림·인텐트를 보고(`uiautomator dump`·`events`), 어댑터를 붙여 확인했다.
+
+- **앱**: Librera 개발자(foobnix)가 Librera 의 다음 판으로 새로 만든 앱(Android·iOS·macOS, Compose). Play `com.librerax`(5천+, Librera 이름으로 배포), GitHub 은 foobnix/LibreraReader 릴리스에 `LibreraX-PRO-<판>.apk` 로 같이 올린다. 그 저장소의 소스는 Librera 가 LibreraX 로 책을 넘기는 다리(`com.foobnix.librerax`)뿐이고 LibreraX 본체 소스는 보이지 않았다. EPUB 등은 웹 화면(foliate-js), PDF 는 PDFium. Librera(`com.foobnix.*`)와 패키지·화면·요소 이름·기록 파일이 모두 달라 `LibreraApp` 으로는 잡히지 않는다.
+- **권한**: 매니페스트에 저장소 권한이 하나도 없다(모든 파일 액세스도 없음). 책은 `폴더 추가`·`책 추가`(시스템 파일 고르기, SAF)로 허용한 곳과 `무료 도서`(받는 책)만 읽는다.
+- **액티비티 하나**: 서재·읽는 화면이 모두 `com.librerax.ComposeMainActivity` 안이다. `com.librerax.reader.ReaderActivity` 는 그 액티비티의 별칭(다른 앱이 책을 열 때)이라 책을 열어도 앞 액티비티는 그대로이고 창 바뀜 알림도 없다 → 읽는 화면은 클래스 이름으로 가릴 수 없고 화면 내용으로 가려야 한다(Libby·부커스 2.0 처럼 `screenInsideActivity`·`markedScreens`).
+- **서재**(요소 id 가 없다, Compose): 위 탭 `라이브러리`·`지금 읽는 중`·`최근 폴더`·`즐겨찾기`·`읽지 않음`·`읽음`, 아래 탭 `라이브러리`·`폴더`·`클라우드`·`노트`·`설정`. 책 칸은 누르기·길게 누르기가 되는 `View` 이고 그 안 글자가 차례로 제목·저자·형식(`이어 보기 책`·`남궁억`·`EPUB`). 표지가 없는 책은 LibreraX 가 그린 표지 안에 제목·저자·형식 글자가 한 번 더 있다(같은 칸 안, 앞쪽). `무료 도서` 줄의 칸은 글자가 없다(표지만).
+- **읽는 화면, 메뉴 있음**(책을 열면 메뉴가 떠 있다): 맨 위에 제목·저자(`이어 보기 책`·`남궁억`, PDF 는 파일 이름 `ezview_doc` 만), 아래에 서재 줄(`라이브러리`·`최근 폴더`·`즐겨찾기` 탭과 책 칸들: 서재 칸과 같은 글자라 서재로 잘못 읽지 않게 해야 한다), 쪽 `1` · `SeekBar` · `81`, `< 페이지 >`.
+- **읽는 화면, 메뉴 없음**: 아래 상태 줄만 보인다: `남은 페이지: ` `7`, 시계 `00:24`, 배터리 `100`, `1` ` / 81`(자리 맞춤용 `000` 글자가 같이 있다). PDF 는 왼쪽이 `ezview_doc`, 오른쪽 `1` ` / 5`. 제목은 없다. 본문 웹 화면은 `uiautomator dump` 에 나오지 않았지만 알림은 `WebView` 에서 온다(`WINDOW_CONTENT_CHANGED`). 상태 줄은 읽기 설정 › `상태 표시줄`(`전체 · 아래` 등)에서 바꾸거나 끌 수 있다(끈 모양은 보지 않았다). 읽기 설정 창은 따로 뜨는 창이라 그동안 맨 앞 창에는 메뉴가 없다.
+- **알림**: 칸·화면을 누르면 `TYPE_VIEW_CLICKED`(클래스 `android.widget.TextView`, 글자 없음)가 온다. 이 알림은 내용 바뀜 알림보다 늦게 와서, 서재 칸을 눌렀을 때는 화면이 이미 읽는 화면(불러오는 중)으로 넘어간 뒤다: 누른 칸으로는 책을 알 수 없다. 쪽 넘김·메뉴는 `WINDOW_CONTENT_CHANGED`.
+- **LibreraX 가 남기는 것**: 공유 저장소에 아무것도 쓰지 않았다(`/sdcard` 에 폴더·책 옆 파일 없음, 기록은 앱 전용).
+- **LibreraX 가 내주는 것**(2026-11-13, dex 를 풀어 보고 Pebble Desk 디버그 빌드에 임시 코드를 넣어 확인. 표지 받기에 쓴다: `LibreraX.recent`): 내보낸 미디어 서비스 `com.librerax.media.BookMediaService`(`android.media.browse.MediaBrowserService`, 자동차·시계용)에 `MediaBrowser` 로 붙으면(호출 앱을 가리지 않았다) 뿌리 `__root__` 아래 `__recent__`(최근 폴더)·`__favorites__`(즐겨찾기)가 있고, `__recent__` 의 항목이 최근에 연 책이다(맨 앞이 방금 연 책, 여섯 줄을 받았다): 미디어 id `book:<LibreraX 의 책 경로>`, 제목, 부제 = 저자(없으면 빈 글자), 아이콘 = 표지 주소 `content://com.librerax.covers/<숫자>`(표지를 만들지 않은 책은 없다: `이상한 나라의 앨리스`). 숫자는 책 경로 글자의 `String.hashCode()`(`<캐시>/covers/<숫자>.jpg`), 그 주소는 내보낸 `CoverProvider` 가 다른 앱에도 JPEG 로 내준다(600×900px. 표지 그림이 든 EPUB 은 그 그림, 없는 책은 LibreraX 가 그린 것·PDF 는 첫 쪽). 책 경로는 허용한 폴더의 책이면 문서 주소(`content://com.android.externalstorage.documents/tree/primary%3ABooks/document/primary%3ABooks%2Fplay_book.epub`), 다른 앱이 열어 준 책이면 LibreraX 가 자기 폴더에 베낀 사본(`/storage/emulated/0/Android/data/com.librerax/files/Books/cover-test.epub`)이다. 진행률은 내주지 않는다. `query` 에는 줄이 없다.
+- **홈에서 열기**: `ReaderActivity` 로 `file://` 를 보내면(허용한 폴더 안 파일이어도) `이 책을 더 이상 열 수 없습니다…` 가 뜬다. LibreraX 가 허용받은 폴더의 문서 주소(`content://com.android.externalstorage.documents/tree/primary%3ABooks/document/primary%3ABooks%2F<파일>`)는 읽던 곳으로 열렸다. 이 주소는 아래 미디어 서비스의 최근 책 항목(`book:<주소>`)으로 알 수 있다(조사 처음에는 몰랐다). 다른 앱이 열어 준 책은 LibreraX 폴더의 사본 경로(`/storage/emulated/0/Android/data/com.librerax/files/Books/…`)이고, 그 `file://` 로도 그 책이 열렸다(LibreraX 가 앞에 있으면 `its current task has been brought to the front` 경고가 나와도 책은 바뀐다).
+- **Pebble Desk**(`readers/LibreraX.kt`, Librera 와 코드를 나누지 않는다): 읽는 화면 = 쪽 막대(`SeekBar`, 바로 앞·뒤 형제가 글자 요소. 쪽은 숫자일 때만 진행률로)가 있는 메뉴가 보이거나, 화면 자체에 누를 수 있는 것이 하나도 없는 동안(`showsViewer`·`viewerIn`: 그 앱의 창을 모두 보아 읽기 설정 창이 떠 있어도 읽는 화면). 책 = 메뉴 맨 위 제목·저자(쪽 막대보다 위에서 가장 위의, 누를 수 있고 아래가 글자 한둘뿐인 묶음), 들어와 처음 읽은 제목의 책은 들어온 때부터. 진행률 = 메뉴의 쪽·상태 줄·리스트 보기 칸. 표지 = LibreraX 가 내주는 그림(아래. 처음에는 서재 칸의 첫 요소(표지 묶음)를 잘랐다). 탭 글자는 앱 언어마다 달라 쓰지 않는다.
+  - 에뮬 확인(디버그 빌드, `uiautomator` 없이 누르고 DB·기록으로): 리스트 보기 서재 `SHELF 5` → 넷째 칸 `다섯 번째 시험 책` 을 누르자 읽는 화면(불러오는 중) → 서재 → 읽는 화면으로 0.7~1.2초 사이 두 번 바뀐 뒤(책을 여는 사이 누를 수 있는 것이 잠깐 보인다) 메뉴 제목으로 `다섯 번째 시험 책 · 허준` 이 들어오고 표지가 붙었다. 메뉴를 닫고 두 쪽 넘기자 상태 줄 `3 / 81` 로 3%. ✕ 로 닫으면 서재, 다른 칸 `이어 보기 책` 은 읽는 화면에 들어온 때(`viewer_mark` 열림과 7ms 차이)부터 편 책으로 적혔다. Pebble Desk 를 덮어 설치해 서비스가 다시 붙은 뒤 메뉴 없는 읽는 화면으로 돌아오면 진행률만 읽고, 메뉴를 띄우자 그 책으로 맞췄다.
+  - 다른 앱처럼 열기(LibreraX 를 끝낸 뒤 별칭 `ReaderActivity` 로): 액티비티 기록은 별칭 이름(`com.librerax/.reader.ReaderActivity`)이지만 안드로이드 11 의 사용 기록에는 `ComposeMainActivity` 로 남았다. 별칭 이름으로 남는 판에 대비해 그 이름도 표시로 자르는 액티비티에 넣었다(`markedScreens`). 책은 메뉴 제목으로 들어왔다(`페블 시험 책 : 이지뷰어 편`).
+  - 표지 그림이 든 EPUB(`cover-test.epub`, 직접 만든 것. `표지 있는 시험 책 · 장영실`)을 다른 앱처럼 열자 표지 없이 들어오고(Books 폴더에 넣기만 해서는 라이브러리 탭에 뜨지 않았다. 당겨도 다시 훑지 않는다), `지금 읽는 중` 탭(리스트 보기)에서 그 칸이 보이자 책의 표지 그림이 붙었다. 리스트 보기 칸의 표지는 89×135px 로 작아 홈 맨 앞 책에서는 흐리다(그리드 보기 칸은 331×497px). 표지 그림이 없는 시험 책들은 LibreraX 가 그린 단색 표지(바탕색에 작은 제목)가 들어왔다.
+  - **표지를 LibreraX 가 내주는 것으로 바꿈**(같은 날): 위처럼 서재 칸에서 자르면 리스트 보기에서 흐리고 서재를 봐야만 붙어서, 화면에서는 자르지 않고(`capturesCovers` = false, 칸에 표지 자리를 두지 않는다) 미디어 서비스의 최근 책에서 표지 주소를 받아 읽는다(`LibreraX.recent`·`LibreraXReader.wantCovers`). 에뮬 확인: LibreraX 책 네 권의 표지 파일을 지우고 서재(`지금 읽는 중` 탭)를 열자 `cover 4/4` 로 네 권 모두 붙었고(`표지 있는 시험 책` 은 책의 표지 그림, 29KB), 한 권의 표지를 다시 지우고 그 책을 열자 편 것으로 적은 50ms 뒤 `cover 1/1` 로 붙었다. Pebble Desk 를 덮어 설치한 직후에는 편 책을 몰라(책 모름) 서재에 보이는 책으로 받는다.
+  - 주소를 받지 못한 책만 서재 칸에서 잘라 오는 것도 넣어 보았다가 뺐다: LibreraX 서재 칸의 표지와 표지 주소는 같은 캐시 파일(`covers/<hashCode>.jpg`, 서재가 없으면 만들어 둔다)이라 주소가 없는 책은 서재에도 LibreraX 가 글자로 그린 표지뿐이다(`이상한 나라의 앨리스`). 쓸모 있는 경우는 진짜 표지가 있는데 최근 책 목록에서 밀려난 책뿐이고, 그 책도 다시 열면 목록 맨 앞으로 와 표지를 받는다.
+  - **홈에서 바로 열기**(같은 날): 최근 책 항목의 경로를 책을 폈을 때 받아 `reader_watch` 설정(`book_path_com.librerax_<책 id>`)에 적고(`LibreraXReader.askRecent`, 책 파일 경로 자리 `book_file` 은 실제 파일을 전제로 쓰여 쓰지 않는다), 홈에서 `LibreraX.open` 이 그 경로를 `reader.ReaderActivity` 로 보낸다. 에뮬 확인: `이어 보기 책` 은 문서 주소, `표지 있는 시험 책` 은 사본 경로로 적혔고, LibreraX 에 다른 책을 띄워 둔 채 홈의 함께 읽는 책에서 각각 누르자 그 책이 읽던 곳에서 열렸다.
+  - 책을 여는 사이 읽는 화면 → 서재 → 읽는 화면으로 잠깐 바뀌던 것(열림·닫힘 표시가 1초쯤 사이에 세 줄): 메뉴가 먼저 뜨고 쪽 글자가 아직 숫자가 아닌 동안을 메뉴로 보지 않아서였다. 쪽 막대 양옆이 글자 요소면 숫자가 아니어도 메뉴로 보게 고친 뒤(`LibreraX.menu`) 한 번만 바뀌었다(`SCREEN … VIEWER` 한 줄).
+  - 남은 것: 스크롤 방식·2단 보기·상태 줄 위/끔(**미확인**), 실기기.
