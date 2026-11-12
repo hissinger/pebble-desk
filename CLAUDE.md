@@ -58,6 +58,7 @@ adb install -r app/build/outputs/apk/release/PebbleDesk-1.7.10-release.apk </dev
 | 파일 | 역할 |
 |---|---|
 | HomeActivity | 홈: 상단 · 책 자리(스켈레톤/한 권/여러 권) · 자주 쓰는 앱(고정 높이, 목록 3·2줄 / 격자 2·1줄) · 하단 줄(모든 앱 · 오늘 읽은 시간 · 설정) |
+| HomeStyle | 홈 모양(설정 › 화면 › 홈 모양: 기본·표지·서재, `HomePrefs.homeStyle`): 표지·서재의 배치 계산 `HomeShelf`(줄 수·표지 크기, 책 수는 넣지 않는다. 화면 없이 시험 `HomeShelfTest`), 표지 위 반납일 딱지 `DueTagView`·`dueTag`(`9일`·`오늘`·`지남`), 그림으로 고르는 창 `chooseHomeStyle`·`HomeStyleThumb`. 홈에 그리기는 HomeActivity `libraryShelf`·`coverShelf` |
 | ReadingActivity | ⑫ 독서 기록: 연속일·오늘 링, 4주 링 달력·막대그래프(각각 뷰 하나로 그림, 같은 높이), 합계, 이번 주 읽은 책 |
 | YearBooksActivity | ⑬ 올해 읽은 책(목록·격자, 해 고르기): 읽는 중·완독한 책(표지에 띠)·뺀 책, 완독·다시 읽기·기록에서 지우기 |
 | Recap / RecapImage / RecapActivity | ⑮ 월간 결산: 한 달 데이터와 배치(막대 끊기·주마다 줄 채우기·오른쪽 칸 모양 `Recap`. 책 막대·책 시간은 회차의 고친 기간 안만 `BookRecord.periodDayMs`, 합계는 실제 읽은 날 그대로), 1080×1350 그림(`RecapImage`, 표지는 `BookShelf.shareCover`), 화면(올해 읽은 책 아래 줄 오른쪽 `10월 결산 ›`, `‹ 9월 · 공유 · 11월 ›`, 그림을 누르면 크게, 공유 = 파일로 저장·다른 앱으로 보내기, 보내는 그림은 `RecapFiles` 가 내준다) |

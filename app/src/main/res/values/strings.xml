@@ -333,6 +333,13 @@
     <string name="due_days">반납 %1$d일 남음</string>
     <string name="due_today">오늘 반납</string>
     <string name="due_over">반납 기한 지남</string>
+    <string name="home_style">홈 모양</string>
+    <string name="home_style_basic">기본</string>
+    <string name="home_style_cover">표지</string>
+    <string name="home_style_library">서재</string>
+    <string name="due_tag_days">%1$d일</string>
+    <string name="due_tag_today">오늘</string>
+    <string name="due_tag_over">지남</string>
     <string name="find_cover">표지 다시 찾기</string>
     <string name="auto_books_guide">자동 추가 안내</string>
     <string name="guide_tap_hint">앱을 누르면 필요한 권한과 자동으로 들어오는 책 정보가 나옵니다.</string>

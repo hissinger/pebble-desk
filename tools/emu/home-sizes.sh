@@ -3,6 +3,7 @@
 # 맨 앞 책 진행률 줄과 함께 읽는 책 줄이 있는지 본다(DESIGN.md `홈 배치 규칙`). 디버그 빌드에서만(run-as).
 #   ANDROID_SERIAL=emulator-5556 tools/emu/home-sizes.sh <DB 파일> <결과 폴더> [맨 앞 책 진행률 글자, 기본 "64% 읽음"]
 #   하나만: ONLY_SIZE=h720 ONLY_PREF=grid-short …   글자 크기: TEXT=150(설정 › 글자 · 간격의 글자, 70~150)
+#   홈 모양: STYLE=cover|library(없으면 기본). 서재는 맨 앞 책도 진행률 글자도 없어 진행률 자리에 책 제목(`데미안`)을 넘기고, 구역 제목 `읽고 있는 책` 을 본다.
 # DB 는 맨 앞 책에 진행률을 두고(가장 빡빡한 경우: 저자·반납일·읽고 있는 앱도) 함께 읽는 책이 있게 만든다.
 # 결과 폴더에 <크기>-<설정>.png 와 summary.txt(PASS / WARN: 함께 읽는 책 줄을 뺌 / FAIL: 맨 앞 책 진행률이 빠짐), sheet-*.png(한눈에 보기, /usr/bin/python3 의 PIL).
 #   LIVE=1: 세로 크기마다 앱을 띄운 채 가로 → 세로로 돌려 찍는다(<크기>-rot-·<크기>-back-).
@@ -10,6 +11,7 @@
 set -e
 case "$ANDROID_SERIAL" in emulator-*) ;; *) echo "ANDROID_SERIAL=emulator-… 로 에뮬을 지정하세요(실기기 금지)" >&2; exit 1 ;; esac
 DB=$1; OUT=$2; PCT=${3:-64% 읽음}
+ALSO_TITLE="함께 읽는 책"; [ "$STYLE" = library ] && ALSO_TITLE="읽고 있는 책"
 [ -f "$DB" ] && [ -n "$OUT" ] || { echo "사용: $0 <DB 파일> <결과 폴더> [진행률 글자]" >&2; exit 1; }
 mkdir -p "$OUT"
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -51,7 +53,7 @@ stop_app() {
 
 # home.xml 의 세 값과 글자 크기(TEXT, 70~150, 없으면 100)를 바꾼다(앱이 꺼져 있을 때)
 set_prefs() {
-  adb shell "run-as $P sh -c 'f=$D/shared_prefs/home.xml; sed -i -e \"/name=\\\"fav_grid\\\"/d\" -e \"/name=\\\"fav_short\\\"/d\" -e \"/name=\\\"show_status_bar\\\"/d\" -e \"/name=\\\"text_scale\\\"/d\" \$f; sed -i \"s#</map>#    <boolean name=\\\"fav_grid\\\" value=\\\"$1\\\" />\\n    <boolean name=\\\"fav_short\\\" value=\\\"$2\\\" />\\n    <boolean name=\\\"show_status_bar\\\" value=\\\"$3\\\" />\\n    <int name=\\\"text_scale\\\" value=\\\"${TEXT:-100}\\\" />\\n</map>#\" \$f'" </dev/null
+  adb shell "run-as $P sh -c 'f=$D/shared_prefs/home.xml; sed -i -e \"/name=\\\"fav_grid\\\"/d\" -e \"/name=\\\"fav_short\\\"/d\" -e \"/name=\\\"show_status_bar\\\"/d\" -e \"/name=\\\"text_scale\\\"/d\" -e \"/name=\\\"home_style\\\"/d\" \$f; sed -i \"s#</map>#    <boolean name=\\\"fav_grid\\\" value=\\\"$1\\\" />\\n    <boolean name=\\\"fav_short\\\" value=\\\"$2\\\" />\\n    <boolean name=\\\"show_status_bar\\\" value=\\\"$3\\\" />\\n    <int name=\\\"text_scale\\\" value=\\\"${TEXT:-100}\\\" />\\n    <string name=\\\"home_style\\\">${STYLE:-basic}</string>\\n</map>#\" \$f'" </dev/null
 }
 
 # 지금 홈을 찍고 맨 앞 책 진행률 줄·함께 읽는 책 줄이 있는지 적는다. 진행률이 없으면 FAIL(맨 앞 책이 먼저다),
@@ -72,7 +74,7 @@ check() {
   adb exec-out screencap -p </dev/null > "$OUT/$1.png"
   local prog=no also=no res=PASS
   grep -q "text=\"$PCT\"" <<< "$xml" && prog=yes
-  grep -q 'text="함께 읽는 책"' <<< "$xml" && also=yes
+  grep -q "text=\"$ALSO_TITLE\"" <<< "$xml" && also=yes
   if [ $prog = no ]; then res=FAIL; elif [ $also = no ]; then res=WARN; fi
   echo "$res $1 진행률=$prog 함께읽는책=$also" | tee -a "$OUT/summary.txt"
 }

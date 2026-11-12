@@ -211,7 +211,7 @@ class SettingsActivity : EinkActivity() {
 
     private fun open(page: String) = startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, page))
 
-    /** 화면: 글자 · 간격, 색, 앱 아이콘, 아이콘 모양, 시계, 기기 상단 바 */
+    /** 화면: 글자 · 간격, 색, 홈 모양, 앱 아이콘, 아이콘 모양, 시계, 기기 상단 바 */
     private fun renderDisplay() {
         list.removeAllViews()
         // 글자 크기·줄 간격은 한 화면에서 슬라이더로 보며 고른다.
@@ -222,6 +222,10 @@ class SettingsActivity : EinkActivity() {
             choose(getString(R.string.color), themes.map { getString(it.label) }, themes.indexOf(prefs.palette), themes.map { it.swatch }) {
                 if (themes[it] != prefs.palette) { prefs.palette = themes[it]; recreate() }
             }
+        }
+        // 홈 모양: 기본 / 표지 / 서재(책 자리를 채우는 방법)를 그림으로 고른다. 홈으로 돌아가면 다시 그린다.
+        row(getString(R.string.home_style), getString(prefs.homeStyle.label), next = true) {
+            chooseHomeStyle(prefs.homeStyle) { prefs.homeStyle = it; renderDisplay() }
         }
         toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint), redraw = ::renderDisplay) { prefs.showIcons = it }
         iconStyleRow()
@@ -251,7 +255,8 @@ class SettingsActivity : EinkActivity() {
         row(getString(R.string.page_key_prev), keyText(prev), on = prev != 0, next = true) { askKey(false) }
         row(getString(R.string.page_key_next), keyText(next), on = next != 0, next = true) { askKey(true) }
         val any = prev != 0 || next != 0
-        val homeRows = listOf(getString(R.string.favorites), getString(R.string.also_reading))
+        // 서재 모양에서는 넘기는 책 줄이 `읽고 있는 책` 격자다
+        val homeRows = listOf(getString(R.string.favorites), getString(if (prefs.homeStyle == HomeStyle.LIBRARY) R.string.now_reading else R.string.also_reading))
         val home = if (prefs.pageKeysAlso) 1 else 0
         row(getString(R.string.page_keys_home), homeRows[home], on = any, next = true) {
             choose(getString(R.string.page_keys_home), homeRows, home) { prefs.pageKeysAlso = it == 1; renderPageKeys() }
