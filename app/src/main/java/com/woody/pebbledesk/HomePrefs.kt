@@ -163,6 +163,11 @@ class HomePrefs(context: Context) {
         get() = sp.getBoolean("fav_short", false)
         set(v) = sp.edit().putBoolean("fav_short", v).apply()
 
+    /** 홈 모양(설정 › 화면): 기본 · 표지 · 서재. 처음은 기본(1.7.10 까지의 홈). */
+    var homeStyle: HomeStyle
+        get() = HomeStyle.of(sp.getString("home_style", null))
+        set(v) = sp.edit().putString("home_style", v.key).apply()
+
     /** 독서 기록의 4주를 날마다 막대그래프로. false 면 링 달력 */
     var readingGraph: Boolean
         get() = sp.getBoolean("reading_graph", false)
