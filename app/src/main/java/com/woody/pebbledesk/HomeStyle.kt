@@ -38,17 +38,22 @@ data class CoverShelf(val mainH: Int, val cols: Int, val rows: Int, val alsoW: I
  */
 object HomeShelf {
     /**
-     * 기본 모양 아래 글자(큰 표지) 함께 읽는 책: [coversH] 는 두 표지가 나눌 높이(테두리 빼고). 함께 읽는 책 표지를 [alsoMinW] 로 먼저 두고
-     * 남는 높이를 맨 앞 책에(상한 [mainMaxW] 까지). 맨 앞 책이 상한이면 남는 높이를 함께 읽는 책 표지에(칸 폭 [cellW] 까지, 맨 앞 책 글자 몫
-     * [mainNeedH] 는 남긴다). 맨 앞 책 표지 높이가 [mainNeedH](가장 긴 글자가 드는 높이)보다 작으면 null(다음 모양으로). 결과는 (맨 앞 책 폭, 함께 읽는 책 폭).
+     * 기본 모양 아래 글자(큰 표지) 함께 읽는 책: [coversH] 는 두 표지가 나눌 높이(테두리 빼고). 두 표지를 1 : [BIG_ALSO_RATIO] 로 나누되
+     * 함께 읽는 책은 [alsoMinW] 이상(칸 폭 [cellW] 까지), 맨 앞 책은 [mainNeedH](가장 긴 글자가 드는 높이) 이상·상한 [mainMaxW] 까지.
+     * 함께 읽는 책 [alsoMinW] 를 두면 맨 앞 책이 [mainNeedH] 보다 작아지면 null(다음 모양으로). 맨 앞 책이 상한이면 남는 높이를 함께 읽는 책에
+     * (맨 앞 책 글자 몫은 남긴다). 결과는 (맨 앞 책 폭, 함께 읽는 책 폭).
      */
     fun bigAlso(coversH: Int, mainNeedH: Int, alsoMinW: Int, mainMaxW: Int, cellW: Int): Pair<Int, Int>? {
-        val mainH = coversH - alsoMinW * 3 / 2
-        if (mainH < mainNeedH) return null
-        val mainW = minOf(mainMaxW, mainH * 2 / 3)
-        val alsoW = if (mainW < mainMaxW) alsoMinW else minOf(cellW, maxOf(alsoMinW, (coversH - maxOf(mainW * 3 / 2, mainNeedH)) * 2 / 3))
+        if (coversH - alsoMinW * 3 / 2 < mainNeedH) return null
+        val ratioMainH = maxOf((coversH / (1 + BIG_ALSO_RATIO)).toInt(), mainNeedH)
+        var alsoW = minOf(cellW, maxOf(alsoMinW, (coversH - ratioMainH) * 2 / 3))
+        val mainW = minOf(mainMaxW, (coversH - alsoW * 3 / 2) * 2 / 3)
+        if (mainW == mainMaxW) alsoW = minOf(cellW, maxOf(alsoW, (coversH - maxOf(mainW * 3 / 2, mainNeedH)) * 2 / 3))
         return mainW to alsoW
     }
+
+    /** 기본 모양 큰 표지: 함께 읽는 책 표지 ÷ 맨 앞 책 표지(흑백에서 크기로 맨 앞 책을 드러낸다. 0.6·0.618·0.667 과 비교, `design-review/also-ratio/`) */
+    const val BIG_ALSO_RATIO = 0.5f
 
     /** 기본 모양 옆 글자·글자만 함께 읽는 책: 맨 앞 책이 쓸 높이 [left] 가 [mainNeedH] 보다 작으면 null, 아니면 맨 앞 책 폭(상한 [mainMaxW] 까지) */
     fun sideMain(left: Int, mainNeedH: Int, mainMaxW: Int): Int? = if (left < mainNeedH) null else minOf(mainMaxW, left * 2 / 3)
