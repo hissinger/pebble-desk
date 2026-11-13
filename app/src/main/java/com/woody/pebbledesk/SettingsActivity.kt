@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.format.DateFormat
 import android.text.format.Formatter
 import android.view.Gravity
 import android.view.KeyEvent
@@ -17,6 +18,7 @@ import com.woody.pebbledesk.readers.BookFiles
 import java.text.Collator
 import java.time.DayOfWeek
 import java.time.format.TextStyle
+import java.util.Date
 import kotlin.math.roundToInt
 
 /** ⑧ 설정. 회색 소제목으로 묶고 값은 오른쪽에 같은 굵기로 쓴다. 켜짐은 검정, 꺼짐은 진회색, `›` 는 다음 화면. */
@@ -196,6 +198,14 @@ class SettingsActivity : EinkActivity() {
             // 누르면 잠시 뒤 다시 해 보라고 알리고, 뒤에서 다시 확인해 둔다.
             Update.State.Failed -> row(label, getString(R.string.update_no_response), on = false, last = true, into = slot) {
                 Sheet(this).header(getString(R.string.update_server_title), getString(R.string.update_server_desc)).show()
+                Update.check(this)
+            }
+            // GitHub API 요청 한도가 찼다: 누르면 언제 다시 되는지 알리고, 뒤에서 다시 확인해 둔다.
+            is Update.State.Limited -> row(label, getString(R.string.update_limited), on = false, last = true, into = slot) {
+                val desc = if (s.until > System.currentTimeMillis()) {
+                    getString(R.string.update_limited_desc, DateFormat.getTimeFormat(this).format(Date(s.until)))
+                } else getString(R.string.update_server_desc)
+                Sheet(this).header(getString(R.string.update_limited), desc).show()
                 Update.check(this)
             }
         }
