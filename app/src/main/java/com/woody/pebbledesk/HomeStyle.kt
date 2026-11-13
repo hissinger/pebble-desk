@@ -55,6 +55,12 @@ object HomeShelf {
     /** 기본 모양 큰 표지: 함께 읽는 책 표지 ÷ 맨 앞 책 표지(흑백에서 크기로 맨 앞 책을 드러낸다. 0.6·0.618·0.667 과 비교, `design-review/also-ratio/`) */
     const val BIG_ALSO_RATIO = 0.5f
 
+    /**
+     * 맨 앞 책 아래 구역 제목의 위 여백(dp): 컬러 색면이 [fieldBottomDp] 만큼 내려와 있으면 그만큼 줄이되 색면 아래 [minGapDp] 는 남긴다.
+     * 흑백(색면 없음, 0)이면 [topDp] 그대로.
+     */
+    fun belowField(topDp: Int, fieldBottomDp: Int, minGapDp: Int): Int = if (fieldBottomDp == 0) topDp else maxOf(topDp - fieldBottomDp, minGapDp)
+
     /** 기본 모양 옆 글자·글자만 함께 읽는 책: 맨 앞 책이 쓸 높이 [left] 가 [mainNeedH] 보다 작으면 null, 아니면 맨 앞 책 폭(상한 [mainMaxW] 까지) */
     fun sideMain(left: Int, mainNeedH: Int, mainMaxW: Int): Int? = if (left < mainNeedH) null else minOf(mainMaxW, left * 2 / 3)
 
