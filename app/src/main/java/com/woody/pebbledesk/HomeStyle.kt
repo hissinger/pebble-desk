@@ -38,6 +38,22 @@ data class CoverShelf(val mainH: Int, val cols: Int, val rows: Int, val alsoW: I
  */
 object HomeShelf {
     /**
+     * 기본 모양 아래 글자(큰 표지) 함께 읽는 책: [coversH] 는 두 표지가 나눌 높이(테두리 빼고). 함께 읽는 책 표지를 [alsoMinW] 로 먼저 두고
+     * 남는 높이를 맨 앞 책에(상한 [mainMaxW] 까지). 맨 앞 책이 상한이면 남는 높이를 함께 읽는 책 표지에(칸 폭 [cellW] 까지, 맨 앞 책 글자 몫
+     * [mainNeedH] 는 남긴다). 맨 앞 책 표지 높이가 [mainNeedH](가장 긴 글자가 드는 높이)보다 작으면 null(다음 모양으로). 결과는 (맨 앞 책 폭, 함께 읽는 책 폭).
+     */
+    fun bigAlso(coversH: Int, mainNeedH: Int, alsoMinW: Int, mainMaxW: Int, cellW: Int): Pair<Int, Int>? {
+        val mainH = coversH - alsoMinW * 3 / 2
+        if (mainH < mainNeedH) return null
+        val mainW = minOf(mainMaxW, mainH * 2 / 3)
+        val alsoW = if (mainW < mainMaxW) alsoMinW else minOf(cellW, maxOf(alsoMinW, (coversH - maxOf(mainW * 3 / 2, mainNeedH)) * 2 / 3))
+        return mainW to alsoW
+    }
+
+    /** 기본 모양 옆 글자·글자만 함께 읽는 책: 맨 앞 책이 쓸 높이 [left] 가 [mainNeedH] 보다 작으면 null, 아니면 맨 앞 책 폭(상한 [mainMaxW] 까지) */
+    fun sideMain(left: Int, mainNeedH: Int, mainMaxW: Int): Int? = if (left < mainNeedH) null else minOf(mainMaxW, left * 2 / 3)
+
+    /**
      * 서재 세로: [cols] 열, 줄 수는 표지 넓이의 합이 가장 큰 것. 표지가 상한([capW])에 막혀 아래가 한 줄의 [EXTRA_ROW] 넘게 남고
      * 한 줄 더 둬도 표지가 [minW] 이상이면 한 줄 더 둔다.
      * [room] 은 격자 높이, [textH] 는 표지 아래 글자(제목·진행률) 높이, [rowGap] 은 줄 사이, [cellW] 는 칸 폭(표지가 넘지 않는다).
@@ -111,8 +127,8 @@ object HomeShelf {
 }
 
 /**
- * 표지 위 반납일 딱지 글자(서재·표지 모양): `9일` · `오늘` · `지남`. 반납일을 모르면 null.
- * 표지 옆·아래 글자 줄의 반납일([bookStatus])은 `반납 9일 남음` 그대로다.
+ * 표지 위 반납일 딱지 글자(서재·표지 모양, 기본 모양의 함께 읽는 책): `9일` · `오늘` · `지남`. 반납일을 모르면 null.
+ * 기본 모양 맨 앞 책과 목록·상세의 반납일([bookStatus])은 `반납 9일 남음` 그대로다.
  */
 fun Context.dueTag(book: ShelfBook, today: LocalDate = LocalDate.now()): String? {
     if (book.due < 0) return null
