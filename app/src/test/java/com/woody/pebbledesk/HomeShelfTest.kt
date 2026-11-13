@@ -12,7 +12,7 @@ import org.robolectric.annotation.Config
 import java.time.LocalDate
 
 /**
- * 홈 모양(표지·서재)의 배치 계산([HomeShelf])과 표지 위 반납일 딱지 글자([dueTag]). 길이는 1dp = 1px 로 넣는다(페블 572×777dp 기준).
+ * 홈 모양(표지·서재, 기본 모양의 함께 읽는 책 크기)의 배치 계산([HomeShelf])과 표지 위 반납일 딱지 글자([dueTag]). 길이는 1dp = 1px 로 넣는다(페블 572×777dp 기준).
  * 책 수는 넣지 않는다: 책이 몇 권이든 표지 크기가 같다.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -21,6 +21,27 @@ class HomeShelfTest {
     private fun library(room: Int) = HomeShelf.library(room, textH = 46, rowGap = 8, cellW = 156, capW = 156, minW = 80, cols = 3)
     private fun cover(room: Int, mainCap: Int = 411, mainMin: Int = 186) =
         HomeShelf.cover(room, rowExtra = 16, rowGap = 10, cols = 4, alsoCapW = 116, alsoMinW = 40, mainFullH = 270, mainMinH = mainMin, mainCapH = mainCap)
+
+    // 기본 모양 함께 읽는 책(큰 표지 60dp 먼저, 남는 높이는 맨 앞 책). 맨 앞 책 상한 180, 칸 폭 156
+    private fun big(coversH: Int, need: Int, mainMax: Int = 180) = HomeShelf.bigAlso(coversH, need, alsoMinW = 60, mainMaxW = mainMax, cellW = 156)
+
+    @Test fun `기본 - 함께 읽는 책 60dp 를 두고 맨 앞 책이 최소보다 작으면 큰 표지를 쓰지 않는다`() = assertNull(big(need = 208, coversH = 208 + 89))
+
+    @Test fun `기본 - 딱 들면 맨 앞 책은 최소, 함께 읽는 책은 60dp`() = assertEquals(138 to 60, big(need = 208, coversH = 208 + 90))
+
+    @Test fun `기본 - 남는 높이는 맨 앞 책에, 함께 읽는 책은 60dp 그대로`() = assertEquals(150 to 60, big(need = 200, coversH = 225 + 90))
+
+    @Test fun `기본 - 맨 앞 책이 상한이면 나머지는 함께 읽는 책에`() = assertEquals(180 to 86, big(need = 200, coversH = 400))
+
+    @Test fun `기본 - 바형처럼 넉넉하면 함께 읽는 책은 칸 폭까지`() = assertEquals(230 to 156, big(need = 220, coversH = 645, mainMax = 230))
+
+    @Test fun `기본 - 맨 앞 책 글자가 상한 표지보다 높으면 그 몫을 남긴다`() = assertEquals(180 to 66, big(need = 300, coversH = 400))
+
+    @Test fun `기본 - 옆 글자 맨 앞 책`() {
+        assertNull(HomeShelf.sideMain(left = 150, mainNeedH = 151, mainMaxW = 180))
+        assertEquals(160, HomeShelf.sideMain(left = 240, mainNeedH = 200, mainMaxW = 180))
+        assertEquals(180, HomeShelf.sideMain(left = 300, mainNeedH = 200, mainMaxW = 180))
+    }
 
     @Test fun `서재 - 페블 격자 1줄은 두 줄`() = assertEquals(LibraryGrid(3, 2, 118), library(456))
 
