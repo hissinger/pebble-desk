@@ -13,7 +13,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * LibreraX(1.2.87): 서재 리스트·그리드 보기 칸(Compose, 요소 이름 없음), 읽는 화면의 메뉴(제목·저자·쪽 막대)와 상태 줄, 읽는 화면 가리기,
+ * LibreraX(1.2.87·1.2.90): 서재 리스트·그리드 보기 칸(Compose, 요소 이름 없음), 읽는 화면의 메뉴(제목·저자·쪽 막대)와 상태 줄, 읽는 화면 가리기,
  * 미디어 서비스의 최근 책에서 표지 주소 고르기.
  * 화면은 크레마 페블 Play 에뮬레이터(1072×1456)에서 본 모양 그대로
  */
@@ -210,6 +210,36 @@ class LibreraXTest {
     @Test fun `읽기 설정 창이 메뉴 위에 떠 있어도 읽는 화면이다`() {
         val dialog = node("android.view.ViewGroup", Rect(75, 312, 997, 1188), null, false, false, text(102, 337, 877, 394, "설정"), button(880, 320, 990, 410))
         assertTrue(LibreraX.viewerIn(windows(dialog, menu("3", "81", "이어 보기 책", "남궁억"))))
+    }
+
+    /**
+     * TTS 창(1.2.90, 화면 전체를 덮는 따로 뜬 창): 머리 `TTS`·단추, 넘기는 줄 안에 이름 · 값 줄(`Engine` · 엔진 이름, `Voice` · 언어)과 속도.
+     * [slider] 면 속도가 막대(앞뒤가 글자인 `SeekBar`, 판에 따라 그럴 수 있는 모양)
+     */
+    private fun tts(slider: Boolean = false) = node(
+        "android.widget.FrameLayout", Rect(0, 45, 1072, 1455), null, false, false,
+        view(76, 313, 997, 1188,
+            view(76, 313, 997, 418, text(102, 342, 667, 389, "TTS"), button(900, 321, 990, 411)),
+            node("android.widget.ScrollView", Rect(76, 418, 997, 1188), null, false, false,
+                view(99, 441, 974, 966,
+                    button(99, 434, 974, 516, text(129, 456, 207, 501, "Engine"), text(230, 456, 462, 501, "Google TTS engine")),
+                    button(99, 516, 974, 636, text(129, 554, 207, 599, "Voice"), text(230, 531, 318, 576, "English")),
+                    *(if (slider) arrayOf(text(129, 657, 207, 702, "Speed"), node("android.widget.SeekBar", Rect(230, 657, 792, 702)), text(800, 657, 860, 702, "1.0"))
+                    else arrayOf(text(129, 657, 207, 702, "Speed"), text(230, 657, 792, 702, "1.0"))),
+                ),
+            ),
+        ),
+    )
+
+    @Test fun `TTS 창의 엔진 줄은 책 제목이 아니다`() {
+        // 메뉴 위에 떠도 제목은 메뉴의 책
+        assertEquals("이어 보기 책", LibreraX.readViewer(windows(tts(), menu("3", "81", "이어 보기 책", "남궁억"))).title)
+        assertEquals("이어 보기 책", LibreraX.readViewer(windows(tts(slider = true), menu("3", "81", "이어 보기 책", "남궁억"))).title)
+        // TTS 창만 보이고 그 안에 막대가 있어도 `Engine` 을 제목으로 읽지 않는다
+        val alone = LibreraX.readViewer(windows(tts(slider = true)))
+        assertNull(alone.title)
+        assertEquals(-1, alone.progress)
+        assertNull(LibreraX.readViewer(windows(tts())).title)
     }
 
     @Test fun `서재 위에 누를 것 없는 창이 떠도 읽는 화면이 아니다`() {
