@@ -828,8 +828,8 @@ class HomeActivity : EinkActivity() {
                     repeat(ALSO_PER_PAGE - shown.size) { addView(View(context), lp(0, 1, 1f).apply { marginStart = dp(GAP_DP) }) }
                 }
                 fun alsoRow(coverW: Int, shown: List<ShelfBook>, measureOnly: Boolean = false) = vbox().apply {
-                    // 컬러면 맨 앞 책 색면이 그만큼 아래로 내려와 있어 위 여백을 줄인다(줄 높이는 같게).
-                    val (header, pageText) = pagedHeader(getString(R.string.also_reading), alsoLevel.headerTopDp - fieldBottom) { alsoPaged }
+                    // 컬러면 맨 앞 책 색면이 그만큼 아래로 내려와 있어 위 여백을 줄인다(색면 아래 [FIELD_GAP_DP] 는 남긴다, [belowFieldDp]).
+                    val (header, pageText) = pagedHeader(getString(R.string.also_reading), belowFieldDp(alsoLevel.headerTopDp)) { alsoPaged }
                     if (!measureOnly) pageText.text = pageLabel(alsoPaged)
                     addView(header)
                     addView(hline(1))
@@ -1075,7 +1075,7 @@ class HomeActivity : EinkActivity() {
         // 맨 앞 책 표지 폭 상한: 세로는 옆 글자 칸을 [COVER_INFO_MIN_DP] 남기는 폭, 가로는 기본 모양과 같다
         val mainCapW = if (wide) mainMaxW() else inner - dp(24) - dp(COVER_INFO_MIN_DP) - dp(2)
         // 구역 제목 줄(컬러면 맨 앞 책 색면 아래 여백만큼 위 여백을 줄인다: [mainLevel] 에 따라 달라진다)
-        fun header() = pagedHeader(getString(R.string.also_reading), COVER_TITLE_TOP_DP - fieldBottom) { alsoPaged }
+        fun header() = pagedHeader(getString(R.string.also_reading), belowFieldDp(COVER_TITLE_TOP_DP)) { alsoPaged }
         // 두 표지와 줄들이 나눌 높이
         fun room() = heroHeight - dp(heroPad) - dp(2) - dp(fieldBottom) - header().first.layoutParams.height - dp(1) - dp(SHELF_CELL_TOP_DP) - padBottom
         fun shelf() = room().let { room ->
@@ -1149,6 +1149,12 @@ class HomeActivity : EinkActivity() {
 
     /** 컬러면 맨 앞 책 자리를 칠하는 색면의 아래 여백(dp). 흑백이면 0. */
     private val fieldBottom get() = if (Palette.current.color) heroPad else 0
+
+    /**
+     * 맨 앞 책 아래 구역 제목(함께 읽는 책)의 위 여백(dp): 컬러면 색면이 [fieldBottom] 만큼 내려와 있어 그만큼 줄이되(줄 높이는 같게),
+     * 색면 아래에 [FIELD_GAP_DP] 는 남긴다(간격을 줄인 모양·표지 모양에서 제목이 색면에 붙었다).
+     */
+    private fun belowFieldDp(topDp: Int) = HomeShelf.belowField(topDp, fieldBottom, FIELD_GAP_DP)
 
     /** 맨 앞 책 자리(표지·제목): 컬러면 테마 색면([Palette.field])을 칠하고 아래로 [fieldBottom] 만큼 넓힌다. */
     private fun View.heroField() {
@@ -1384,7 +1390,7 @@ class HomeActivity : EinkActivity() {
         private val MAIN_MIN = MainLevel(4, 4, 0, 8, 6, 4)
 
         /**
-         * 함께 읽는 책 줄의 모양: 아래 글자([big]) / 옆 글자 / 글자만([textOnly]), 구역 제목 위 여백(컬러면 맨 앞 책 색면 아래 여백을 뺀다),
+         * 함께 읽는 책 줄의 모양: 아래 글자([big]) / 옆 글자 / 글자만([textOnly]), 구역 제목 위 여백(컬러면 맨 앞 책 색면 아래 여백을 빼되 [FIELD_GAP_DP] 는 남긴다, [belowFieldDp]),
          * 선 아래 → 칸 위 여백, 줄 아래 여백(null 이면 [HERO_PAD_BOTTOM_DP], 낮춤이면 [SHORT_PAD_BOTTOM_DP], 값이 있으면 그것과 둘 중 작은 것),
          * 책 제목 줄 수, 아래 글자 모양의 표지 → 제목 간격.
          */
@@ -1470,6 +1476,8 @@ class HomeActivity : EinkActivity() {
         /** 세로 홈 자주 쓰는 앱 목록 줄 수(낮게면 한 줄 적게) */
         fun favListRows(short: Boolean) = if (short) FAV_ROWS - 1 else FAV_ROWS
         /** 세로 홈 자주 쓰는 앱 격자 줄 수(낮게면 한 줄, 줄 높이는 그대로) */
+        /** 컬러 색면 아래 → 구역 제목 가장 작은 여백([belowFieldDp]) */
+        private const val FIELD_GAP_DP = 10
         fun favGridRows(short: Boolean) = if (short) GRID_ROWS - 1 else GRID_ROWS
 
         /** 자주 쓰는 앱 격자: 4칸 × 2줄(목록과 같은 높이 안에), 아이콘 최대 크기 */

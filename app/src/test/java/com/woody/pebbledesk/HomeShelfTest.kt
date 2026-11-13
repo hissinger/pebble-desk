@@ -39,6 +39,14 @@ class HomeShelfTest {
 
     @Test fun `기본 - 맨 앞 책 글자가 상한 표지보다 높으면 그 몫을 남긴다`() = assertEquals(180 to 66, big(need = 300, coversH = 400))
 
+    @Test fun `색면 아래 구역 제목 여백 - 흑백은 그대로, 컬러는 색면만큼 줄이되 10dp 는 남긴다`() {
+        assertEquals(28, HomeShelf.belowField(28, 0, 10))
+        assertEquals(8, HomeShelf.belowField(8, 0, 10))
+        assertEquals(20, HomeShelf.belowField(28, 8, 10))
+        assertEquals(10, HomeShelf.belowField(14, 8, 10))
+        assertEquals(10, HomeShelf.belowField(8, 4, 10))
+    }
+
     @Test fun `기본 - 옆 글자 맨 앞 책`() {
         assertNull(HomeShelf.sideMain(left = 150, mainNeedH = 151, mainMaxW = 180))
         assertEquals(160, HomeShelf.sideMain(left = 240, mainNeedH = 200, mainMaxW = 180))
