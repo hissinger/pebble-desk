@@ -19,7 +19,7 @@ import com.woody.pebbledesk.Seen
 import com.woody.pebbledesk.hasTitle
 
 /**
- * LibreraX(Librera 개발자가 새로 만든 내 파일 리더, 1.2.87. [Librera] 와 패키지·화면·기록이 모두 달라 코드를 나누지 않는다).
+ * LibreraX(Librera 개발자가 새로 만든 내 파일 리더, 1.2.87·1.2.90. [Librera] 와 패키지·화면·기록이 모두 달라 코드를 나누지 않는다).
  * 액티비티가 `ComposeMainActivity` 하나이고(다른 앱이 책을 열 때의 `reader.ReaderActivity` 는 그 별칭) 서재·읽는 화면이 모두 Compose 라 요소 이름이 없다.
  * 책을 열고 닫아도 화면 바뀜 알림은 없고 내용 바뀜만 온다(Libby·부커스 2.0 과 같다). 탭·단추 글자는 앱 언어마다 달라 글자가 아니라 모양으로 가린다.
  * 서재(리스트·2열·그리드 보기)의 칸: 누르기·길게 누르기가 되는 묶음 바로 아래에 표지 묶음, 제목, 저자(책 정보가 없으면 폴더 `[Download]`),
@@ -113,10 +113,15 @@ object LibreraX : ReaderApp(
         return windows.active?.let(::shelfCells)?.firstOrNull { it.cell == at }
     }
 
-    /** 읽는 화면: 메뉴가 보이면 제목·저자와 쪽 막대 양옆의 쪽, 없으면 상태 줄의 쪽(`1` ` / 81`) */
+    /**
+     * 읽는 화면: 메뉴가 보이면 제목·저자와 쪽 막대 양옆의 쪽, 없으면 상태 줄의 쪽(`1` ` / 81`).
+     * 제목은 메뉴가 있는 창에서만 찾고(위에 뜬 TTS 창의 `엔진`(`Engine`) 줄을 책 제목으로 읽었다), 쪽 막대가 있는 창이 여럿이면 제목이 있는 창,
+     * 없으면 쪽이 숫자인 창을 쓴다
+     */
     override fun readViewer(windows: AppWindows): ViewerInfo {
-        windows.all.firstNotNullOfOrNull(::menu)?.let { m ->
-            val (title, author) = menuTitle(windows.all, m.bar) ?: (null to "")
+        val menus = windows.all.mapNotNull { w -> menu(w)?.let { m -> m to menuTitle(w, m.bar) } }
+        (menus.firstOrNull { it.second != null } ?: menus.firstOrNull { it.first.page != null } ?: menus.firstOrNull())?.let { (m, found) ->
+            val (title, author) = found ?: (null to "")
             return ViewerInfo(title, author, pagePercent(m.page, m.total, roundUp = false))
         }
         return ViewerInfo(null, "", windows.all.firstNotNullOfOrNull { statusPages(it).takeIf { p -> p >= 0 } } ?: -1)
@@ -151,19 +156,19 @@ object LibreraX : ReaderApp(
     }
 
     /**
-     * 메뉴 맨 위의 제목·저자: 누를 수 있고 아래가 글자 하나(제목)나 둘(제목·저자)뿐인 묶음 가운데 쪽 막대 [bar] 보다 위에서 가장 위의 것.
-     * 서재 줄의 탭(옆으로 넘기는 줄 안)은 뺀다. 저자 자리의 폴더(`[Download]`)는 저자가 아니다
+     * 메뉴 맨 위의 제목·저자: 메뉴가 있는 창 [root] 에서 누를 수 있고 아래가 글자 하나(제목)나 둘(제목·저자)뿐인 묶음 가운데 쪽 막대 [bar] 보다 위에서 가장 위의 것.
+     * 넘기는 줄 안(서재 줄의 탭, 설정·TTS 창의 `엔진`·`음성` 같은 이름 · 값 줄)은 뺀다. 저자 자리의 폴더(`[Download]`)는 저자가 아니다
      */
-    private fun menuTitle(roots: List<AccessibilityNodeInfo>, bar: Rect): Pair<String, String>? {
+    private fun menuTitle(root: AccessibilityNodeInfo, bar: Rect): Pair<String, String>? {
         var best: AccessibilityNodeInfo? = null
         fun walk(n: AccessibilityNodeInfo, depth: Int) {
-            if (n.className?.endsWith("HorizontalScrollView") == true) return
+            if (n.className?.endsWith("ScrollView") == true) return
             val kids = n.kids()
             if (n.isClickable && kids.size in 1..2 && kids.all { it.label() != null } && n.bounds().bottom <= bar.top &&
                 (best == null || n.bounds().top < best!!.bounds().top)) best = n
             if (depth < DEEP_WALK_DEPTH) for (k in kids) walk(k, depth + 1)
         }
-        roots.forEach { walk(it, 0) }
+        walk(root, 0)
         val texts = best?.kids()?.mapNotNull { it.label() } ?: return null
         return texts[0] to texts.getOrNull(1)?.takeUnless(FOLDER::matches).orEmpty()
     }
@@ -271,7 +276,8 @@ object LibreraX : ReaderApp(
  * 책은 메뉴 제목으로 안다: 칸을 누른 알림은 화면이 읽는 화면으로 넘어간 뒤에 와서(그때는 서재가 아니다) 누른 칸으로는 알 수 없다.
  * 메뉴는 책이 다 열린 뒤에 보이므로, 읽는 화면에 들어와 처음 읽은 제목의 책은 들어온 때부터 편 것으로 적는다.
  * 표지는 화면에서 자르지 않고 LibreraX 가 내주는 그림을 받는다([LibreraX.recent]): 표지가 없는 책이면, 편 책은 폈을 때·읽는 화면이 잠잠해질 때, 서재에 보이는 책은 서재가 멈출 때.
- * 같은 목록에서 홈에서 열 책의 경로도 적는다: 책을 폈을 때는 늘(다른 파일로 같은 제목을 열었을 수 있다), 읽는 화면에서는 경로를 모르는 편 책만
+ * 같은 목록에서 홈에서 열 책의 경로도 적는다: 책을 폈을 때는 늘(다른 파일로 같은 제목을 열었을 수 있다), 읽는 화면·서재에서는 경로를 모르는 책만
+ * (폈을 때 최근 책에 아직 없었거나 서비스가 꺼진 동안 연 책. 경로를 모르면 홈에서 책이 아니라 앱이 열린다)
  */
 private class LibreraXReader(app: ReaderApp) : ScreenReader(app) {
     /** 읽는 화면에 새로 들어온 때. 그 뒤 처음 제목을 읽으면 지운다(읽는 화면 안에서 책을 바꾼 것은 제목이 바뀐 때부터) */
@@ -281,7 +287,7 @@ private class LibreraXReader(app: ReaderApp) : ScreenReader(app) {
     private var coverBusy = false
     /** 받는 중에 편 책: 끝나면 그 책의 경로를 받으러 한 번 더 묻는다 */
     private var pendingOpened: ShelfBook? = null
-    /** 책(id)마다 경로를 받아 본 횟수(편 책 기록의 책이 최근 책에 없을 때 [TRIES] 번까지) */
+    /** 책(id)마다 경로를 받아 본 횟수(경로를 모르는 책이 최근 책에 없을 때 [TRIES] 번까지) */
     private val pathTries = mutableMapOf<String, Int>()
 
     override fun screenName(ctx: AppContext, activity: String?): String? {
@@ -311,13 +317,10 @@ private class LibreraXReader(app: ReaderApp) : ScreenReader(app) {
             return
         }
         recordShown(ctx, shown)
-        val book = ctx.recorder.recordedBook(ctx.pkg)
-        val needPath = book?.takeIf { LibreraX.bookPath(ctx.context, it.id) == null && (pathTries[it.id] ?: 0) < TRIES }
-        needPath?.let { pathTries[it.id] = (pathTries[it.id] ?: 0) + 1 }
-        askRecent(ctx, listOfNotNull(book), needPath)
+        askRecent(ctx, listOfNotNull(ctx.recorder.recordedBook(ctx.pkg)), null)
     }
 
-    /** 서재가 멈췄다: 바탕대로 읽고, 보이는 칸 가운데 이 앱으로 넣은 책에 표지가 없으면 받는다 */
+    /** 서재가 멈췄다: 바탕대로 읽고, 보이는 칸 가운데 이 앱으로 넣은 책에 표지나 경로가 없으면 받는다 */
     override fun onShelf(ctx: AppContext) {
         super.onShelf(ctx)
         val lookup = ctx.recorder.lookup
@@ -332,7 +335,7 @@ private class LibreraXReader(app: ReaderApp) : ScreenReader(app) {
     override fun capturesCovers(ctx: AppContext): Boolean = false
 
     /**
-     * LibreraX 의 최근 책을 받아 [books] 가운데 표지가 없는 책의 표지를 붙이고, [opened](편 책) 의 경로를 적는다. 한 번에 하나씩 묻는다:
+     * LibreraX 의 최근 책을 받아 [books] 가운데 표지가 없는 책의 표지를 붙이고, 경로를 모르는 책과 [opened](편 책) 의 경로를 적는다. 한 번에 하나씩 묻는다:
      * 받는 중이면 편 책만 기억해 두었다가 끝난 뒤 다시 묻는다
      */
     private fun askRecent(ctx: AppContext, books: List<ShelfBook>, opened: ShelfBook?) {
@@ -341,12 +344,15 @@ private class LibreraXReader(app: ReaderApp) : ScreenReader(app) {
             return
         }
         val lookup = ctx.recorder.lookup
-        val need = books.distinctBy { it.id }.filter { !lookup.hasCover(it.id) && (coverTries[it.id] ?: 0) < TRIES }
-        if (need.isEmpty() && opened == null) return
+        val all = books.distinctBy { it.id }
+        val need = all.filter { !lookup.hasCover(it.id) && (coverTries[it.id] ?: 0) < TRIES }
+        val needPath = all.filter { it.id != opened?.id && LibreraX.bookPath(ctx.context, it.id) == null && (pathTries[it.id] ?: 0) < TRIES }
+        if (need.isEmpty() && needPath.isEmpty() && opened == null) return
         need.forEach { coverTries[it.id] = (coverTries[it.id] ?: 0) + 1 }
+        needPath.forEach { pathTries[it.id] = (pathTries[it.id] ?: 0) + 1 }
         coverBusy = true
         LibreraX.recent(ctx.context) { items ->
-            opened?.let { b -> LibreraX.recentFor(items, b)?.let { LibreraX.saveBookPath(ctx.prefs, b.id, it.path) } }
+            for (b in listOfNotNull(opened) + needPath) LibreraX.recentFor(items, b)?.let { LibreraX.saveBookPath(ctx.prefs, b.id, it.path) }
             val found = need.mapNotNull { b -> LibreraX.recentFor(items, b)?.cover?.let { b to it } }
             if (found.isEmpty()) {
                 if (need.isNotEmpty()) ctx.log(WatchLog.Kind.NOTE, "cover", if (items.isEmpty()) "no list" else "none")
