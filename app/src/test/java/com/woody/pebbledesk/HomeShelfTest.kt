@@ -22,16 +22,18 @@ class HomeShelfTest {
     private fun cover(room: Int, mainCap: Int = 411, mainMin: Int = 186) =
         HomeShelf.cover(room, rowExtra = 16, rowGap = 10, cols = 4, alsoCapW = 116, alsoMinW = 40, mainFullH = 270, mainMinH = mainMin, mainCapH = mainCap)
 
-    // 기본 모양 함께 읽는 책(큰 표지 60dp 먼저, 남는 높이는 맨 앞 책). 맨 앞 책 상한 180, 칸 폭 156
+    // 기본 모양 함께 읽는 책(큰 표지): 두 표지를 2 : 1 로, 함께 읽는 책 60dp 이상·맨 앞 책 최소 이상. 맨 앞 책 상한 180, 칸 폭 156
     private fun big(coversH: Int, need: Int, mainMax: Int = 180) = HomeShelf.bigAlso(coversH, need, alsoMinW = 60, mainMaxW = mainMax, cellW = 156)
 
     @Test fun `기본 - 함께 읽는 책 60dp 를 두고 맨 앞 책이 최소보다 작으면 큰 표지를 쓰지 않는다`() = assertNull(big(need = 208, coversH = 208 + 89))
 
     @Test fun `기본 - 딱 들면 맨 앞 책은 최소, 함께 읽는 책은 60dp`() = assertEquals(138 to 60, big(need = 208, coversH = 208 + 90))
 
-    @Test fun `기본 - 남는 높이는 맨 앞 책에, 함께 읽는 책은 60dp 그대로`() = assertEquals(150 to 60, big(need = 200, coversH = 225 + 90))
+    @Test fun `기본 - 넉넉하면 두 표지를 2 대 1 로`() = assertEquals(140 to 70, big(need = 200, coversH = 315))
 
-    @Test fun `기본 - 맨 앞 책이 상한이면 나머지는 함께 읽는 책에`() = assertEquals(180 to 86, big(need = 200, coversH = 400))
+    @Test fun `기본 - 페블 홈 시계 격자 1줄`() = assertEquals(155 to 77, big(need = 211, coversH = 348))
+
+    @Test fun `기본 - 맨 앞 책이 상한이면 나머지는 함께 읽는 책에`() = assertEquals(180 to 153, big(need = 200, coversH = 500))
 
     @Test fun `기본 - 바형처럼 넉넉하면 함께 읽는 책은 칸 폭까지`() = assertEquals(230 to 156, big(need = 220, coversH = 645, mainMax = 230))
 

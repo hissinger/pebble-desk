@@ -889,9 +889,9 @@ class HomeActivity : EinkActivity() {
                 var chosen: AlsoLevel? = null
                 var mainW = 0
                 var alsoW = dp(SMALL_COVER_DP)
-                // 함께 읽는 책 모양과 맨 앞 책 간격([ALSO_STEPS]): 처음 드는 것. 아래 글자(큰 표지) 모양은 함께 읽는 책 표지를 [BIG_ALSO_MIN_DP] 로
-                // 먼저 두고 남는 높이를 맨 앞 책에(최대 [mainMaxW] 까지, 그래도 남으면 함께 읽는 책 표지를 칸 폭까지). 맨 앞 책이 최소(지금 간격의
-                // 가장 긴 글자가 다 드는 높이)보다 작아지면 다음 단계. 옆 글자·글자만 모양은 남는 높이를 맨 앞 책에(최대까지), 그래도 남으면 그 줄 아래 빈칸.
+                // 함께 읽는 책 모양과 맨 앞 책 간격([ALSO_STEPS]): 처음 드는 것. 아래 글자(큰 표지) 모양은 두 표지를 2 : 1 로 나눈다([HomeShelf.bigAlso]:
+                // 함께 읽는 책 [BIG_ALSO_MIN_DP] 이상, 맨 앞 책은 최소(지금 간격의 가장 긴 글자가 다 드는 높이) 이상·최대 [mainMaxW] 까지).
+                // 함께 읽는 책 [BIG_ALSO_MIN_DP] 를 두면 맨 앞 책이 최소보다 작아지면 다음 단계. 옆 글자·글자만 모양은 남는 높이를 맨 앞 책에(최대까지), 그래도 남으면 그 줄 아래 빈칸.
                 if (fixedFrame) for ((level, ml) in ALSO_STEPS) {
                     mainLevel = ml
                     val need = need(ml)
@@ -1430,8 +1430,8 @@ class HomeActivity : EinkActivity() {
         /** 함께 읽는 책 표지 폭 */
         private const val SMALL_COVER_DP = 50
         /**
-         * 아래 글자 모양 함께 읽는 책의 표지 폭(1.7.10 까지 80dp 부터, 1.7.11 은 맨 앞 책과 2 : 1 로 나눔). 이만큼을 먼저 두고 남는 높이는
-         * 맨 앞 책에(최대까지, 그래도 남으면 함께 읽는 책에). 맨 앞 책이 최소보다 작아지면 옆 글자.
+         * 아래 글자 모양 함께 읽는 책의 표지 폭 가장 작은 값(1.7.10 까지 80dp). 두 표지를 2 : 1 로 나눌 때 이보다 작아지지 않고,
+         * 이만큼을 두면 맨 앞 책이 최소보다 작아지면 다음 모양(간격 줄임 → 옆 글자).
          */
         private const val BIG_ALSO_MIN_DP = 60
         /** 아래 글자 모양 표지 → 글자(제목) 간격 */
