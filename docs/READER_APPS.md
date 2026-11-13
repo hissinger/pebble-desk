@@ -34,6 +34,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | 아이리더 기본 리더 `com.zhangyue.iReader.Eink`(掌阅 iReader SmartOS 기기의 시스템 앱. Tango·Ocean 5C 에서 확인) | `com.zhangyue.iReader.Eink.Activity.ActivityRead`·`ActivityReadP1` | O (`ActivityAliasOpenBook` 에 파일 경로 `file`) | O (`ActivityAliasBookShelf`. 실행 화면은 기기에 따라 서점 별칭) | X | 앱 전용 DB |
 | Wattpad `wp.wattpad`(웹 소설, 로그인 필요. 한국 Play 스토어에 없음) | `wp.wattpad.reader.ReaderActivity` | O `wattpad://story/<이야기 번호>`(읽던 자리. 번호는 공개 검색으로) | 그냥 열면 이어 보기 | ? | 앱 전용 저장소 (미확인) |
 | 이씨오 범용뷰어 3.0 `com.mackerly.eco.ecobookviewer3`(도서관 전자책 대출. Play 라이선스 확인이 있어 Play 스토어 없는 기기에서는 열리지 않음) | `com.mackerly.eco.viewer.ViewerActivity` | X (책 정보를 앱 안 화면끼리만 넘긴다) | 그냥 열면 내 서재(로그인한 도서관) | X | 없음(웹 뷰어 `epub.eco.co.kr` 로 그때그때 받는다) |
+| 북큐브 `com.bookcube.bookplayer`(북큐브네트웍스 전자책 서점·웹소설·웹툰. `도서관` 탭으로 공공·대학 전자도서관 대출도. 웹툰은 서점 웹 화면에서 바로 본다) | `com.bookcube.ui.Epub30ViewerActivity`·`PdfViewerActivityGL`(옛 PDF 뷰어 `PdfViewerActivity`. 메뉴는 따로 `EpubMenuActivity`·`PdfMenuActivityGL`) | ? | 그냥 열면 내서재(설정 › 앱 실행 시 메인 설정) | ? | `Android/data`(`bookimg`·`bookshelf`) |
 | YES24 `com.yes24.ebook.einkstore`(my YES, 시스템 앱. USB 디버깅 중에는 쓸 수 없음) | O | X (스토어 상세만) | O | X | `Android/data` |
 
 - 사용 기록에는 **앱·화면 이름과 시각만** 남는다. 어떤 책인지는 알 수 없다.
@@ -97,6 +98,7 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 | iReader 기기 내장판 4.1.0 | 공개 Provider 의 표지 | 최근 책 Provider(펌웨어 식별자로 맞추거나, 없으면 맨 위 줄) | 최근 책 Provider | 저장한 진행률(`readpercent`, 읽는 화면을 나올 때) | X |
 | Wattpad | 서재·이야기 화면 | 서재·이야기 화면·읽는 화면(화 처음의 툴바) | 서재(목록 보기)·이야기 화면 | 읽는 화면(화 이름) | X |
 | 이씨오 범용뷰어 3.0(EPUB 책만) | 서재 | 읽는 화면(옆 메뉴 표지 단추) | 읽는 화면(옆 메뉴 표지 단추) | 읽는 화면(장 순서) | 서재 |
+| 북큐브 | 북큐브 검색(인터넷이 안 되면 서재, 딱지째) | 서재(리스트형)·메뉴 | 서재(리스트형) | 서재·읽는 화면(EPUB 하단 좌/우 정보)·메뉴 | 서재(리스트형) |
 
 #### 아이리더 기본 리더 `com.zhangyue.iReader.Eink`
 
@@ -139,6 +141,18 @@ Pebble Desk 가 이북 앱에서 무엇을 알아내고 무엇을 할 수 있는
 - **반납일**: 서재 칸의 `반납예정일`.
 - **PDF 책**: 지원하지 않는다(안내의 알아 둘 것). PDF 는 다른 웹 뷰어(앱 안의 pdf.js)로 열리는데, 문서 제목이 `PDF 뷰어` 로 고정이고 화면에는 쪽(`1` `/ 348`)·목차·도구 단추뿐이라 어느 책인지 알 길이 없다. PDF 파일은 DRM(드림인사이드 OPS)으로 암호화돼 앱 전용 저장소에 있고, 뷰어가 서버에서 받은 책 정보도 웹뷰 저장소에만 있다. 그래서 PDF 읽는 화면(쪽 수 요소 `numPages`)이 보이면 그 화면이 열린 때부터 책 모름으로 적는다(앞서 편 책에 시간이 붙지 않게, 시간은 하루 합계·연속일에만).
 - **제약**: 서재·읽는 화면이 Compose 라 칸을 눌러도 누름 알림이 오지 않는다(편 책은 읽는 화면으로만 안다). 읽는 화면의 웹 화면은 창에서 훑어 닿지 않고 웹 화면이 보내는 내용 바뀜 알림의 요소로만 닿는다(공통 자리 `ReaderAdapter.onContent`). 뒤로를 2초 안에 두 번 눌러야 닫힌다.
+
+### 북큐브 `com.bookcube.bookplayer`
+
+- **권한**: 공통.
+- **할 것**: 내서재 보기(위 오른쪽 `⋯`)를 `리스트형` 으로 둔다. `표지형` 칸에는 제목 글자가 없어 그렇게 연 책은 읽다가 메뉴를 띄워야 들어온다. 뷰어설정 › 하단 좌/우 정보 표시 한쪽을 `페이지 정보`(처음 설정 `챕터명 / 페이지 정보`)로 둔다.
+- **표지**: 책이 들어오면 북큐브 공개 검색(`www.bookcube.com/book/m/search.asp`, 로그인 없이 제목만 보낸다. 웹소설 한 화는 `site=novel` 로 작품 제목)에서 제목·저자가 같은 결과의 원본 표지(`bookimg.bookcube.com/270/<책번호 앞 4자리>/<책번호>.jpg`, 웹소설 `serialimg.bookcube.com/270/<작품 번호>.jpg`, 딱지 없음)를 받아 바꾼다. 책마다 한 번(받았거나 검색에 없으면 다시 찾지 않는다), 인터넷이 안 되면 다음에 열 때 다시. 그 전·인터넷이 없을 때는 리스트형 칸에서 잘라 온다(안드로이드 11 부터). 표지 왼쪽 위에 늘 딱지(파일 종류 `EPUB`·`PDF`, 받고 아직 안 읽은 책은 `NEW`)가 겹쳐 있어 그 표지에는 딱지가 함께 찍힌다(사용자가 정함. 한때 딱지 아래만 잘랐으나 위·옆이 잘려 표지 위쪽 제목이 빠졌다). 받지 않은 칸·기간이 지난 칸은 표지를 어둡게 덮고 받기·만료 그림을 겹쳐 자르지 않는다. 읽는 화면은 화면 캡처가 막혀 있다.
+- **제목·저자**: 리스트형 칸의 제목(미리보기 책은 서재에서만 앞에 붙는 `[미리보기]` 를 뗀다. 무료 책의 `[무료]` 는 상품 이름 그대로라 둔다)과 `저자 | 출판사` 의 저자. 메뉴 위 제목(`bookTitle`)으로도 안다.
+- **진행률**: 리스트형 칸 오른쪽 진행 원의 %(`down_progress_text`, 읽는 화면과 같다), EPUB 읽는 화면 아래 왼쪽·오른쪽 정보 중 `페이지 정보`(`7/37(19%)`), 메뉴 아래 `progressRatio`(PDF `2/124(2%)`). PDF 읽는 화면에는 글자가 없어 메뉴를 띄우거나 서재로 돌아올 때 들어온다.
+- **반납일**: 리스트형 칸의 대여 기간 `2026-11-23 23:50 만료`(도서관 대출·대여 책). 그 위 줄은 도서관 이름.
+- **웹소설**: 화 하나가 책 파일 하나라 화마다 한 권(`포식으로 레벨업하는 군주님 2화`, 진행률은 그 화의 %). 내서재에는 작품 칸(`총 2화 ›`)이 있고 누르면 같은 화면에 화 칸(`… - 2화`)이 뜬다. 저자는 앞서 본 작품 칸에서 붙인다.
+- **서점에서 바로 연 책·`다음 권`·`다음 화`**: 서재 칸을 거치지 않아 메뉴를 띄울 때까지 책 모름(메뉴 제목을 읽으면 열린 때부터 그 책).
+- **웹툰**: 넣지 않는다(사용자가 정함). 내서재로 받지 않고 서점 웹 화면 안에서 보며, 뷰어에는 `1화`·`이전화`·`다음화` 뿐이다.
 
 ### LibreraX `com.librerax`
 
@@ -971,6 +985,20 @@ Bilingify 의 오픈소스 리더(https://github.com/readest/readest, Tauri). �
 - **Pebble Desk**(`readers/EcoViewer.kt`, `ScreenReader` 상속): 서재 칸은 모양으로 찾고(표지·반납일, 진행률은 버림), 웹 화면은 내용 바뀜 알림의 요소에서 가장 바깥 `WebView` 를 붙잡아 두었다가(`onContent`, 읽는 화면에 새로 들어올 때마다 다시) 잠잠해지면 표지 단추와 장 순서를 읽는다. 표지 단추 글자는 서재에서 본 제목·목록의 책 제목 가운데 가장 긴 앞부분을 제목, 나머지를 저자로 나눈다.
   - **PDF 책**(2026-11-07 대출 6권 중 2권: 『셜록 홈즈 전집 2』 348쪽, 『박영규 선생님의 만화 조선왕조실록 2』 212쪽): `ViewerActivity` 가 assets 의 `PdfViewer/minified/web/viewer.html`(이씨오가 고친 pdf.js, `<title>PDF 뷰어</title>`)을 연다. `epub.eco.co.kr`·`/book_content/<contentKey>.pdf` 요청은 앱이 가로채(`i3.j.shouldInterceptRequest`) assets 와 DRM 라이브러리 `com.drminside.opsclientv2.OpsPdf` 로 푼 바이트를 내준다(그 주소는 실제로 없다). 고친 pdf.js 에는 PDF 정보의 제목을 문서 제목에 쓰는 코드가 없고(`setTitleUsingUrl` 만), 서버 `INIT` 응답은 웹뷰 localStorage `init-<contentKey>` 에만 둔다. 접근성 트리: HTML id 가 그대로 보인다(`pageNumber` `1`, `numPages` `/ 348`, `outlineView` 의 목차 `1. 셜록 홈즈` … `아서 코난 도일`, 도구 단추). 웹 화면 요소의 덧정보 `SUPPLEMENTAL_DESCRIPTION_KEY=PDF 뷰어`, 창 제목은 앱 이름. 끝 쪽까지 읽고 서재를 새로고침해도 진행 막대는 0. 서재 목록 보기는 화면에 보이는 칸만 트리에 나온다(6권 중 위 5칸, 내린 뒤 4칸).
   - 에뮬레이터에서 확인: 격자 보기 서재를 본 뒤 칸을 누르자 `레 미제라블 3(한글판)`·저자 `빅토르 위고`·58%(7/12)로 들어왔고 표지는 서재에서 잘렸다. 서재로 돌아오자 반납일 2026-11-14, 목록 보기로 다시 열어 목차에서 다음 장으로 옮기자 66%(8/12). 홈 함께 읽는 책에 `이씨오 범용뷰어 · 66% 읽음 · 반납 7일 남음`.
+
+### 북큐브 `com.bookcube.bookplayer` (2026-11-14, 에뮬레이터 `CremaPebble_A11_Play`(안드로이드 11), Play 스토어 3.0.43 (206), minSdk 24·targetSdk 36, 경산시립 멀티전자도서관 계정, **지원**)
+
+- **받기**: Play 스토어(북큐브네트웍스, 50만 회 이상)로 `CremaPebble_A11_Play` 에 깔았다. 분할 APK 아님, 라이선스 확인 없음. 로그인 없이도 내서재에 무료 책 6권이 있다.
+- **코드**(jadx, 일반 View 와 RecyclerView): 내서재 `ui.BookShelfActivity`(위 탭 `내서재`·`도서관`(웹 화면, 도서관 고르기·로그인·대출), 목록 칸 `book_list_row`, 표지형 칸 `book_grid_row`). 목록 칸 그리기 `BookListAdapter`: 제목 `row_text`(미리보기 책 `service_type 4` 는 `[미리보기]` + 제목), `row_text2` = `저자 | 출판사`, `down_progress_text` = 읽은 %(`read_progress`), `row_text3` = 대여 기간 `setExpireText`(`yyyy-MM-dd HH:mm` + ` 만료`, 받기 전 대여는 `다운로드 시점으로부터 N일`), `row_text4` = 도서관 이름(`service_type 3`·`11`). 받지 않은 칸·기간 지난 칸은 `down_back_color`·`list_img_down_icon` 을 보인다. 왼쪽 위 딱지 `list_icon`(`list_file_type_icon` `EPUB`·`PDF`·`MP3`·`IMG`, 받고 안 읽은 책은 `list_img_ribbon_icon` `NEW`). 책 그림은 `Android/data/com.bookcube.bookplayer/files/bookimg` 라 다른 앱이 읽을 수 없다.
+- **칸 누르기**: 줄 전체(이름 없는 `LinearLayout`)가 누른 요소로 온다. 받지 않은 칸은 `ViewNextBookActivity`(`책파일 다운로드 중입니다.`, 대출 책 약 85초) 뒤 읽는 화면, 받은 칸은 `LoadActivity` 뒤 읽는 화면. 표지형 칸은 `grid_click_layout`(글자 없음, 반납일은 표지 위 띠 `grid_img_line_text`).
+- **읽는 화면**: `Epub30ViewerActivity`(화면 캡처 막힘). 본문은 그림(`bookPage`), 아래 `addInfoLeft`·`addInfoRight`(뷰어설정 › 하단 좌/우 정보 표시: 챕터명·페이지 정보·현재 시각·표시 안함, 처음은 왼쪽 챕터명·오른쪽 페이지 정보 `7/37(19%)`). 가운데를 누르면 메뉴가 **따로 액티비티** `EpubMenuActivity`(PDF 는 `PdfMenuActivityGL`): 위 `bookTitle`, 아래 `progressRatio` `7/37(19%)`·`첫 페이지`·`이전 권`·`다음 권`·목차·스크랩·서평·보기설정·뷰어설정. 본문 그림 크게 보기 `ImageViewerActivity`.
+- **Pebble Desk**(`readers/Bookcube.kt`, `ScreenReader` 를 상속한 `BookcubeReader`): 메뉴 액티비티와 그림 보기도 읽는 화면으로 둔다(메뉴를 띄운 동안도 읽은 시간, 메뉴 제목으로 책). 받지 않은 칸은 눌러도 받기만 할 수 있어 읽는 화면이 열려야 편 것으로 본다(`openOnViewer`). 표지는 북큐브 검색의 원본, 인터넷이 안 되면 서재에서 딱지째.
+  - 에뮬레이터에서 확인: 도서관 탭에서 경산시립 멀티전자도서관에 로그인해 『우울해서 빵을 샀어』를 빌리자 리스트형 칸에 `경산시립 멀티전자도서관`·`2026-11-23 23:50 만료`. 받지 않은 칸을 누르자 받기 뒤 읽는 화면이 열려 제목·저자 `안드레아 카스프르작`·반납일 2026-11-23 으로 들어왔고, 메뉴에서 제목·1%, 서재로 돌아오자 서재에서 자른 표지가 붙었다(그때는 딱지 아래만 잘라 98×132, 지금은 검색 원본으로 바꾼다). 다시 서재 첫 칸으로 열어 2%. 홈 맨 앞 책에 `반납 9일 남음`·`북큐브`·`2% 읽음`.
+  - PDF(같은 도서관 교재 『세상 편한 집밥』, 칸 딱지 `PDF`, 124쪽): 받기 뒤 `PdfViewerActivityGL`(요소는 `pdf_view` 하나, 글자 없음). 메뉴 `PdfMenuActivityGL` 에 `bookTitle`·`progressRatio` `2/124(2%)`. 누른 칸으로 제목·저자 `박미란`·반납일이 들어오고 진행률은 메뉴를 띄울 때 2%. 메뉴 없이 쪽만 넘기고 서재로 돌아오자 칸의 %로 4% → 9%.
+  - 웹소설(북큐브 계정, 『포식으로 레벨업하는 군주님』 무료 1·2화): 서재 작품 칸 `포식으로 레벨업하는 군주님`·`아이박슨 | 연필`·`총 1화 ›`(진행 원 없음, 딱지 없음, `service_type 2`), 누르면 같은 `BookShelfActivity` 안에 위 막대 `serial_menu_title`(작품)·화 칸 `포식으로 레벨업하는 군주님 - 1화`·둘째 줄 `1화`·진행 원(그 화의 %). 읽는 화면은 EPUB 과 같고 메뉴 제목 `포식으로 레벨업하는 군주님 1화`·`이전 화`·`다음 화`. 서점에서 받아 `바로보기` 하면 `DownloadActivity` → `ViewNextBookActivity` → 읽는 화면(서재 칸 없음): 책 모름으로 열었다가 메뉴에서 `… 2화` 로. 처음엔 작품 한 권 + 읽는 화로 만들었다가 사용자 결정으로 화마다 한 권으로 바꿨다. 화 칸에서 열자 `포식으로 레벨업하는 군주님 2화`·`아이박슨`·20%·표지.
+  - 웹툰(『사상최강의 데릴사위』 1화): 서점 웹 화면(`BookShelfActivity` 안, HTML `view-header`·`viewer`·`view-footer`)에서 바로 본다. 위 막대에 `1화` 뿐(작품 제목은 그 전 작품 화면에만), 그림은 설명이 uuid. 사용자가 제외하기로 했다.
+  - 표지 원본(같은 날): 딱지 `list_icon`(`list_file_type_icon`·`list_img_ribbon_icon`)과 표지 `list_img` 는 다른 요소지만 화면 캡처에는 겹쳐 찍힌다. 앱 코드(`hyoyeon.job.BookImgDownloader`)의 표지 주소 `bookimg.bookcube.com/{150|200|270}/<책번호 앞 4자리>/<책번호>.jpg`(웹소설 `serialimg…`). 책번호는 서재 화면에 없고 앱 데이터(`Android/data/…/bookimg`)는 읽을 수 없어, 공개 검색(서점 `site=book`, 웹소설 `site=novel`)의 결과 칸(표지 그림 대체 글 = 제목, 글자 줄 제목·저자·출판사)에서 찾는다. 에뮬에서 『세상 편한 집밥』(181200079, 270×309)·『포식으로 레벨업하는 군주님 2화』(작품 sf6719, 270×411)가 딱지 없는 원본으로 바뀌었다.
+  - 시험 중 알게 된 것: mobile-mcp(mobilecli `DeviceServer`)·`uiautomator` 가 UiAutomation 을 잡고 있는 동안 다른 접근성 서비스가 풀린다(`dumpsys accessibility` 의 `Bound services:{}`). 그 프로세스를 끝내면 다시 붙는다.
 
 ### Fabularium `io.davidar.fabularium` (2026-11-12, 에뮬레이터 `CremaPebble_A11`(안드로이드 11), F-Droid 1.5.1 (27), minSdk 16·targetSdk 28, **지원하지 않기로 함**)
 

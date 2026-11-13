@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import com.woody.pebbledesk.readers.Aladin
 import com.woody.pebbledesk.readers.BookFusion
+import com.woody.pebbledesk.readers.Bookcube
 import com.woody.pebbledesk.readers.Bookers
 import com.woody.pebbledesk.readers.Bookers2
 import com.woody.pebbledesk.readers.CherieViewer
@@ -235,6 +236,12 @@ internal object ReaderGuide {
         App(listOf(R.string.guide_eco), listOf(EcoViewer), Info(
             emptyList(),
             cover = YES, title = YES, author = YES, progress = YES, due = YES, note = R.string.guide_note_eco,
+        )),
+        App(listOf(R.string.guide_bookcube), listOf(Bookcube), Info(
+            listOf(R.string.guide_t_bookcube_list, R.string.guide_t_bookcube_bottom),
+            cover = yes(R.string.guide_n_bookcube_cover), title = yes(R.string.guide_n_bookcube_title),
+            author = Field(R.string.guide_added_bookcube_list), progress = yes(R.string.guide_n_bookcube_pdf), due = Field(R.string.guide_added_bookcube_list),
+            note = R.string.guide_note_bookcube,
         )),
     )
 }

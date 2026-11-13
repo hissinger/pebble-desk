@@ -380,6 +380,7 @@
     <string name="guide_librera">Librera</string>
     <string name="guide_wattpad">Wattpad</string>
     <string name="guide_eco">이씨오 범용뷰어 3.0</string>
+    <string name="guide_bookcube">북큐브</string>
     <string name="guide_librera_pro">Librera Pro</string>
     <string name="guide_librerax">LibreraX</string>
     <string name="guide_permissions">필요한 권한</string>
@@ -482,6 +483,13 @@
     <string name="guide_n_wattpad_chapter">% 대신 화면 맨 위에 보이는 화 이름 그대로 들어옵니다</string>
     <string name="guide_note_yes24ebook">내서재 위 탭(읽고 있는 책 · 책장 · 구매한 책)을 1초 안에 다른 탭으로 넘겼다가 다시 돌아오면, 드물게 표지가 옆으로 밀린 채 들어올 수 있습니다.</string>
     <string name="guide_note_eco">PDF 책은 자동으로 들어오지 않습니다.</string>
+    <string name="guide_t_bookcube_list">내서재 보기는 \'리스트형\'으로 두세요. \'표지형\'에는 제목이 없어 읽다가 메뉴를 띄워야 책이 들어옵니다.</string>
+    <string name="guide_t_bookcube_bottom">뷰어설정 › 하단 좌/우 정보 표시 한쪽을 \'페이지 정보\'로 두세요(처음 설정). 없으면 읽는 중 진행률은 메뉴를 띄울 때만 들어옵니다.</string>
+    <string name="guide_n_bookcube_cover">북큐브 검색에서 받고, 인터넷이 안 되면 내서재에서 잘라 옵니다</string>
+    <string name="guide_added_bookcube_list">내서재가 \'리스트형\'이면 들어옵니다</string>
+    <string name="guide_n_bookcube_title">\'표지형\'으로 연 책은 메뉴를 띄우면 들어옵니다</string>
+    <string name="guide_n_bookcube_pdf">PDF 책은 내서재로 돌아오거나 메뉴를 띄우면 들어옵니다</string>
+    <string name="guide_note_bookcube">웹소설은 화마다 한 권으로 들어옵니다. 서점에서 바로 보는 웹툰은 들어오지 않습니다.</string>
     <string name="guide_note_wattpad">이야기 하나를 책 한 권으로 봅니다(화마다 따로 책을 만들지 않습니다).</string>
     <string name="guide_note_librera">Play 스토어 무료판은 라이브러리에서 연 책과 메뉴를 띄운 책만 들어옵니다.</string>
     <string name="book_files">책 파일 읽기</string>
