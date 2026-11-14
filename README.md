@@ -15,7 +15,7 @@
 - **Books this year**: every book you read or finished, as a list or a cover grid, for any year.
 - **Favorites and All apps**: your own order and names, list or grid, two heights (the shorter one gives book covers more room). All apps by page with a letter index. Hide apps you don't use.
 - **Made for E Ink**: black and white, no animation, pages instead of scrolling, and only what changed is redrawn. To turn pages with hardware buttons (volume keys, page buttons), press the buttons you want in Settings.
-- **Display**: text size 70–150% and line spacing 80–150%, six color themes for color E Ink, icon packs (such as Arcticons) with per-app icons, landscape and tall (bar-shaped) screens.
+- **Display**: text size 70–150% and line spacing 80–150%, six color themes for color E Ink, your own picture as the Home background (adjustable strength), icon packs (such as Arcticons) with per-app icons, landscape and tall (bar-shaped) screens.
 - **Devices**: designed for the Crema Pebble; other Android E Ink devices (BOOX, Meebook and others) are scaled to the same width.
 - **Stays on the device**: your log is never sent anywhere. Updates install from inside the app.
 

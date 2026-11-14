@@ -125,6 +125,12 @@ class HomeActivity : EinkActivity() {
     private var shownHero: List<Any?>? = null
     private var shownFavs: List<Any?>? = null
 
+    /** 홈 맨 바깥 뷰(흰 바탕과 배경 사진을 직접 칠한다) */
+    private lateinit var root: LinearLayout
+    /** 배경 사진([Wallpaper.spec], 홈으로 돌아올 때마다 [refresh] 가 정한다). null 이면 흰 바탕 */
+    private var wallpaperSpec: Wallpaper.Spec? = null
+    private val wallpaper = Wallpaper.Cache()
+
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             updateStatus()
@@ -519,10 +525,12 @@ class HomeActivity : EinkActivity() {
 
     private fun buildViews() {
         // 흰 바탕은 배경(background)으로 두지 않고 직접 칠한다. 크레마는 앱이 바뀔 때마다 배경이 있는 뷰 묶음(창의 맨 바깥 포함)에
-        // 명암 필터를 다시 걸고 다시 그려, 홈으로 돌아올 때 전자잉크가 한 번 더 깜빡인다. 창 배경도 그래서 비운다.
-        val root = object : LinearLayout(this) {
+        // 명암 필터를 다시 걸고 다시 그려, 홈으로 돌아올 때 전자잉크가 한 번 더 깜빡인다. 창 배경도 그래서 비운다. 배경 사진도 여기서 그린다.
+        root = object : LinearLayout(this) {
             override fun dispatchDraw(canvas: Canvas) {
                 canvas.drawColor(Color.WHITE)
+                // 사진이 바뀌었으면 그리기 전에 그 자리에서 만든다(흰 바탕을 한 번 그린 뒤 사진을 덧그리면 전자잉크가 깜빡인다)
+                wallpaper.get(context, wallpaperSpec, width, height)?.let { canvas.drawBitmap(it, 0f, 0f, null) }
                 super.dispatchDraw(canvas)
             }
         }.apply { orientation = LinearLayout.VERTICAL }
@@ -607,13 +615,16 @@ class HomeActivity : EinkActivity() {
         short = prefs.favShort && !wide
 
         heroHeight = hero.height
+        // 배경 사진(설정에서 고르거나 진하기를 바꾸고 돌아오면 바탕을 다시 그린다). 사진이 있으면 맨 앞 책 색면을 칠하지 않는다(책 자리를 다시 만든다).
+        val wall = Wallpaper.spec(this, prefs.wallpaperStrength, Palette.current.color)
+        if (wall != wallpaperSpec) { wallpaperSpec = wall; root.invalidate() }
         // 책이 없으면 자리 표시의 안내 줄이 자동 추가 켜짐에 따라 달라진다
         val watching = books.isEmpty() && ReaderWatchService.isEnabled(this)
         // 진행률·반납일 글자(반납일은 날이 바뀌면 달라진다)
         val status = books.map { bookStatus(it) }
         // 표지가 생겼는지(책 파일 표지는 뒤에서 꺼내 둔다: 압축 만화·만화 표지 도구를 받은 뒤. 책 목록이 그대로여도 다시 그리게)
         val covers = books.map { BookShelf.hasCover(this, it.id) }
-        val heroState = listOf(books, reading, icons, packs, ownIcons[reading?.key], heroHeight, watching, status, covers, short, homeStyle)
+        val heroState = listOf(books, reading, icons, packs, ownIcons[reading?.key], heroHeight, watching, status, covers, short, homeStyle, wall != null)
         // 아이콘이 바뀌었을 수 있는 앱(그사이 업데이트된 앱)이 보이는 자리만 다시 그린다(다른 앱 업데이트로 홈 전체가 깜빡이지 않게).
         if (reading?.pkg in changedPkgs || heroState != shownHero) {
             shownHero = heroState
@@ -1156,10 +1167,13 @@ class HomeActivity : EinkActivity() {
      */
     private fun belowFieldDp(topDp: Int) = HomeShelf.belowField(topDp, fieldBottom, FIELD_GAP_DP)
 
-    /** 맨 앞 책 자리(표지·제목): 컬러면 테마 색면([Palette.field])을 칠하고 아래로 [fieldBottom] 만큼 넓힌다. */
+    /**
+     * 맨 앞 책 자리(표지·제목): 컬러면 테마 색면([Palette.field])을 칠하고 아래로 [fieldBottom] 만큼 넓힌다.
+     * 배경 사진이 있으면 색면은 칠하지 않는다(사진을 가리지 않게. 여백은 그대로 두어 배치가 바뀌지 않는다).
+     */
     private fun View.heroField() {
         setPadding(dp(Ui.MARGIN), dp(heroPad), dp(Ui.MARGIN), dp(fieldBottom))
-        Palette.current.field?.let { setBackgroundColor(it) }
+        if (wallpaperSpec == null) Palette.current.field?.let { setBackgroundColor(it) }
     }
 
     /**

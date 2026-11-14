@@ -333,6 +333,13 @@
     <string name="due_today">Due today</string>
     <string name="due_over">Overdue</string>
     <string name="home_style">Home layout</string>
+    <string name="wallpaper">Background picture</string>
+    <string name="wallpaper_choose">Choose picture</string>
+    <string name="wallpaper_change">Change picture</string>
+    <string name="wallpaper_remove">Remove picture</string>
+    <string name="wallpaper_strength">Strength</string>
+    <string name="wallpaper_hint">The picture fills the whole Home background, blended with white. Pick a strength that keeps the text easy to read.</string>
+    <string name="wallpaper_failed">Couldn\'t open the picture</string>
     <string name="home_style_basic">Standard</string>
     <string name="home_style_cover">Covers</string>
     <string name="home_style_library">Library</string>
