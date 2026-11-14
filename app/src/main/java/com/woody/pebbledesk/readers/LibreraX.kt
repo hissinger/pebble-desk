@@ -51,7 +51,11 @@ object LibreraX : ReaderApp(
      * BOOX 가 얼린 앱이면(런처로 풀어야 한다) 앱을 연다. 그 책이 지워졌으면 LibreraX 가 `이 책을 더 이상 열 수 없습니다` 를 보인다
      */
     override fun open(ctx: HomeContext, book: ShelfBook): OpenResult {
-        val path = bookPath(ctx.context, book.id)?.takeIf { !ctx.frozen } ?: return OpenResult.Launch
+        val known = bookPath(ctx.context, book.id)
+        val frozen = ctx.frozen
+        // 홈에서 책이 아니라 앱이 열린다는 기기에서 어느 길이었는지 자동 추가 기록(기기 정보 › 기록 보기)으로 본다
+        WatchLog.add(ctx.context, WatchLog.Kind.NOTE, pkg, "open " + (if (frozen) "frozen" else known?.let(::pathKind) ?: "no path"))
+        val path = known?.takeIf { !frozen } ?: return OpenResult.Launch
         val reader = ComponentName(pkg, ALIAS)
         if (path.startsWith("/")) return OpenResult.File(reader, path)
         val uri = Uri.parse(path)
@@ -62,10 +66,18 @@ object LibreraX : ReaderApp(
     /** 책 [id] 를 LibreraX 가 여는 경로(문서 주소 `content://…` 나 LibreraX 폴더의 사본 `/storage/…`). 모르면 null */
     internal fun bookPath(context: Context, id: String): String? = prefs(context).getString(pathPref(id), null)
 
-    /** 책 [id] 의 LibreraX 경로를 적는다(같으면 쓰지 않는다). 문서 주소·절대 경로가 아니면 적지 않는다 */
-    internal fun saveBookPath(prefs: SharedPreferences, id: String, path: String) {
-        if (!path.startsWith(CONTENT) && !path.startsWith("/")) return
+    /** 책 [id] 의 LibreraX 경로를 적는다(같으면 쓰지 않는다). 문서 주소·절대 경로가 아니면(클라우드 책 `gdrive://…` 등) 적지 않고 false */
+    internal fun saveBookPath(prefs: SharedPreferences, id: String, path: String): Boolean {
+        if (!path.startsWith(CONTENT) && !path.startsWith("/")) return false
         if (prefs.getString(pathPref(id), null) != path) prefs.edit().putString(pathPref(id), path).apply()
+        return true
+    }
+
+    /** 기록에 남길 경로의 모양(파일 이름 없이): 문서 주소는 주소를 내주는 곳, 절대 경로는 `file`, 그 밖은 앞의 이름(`gdrive`) */
+    internal fun pathKind(path: String): String = when {
+        path.startsWith(CONTENT) -> "content " + Uri.parse(path).authority.orEmpty()
+        path.startsWith("/") -> "file"
+        else -> path.substringBefore(':', "?")
     }
 
     private fun prefs(context: Context) = Storage.of(context).getSharedPreferences(WatchCore.WATCH_PREFS, Context.MODE_PRIVATE)
@@ -352,17 +364,27 @@ private class LibreraXReader(app: ReaderApp) : ScreenReader(app) {
         needPath.forEach { pathTries[it.id] = (pathTries[it.id] ?: 0) + 1 }
         coverBusy = true
         LibreraX.recent(ctx.context) { items ->
-            for (b in listOfNotNull(opened) + needPath) LibreraX.recentFor(items, b)?.let { LibreraX.saveBookPath(ctx.prefs, b.id, it.path) }
+            val paths = (listOfNotNull(opened) + needPath).map { b ->
+                val item = LibreraX.recentFor(items, b)
+                val saved = item?.let { LibreraX.saveBookPath(ctx.prefs, b.id, it.path) } == true
+                when {
+                    items.isEmpty() -> "no list"
+                    item == null -> "none"
+                    else -> LibreraX.pathKind(item.path) + if (saved) "" else " skip"
+                }
+            }
+            // 홈에서 그 책이 아니라 앱이 열리면 경로를 받았는지·어떤 모양인지 기록 보기로 본다(한 번 물을 때 한 줄)
+            if (paths.isNotEmpty()) ctx.log(WatchLog.Kind.NOTE, "path " + paths.distinct().joinToString(", "))
             val found = need.mapNotNull { b -> LibreraX.recentFor(items, b)?.cover?.let { b to it } }
             if (found.isEmpty()) {
-                if (need.isNotEmpty()) ctx.log(WatchLog.Kind.NOTE, "cover", if (items.isEmpty()) "no list" else "none")
+                if (need.isNotEmpty()) ctx.log(WatchLog.Kind.NOTE, "cover " + if (items.isEmpty()) "no list" else "none")
                 done(ctx)
                 return@recent
             }
             val resolver = ctx.context.contentResolver
             ctx.inBackground({ found.map { (b, uri) -> b to BookFiles.streamCover { resolver.openInputStream(uri) ?: error("No cover") } } }) { read ->
                 val covers = read.getOrNull().orEmpty().mapNotNull { (b, jpeg) -> jpeg?.let { b to it } }
-                ctx.log(WatchLog.Kind.NOTE, "cover", "${covers.size}/${found.size}")
+                ctx.log(WatchLog.Kind.NOTE, "cover ${covers.size}/${found.size}")
                 // 받는 사이 사용자가 표지를 붙였으면 덮지 않는다
                 for ((b, jpeg) in covers) if (!lookup.hasCover(b.id)) ctx.recorder.cover(b.id, jpeg)
                 done(ctx)

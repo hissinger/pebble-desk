@@ -303,7 +303,17 @@ class LibreraXTest {
     }
 
     @Test fun `문서 주소·절대 경로가 아닌 것은 적지 않는다`() {
-        LibreraX.saveBookPath(prefs(), "b-3", "relative/a.epub")
+        assertFalse(LibreraX.saveBookPath(prefs(), "b-3", "relative/a.epub"))
+        assertFalse(LibreraX.saveBookPath(prefs(), "b-3", "gdrive://abc/Book.epub"))
         assertNull(LibreraX.bookPath(context, "b-3"))
+        assertTrue(LibreraX.saveBookPath(prefs(), "b-3", "/storage/emulated/0/Android/data/com.librerax/files/Books/a.epub"))
+    }
+
+    @Test fun `기록에는 경로의 모양만 남긴다`() {
+        assertEquals("content com.android.providers.downloads.documents",
+            LibreraX.pathKind("content://com.android.providers.downloads.documents/tree/raw%3A%2Fstorage/document/raw%3A%2Fstorage%2Fa.epub"))
+        assertEquals("file", LibreraX.pathKind("/storage/emulated/0/Android/data/com.librerax/files/OPDS/Pride and Prejudice.epub"))
+        assertEquals("gdrive", LibreraX.pathKind("gdrive://abc/Book.epub"))
+        assertEquals("?", LibreraX.pathKind("relative/a.epub"))
     }
 }
