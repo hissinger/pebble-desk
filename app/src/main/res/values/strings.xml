@@ -336,6 +336,13 @@
     <string name="due_today">오늘 반납</string>
     <string name="due_over">반납 기한 지남</string>
     <string name="home_style">홈 모양</string>
+    <string name="wallpaper">배경 사진</string>
+    <string name="wallpaper_choose">사진 고르기</string>
+    <string name="wallpaper_change">사진 바꾸기</string>
+    <string name="wallpaper_remove">사진 지우기</string>
+    <string name="wallpaper_strength">진하기</string>
+    <string name="wallpaper_hint">고른 사진을 홈 전체 바탕에 흰색과 섞어 깝니다. 글자가 잘 읽히는 진하기를 고르세요.</string>
+    <string name="wallpaper_failed">사진을 열지 못했습니다</string>
     <string name="home_style_basic">기본</string>
     <string name="home_style_cover">표지</string>
     <string name="home_style_library">서재</string>
