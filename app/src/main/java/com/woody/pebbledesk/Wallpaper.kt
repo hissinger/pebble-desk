@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.ImageDecoder
@@ -33,16 +34,21 @@ object Wallpaper {
 
     /**
      * [uri] 의 사진을 복사한다(뒤에서 부른다). 화면을 어느 쪽으로 돌려도 채울 수 있게 화면 긴 변 크기의 정사각형을 덮는 데까지만 줄인다(키우지 않는다).
-     * 사진의 회전 정보는 [ImageDecoder] 가 맞춘다. 읽지 못하면 예외(있던 사진은 그대로).
+     * 사진의 회전 정보는 [ImageDecoder] 가 맞춘다. 투명한 곳은 흰색으로. 읽지 못하면 예외(있던 사진은 그대로).
      * 크기는 고르는 창이 아니라 화면 전체로 잰다(분할 화면에서 골라도 홈 전체를 채우게).
      */
     fun save(context: Context, uri: Uri) {
         val long = Resources.getSystem().displayMetrics.let { max(it.widthPixels, it.heightPixels) }
-        val bmp = ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
+        val decoded = ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             val (w, h) = info.size.width to info.size.height
             val s = min(1f, max(long.toFloat() / w, long.toFloat() / h))
             if (s < 1f) decoder.setTargetSize(max(1, (w * s).roundToInt()), max(1, (h * s).roundToInt()))
+        }
+        // JPEG 은 투명을 담지 못해 투명한 곳이 검게 남는다(투명 배경 PNG): 흰 바탕에 얹는다
+        val bmp = if (!decoded.hasAlpha()) decoded else Bitmap.createBitmap(decoded.width, decoded.height, Bitmap.Config.ARGB_8888).also {
+            Canvas(it).apply { drawColor(Color.WHITE); drawBitmap(decoded, 0f, 0f, null) }
+            decoded.recycle()
         }
         // 반쯤 쓴 파일이 남지 않게 다른 이름으로 다 쓴 뒤 바꾼다(실패하면 지운다)
         val dst = file(context)

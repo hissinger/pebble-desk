@@ -500,26 +500,46 @@ class SettingsActivity : EinkActivity() {
         col.addView(StepSlider(this, steps, value, onStep = { valueText.text = "$it%" }, onCommit = onCommit))
     }
 
-    /** 시스템 파일 고르기로 사진 하나를 고르게 한다(고르면 [onActivityResult]) */
+    /**
+     * 사진을 줄 수 있는 앱 목록(안드로이드 고르기 창 `createChooser`)을 띄워 사용자가 앱을 고른다: 파일 앱(`GET_CONTENT`)·갤러리(`ACTION_PICK`,
+     * 전자잉크 런처 inkOS 가 쓰는 길)·시스템 파일 고르기(`OPEN_DOCUMENT`). 한 길만 열면 그 앱이 사진을 돌려주지 않는 기기(iReader 계열,
+     * 2026-11-14 보고: 고른 뒤 아무 일 없이 끝남)에서 막히므로 다른 앱으로 고를 수 있게 한다. 결과는 [onActivityResult].
+     */
     private fun pickWallpaper() {
-        val open = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
-        val get = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
-        if (runCatching { startActivityForResult(open, PICK_WALLPAPER) }.isFailure &&
-            runCatching { startActivityForResult(get, PICK_WALLPAPER) }.isFailure
-        ) Sheet(this).header(getString(R.string.wallpaper_failed)).show()
+        val files = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+        // 갤러리: 주소 없이 종류만(inkOS 와 같다. setType 은 앞서 넣은 주소를 지우므로 주소와 함께 쓰지 않는다)
+        val gallery = Intent(Intent.ACTION_PICK).setType("image/*")
+        val documents = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+        val chooser = Intent.createChooser(files, getString(R.string.wallpaper_choose)).putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(gallery, documents))
+        if (runCatching { startActivityForResult(chooser, PICK_WALLPAPER) }.isFailure) wallpaperFailed("no picker")
     }
 
+    /**
+     * 고른 사진을 받는다. 주소를 `data` 대신 `clipData` 로만 주는 고르기 창이 있어 둘 다 본다.
+     * 사용자가 닫은 것(취소·주소 없음)만 조용히 끝내고, 그 밖에 주소 없이 돌아오거나 읽지 못하면 실패 창에 진단 한 줄을 붙인다
+     * (iReader 계열에서 고른 뒤 아무 일 없이 끝난다는 보고: 사진으로 받아 원인을 가린다).
+     */
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != PICK_WALLPAPER || resultCode != RESULT_OK) return
-        val uri = data?.data ?: return
+        if (requestCode != PICK_WALLPAPER) return
+        val uri = data?.data ?: data?.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+        if (uri == null) {
+            if (resultCode == RESULT_CANCELED) return
+            // 고르기 창이 넣은 extras 를 풀다 그 앱만 아는 객체면 예외가 나니 감싼다(진단하다 앱이 죽지 않게)
+            val extras = runCatching { data?.extras?.keySet()?.sorted() }.getOrElse { "?" }
+            wallpaperFailed("result $resultCode, no uri, extras $extras")
+            return
+        }
         // 큰 사진은 읽고 줄이는 데 시간이 걸려 뒤에서
         Bg.run({ Wallpaper.save(this, uri) }) { result ->
             if (isFinishing || isDestroyed) return@run
             renderWallpaper()
-            if (result.isFailure) Sheet(this).header(getString(R.string.wallpaper_failed)).show()
+            result.exceptionOrNull()?.let { e -> wallpaperFailed("${uri.scheme}://${uri.authority} · ${e.javaClass.simpleName}: ${e.message.orEmpty().take(80)}") }
         }
     }
+
+    /** 사진을 열지 못했을 때: 제목 아래 회색 진단 한 줄(사진으로 받아 원인을 가린다) */
+    private fun wallpaperFailed(detail: String) = Sheet(this).header(getString(R.string.wallpaper_failed), detail).show()
 
     /** 하루 목표 직접 입력(분). 범위 밖이면 가장 가까운 값으로 */
     private fun askGoal() {
