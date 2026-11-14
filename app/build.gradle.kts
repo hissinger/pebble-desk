@@ -14,8 +14,8 @@ android {
         applicationId = "com.woody.pebbledesk"
         minSdk = 28
         targetSdk = 34
-        versionCode = 45
-        versionName = "1.7.12"
+        versionCode = 47
+        versionName = "1.8.1"
     }
 
     buildTypes {

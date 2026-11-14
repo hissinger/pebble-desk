@@ -36,7 +36,7 @@ class SettingsActivity : EinkActivity() {
     private lateinit var guide: PagedBlocks
     /**
      * 어느 화면인가: 설정(null), 독서([PAGE_READING]), 자동 추가 안내([PAGE_GUIDE]), 그 앱 하나의 안내([PAGE_GUIDE_APP]),
-     * 화면([PAGE_DISPLAY]), 글자 · 간격([PAGE_TEXT]), 페이지 버튼([PAGE_KEYS])
+     * 화면([PAGE_DISPLAY]), 글자 · 간격([PAGE_TEXT]), 페이지 버튼([PAGE_KEYS]), 배경 사진([PAGE_WALLPAPER])
      */
     private val page by lazy { intent.getStringExtra(EXTRA_PAGE) }
     /** 앱 안내 화면의 앱 */
@@ -54,6 +54,7 @@ class SettingsActivity : EinkActivity() {
             PAGE_DISPLAY -> getString(R.string.section_display)
             PAGE_TEXT -> getString(R.string.text_spacing)
             PAGE_KEYS -> getString(R.string.page_keys)
+            PAGE_WALLPAPER -> getString(R.string.wallpaper)
             else -> getString(R.string.settings)
         }
         val titleRow = titleRow(title) { finish() }
@@ -97,6 +98,7 @@ class SettingsActivity : EinkActivity() {
             PAGE_DISPLAY -> renderDisplay()
             PAGE_TEXT -> renderText()
             PAGE_KEYS -> renderPageKeys()
+            PAGE_WALLPAPER -> renderWallpaper()
             else -> {
                 render()
                 Update.onChange = { renderUpdate(); updates.onChange(); showLatest() }
@@ -221,7 +223,7 @@ class SettingsActivity : EinkActivity() {
 
     private fun open(page: String) = startActivity(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_PAGE, page))
 
-    /** 화면: 글자 · 간격, 색, 홈 모양, 앱 아이콘, 아이콘 모양, 시계, 기기 상단 바 */
+    /** 화면: 글자 · 간격, 색, 홈 모양, 배경 사진, 앱 아이콘, 아이콘 모양, 시계, 기기 상단 바 */
     private fun renderDisplay() {
         list.removeAllViews()
         // 글자 크기·줄 간격은 한 화면에서 슬라이더로 보며 고른다.
@@ -236,6 +238,12 @@ class SettingsActivity : EinkActivity() {
         // 홈 모양: 기본 / 표지 / 서재(책 자리를 채우는 방법)를 그림으로 고른다. 홈으로 돌아가면 다시 그린다.
         row(getString(R.string.home_style), getString(prefs.homeStyle.label), next = true) {
             chooseHomeStyle(prefs.homeStyle) { prefs.homeStyle = it; renderDisplay() }
+        }
+        // 배경 사진: 진하기(사진이 없으면 `없음`, 진하기 0 이면 홈에 보이지 않아 흐리게)
+        val wallpaper = Wallpaper.exists(this)
+        val strength = prefs.wallpaperStrength
+        row(getString(R.string.wallpaper), if (wallpaper) "$strength%" else getString(R.string.none), on = wallpaper && strength > 0, next = true) {
+            open(PAGE_WALLPAPER)
         }
         toggle(getString(R.string.app_icons), prefs.showIcons, hint = getString(R.string.app_icons_hint), redraw = ::renderDisplay) { prefs.showIcons = it }
         iconStyleRow()
@@ -424,15 +432,7 @@ class SettingsActivity : EinkActivity() {
                 preview.addView(appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = prefs.showIcons), lp(MATCH, rowDp(Ui.ROW_DP)))
             }
         }
-        fun slider(label: Int, steps: List<Int>, value: Int, apply: (Int) -> Unit) {
-            val valueText = text("$value%", 20f, Ui.medium)
-            col.addView(hbox().apply {
-                setPadding(dp(Ui.MARGIN), dp(18), dp(Ui.MARGIN), 0)
-                addView(text(getString(label), ROW_LABEL_SP), lp(0, WRAP, 1f))
-                addView(valueText)
-            })
-            col.addView(StepSlider(this, steps, value, onStep = { valueText.text = "$it%" }) { apply(it); showPreview() })
-        }
+        fun slider(label: Int, steps: List<Int>, value: Int, apply: (Int) -> Unit) = stepSlider(label, steps, value) { apply(it); showPreview() }
         slider(R.string.text_size, HomePrefs.TEXT_SCALES, prefs.textScalePercent) {
             prefs.textScalePercent = it; Ui.textScale = it / 100f
         }
@@ -450,6 +450,96 @@ class SettingsActivity : EinkActivity() {
         col.addView(preview)
         showPreview()
     }
+
+    /**
+     * 배경 사진 화면: 사진 고르기(바꾸기)·지우기, 진하기 슬라이더(0~100%, 10% 씩), 아래 미리 보기(사진 위에 자주 쓰는 앱 몇 줄, 손을 떼면 바뀐다).
+     * 홈은 돌아갈 때 새 사진·진하기로 다시 그린다([Wallpaper]). 사진이 없으면 고르기 줄과 설명만.
+     */
+    private fun renderWallpaper() {
+        list.removeAllViews()
+        val right = splitColumns()
+        val has = Wallpaper.exists(this)
+        row(getString(if (has) R.string.wallpaper_change else R.string.wallpaper_choose), null, next = true, last = !has) { pickWallpaper() }
+        if (has) row(getString(R.string.wallpaper_remove), null, last = true) { Wallpaper.clear(this); renderWallpaper() }
+        col.addView(text(keepWords(getString(R.string.wallpaper_hint)), 15f, color = Ui.GRAY, lines = 3).apply {
+            setPadding(dp(Ui.MARGIN), dp(10), dp(Ui.MARGIN), 0)
+        })
+        if (!has) return
+        // 미리 보기: 홈처럼 맨 바깥 뷰가 사진을 직접 칠하고 그 위에 줄을 얹는다. 진하기·크기가 바뀔 때만 그림을 다시 만든다.
+        fun currentSpec() = Wallpaper.spec(this, prefs.wallpaperStrength, Palette.current.color)
+        var spec = currentSpec()
+        val cache = Wallpaper.Cache()
+        val preview = object : LinearLayout(this) {
+            override fun dispatchDraw(canvas: Canvas) {
+                cache.get(context, spec, width, height)?.let { canvas.drawBitmap(it, 0f, 0f, null) }
+                super.dispatchDraw(canvas)
+            }
+        }.apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(8)) }
+        stepSlider(R.string.wallpaper_strength, HomePrefs.WALLPAPER_STRENGTHS, prefs.wallpaperStrength) {
+            prefs.wallpaperStrength = it; spec = currentSpec(); preview.invalidate()
+        }
+        col = right
+        section(getString(R.string.preview))
+        col.addView(hline(1))
+        val apps = AppStore.load(this).let { all -> favoriteApps(all, prefs).ifEmpty { all } }.take(PREVIEW_ROWS)
+        apps.forEach { app ->
+            preview.addView(appRow(app, app.label, Ui.ROW_ICON_DP, Ui.ROW_SP, showIcon = prefs.showIcons), lp(MATCH, rowDp(Ui.ROW_DP)))
+        }
+        // 세로면 남는 높이를 모두 미리 보기로(사진이 더 보이게), 가로면 줄 높이만큼
+        col.addView(preview, if (landscape()) lp(MATCH, WRAP) else lp(MATCH, 0, 1f))
+    }
+
+    /** 이름 · 값(`120%`) 줄과 그 아래 단계 슬라이더(글자 · 간격, 배경 사진). 미는 동안 값 글자만 바꾸고 손을 떼면 [onCommit]. */
+    private fun stepSlider(label: Int, steps: List<Int>, value: Int, onCommit: (Int) -> Unit) {
+        val valueText = text("$value%", 20f, Ui.medium)
+        col.addView(hbox().apply {
+            setPadding(dp(Ui.MARGIN), dp(18), dp(Ui.MARGIN), 0)
+            addView(text(getString(label), ROW_LABEL_SP), lp(0, WRAP, 1f))
+            addView(valueText)
+        })
+        col.addView(StepSlider(this, steps, value, onStep = { valueText.text = "$it%" }, onCommit = onCommit))
+    }
+
+    /**
+     * 사진을 줄 수 있는 앱 목록(안드로이드 고르기 창 `createChooser`)을 띄워 사용자가 앱을 고른다: 파일 앱(`GET_CONTENT`)·갤러리(`ACTION_PICK`,
+     * 전자잉크 런처 inkOS 가 쓰는 길)·시스템 파일 고르기(`OPEN_DOCUMENT`). 한 길만 열면 그 앱이 사진을 돌려주지 않는 기기(iReader 계열,
+     * 2026-11-14 보고: 고른 뒤 아무 일 없이 끝남)에서 막히므로 다른 앱으로 고를 수 있게 한다. 결과는 [onActivityResult].
+     */
+    private fun pickWallpaper() {
+        val files = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+        // 갤러리: 주소 없이 종류만(inkOS 와 같다. setType 은 앞서 넣은 주소를 지우므로 주소와 함께 쓰지 않는다)
+        val gallery = Intent(Intent.ACTION_PICK).setType("image/*")
+        val documents = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+        val chooser = Intent.createChooser(files, getString(R.string.wallpaper_choose)).putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(gallery, documents))
+        if (runCatching { startActivityForResult(chooser, PICK_WALLPAPER) }.isFailure) wallpaperFailed("no picker")
+    }
+
+    /**
+     * 고른 사진을 받는다. 주소를 `data` 대신 `clipData` 로만 주는 고르기 창이 있어 둘 다 본다.
+     * 사용자가 닫은 것(취소·주소 없음)만 조용히 끝내고, 그 밖에 주소 없이 돌아오거나 읽지 못하면 실패 창에 진단 한 줄을 붙인다
+     * (iReader 계열에서 고른 뒤 아무 일 없이 끝난다는 보고: 사진으로 받아 원인을 가린다).
+     */
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != PICK_WALLPAPER) return
+        val uri = data?.data ?: data?.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+        if (uri == null) {
+            if (resultCode == RESULT_CANCELED) return
+            // 고르기 창이 넣은 extras 를 풀다 그 앱만 아는 객체면 예외가 나니 감싼다(진단하다 앱이 죽지 않게)
+            val extras = runCatching { data?.extras?.keySet()?.sorted() }.getOrElse { "?" }
+            wallpaperFailed("result $resultCode, no uri, extras $extras")
+            return
+        }
+        // 큰 사진은 읽고 줄이는 데 시간이 걸려 뒤에서
+        Bg.run({ Wallpaper.save(this, uri) }) { result ->
+            if (isFinishing || isDestroyed) return@run
+            renderWallpaper()
+            result.exceptionOrNull()?.let { e -> wallpaperFailed("${uri.scheme}://${uri.authority} · ${e.javaClass.simpleName}: ${e.message.orEmpty().take(80)}") }
+        }
+    }
+
+    /** 사진을 열지 못했을 때: 제목 아래 회색 진단 한 줄(사진으로 받아 원인을 가린다) */
+    private fun wallpaperFailed(detail: String) = Sheet(this).header(getString(R.string.wallpaper_failed), detail).show()
 
     /** 하루 목표 직접 입력(분). 범위 밖이면 가장 가까운 값으로 */
     private fun askGoal() {
@@ -692,6 +782,8 @@ class SettingsActivity : EinkActivity() {
         private const val PAGE_TEXT = "text"
         private const val PAGE_DISPLAY = "display"
         private const val PAGE_KEYS = "page_keys"
+        private const val PAGE_WALLPAPER = "wallpaper"
+        private const val PICK_WALLPAPER = 1
         /** 설정 줄 이름 글자(sp) */
         private const val ROW_LABEL_SP = 22f
         private const val PAGE_READING = "reading"
