@@ -281,6 +281,13 @@ Pebble Desk(1.2.x)를 기본 홈으로 쓰는 홈 화면. 책 1권(밀리의서�
   - 최근 화면: `com.szzy.ireader.ink.launcher / LauncherActivity`(iReader 홈), `com.zhangyue.iReader.Eink / ActivityRead`(기본 리더 읽는 화면). 기본 홈이 꺼져 있어 iReader 홈을 쓰며 Pebble Desk 는 앱으로 연다.
 - **Tango**(1세대): `PM06A-CKD`, `ro.build.versionCode=4.1.0.215.0`, 화면 824×1648 · **320dpi** · 412×824dp → 앱 기준 230dpi(2026-10-13 사진은 400dpi · 330×659dp 였다. 사용자가 화면 크기를 바꿨는지 펌웨어가 바뀐 것인지 **(미확인)**. 앱 기준 230dpi 는 그대로). `persist.eink.dither256.disable=0` · `persist.sys.eink.color.filter=10` · `persist.sys.eink.contrast=6` · `screen_brightness=103` · `EinkLightStep=20` · `down_key_long_function=7` · `eink_wallpaper_name=系统日历` · `ireader_systemui_shutdown_pending=0`. 권한 `자동 추가 켜짐 · 오늘 읽은 시간 켜짐 · 기본 홈 꺼짐`, `와이파이 켜짐·연결됨 · 블루투스 켜짐`. 서비스 `연결 10/31 01:29 · 끊긴 횟수 0`, `앱 종료 10/31 01:29 PKG_UPDATED · 10/30 01:13 PKG_UPDATED`. 최근 화면 `com.szzy.ireader.ink.launcher / LauncherActivity`, `com.zhangyue.iReader.Eink / RecentTaskListActivity`(최근 작업), `com.zhangyue.iReader.Eink / ActivityRead`.
 
+### 배경 사진 고르기가 안 됨 (2026-11-14, Pebble Desk 1.8.0, 카페 댓글)
+
+- 오션·탱고·무스냅 오션 사용자가 설정 › 화면 › 배경 사진에서 사진을 골라도 홈에 아무것도 깔리지 않는다고 했다. 무스냅은 이미지 폴더에서 고르면 `loading` 이 잠깐 떴다 사라지고 끝난다. 실패 창은 뜨지 않았다(1.8.0 은 고르기 창이 사진 없이 돌아오면 조용히 끝냈다).
+- `Ocean5Pro_A14` 에뮬(1264×1680·320dpi, 순정 안드로이드 14)에서는 PNG·JPEG 모두 고르기 창 → 미리 보기 → 홈까지 된다. 그래서 iReader 펌웨어의 시스템 파일 고르기 창(`OPEN_DOCUMENT` 를 맡는 앱)이 고른 사진을 돌려주지 않는 것으로 **추정**한다. 펌웨어는 공개되지 않아 직접 볼 수 없다(위 `펌웨어 파일`).
+- 비슷한 보고: Mihon 이슈 #1939(iReader Smart XS 에서 `파일 고르기 앱이 없음`), #386(Tolino, 순정 파일 고르기 창이 없어 같은 증상). iReader 오션·탱고의 사진 고르기를 직접 다룬 글은 찾지 못했다(2026-11-14).
+- 다음 판: `사진 고르기` 가 앱 목록(파일 앱 `GET_CONTENT`·갤러리 `ACTION_PICK`(전자잉크 런처 inkOS 가 쓰는 길)·시스템 파일 고르기)을 띄운다. 주소는 `data`·`clipData` 둘 다 보고, 사진 없이 돌아오면 `사진을 열지 못했습니다` 창에 진단 한 줄(결과 코드·extras 이름)을 붙인다. 고르기를 맡은 앱은 기기 정보 `최근에 뜬 다른 화면` 에 보인다.
+
 ### 다음에 받을 것
 
 1. ~~설정 › 기기 정보 사진~~ 받음(2026-10-10). 빠른 설정 시험 결과는 아직.
