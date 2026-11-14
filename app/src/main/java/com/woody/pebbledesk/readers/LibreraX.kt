@@ -225,8 +225,18 @@ object LibreraX : ReaderApp(
         return Recent(path, name, icon)
     }
 
-    /** [items](방금 연 책이 맨 앞) 가운데 [book] 의 줄: 제목이 그 책의 것인 첫 줄 */
-    internal fun recentFor(items: List<Recent>, book: ShelfBook): Recent? = items.firstOrNull { book.hasTitle(it.title) }
+    /**
+     * [items](방금 연 책이 맨 앞) 가운데 [book] 의 줄: 제목이 그 책의 것인 첫 줄, 없으면 경로의 파일 이름(확장자 뺌)이 그 책의 제목인 첫 줄.
+     * PDF 는 메뉴에 파일 이름이 보여 그 이름으로 넣는데 최근 책의 제목은 파일 안의 제목이다(`SPIEGEL_2026_46` · `DER SPIEGEL …`)
+     */
+    internal fun recentFor(items: List<Recent>, book: ShelfBook): Recent? =
+        items.firstOrNull { book.hasTitle(it.title) } ?: items.firstOrNull { fileTitle(it.path).let { f -> f.isNotBlank() && book.hasTitle(f) } }
+
+    /** 책 경로의 파일 이름에서 확장자를 뺀 것(문서 주소는 풀어서: `…%2FSPIEGEL_2026_46.pdf` → `SPIEGEL_2026_46`) */
+    internal fun fileTitle(path: String): String {
+        val name = (if (path.startsWith(CONTENT)) Uri.decode(path) else path).substringAfterLast('/').substringAfterLast(':')
+        return name.substringBeforeLast('.')
+    }
 
     /**
      * LibreraX 미디어 서비스에 붙어 최근에 연 책들을 받아 [done] 에(화면 스레드, 한 번만). 붙지 못하거나 [MEDIA_TIMEOUT_MS] 안에 답이 없으면 빈 목록.

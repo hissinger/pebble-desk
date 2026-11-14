@@ -279,6 +279,19 @@ class LibreraXTest {
         assertNull(LibreraX.recentFor(items, book("없는 책")))
     }
 
+    @Test fun `PDF 는 최근 책의 제목이 파일 안의 제목이라 경로의 파일 이름으로 찾는다`() {
+        val doc = "content://com.android.providers.downloads.documents/tree/raw%3A%2Fstorage%2Femulated%2F0%2FDownload/document/raw%3A%2Fstorage%2Femulated%2F0%2FDownload%2FSPIEGEL_2026_46.pdf"
+        val items = listOfNotNull(
+            LibreraX.recentItem("book:/x/other.epub", "SPIEGEL", null),
+            LibreraX.recentItem("book:$doc", "DER SPIEGEL 46/2026", null),
+        )
+        assertEquals(doc, LibreraX.recentFor(items, book("SPIEGEL_2026_46"))?.path)
+        // 제목이 맞는 줄이 있으면 그 줄
+        assertEquals("/x/other.epub", LibreraX.recentFor(items, book("SPIEGEL"))?.path)
+        assertEquals("ezview_doc", LibreraX.fileTitle("content://com.android.externalstorage.documents/tree/primary%3ABooks/document/primary%3Aezview_doc.pdf"))
+        assertEquals("cover-test", LibreraX.fileTitle("/storage/emulated/0/Android/data/com.librerax/files/Books/cover-test.epub"))
+    }
+
     private val context get() = org.robolectric.RuntimeEnvironment.getApplication()
     private fun prefs() = com.woody.pebbledesk.Storage.of(context).getSharedPreferences(com.woody.pebbledesk.WatchCore.WATCH_PREFS, android.content.Context.MODE_PRIVATE)
     private fun home(book: com.woody.pebbledesk.ShelfBook) =
