@@ -599,15 +599,16 @@ class SettingsActivity : EinkActivity() {
     }
 
     /**
-     * 자동 추가 창: 무엇을 읽는지 + `접근성 설정 열기`. 안드로이드 13+ 이면 `앱 정보 열기` 도 두고,
-     * 꺼져 있으면([watching] 이 false) 허용이 안 보일 때 안내(BOOX Leaf2)와 13+ 의 제한된 설정 안내를 설명 아래 단락으로 붙인다.
-     * 서비스가 한 번이라도 연결된 적이 있으면(이미 켜 본 것. 제한된 설정도 풀려 있다) 두 안내와 `앱 정보 열기` 는 두지 않는다.
+     * 자동 추가 창: 무엇을 읽는지 + `접근성 설정 열기`. 안드로이드 13+ 이면 켜짐·연결 기록과 상관없이 늘
+     * 제한된 설정 안내 단락과 `앱 정보 열기` 를 둔다(막혔는지는 앱이 알 수 없다). 허용이 안 보일 때 안내(BOOX Leaf2)는
+     * 꺼져 있고([watching] 이 false) 서비스가 한 번도 연결된 적이 없을 때만 붙인다.
      * BOOX 면 켜져 있어도 백그라운드 `무제한` 안내와 `E-Ink 센터 열기` 를 둔다(켠 뒤 5분 강제 종료로 꺼지므로).
      */
     private fun autoBooksSheet(watching: Boolean) {
-        val turnedOnBefore = ReaderWatchService.lifeLog(this).first > 0
-        val restricted = ReaderWatchService.mayBeRestricted && !turnedOnBefore
-        val hints = if (watching || turnedOnBefore) emptyList() else listOfNotNull(R.string.allow_hint, R.string.restricted_hint.takeIf { restricted })
+        val restricted = ReaderWatchService.mayBeRestricted
+        // 이미 켜 본 적이 있으면(서비스가 한 번이라도 연결) 허용 안내는 필요 없다
+        val allowHint = !watching && ReaderWatchService.lifeLog(this).first == 0L
+        val hints = listOfNotNull(R.string.allow_hint.takeIf { allowHint }, R.string.restricted_hint.takeIf { restricted })
         val boox = Device.hasBooxLauncher(this)
         val desc = (listOfNotNull(R.string.auto_books_desc, R.string.boox_background_hint.takeIf { boox }) + hints)
             .joinToString("\n\n") { getString(it) }
